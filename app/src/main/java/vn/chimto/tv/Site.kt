@@ -13,6 +13,9 @@ data class Film(val url: String, val title: String, val poster: String?, val bad
 data class Section(val title: String, val films: List<Film>)
 data class Category(val title: String, val url: String)
 
+/** Đo nhanh một trang: thời gian tải trang chủ (ms) và số phim đọc được (0 = có thể là trang chặn của nhà mạng). */
+data class SiteCheck(val ms: Long, val films: Int)
+
 /** movedTo: trang đã chuyển sang tên miền khác (theo chuyển hướng) → gốc mới. */
 data class Home(val sections: List<Section>, val categories: List<Category>, val movedTo: String?)
 /** sections: trang chia nhóm (vd lịch chiếu theo ngày) — khi có thì hiển thị thay cho films. */
@@ -70,6 +73,14 @@ object Site {
         val doc = fetch("$base/")
         val movedTo = originOf(doc.location())?.takeIf { hostOf(it) != hostOf(base) }
         return parseHome(doc).copy(movedTo = movedTo)
+    }
+
+    /** Thời gian tính phần tải qua mạng, không tính lúc đọc HTML (TV yếu đọc chậm, không phải lỗi của trang). */
+    fun check(base: String): SiteCheck {
+        val t0 = System.nanoTime()
+        val r = Http.get("$base/")
+        val ms = (System.nanoTime() - t0) / 1_000_000
+        return SiteCheck(ms, parseHome(Jsoup.parse(r.body, r.url)).sections.sumOf { it.films.size })
     }
 
     /** Gom thẻ phim theo tiêu đề khối đứng trước nó (theo thứ tự trong trang). */

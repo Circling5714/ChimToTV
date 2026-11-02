@@ -9,6 +9,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
@@ -97,13 +98,19 @@ class MainActivity : Activity() {
         onMenu(menuAdapter.items.first())
     }
 
-    /** Chọn trang phim trong danh sách (sửa danh sách trong Cài đặt). */
+    /**
+     * Chọn trang phim trong danh sách (sửa danh sách trong Cài đặt). Mở ra là đo cùng lúc mọi trang: tải trang chủ
+     * mất bao lâu, đọc được bao nhiêu phim, kèm điểm video của các lần xem trước.
+     */
     private fun pickSite() {
         val sites = Prefs.sites
-        val names = sites.map { Site.hostOf(it) ?: it }.toTypedArray()
-        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        val names = sites.map { Site.hostOf(it) ?: it }
+        val checks = arrayOfNulls<Result<SiteCheck>>(sites.size)
+        val labels = names.indices.map { siteLabel(names[it], null, false) }.toMutableList()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_single_choice, labels)
+        val dialog = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle("Chọn trang phim")
-            .setSingleChoiceItems(names, sites.indexOf(Prefs.baseUrl)) { dialog, which ->
+            .setSingleChoiceItems(adapter, sites.indexOf(Prefs.baseUrl)) { dialog, which ->
                 dialog.dismiss()
                 if (sites[which] != Prefs.baseUrl) {
                     Prefs.baseUrl = sites[which]
@@ -112,6 +119,31 @@ class MainActivity : Activity() {
             }
             .setNeutralButton("Thêm / sửa…") { _, _ -> startActivity(Intent(this, SettingsActivity::class.java)) }
             .show()
+        for (i in sites.indices) {
+            background({ Site.check(sites[i]) }) { r ->
+                if (!dialog.isShowing) return@background
+                checks[i] = r
+                val ok = checks.withIndex().filter { (it.value?.getOrNull()?.films ?: 0) > 0 }
+                val fastest = ok.minByOrNull { it.value!!.getOrThrow().ms }?.index.takeIf { ok.size >= 2 }
+                for (j in sites.indices) labels[j] = siteLabel(names[j], checks[j], j == fastest)
+                adapter.notifyDataSetChanged()
+            }
+        }
+    }
+
+    /** vd "yanhh3d.ee  —  0,4 s · 36 phim · video mượt  ★ nhanh nhất" */
+    private fun siteLabel(host: String, check: Result<SiteCheck>?, fastest: Boolean): String {
+        val parts = ArrayList<String>()
+        when {
+            check == null -> parts += "đang đo…"
+            check.isFailure -> parts += "✗ không vào được"
+            else -> check.getOrThrow().let {
+                parts += "%.1f s".format(it.ms / 1000.0).replace('.', ',')
+                parts += if (it.films > 0) "${it.films} phim" else "không đọc được phim"
+            }
+        }
+        PlayStats.siteSummary(host)?.let { parts += it }
+        return "$host  —  " + parts.joinToString(" · ") + if (fastest) "  ★ nhanh nhất" else ""
     }
 
     private fun rebuildMenu() {

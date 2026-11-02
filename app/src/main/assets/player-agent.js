@@ -34,10 +34,14 @@
   function state() {
     var v = video();
     if (!v) return null;
+    // Khung hình rớt (TV giải mã / vẽ không kịp) — để app phân biệt "TV yếu" với "mạng chậm"
+    var q = v.getVideoPlaybackQuality ? v.getVideoPlaybackQuality() : null;
     return {
       chimto: 'state', ready: v.readyState > 0, t: v.currentTime || 0,
       d: isFinite(v.duration) ? v.duration : 0, paused: v.paused, ended: v.ended,
-      waiting: !v.paused && v.readyState < 3
+      waiting: !v.paused && v.readyState < 3,
+      df: q ? q.droppedVideoFrames : (v.webkitDroppedFrameCount || 0),
+      tf: q ? q.totalVideoFrames : (v.webkitDecodedFrameCount || 0)
     };
   }
   function play(v) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }

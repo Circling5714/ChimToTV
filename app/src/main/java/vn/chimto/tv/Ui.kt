@@ -82,6 +82,11 @@ class Notice(private val view: TextView) {
         view.removeCallbacks(hide)
         view.postDelayed(hide, ms)
     }
+
+    fun hide() {
+        view.removeCallbacks(hide)
+        view.visibility = View.GONE
+    }
 }
 
 /**

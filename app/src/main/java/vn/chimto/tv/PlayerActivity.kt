@@ -50,6 +50,7 @@ class PlayerActivity : Activity() {
 
     private data class PlayState(
         val t: Double, val d: Double, val paused: Boolean, val ended: Boolean, val waiting: Boolean, val ready: Boolean,
+        val droppedFrames: Int, val totalFrames: Int,
     )
 
     private lateinit var web: WebView
@@ -65,7 +66,8 @@ class PlayerActivity : Activity() {
     private lateinit var panel: View
     private lateinit var panelTitle: TextView
     private lateinit var serverRow: LinearLayout
-    private lateinit var serverLabel: View
+    private lateinit var serverLabel: TextView
+    private var serverHint: CharSequence = ""
     private lateinit var groupRow: LinearLayout
     private lateinit var groupLabel: View
     private lateinit var notice: Notice
@@ -102,6 +104,12 @@ class PlayerActivity : Activity() {
     private var lastSave = 0L
     private var seekTarget: Double? = null
 
+    // Chấm điểm server: lần phát hiện tại + gợi ý đổi server khi giật nhiều (OK để chuyển)
+    private var session: PlaySession? = null
+    private var suggested = false
+    private var suggestion: Server? = null
+    private var suggestionUntil = 0L
+
     private val poll = object : Runnable {
         override fun run() {
             web.evaluateJavascript("window.__chimtoState||null") { onState(it) }
@@ -112,6 +120,7 @@ class PlayerActivity : Activity() {
     private val flushSeek = Runnable {
         val target = seekTarget ?: return@Runnable
         seekTarget = null
+        session?.seeked()
         cmd("seekTo", target)
         state = state?.copy(t = target)
         updateOsd()
@@ -135,6 +144,7 @@ class PlayerActivity : Activity() {
         panelTitle = findViewById(R.id.panelTitle)
         serverRow = findViewById(R.id.serverRow)
         serverLabel = findViewById(R.id.serverLabel)
+        serverHint = serverLabel.text
         groupRow = findViewById(R.id.groupRow)
         groupLabel = findViewById(R.id.groupLabel)
         notice = Notice(findViewById(R.id.notice))
@@ -322,7 +332,12 @@ class PlayerActivity : Activity() {
                     playPage(src)
                 } else {
                     val host = Site.hostOf(src.epUrl)
-                    playServer(src.servers.firstOrNull { it.type == Prefs.serverType(host) } ?: src.servers.firstOrNull())
+                    val usual = src.servers.firstOrNull { it.type == Prefs.serverType(host) } ?: src.servers.firstOrNull()
+                    val pick = PlayStats.choose(host, src.servers, usual)
+                    if (usual != null && pick != usual) {
+                        notice.show("${usual.label} hay giật gần đây — mở ${pick?.label} (▼ để đổi server).", 6000)
+                    }
+                    playServer(pick)
                 }
             }.onFailure { showError("Không mở được ${ep.title}.\n${it.friendly()}") }
         }
@@ -333,6 +348,7 @@ class PlayerActivity : Activity() {
         stopVideo()
         pageMode = true
         loadStartedAt = System.currentTimeMillis()
+        session = PlaySession(Site.hostOf(src.epUrl), "page", loadStartedAt)
         showLoading("Đang mở trang tập phim…")
         web.loadUrl(src.epUrl)
     }
@@ -354,6 +370,7 @@ class PlayerActivity : Activity() {
             r.onSuccess { url ->
                 embedUrl = url
                 loadStartedAt = System.currentTimeMillis()
+                session = PlaySession(Site.hostOf(src.epUrl), s?.type ?: "embed", loadStartedAt)
                 web.loadDataWithBaseURL(src.epUrl, wrapperHtml.replace("{{SRC}}", htmlAttr(url)), "text/html", "utf-8", null)
             }.onFailure {
                 showError("${it.friendly()}\nNhấn ▼ để chọn server khác.")
@@ -364,6 +381,10 @@ class PlayerActivity : Activity() {
 
     private fun stopVideo() {
         savePosition()
+        session?.save(System.currentTimeMillis())
+        session = null
+        suggested = false
+        dismissSuggestion()
         pageMode = false
         embedUrl = null
         state = null
@@ -380,19 +401,45 @@ class PlayerActivity : Activity() {
         val servers = if (src.pageMode) emptyList() else src.servers
         serverLabel.visibility = if (servers.isEmpty()) View.GONE else View.VISIBLE
         val inflater = LayoutInflater.from(this)
+        val host = Site.hostOf(src.epUrl)
         for (s in servers) {
             val b = inflater.inflate(R.layout.item_button, serverRow, false) as TextView
-            b.text = s.label
+            b.text = serverText(host, s)
             b.tag = s.type
-            b.setOnClickListener {
-                Prefs.setServer(Site.hostOf(src.epUrl), s.type, s.label)
-                // Đổi server giữa chừng: xem tiếp từ chỗ đang xem
-                state?.takeIf { started && it.t > 5 }?.let { resumeAt = it.t.toInt() }
-                hidePanel()
-                playServer(s)
-            }
+            b.setOnClickListener { switchServer(s) }
             serverRow.addView(b)
         }
+    }
+
+    /** Tên server kèm điểm các lần xem trước, vd "VIP  ·  mượt, mở 4 s". */
+    private fun serverText(host: String?, s: Server) =
+        PlayStats.score(host, s.type).summary?.let { "${s.label}  ·  $it" } ?: s.label
+
+    /** Người xem chọn server khác (nút trong menu ▼ hoặc bấm OK ở gợi ý): nhớ lựa chọn, xem tiếp từ chỗ đang xem. */
+    private fun switchServer(s: Server) {
+        val src = source ?: return
+        Prefs.setServer(Site.hostOf(src.epUrl), s.type, s.label)
+        state?.takeIf { started && it.t > 5 }?.let { resumeAt = it.t.toInt() }
+        hidePanel()
+        playServer(s)
+    }
+
+    /** Server đang giật nhiều → gợi ý server khác (chấm tốt hơn hoặc chưa thử), người xem bấm OK mới chuyển. */
+    private fun suggestServer(now: Long) {
+        suggested = true // mỗi lần phát chỉ gợi ý một lần (không có server khác thì thôi)
+        val src = source?.takeIf { !it.pageMode } ?: return
+        val cur = server ?: return
+        val (alt, score) = PlayStats.alternative(Site.hostOf(src.epUrl), src.servers, cur) ?: return
+        suggestion = alt
+        suggestionUntil = now + 15_000
+        val why = score.summary?.let { " ($it)" } ?: ""
+        notice.show("${cur.label} đang giật nhiều.\nNhấn OK để chuyển sang ${alt.label}$why  •  Back: bỏ qua", 15_000)
+    }
+
+    private fun dismissSuggestion() {
+        if (suggestion == null) return
+        suggestion = null
+        notice.hide()
     }
 
     /** Nút đổi bản (Việt Sub / Thuyết Minh…) khi trang chia tập theo nhóm. */
@@ -469,13 +516,20 @@ class PlayerActivity : Activity() {
         val s = PlayState(
             o.optDouble("t", 0.0), o.optDouble("d", 0.0), o.optBoolean("paused"),
             o.optBoolean("ended"), o.optBoolean("waiting"), o.optBoolean("ready"),
+            o.optInt("df"), o.optInt("tf"),
         )
         val wasPaused = state?.paused
         state = s
+        val now = System.currentTimeMillis()
+        session?.let {
+            it.update(now, s.paused, s.waiting, s.ready, s.droppedFrames, s.totalFrames)
+            if (!suggested && it.struggling(now)) suggestServer(now)
+        }
         if (!started && s.ready) {
             started = true
             hideLoading()
             if (resumeAt > 30 && (s.d <= 0 || resumeAt < s.d - 30)) {
+                session?.seeked()
                 cmd("seekTo", resumeAt)
                 notice.show("Xem tiếp từ ${formatTime(resumeAt.toDouble())}")
             }
@@ -484,7 +538,6 @@ class PlayerActivity : Activity() {
         if (osd.visibility == View.VISIBLE) updateOsd()
         if (wasPaused != null && wasPaused != s.paused) showOsd()
 
-        val now = System.currentTimeMillis()
         if (started && now - lastSave > 5000) {
             lastSave = now
             savePosition()
@@ -520,6 +573,23 @@ class PlayerActivity : Activity() {
                 return true
             }
             return super.dispatchKeyEvent(e)
+        }
+        // Đang hiện gợi ý đổi server: OK = chuyển, Back = bỏ qua
+        val alt = suggestion
+        if (alt != null && System.currentTimeMillis() < suggestionUntil) {
+            when (code) {
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                    if (e.action == KeyEvent.ACTION_DOWN && e.repeatCount == 0) {
+                        dismissSuggestion()
+                        switchServer(alt)
+                    }
+                    return true
+                }
+                KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+                    if (e.action == KeyEvent.ACTION_UP) dismissSuggestion()
+                    return true
+                }
+            }
         }
         if (!isPlayerKey(code)) return super.dispatchKeyEvent(e)
         if (e.action != KeyEvent.ACTION_DOWN) return true
@@ -619,6 +689,13 @@ class PlayerActivity : Activity() {
 
     private fun showPanel() {
         osd.visibility = View.GONE
+        // Điểm server mới nhất + tình hình lần xem này
+        val host = source?.let { Site.hostOf(it.epUrl) }
+        for (i in 0 until serverRow.childCount) {
+            val b = serverRow.getChildAt(i) as TextView
+            source?.servers?.firstOrNull { it.type == b.tag }?.let { b.text = serverText(host, it) }
+        }
+        serverLabel.text = session?.describe()?.let { "Server — lần xem này: $it" } ?: serverHint
         panel.visibility = View.VISIBLE
         val active = ((0 until serverRow.childCount).map { serverRow.getChildAt(it) } +
             (0 until groupRow.childCount).map { groupRow.getChildAt(it) }).firstOrNull { it.isActivated }
@@ -659,6 +736,7 @@ class PlayerActivity : Activity() {
 
     override fun onPause() {
         savePosition()
+        session?.save(System.currentTimeMillis())
         cmd("pause")
         mainHandler.removeCallbacks(poll)
         web.onPause()

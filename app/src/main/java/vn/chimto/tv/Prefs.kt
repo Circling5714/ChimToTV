@@ -63,6 +63,15 @@ object Prefs {
         get() = sp.getBoolean("auto_next", true)
         set(value) = sp.edit().putBoolean("auto_next", value).apply()
 
+    /** Điểm các lần xem theo trang + server (xem PlayStats). */
+    var playStats: JSONObject
+        get() = try {
+            JSONObject(sp.getString("play_stats", "{}") ?: "{}")
+        } catch (e: Exception) {
+            JSONObject()
+        }
+        set(value) = sp.edit().putString("play_stats", value.toString()).apply()
+
     // ---- Cập nhật OTA ----
 
     var autoUpdate: Boolean
