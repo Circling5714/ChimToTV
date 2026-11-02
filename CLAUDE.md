@@ -1,6 +1,7 @@
-# ChimTo TV — hướng dẫn cho Claude
+# Côn Bằng TV — hướng dẫn cho Claude
 
 App Android TV (Kotlin, WebView) xem phim hoạt hình 3D từ các trang web, điều khiển bằng remote / bàn phím.
+Trước đây tên là ChimTo TV: chỉ đổi tên hiển thị / logo — mã gói `vn.chimto.tv`, repo `ChimToTV`, tên tệp APK giữ nguyên.
 Đọc `README.md` để biết cấu trúc và cách phát video; `CHANGELOG.md` để biết các bản đã phát hành.
 
 ## Cách làm việc với anh
@@ -15,7 +16,7 @@ App Android TV (Kotlin, WebView) xem phim hoạt hình 3D từ các trang web, �
 2. `.\build.ps1` → `dist\ChimToTV-<bản>.apk`, ký bằng `keys\` (không có trong git — mất là app trên mọi TV không nhận
    bản cập nhật OTA nữa).
 3. Kiểm APK: `apksigner verify --print-certs` (chứng chỉ SHA-256 `949ef2b5…177b`), `aapt2 dump badging` (đúng bản).
-4. `git push`, rồi `gh release create v<bản> dist\ChimToTV-<bản>.apk --title "ChimTo TV <bản>" --notes-file … --latest`.
+4. `git push`, rồi `gh release create v<bản> dist\ChimToTV-<bản>.apk --title "Côn Bằng TV <bản>" --notes-file … --latest`.
    Ghi chú phải có mục `## Có gì mới` — app hiện mục này trong hộp thoại cập nhật trên TV.
 5. Kiểm sau phát hành: API `releases/latest` trả đúng tag + có tệp `.apk`; tải từ link công khai, SHA-256 khớp.
 

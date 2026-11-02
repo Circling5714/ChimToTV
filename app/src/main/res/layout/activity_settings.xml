@@ -190,6 +190,25 @@
             android:textSize="14sp" />
 
         <TextView
+            style="@style/SettingsLabel"
+            android:text="Liên hệ" />
+
+        <!-- Nút (không phải chữ thường) để remote đi tới được và màn hình cuộn xuống tới mục này -->
+        <TextView
+            android:id="@+id/btnContact"
+            style="@style/TvButton"
+            android:layout_marginTop="8dp"
+            android:text="Telegram: t.me/tivikit" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Góp ý, báo lỗi, hỏi đáp: nhắn nhóm Telegram @tivikit (trên điện thoại mở t.me/tivikit)."
+            android:textColor="@color/text_dim"
+            android:textSize="14sp" />
+
+        <TextView
             android:id="@+id/about"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

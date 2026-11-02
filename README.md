@@ -1,12 +1,16 @@
-# ChimTo TV
+# Côn Bằng TV
 
-![ChimTo TV](design/banner-1280.png)
+![Côn Bằng TV](design/banner-1280.png)
 
-App Android TV xem phim hoạt hình 3D từ trang web bằng remote hoặc bàn phím.
+App Android TV xem phim hoạt hình 3D từ trang web bằng remote hoặc bàn phím (trước đây tên là ChimTo TV — vẫn cùng một
+app, cài đè và tự cập nhật bình thường).
 Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, nên trang đổi tên miền chỉ cần sửa link trong **Cài đặt**.
 
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
+
+**Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
+**Liên hệ**.
 
 ## Trang phim hỗ trợ
 
@@ -66,13 +70,13 @@ Thư mục `keys\` chứa khoá ký app — **giữ lại**, mất khoá thì b�
 
 App (từ bản 1.3) tự hỏi GitHub Releases khi mở / quay lại màn hình chính (tối đa 2 giờ một lần). Có bản mới thì
 tải APK ngầm, kiểm tra cùng gói + cùng chữ ký + số hiệu lớn hơn, rồi hỏi **Cài đặt ngay**.
-Lần đầu Android hỏi cho phép ChimTo TV "cài ứng dụng không rõ nguồn" (app tự mở đúng trang cài đặt).
+Lần đầu Android hỏi cho phép Côn Bằng TV "cài ứng dụng không rõ nguồn" (app tự mở đúng trang cài đặt).
 Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ lần thứ hai trở đi cập nhật hoàn toàn tự động.
 
 1. Tăng `versionCode` / `versionName` trong `app/build.gradle.kts`.
 2. `.\build.ps1` → `dist\ChimToTV-<phiên bản>.apk` (ký bằng `keys\` — phải cùng khoá thì app mới nhận).
 3. Tạo release tag `v<phiên bản>` và đính kèm APK, ví dụ:
-   `gh release create v1.5 dist\ChimToTV-1.5.apk --title "ChimTo TV 1.5" --notes-file ghi-chu.md`
+   `gh release create v1.5 dist\ChimToTV-1.5.apk --title "Côn Bằng TV 1.5" --notes-file ghi-chu.md`
    Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập nhật trên TV.
 
 Thử OTA không cần phát hành thật: bản debug hỏi `http://127.0.0.1:8765/latest.json` (cùng định dạng GitHub API).
@@ -82,13 +86,17 @@ hay cắt giữa chừng.
 
 ## Logo
 
-Logo và banner TV vẽ bằng SVG trong `design/logo.html` (phương án C — ấn triện chữ 仙 trong vòng bút mực vàng).
+Logo và banner TV vẽ bằng SVG trong `design/logo.html` (phương án C — ấn triện chữ 鵬 của chim Côn Bằng trong vòng bút
+mực vàng; font Spectral SC cho tên có dấu tiếng Việt, Yuji Boku cho chữ bút lông 鵬).
 Sửa xong thì xuất lại toàn bộ icon / icon thích ứng / banner (xhdpi → xxxhdpi) bằng Chrome headless:
 
 ```powershell
 node design/render.mjs preview xem-truoc.png   # xem cả 3 phương án
 node design/render.mjs export c                 # ghi PNG vào app/src/main/res
 ```
+
+Đổi tên app chỉ là đổi **tên hiển thị** (`app_name`), logo và banner. Mã gói `vn.chimto.tv`, khoá ký và repo
+`Circling5714/ChimToTV` phải giữ nguyên — đổi một trong ba thì các TV đã cài không nhận bản cập nhật nữa.
 
 ## Cách phát video (cho người sửa code)
 

@@ -12,6 +12,10 @@ import android.widget.TextView
 import android.widget.Toast
 
 class SettingsActivity : Activity() {
+    companion object {
+        const val CONTACT_URL = "https://t.me/tivikit"
+    }
+
     private lateinit var url: EditText
     private lateinit var result: TextView
     private lateinit var recent: LinearLayout
@@ -95,9 +99,12 @@ class SettingsActivity : Activity() {
             showAutoUpdate()
         }
 
+        // Mở trang Telegram ngay trong app (TV thường không có Telegram / trình duyệt riêng)
+        findViewById<View>(R.id.btnContact).setOnClickListener { startActivity(WebActivity.intent(this, CONTACT_URL)) }
+
         val version = packageManager.getPackageInfo(packageName, 0).versionName
         findViewById<TextView>(R.id.about).text =
-            "ChimTo TV $version — xem phim từ trang web trên tivi bằng remote / bàn phím."
+            "${getString(R.string.app_name)} $version — xem phim từ trang web trên tivi bằng remote / bàn phím."
         showSites()
         url.requestFocus()
     }

@@ -93,7 +93,7 @@ object Updater {
         @Suppress("DEPRECATION")
         val flags = PackageManager.GET_SIGNATURES or if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else 0
         val archive = pm.getPackageArchiveInfo(apk.path, flags) ?: return "Tệp tải về không phải APK hợp lệ"
-        if (archive.packageName != context.packageName) return "APK không phải của ChimTo TV"
+        if (archive.packageName != context.packageName) return "APK không phải của Côn Bằng TV"
         val mine = pm.getPackageInfo(context.packageName, flags)
         val theirs = signers(archive)
         if (theirs.isEmpty() || theirs != signers(mine)) return "Chữ ký APK không khớp với bản đang cài — bỏ qua"
@@ -205,13 +205,13 @@ object Updater {
 
     private fun startInstall(activity: Activity, file: File) {
         if (!canInstall(activity)) {
-            Toast.makeText(activity, "Bật \"Cho phép cài ứng dụng\" cho ChimTo TV rồi quay lại app.", Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, "Bật \"Cho phép cài ứng dụng\" cho Côn Bằng TV rồi quay lại app.", Toast.LENGTH_LONG).show()
             try {
                 activity.startActivity(
                     Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}")),
                 )
             } catch (e: ActivityNotFoundException) {
-                Toast.makeText(activity, "Vào Cài đặt tivi → Ứng dụng → Quyền đặc biệt → Cài ứng dụng không rõ nguồn → bật ChimTo TV.", Toast.LENGTH_LONG).show()
+                Toast.makeText(activity, "Vào Cài đặt tivi → Ứng dụng → Quyền đặc biệt → Cài ứng dụng không rõ nguồn → bật Côn Bằng TV.", Toast.LENGTH_LONG).show()
             }
             return
         }

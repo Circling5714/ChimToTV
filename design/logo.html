@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Nguồn logo ChimTo TV (vẽ bằng SVG, phong cách hoạt hình 3D tiên hiệp).
+  Nguồn logo Côn Bằng TV (trước là ChimTo TV; vẽ bằng SVG, phong cách hoạt hình 3D tiên hiệp).
   Xuất PNG: node design/render.mjs  (xem cách dùng ở đầu file đó)
   ?mode=preview            : xem cả 3 phương án
   ?mode=export&concept=a   : bày từng tài sản đúng kích thước để chụp
@@ -10,7 +10,8 @@
 <meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Be+Vietnam+Pro:wght@500;600&family=Ma+Shan+Zheng&display=block" rel="stylesheet">
+<!-- Spectral SC: tên có dấu tiếng Việt (Cinzel thiếu "ằ"); Yuji Boku: chữ bút lông phồn thể 鵬 (Ma Shan Zheng không có) -->
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Spectral+SC:wght@800&family=Be+Vietnam+Pro:wght@500;600&family=Yuji+Boku&display=block" rel="stylesheet">
 <style>
   html, body { margin: 0; background: transparent; }
   body.preview { background: #1e2026; font-family: "Be Vietnam Pro", sans-serif; color: #eee; padding: 24px; }
@@ -71,14 +72,14 @@ function sword() {
   </g>`;
 }
 
-// Ấn triện đỏ chữ 仙 (tiên) — tâm (cx,cy), cạnh s
+// Ấn triện đỏ chữ 鵬 (bằng — chim Côn Bằng) — tâm (cx,cy), cạnh s
 function seal(cx, cy, s) {
   const x = cx - s / 2, y = cy - s / 2, b = s * .09;
   return `
   <g filter="url(#stamp)">
     <rect x="${x}" y="${y}" width="${s}" height="${s}" rx="${s * .08}" fill="#c3272b"/>
     <rect x="${x + b}" y="${y + b}" width="${s - 2 * b}" height="${s - 2 * b}" rx="${s * .04}" fill="none" stroke="#f6e3c0" stroke-width="${s * .035}"/>
-    <text x="${cx}" y="${cy + s * .29}" text-anchor="middle" font-family="Ma Shan Zheng" font-size="${s * .78}" fill="#f6e3c0">仙</text>
+    <text x="${cx}" y="${cy + s * .02}" text-anchor="middle" dominant-baseline="central" font-family="Yuji Boku" font-size="${s * .7}" fill="#f6e3c0">鵬</text>
   </g>`;
 }
 
@@ -153,7 +154,7 @@ const concepts = {
       <g transform="translate(372 44) scale(.53)">${concepts.b.mark()}</g>`,
   },
   c: {
-    name: 'Ấn triện', note: 'Ấn đỏ chữ 仙 trong vòng bút mực vàng',
+    name: 'Ấn triện', note: 'Ấn đỏ chữ 鵬 trong vòng bút mực vàng',
     bgDefs: `<radialGradient id="bgC" cx="50%" cy="42%" r="78%"><stop offset="0" stop-color="#3a2416"/><stop offset=".6" stop-color="#1a0f0a"/><stop offset="1" stop-color="#080504"/></radialGradient>`,
     bg: (w, h) => `<rect width="${w}" height="${h}" fill="url(#bgC)"/>`,
     mark: () => `
@@ -192,8 +193,8 @@ function bannerSvg(c, w) {
   return `<svg width="${w}" height="${h}" viewBox="0 0 640 360">${defs(c)}
     ${c.bg(640, 360)}${c.banner()}
     <g filter="url(#softglow)" opacity=".55">
-      <text x="44" y="186" font-family="Cinzel" font-weight="900" font-size="74" fill="#f7c95a">ChimTo</text></g>
-    <text x="44" y="186" font-family="Cinzel" font-weight="900" font-size="74" fill="url(#gold)">ChimTo</text>
+      <text x="44" y="186" font-family="Spectral SC" font-weight="800" font-size="62" fill="#f7c95a">Côn Bằng</text></g>
+    <text x="44" y="186" font-family="Spectral SC" font-weight="800" font-size="62" fill="url(#gold)">Côn Bằng</text>
     <text x="48" y="240" font-family="Cinzel" font-weight="700" font-size="40" fill="#ffffff" letter-spacing="3">TV</text>
     <rect x="112" y="225" width="160" height="2" fill="url(#gold)" opacity=".8"/>
     <text x="48" y="284" font-family="Be Vietnam Pro" font-weight="600" font-size="19" fill="#e8d9b0" letter-spacing="4">HOẠT HÌNH 3D · TIÊN HIỆP</text>
@@ -237,7 +238,8 @@ function render() {
     }
   }
 }
-document.fonts.load('900 40px Cinzel').then(() => document.fonts.load('40px "Ma Shan Zheng"', '仙'))
+document.fonts.load('900 40px Cinzel').then(() => document.fonts.load('40px "Yuji Boku"', '鵬'))
+  .then(() => document.fonts.load('800 40px "Spectral SC"', 'Côn Bằng'))
   .then(() => document.fonts.load('600 20px "Be Vietnam Pro"', 'HOẠT HÌNH'))
   .then(() => document.fonts.ready).then(() => { render(); document.title = 'ready'; });
 </script>
