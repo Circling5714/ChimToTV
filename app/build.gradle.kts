@@ -18,8 +18,8 @@ android {
         // Android 5.0 trở lên: chạy được cả trên các TV box đời cũ.
         minSdk = 21
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
     }
     signingConfigs {
         if (kyFile.exists()) {
@@ -31,7 +31,13 @@ android {
             }
         }
     }
+    buildFeatures { buildConfig = true }
     buildTypes {
+        // Bản gỡ lỗi cài song song với bản thật (vn.chimto.tv.debug), bật gỡ lỗi WebView để đo / soi qua DevTools
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

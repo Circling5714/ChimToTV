@@ -58,6 +58,9 @@ class MainActivity : Activity() {
         grid.layoutManager = GridLayoutManager(this, gridAdapter.spanCount).apply { spanSizeLookup = gridAdapter.spanLookup }
         grid.adapter = gridAdapter
         grid.itemAnimator = null
+        // Lưới cố định khung: thêm trang mới không bắt cả màn hình đo lại; giữ sẵn nhiều ô để cuộn qua lại không phải dựng lại
+        grid.setHasFixedSize(true)
+        grid.setItemViewCacheSize(gridAdapter.spanCount * 3)
 
         search.leaveWithUpDown()
         search.setOnEditorActionListener { _, actionId, event ->

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Không đặt nền ở đây: nền cửa sổ (theme) đã cùng màu, vẽ thêm một lớp là phí GPU trên TV yếu -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg"
     android:orientation="horizontal">
 
     <LinearLayout

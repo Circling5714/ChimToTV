@@ -2,6 +2,7 @@ package vn.chimto.tv
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -36,12 +37,15 @@ fun Throwable.friendly(): String = when (this) {
     else -> message ?: javaClass.simpleName
 }
 
-/** Phóng to nhẹ + nổi lên trên các ô bên cạnh khi được chọn bằng remote. */
+/**
+ * Phóng to nhẹ khi được chọn bằng remote. Không có bóng đổ (outlineProvider = null) vì GPU của TV yếu vẽ bóng rất tốn;
+ * translationZ nhỏ chỉ để ô được chọn vẽ đè lên ô bên cạnh khi phóng to.
+ */
 fun View.focusZoom(scale: Float = 1.07f) {
-    val lift = context.dp(6).toFloat()
+    outlineProvider = null
     setOnFocusChangeListener { v, has ->
         v.animate().scaleX(if (has) scale else 1f).scaleY(if (has) scale else 1f).setDuration(120).start()
-        v.translationZ = if (has) lift else 0f
+        v.translationZ = if (has) 1f else 0f
     }
 }
 
@@ -80,10 +84,28 @@ class Notice(private val view: TextView) {
     }
 }
 
-/** Poster tỉ lệ 2:3, cao theo chiều rộng ô lưới. */
+/**
+ * Poster tỉ lệ 2:3, cao theo chiều rộng ô lưới.
+ * Kích thước không phụ thuộc ảnh, nên khi ảnh tải xong không cần đo lại cả lưới
+ * (mặc định ImageView gọi requestLayout → RecyclerView bố cục lại toàn bộ, gây khựng trên TV yếu).
+ */
 class PosterView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : ImageView(context, attrs) {
+    private var settingImage = false
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
         setMeasuredDimension(w, w * 3 / 2)
+    }
+
+    override fun setImageDrawable(drawable: Drawable?) {
+        settingImage = true
+        super.setImageDrawable(drawable)
+        // Nền giữ chỗ chỉ cần khi chưa có ảnh (đỡ vẽ chồng một lớp dưới ảnh)
+        setBackgroundColor(if (drawable == null) context.getColor(R.color.surface2) else 0)
+        settingImage = false
+    }
+
+    override fun requestLayout() {
+        if (!settingImage) super.requestLayout()
     }
 }
