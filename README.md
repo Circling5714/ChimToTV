@@ -10,7 +10,8 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 
 ## Trang phim hỗ trợ
 
-Có sẵn trong danh sách (menu **Đổi trang phim**):
+Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app đo ngay từng trang: tải trang chủ mất bao lâu,
+đọc được bao nhiêu phim, trang nhanh nhất có dấu ★, kèm điểm video các lần xem trước (vd "video mượt").
 
 | Trang | Kiểu giao diện | Cách phát |
 | --- | --- | --- |
@@ -36,13 +37,19 @@ thì app tự mở trang tập và phóng trình phát ra toàn màn hình.
 | --- | --- |
 | Trang chủ / danh sách | Mũi tên: di chuyển • OK/Enter: mở phim • Back: về menu bên trái, Back lần nữa để thoát |
 | Chi tiết phim | OK: xem tiếp / xem tập mới nhất • ▼: vào danh sách tập (ô xanh = đã xem) |
-| Đang xem phim | OK/Space: dừng–phát • ◀ ▶: tua (giữ để tua nhanh) • ▲: xem thời gian • ▼/Menu: đổi server, đổi tập • Số 0–9: nhảy tới 0–90% • CH+/CH−, N/P: tập sau/trước • Back: thoát |
+| Đang xem phim | OK/Space: dừng–phát • ◀ ▶: tua (giữ để tua nhanh) • ▲: xem thời gian • ▼/Menu: đổi server (kèm điểm từng server), đổi tập • Số 0–9: nhảy tới 0–90% • CH+/CH−, N/P: tập sau/trước • Back: thoát |
+| Gợi ý đổi server (hiện khi video giật nhiều) | OK: chuyển sang server được gợi ý, xem tiếp đúng chỗ • Back: bỏ qua |
 | Duyệt web | Mũi tên: di chuyển con trỏ (chạm mép thì cuộn) • OK: bấm • CH+/CH−: cuộn nhanh • Menu: tải lại • Back: lùi trang |
 
 ## Khi trang thay đổi
 
 - **Đổi tên miền**: Cài đặt → nhập tên miền mới → Lưu (nút "Kiểm tra kết nối" cho biết đọc được bao nhiêu phim). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật.
-- **Video không chạy**: trong lúc xem nhấn ▼ → chọn server khác. App nhớ server chọn lần cuối.
+- **Video không chạy / hay giật**: trong lúc xem nhấn ▼ → chọn server khác. App nhớ server chọn lần cuối và chấm điểm
+  từng server theo những lần xem trên chính TV đó (mở mất bao lâu, giật nhiều hay ít). Server đang giật nhiều thì app
+  gợi ý server khác cùng ngôn ngữ, nhấn OK để chuyển. Báo "TV rớt …% khung hình" nghĩa là TV xử lý không kịp, đổi
+  server không đỡ.
+- **Trang chậm / bị chặn**: mở **Đổi trang phim** để xem trang nào nhanh. "✗ không vào được" = không kết nối được;
+  "không đọc được phim" = vào được nhưng không có danh sách phim (có thể là trang chặn của nhà mạng).
 - **Trang đổi giao diện** (app không đọc được danh sách): dùng mục **Duyệt web** để xem bằng con trỏ.
 
 ## Dựng lại
@@ -65,7 +72,7 @@ Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ l�
 1. Tăng `versionCode` / `versionName` trong `app/build.gradle.kts`.
 2. `.\build.ps1` → `dist\ChimToTV-<phiên bản>.apk` (ký bằng `keys\` — phải cùng khoá thì app mới nhận).
 3. Tạo release tag `v<phiên bản>` và đính kèm APK, ví dụ:
-   `gh release create v1.4 dist\ChimToTV-1.4.apk --title "ChimTo TV 1.4" --notes-file ghi-chu.md`
+   `gh release create v1.5 dist\ChimToTV-1.5.apk --title "ChimTo TV 1.5" --notes-file ghi-chu.md`
    Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập nhật trên TV.
 
 Thử OTA không cần phát hành thật: bản debug hỏi `http://127.0.0.1:8765/latest.json` (cùng định dạng GitHub API).
@@ -92,6 +99,11 @@ và báo trạng thái lên trang bọc; app đọc trạng thái mỗi giây đ
 
 Trang không có `player.php` (chế độ trang tập): WebView mở thẳng trang tập, `assets/page-focus.js` phóng iframe /
 video lớn nhất ra toàn màn hình, agent chạy cả ở khung trên cùng lẫn trong iframe.
+
+Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
+phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server
+trong `Prefs.playStats`. Cách chọn / gợi ý server (cùng ngôn ngữ, không nét hơn khi chưa thử) có test riêng:
+`.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.PlayStatsTest`.
 
 Bộ đọc trang nằm ở `Site.kt`. Kiểm tra nó trên HTML thật đã tải về (không cần TV):
 
