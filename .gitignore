@@ -5,5 +5,7 @@ local.properties
 keys/
 # Tài liệu tham khảo cá nhân (APK của app khác) — không đưa lên repo
 Code_tham_khao/
+# Ghi chú tiến độ từng phiên (có IP tivi thử, ghi chú nội bộ) — chỉ để ở máy
+TIEN-DO-*.md
 *.iml
 .idea/

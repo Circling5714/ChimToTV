@@ -5,6 +5,9 @@
 App Android TV xem phim hoạt hình 3D từ trang web bằng remote hoặc bàn phím.
 Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, nên trang đổi tên miền chỉ cần sửa link trong **Cài đặt**.
 
+**Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
+[nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
+
 ## Trang phim hỗ trợ
 
 Có sẵn trong danh sách (menu **Đổi trang phim**):
@@ -22,9 +25,10 @@ thì app tự mở trang tập và phóng trình phát ra toàn màn hình.
 
 ## Cài lên tivi
 
-- File cài: `dist\ChimToTV-<phiên bản>.apk`
-- Qua mạng (tivi/box bật gỡ lỗi ADB): `.\build.ps1 -Install 10.10.17.104`
-- Hoặc chép APK vào USB / dùng app "Send Files to TV" rồi mở bằng trình quản lý file trên tivi.
+- Tải `ChimToTV-<phiên bản>.apk` ở [Releases](https://github.com/Circling5714/ChimToTV/releases/latest), chép vào USB /
+  dùng app "Send Files to TV" rồi mở bằng trình quản lý file trên tivi.
+- Qua mạng (tivi/box bật gỡ lỗi ADB): `.\build.ps1 -Install <IP-tivi>` (dựng từ mã nguồn rồi cài).
+- Đã có bản 1.3 trở lên thì không cần cài tay nữa: app tự tìm bản mới và hỏi cài.
 
 ## Phím điều khiển
 
@@ -45,7 +49,7 @@ thì app tự mở trang tập và phóng trình phát ra toàn màn hình.
 
 ```powershell
 .\build.ps1                      # chỉ dựng APK
-.\build.ps1 -Install 10.10.17.104 # dựng + cài + mở trên tivi
+.\build.ps1 -Install <IP-tivi>   # dựng + cài + mở trên tivi
 ```
 
 Cần JDK 17 (`%USERPROFILE%\.jdks\jdk-17.0.20.1+1`) và Android SDK (`%LOCALAPPDATA%\Android\Sdk`).

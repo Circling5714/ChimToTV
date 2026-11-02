@@ -1,6 +1,6 @@
 # Dựng ChimTo TV -> dist\ChimToTV-<phiên bản>.apk (và cài lên tivi nếu có -Install)
 # Cách dùng:  .\build.ps1                      (chỉ dựng)
-#             .\build.ps1 -Install 10.10.17.104 (dựng + cài qua adb rồi mở app)
+#             .\build.ps1 -Install <IP-tivi>    (dựng + cài qua adb rồi mở app, vd 192.168.1.50)
 param([string]$Install)
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
