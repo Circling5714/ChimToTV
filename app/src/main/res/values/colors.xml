@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#0E1014</color>
+    <color name="surface">#171A21</color>
+    <color name="surface2">#232833</color>
+    <color name="text">#F2F4F8</color>
+    <color name="text_dim">#9AA3B2</color>
+    <!-- Màu viền / nền khi một mục đang được chọn bằng remote -->
+    <color name="focus">#FFB020</color>
+    <color name="on_focus">#14110A</color>
+    <color name="brand">#2BAF85</color>
+    <color name="watched">#3A6B5C</color>
+    <color name="scrim">#CC000000</color>
+</resources>

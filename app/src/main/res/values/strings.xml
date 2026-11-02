@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ChimTo TV</string>
+    <string name="loading">Đang tải…</string>
+    <string name="retry">Thử lại</string>
+    <string name="search_hint">Nhập tên phim rồi nhấn OK / Enter</string>
+    <string name="url_hint">vd: yanhh3d.ee hoặc https://yanhh3d.ee</string>
+</resources>
