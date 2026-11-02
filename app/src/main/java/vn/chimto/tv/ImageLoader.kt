@@ -24,7 +24,8 @@ object ImageLoader {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount / 1024
     }
     private lateinit var dir: File
-    private val thumbSuffix = Regex("""-\d+x\d+\.\w+$""")
+    // "-300x450.webp" hoặc "-300x450.jpg?w=300" (ảnh qua CDN có tham số)
+    private val thumbSuffix = Regex("""-\d+x\d+\.\w+(\?.*)?$""")
     private var hiRes = false
 
     // Trang không giữ ảnh gốc (thử mãi không thấy) → thôi không thử nữa trong phiên này

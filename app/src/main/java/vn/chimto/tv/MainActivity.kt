@@ -1,6 +1,7 @@
 package vn.chimto.tv
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -17,7 +18,7 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
 
 class MainActivity : Activity() {
-    private enum class Kind { HOME, SEARCH, HISTORY, CATEGORY, WEB, SETTINGS }
+    private enum class Kind { HOME, SEARCH, HISTORY, CATEGORY, SITE, WEB, SETTINGS }
 
     private data class Entry(val title: String, val kind: Kind, val url: String? = null)
 
@@ -79,12 +80,34 @@ class MainActivity : Activity() {
         val active = menuAdapter.active
         if (loadedBase != null && loadedBase != Prefs.baseUrl) {
             // Link trang vừa đổi trong Cài đặt → tải lại từ đầu
-            categories = emptyList()
-            rebuildMenu()
-            onMenu(menuAdapter.items.first())
+            reloadSite()
         } else if (active?.kind == Kind.HISTORY) {
             showHistory(focusFirst = false)
         }
+    }
+
+    private fun reloadSite() {
+        siteLabel.text = Site.hostOf(Prefs.baseUrl)
+        categories = emptyList()
+        rebuildMenu()
+        onMenu(menuAdapter.items.first())
+    }
+
+    /** Chọn trang phim trong danh sách (sửa danh sách trong Cài đặt). */
+    private fun pickSite() {
+        val sites = Prefs.sites
+        val names = sites.map { Site.hostOf(it) ?: it }.toTypedArray()
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("Chọn trang phim")
+            .setSingleChoiceItems(names, sites.indexOf(Prefs.baseUrl)) { dialog, which ->
+                dialog.dismiss()
+                if (sites[which] != Prefs.baseUrl) {
+                    Prefs.baseUrl = sites[which]
+                    reloadSite()
+                }
+            }
+            .setNeutralButton("Thêm / sửa…") { _, _ -> startActivity(Intent(this, SettingsActivity::class.java)) }
+            .show()
     }
 
     private fun rebuildMenu() {
@@ -94,6 +117,7 @@ class MainActivity : Activity() {
             Entry("Lịch sử xem", Kind.HISTORY),
         )
         categories.forEach { items += Entry(it.title, Kind.CATEGORY, it.url) }
+        items += Entry("Đổi trang phim", Kind.SITE)
         items += Entry("Duyệt web", Kind.WEB)
         items += Entry("Cài đặt", Kind.SETTINGS)
         menuAdapter.submit(items)
@@ -107,6 +131,10 @@ class MainActivity : Activity() {
             }
             Kind.SETTINGS -> {
                 startActivity(Intent(this, SettingsActivity::class.java))
+                return
+            }
+            Kind.SITE -> {
+                pickSite()
                 return
             }
             else -> Unit

@@ -18,24 +18,43 @@ data class Home(val sections: List<Section>, val categories: List<Category>, val
 /** sections: trang chia nhóm (vd lịch chiếu theo ngày) — khi có thì hiển thị thay cho films. */
 data class FilmPage(val films: List<Film>, val nextUrl: String?, val sections: List<Section> = emptyList())
 data class Episode(val title: String, val url: String)
+
+/** Một danh sách tập, vd "Việt Sub" / "Thuyết Minh" (trang HaLim chia tập theo server). */
+data class EpisodeGroup(val name: String, val episodes: List<Episode>)
+
 data class FilmDetail(
     val url: String, val title: String, val otherTitle: String?, val poster: String?,
-    val description: String?, val info: String?, val episodes: List<Episode>,
-)
+    val description: String?, val info: String?, val groups: List<EpisodeGroup>,
+) {
+    val episodeCount get() = groups.maxOfOrNull { it.episodes.size } ?: 0
+    fun groupOf(epUrl: String): EpisodeGroup? = groups.firstOrNull { g -> g.episodes.any { it.url == epUrl } }
+}
 
 data class Server(val label: String, val type: String)
 
-/** Thông tin để xin trình phát của một tập (gọi player.php như trang web làm). */
+/**
+ * Cách phát một tập.
+ * - Có player.php (yanhh3d, hoathinh3d.ee, hhkungfu): xin địa chỉ iframe rồi phát trong trang bọc của app.
+ * - pageMode: trang tự nạp trình phát bằng cơ chế riêng (vd hoathinh3d.pw có khoá xác thực) → mở thẳng
+ *   trang tập trong WebView, app chỉ phóng trình phát ra toàn màn hình.
+ */
 data class EpisodeSource(
-    val epUrl: String, val servers: List<Server>, val postId: String, val ep: String,
-    val playerUrl: String, val directEmbed: String?,
+    val epUrl: String, val servers: List<Server>, val postId: String, val ep: String, val sv: String,
+    val playerUrl: String?, val directEmbed: String?, val pageMode: Boolean,
 )
 
 /**
- * Đọc dữ liệu từ trang phim (giao diện kiểu "flw-item" như yanhh3d).
- * Mọi đường dẫn lấy từ chính trang → đổi tên miền trong Cài đặt là chạy tiếp.
+ * Đọc dữ liệu từ trang phim. Không viết riêng cho từng trang: nhận dạng theo các mẫu giao diện phổ biến của
+ * trang hoạt hình 3D (thẻ "flw-item" kiểu yanhh3d, thẻ "halim-item" của theme HaLim) và có phương án dự phòng.
+ * Mọi đường dẫn lấy từ chính trang → đổi tên miền / thêm trang tương tự trong Cài đặt là chạy.
  */
 object Site {
+    /** Thẻ phim ở lưới / trượt / bảng xếp hạng. */
+    private const val CARD = ".flw-item, li.item-top, .halim-item, a.halim-trending-link"
+
+    /** Tiêu đề khối trên trang chủ. */
+    private const val HEADING = ".cat-heading, .section-title"
+
     private val detailCache = LruCache<String, FilmDetail>(30)
 
     fun cachedDetail(url: String): FilmDetail? = detailCache.get(url)
@@ -45,88 +64,105 @@ object Site {
         return Jsoup.parse(r.body, r.url)
     }
 
+    // ---- Trang chủ ----
+
     fun home(base: String = Prefs.baseUrl): Home {
         val doc = fetch("$base/")
-        val finalOrigin = originOf(doc.location())
-        val movedTo = finalOrigin?.takeIf { hostOf(it) != hostOf(base) }
+        val movedTo = originOf(doc.location())?.takeIf { hostOf(it) != hostOf(base) }
+        return parseHome(doc).copy(movedTo = movedTo)
+    }
 
+    /** Gom thẻ phim theo tiêu đề khối đứng trước nó (theo thứ tự trong trang). */
+    fun parseHome(doc: Document): Home {
+        val groups = LinkedHashMap<Element?, MutableList<Element>>()
+        var heading: Element? = null
+        for (el in doc.select("$HEADING, $CARD")) {
+            if (el.parents().any { it.`is`(CARD) }) continue
+            if (el.`is`(CARD)) groups.getOrPut(heading) { ArrayList() }.add(el) else heading = el
+        }
         val sections = ArrayList<Section>()
-        for (sec in doc.select("section.block_area")) {
-            val films = parseCards(sec)
+        for ((h, cards) in groups) {
+            val films = cards.mapNotNull { parseCard(it) }.distinctBy { it.url }
             if (films.isEmpty()) continue
-            val heading = sec.selectFirst(".cat-heading")?.text()?.trim().orEmpty()
+            val text = h?.text()?.trim().orEmpty()
             val title = when {
-                heading.isNotEmpty() && sec.hasClass("block_area-schedule") -> "$heading hôm nay"
-                heading.isNotEmpty() -> heading
-                sec.hasClass("block_area_trending") -> "Nổi bật"
-                sec.hasClass("block_area-realtime") -> "Xem nhiều"
-                else -> "Phim"
+                h == null -> "Nổi bật"
+                text.isEmpty() -> if (h.closest(".block_area-realtime") != null) "Xem nhiều" else "Phim"
+                h.closest(".block_area-schedule") != null -> "$text hôm nay"
+                else -> text
             }
             sections += Section(title, films)
         }
-        if (sections.isEmpty()) {
-            val all = parseCards(doc)
-            if (all.isNotEmpty()) sections += Section("Phim mới", all)
-        }
-        return Home(sections, parseCategories(doc), movedTo)
+        return Home(sections, parseCategories(doc), null)
     }
 
     private fun parseCategories(doc: Document): List<Category> {
-        val home = originOf(doc.location())
+        val home = originOf(doc.location())?.let { hostOf(it) }
         val out = LinkedHashMap<String, Category>()
-        var links = doc.select("a.nav-link[href]")
+        var links = doc.select("a.nav-link[href], li.menu-item > a[href], #header nav a[href], .navbar a[href], #menu a[href]")
         if (links.isEmpty()) links = doc.select(".block_area-genres a[href]")
         for (a in links) {
             // Bỏ mục cha của menu thả xuống (href="#")
             if (a.attr("href").trim().let { it.startsWith("#") || it.startsWith("javascript", true) }) continue
             val url = a.absUrl("href").trimEnd('/')
-            val title = a.text().trim()
-            if (url.isEmpty() || title.isEmpty() || url == home || url in out) continue
-            if (url.contains("/account") || url.contains("login")) continue
+            val title = a.text().trim().ifEmpty { a.attr("title").trim() }
+            if (url.isEmpty() || title.isEmpty() || url in out) continue
+            if (hostOf(url) != home || URL(url).path.trim('/').isEmpty()) continue
+            if (Regex("account|login|dang-nhap|lich-su|history|bookmark|theo-doi|sitemap|feed").containsMatchIn(url)) continue
             out[url] = Category(title, url)
         }
         return out.values.toList()
     }
 
-    /** Thẻ phim: .flw-item (lưới / trượt) và li.item-top (bảng xếp hạng). */
-    fun parseCards(root: Element): List<Film> {
-        val out = LinkedHashMap<String, Film>()
-        for (el in root.select(".flw-item, li.item-top")) {
-            val a = el.selectFirst("a.film-poster-ahref[href]")
-                ?: el.selectFirst(".film-name a[href]")
-                ?: el.selectFirst("a[href]")
-                ?: continue
-            val url = a.absUrl("href")
-            if (url.isEmpty() || url in out) continue
-            val img = el.selectFirst("img")
-            val title = listOf(
-                el.selectFirst(".film-name a")?.text(), a.attr("title"), el.selectFirst("h4")?.text(), img?.attr("alt"),
-            ).firstOrNull { !it.isNullOrBlank() }?.trim() ?: continue
-            val badge = el.selectFirst(".tick-rate, .fdi-item")?.text()?.trim()?.takeIf { it.isNotEmpty() }
-            out[url] = Film(url, title, img?.let { imageUrl(it) }, badge)
-        }
-        return out.values.toList()
+    /** Thẻ phim → Film. Hỗ trợ flw-item (yanhh3d), halim-item (HaLim), item-top (bảng xếp hạng). */
+    private fun parseCard(el: Element): Film? {
+        val a = el.selectFirst("a.film-poster-ahref[href], a.halim-thumb[href], .film-name a[href]")
+            ?: el.selectFirst("a[href]") ?: el.takeIf { it.tagName() == "a" && it.hasAttr("href") } ?: return null
+        val url = a.absUrl("href")
+        if (url.isEmpty()) return null
+        val img = el.selectFirst("img")
+        val title = listOf(
+            el.selectFirst(".film-name a, .entry-title, .halim-trending-title-text, h4")?.text(),
+            a.attr("title"), img?.attr("alt"),
+        ).firstOrNull { !it.isNullOrBlank() }?.trim() ?: return null
+        val badge = el.selectFirst(".tick-rate, .fdi-item, .episode")?.text()?.trim()?.takeIf { it.isNotEmpty() }
+        return Film(url, title, img?.let { imageUrl(it) }, badge)
     }
+
+    fun parseCards(root: Element): List<Film> =
+        root.select(CARD).filter { c -> c.parents().none { it.`is`(CARD) } }.mapNotNull { parseCard(it) }.distinctBy { it.url }
 
     private fun imageUrl(img: Element): String? =
         listOf("data-src", "data-lazy-src", "data-original", "src")
             .map { img.absUrl(it) }
             .firstOrNull { it.startsWith("http") }
 
+    // ---- Danh sách / tìm kiếm ----
+
     fun list(url: String): FilmPage {
         val doc = fetch(url)
-        val mainFilms = doc.selectFirst("#main-content")?.let { parseCards(it) }.orEmpty()
-        if (mainFilms.isEmpty()) {
+        val page = parseList(doc, url)
+        if (page.films.isEmpty()) {
             val days = doc.select(".day-tabs .day-tab[data-id]")
             if (days.isNotEmpty()) return FilmPage(emptyList(), null, schedule(doc, days))
         }
-        val films = mainFilms.ifEmpty { parseCards(doc) }
+        return page
+    }
+
+    fun parseList(doc: Document, url: String): FilmPage {
+        val main = doc.select("#main-content, #main-contents, main").firstOrNull { parseCards(it).isNotEmpty() }
+        // Trang lịch chiếu yanhh3d: khung chính trống, chỉ có bảng xếp hạng ở cột phụ → để list() nạp theo ngày
+        val films = when {
+            main != null -> parseCards(main)
+            doc.select(".day-tabs .day-tab[data-id]").isNotEmpty() -> emptyList()
+            else -> parseCards(doc)
+        }
         val next = doc.selectFirst(".pagination a.next[href], a.next.page-numbers[href], a[rel=next][href]")
             ?.absUrl("href")?.takeIf { it.isNotEmpty() && it != url }
         return FilmPage(films, next)
     }
 
-    /** Trang lịch chiếu: mỗi ngày nạp riêng qua admin-ajax (action yan_ajax_schedule), bắt đầu từ hôm nay. */
+    /** Trang lịch chiếu yanhh3d: mỗi ngày nạp riêng qua admin-ajax (action yan_ajax_schedule), bắt đầu từ hôm nay. */
     private fun schedule(doc: Document, days: List<Element>): List<Section> {
         val scripts = doc.select("script").joinToString("\n") { it.data() }
         val ajax = Regex("""ajax_url\s*=\s*['"]([^'"]+)['"]""").find(scripts)?.groupValues?.get(1)
@@ -145,42 +181,71 @@ object Site {
         }
     }
 
+    /** Trang WordPress nhận ?s= (trang HaLim tự chuyển sang /search/…). */
     fun search(query: String): FilmPage =
         list("${Prefs.baseUrl}/?s=" + URLEncoder.encode(query.trim(), "UTF-8"))
 
-    fun detail(url: String): FilmDetail {
-        val doc = fetch(url)
+    // ---- Chi tiết phim ----
+
+    fun detail(url: String): FilmDetail = parseDetail(fetch(url), url).also { detailCache.put(url, it) }
+
+    fun parseDetail(doc: Document, url: String): FilmDetail {
         val title = doc.selectFirst(".anisc-detail .film-name, h1.film-name, h1")?.text()?.trim()
             ?.takeIf { it.isNotEmpty() } ?: meta(doc, "og:title") ?: url
-        val other = doc.selectFirst(".film-name-real")?.text()?.trim()?.takeIf { it.isNotEmpty() && it != title }
-        val poster = doc.selectFirst(".anisc-poster img, .film-poster img")?.let { imageUrl(it) } ?: meta(doc, "og:image")
-        val desc = doc.selectFirst(".film-description .text, .film-description, .short-content")?.text()?.trim()
-            ?.takeIf { it.isNotEmpty() } ?: meta(doc, "og:description")
+        val other = doc.selectFirst(".film-name-real, .info-hero__alt, .movie-detail .original_title, h2.org_title")
+            ?.text()?.trim()?.takeIf { it.isNotEmpty() && it != title }
+        val poster = doc.selectFirst(".anisc-poster img, .info-hero__poster img, .movie-thumb, .halim-movie-wrapper .movie-poster img")
+            ?.let { imageUrl(it) } ?: meta(doc, "og:image")
+        val desc = doc.selectFirst(
+            ".film-description .text, .film-description, .short-content, .info-hero__desc, #film-content, .film-content, .entry-content .video-item",
+        )?.text()?.trim()?.takeIf { it.length > 20 } ?: meta(doc, "og:description")
         val info = listOfNotNull(
-            doc.selectFirst(".movie-status")?.text()?.trim(),
+            doc.selectFirst(".movie-status, .info-hero__status, .status-badge")?.text()?.trim(),
             doc.select(".anisc-info .item").firstOrNull { it.text().startsWith("Thời lượng") }
                 ?.selectFirst(".name")?.text()?.trim(),
-            doc.select(".item-cate a").joinToString(", ") { it.text().trim() },
-        ).filter { it.isNotEmpty() }.joinToString("  •  ").ifEmpty { null }
+            doc.select(".item-cate a, .info-hero__tags a, .category a[rel~=tag]").joinToString(", ") { it.text().trim() },
+        ).filter { it.isNotEmpty() }.distinct().joinToString("  •  ").ifEmpty { null }
 
-        var episodes = parseEpisodes(doc)
-        if (episodes.isEmpty()) {
-            doc.selectFirst("a.btn-play[href]")?.absUrl("href")?.takeIf { it.isNotEmpty() }
-                ?.let { episodes = listOf(Episode("Xem phim", it)) }
+        var groups = parseEpisodeGroups(doc)
+        if (groups.isEmpty()) {
+            doc.selectFirst("a.btn-play[href], a.watch-btn[href], a.watch-movie[href]")?.absUrl("href")?.takeIf { it.isNotEmpty() }
+                ?.let { groups = listOf(EpisodeGroup("Tập phim", listOf(Episode("Xem phim", it)))) }
         }
-        return FilmDetail(url, title, other, poster, desc, info, episodes).also { detailCache.put(url, it) }
+        return FilmDetail(url, title, other, poster, desc, info, groups)
     }
 
-    /** Danh sách tập, sắp tăng dần (trang web xếp tập mới nhất lên đầu). */
-    private fun parseEpisodes(doc: Document): List<Episode> {
+    /** Danh sách tập theo nhóm, mỗi nhóm sắp tăng dần (trang web thường xếp tập mới nhất lên đầu). */
+    private fun parseEpisodeGroups(doc: Document): List<EpisodeGroup> {
+        // HaLim: mỗi <ul class="halim-list-eps"> là danh sách tập của một server (Việt Sub, Thuyết Minh…)
+        val lists = doc.select("ul.halim-list-eps")
+        if (lists.isNotEmpty()) {
+            val tabLabels = doc.select(".hh3d-server-tab__label, .halim-server-tab .label")
+            val groups = lists.mapIndexedNotNull { i, ul ->
+                val eps = episodesFrom(ul.select("a[href]"))
+                if (eps.isEmpty()) return@mapIndexedNotNull null
+                val clean = { e: Element? -> e?.text()?.trim()?.trim('#', ':', ' ')?.takeIf { it.isNotEmpty() } }
+                val name = clean(ul.closest(".halim-server")?.selectFirst(".halim-server-name"))
+                    ?: clean(tabLabels.getOrNull(i))
+                    ?: "Server ${i + 1}"
+                EpisodeGroup(name, eps)
+            }
+            return groups.distinctBy { g -> g.episodes.map { it.url } }
+        }
         var links = doc.select("a.ep-item[href]")
         if (links.isEmpty()) links = doc.select(".ss-list a[href], .episodes a[href]")
         if (links.isEmpty()) links = doc.select("a[href*=/tap-]")
+        val eps = episodesFrom(links)
+        return if (eps.isEmpty()) emptyList() else listOf(EpisodeGroup("Tập phim", eps))
+    }
+
+    private fun episodesFrom(links: List<Element>): List<Episode> {
         val map = LinkedHashMap<String, Episode>()
         for (a in links) {
             val u = a.absUrl("href")
             if (u.isEmpty() || u in map) continue
-            map[u] = Episode(a.text().trim().ifEmpty { a.attr("title").trim() }, u)
+            var title = a.text().trim().ifEmpty { a.attr("title").trim() }
+            if (title.matches(Regex("""\d+(\.\d+)?"""))) title = "Tập $title"
+            map[u] = Episode(title, u)
         }
         val eps = map.values.toList()
         val nums = eps.map { epNumber(it.title) ?: epNumber(it.url.substringAfterLast('/')) }
@@ -195,38 +260,47 @@ object Site {
         (Regex("""(?i)t[aậ]p[\s\-_]*(\d+(?:\.\d+)?)""").find(s) ?: Regex("""(\d+(?:\.\d+)?)""").find(s))
             ?.groupValues?.get(1)?.toDoubleOrNull()
 
-    fun source(epUrl: String): EpisodeSource {
-        val doc = fetch(epUrl)
+    // ---- Trang tập phim ----
+
+    fun source(epUrl: String): EpisodeSource = parseSource(fetch(epUrl), epUrl)
+
+    fun parseSource(doc: Document, epUrl: String): EpisodeSource {
         val scripts = doc.select("script").joinToString("\n") { it.data() }
-        var servers = doc.select("#list_sv [data-type]").map { Server(it.text().trim(), it.attr("data-type")) }
-        if (servers.isEmpty()) {
-            servers = doc.select(".player-servers [data-type], .btn3dsv[data-type]")
-                .map { Server(it.text().trim(), it.attr("data-type")) }
-        }
-        servers = servers.filter { it.type.isNotEmpty() }.distinctBy { it.type }
+        val servers = doc.select("#list_sv [data-type], .get-eps[data-type], .btn3dsv[data-type]")
+            .map { Server(it.text().trim(), it.attr("data-type")) }
+            .filter { it.type.isNotEmpty() }.distinctBy { it.type }
             .map { if (it.label.isEmpty()) it.copy(label = it.type) else it }
 
-        val active = doc.selectFirst("a.ep-item.active[data-post-id]") ?: doc.selectFirst("[data-post-id][data-ep]")
+        val active = doc.selectFirst("a.ep-item.active[data-post-id], .halim-episode.active a[data-post-id], .active > a[data-post-id]")
+            ?: doc.selectFirst("[data-post-id][data-ep]")
         val postId = active?.attr("data-post-id")?.takeIf { it.isNotEmpty() }
             ?: Regex("""MovieInfo\s*=\s*\{\s*id:\s*(\d+)""").find(scripts)?.groupValues?.get(1)
             ?: ""
         val ep = active?.attr("data-ep")?.takeIf { it.isNotEmpty() }
             ?: epUrl.trimEnd('/').substringAfterLast('/').removeSuffix(".html")
-        val playerUrl = Regex("""url:\s*['"]([^'"]*player\.php)['"]""").find(scripts)?.groupValues?.get(1)
-            ?.let { resolve(epUrl, it) } ?: resolve(epUrl, "/player/player.php")
-        val direct = doc.selectFirst("#video-player iframe[src], .player-frame iframe[src]")?.absUrl("src")
-            ?.takeIf { it.startsWith("http") }
-        if ((servers.isEmpty() || postId.isEmpty()) && direct == null) {
-            throw IOException("Không tìm thấy trình phát trên trang tập này")
+        val sv = active?.attr("data-sv")?.takeIf { it.isNotEmpty() } ?: "1"
+
+        // player.php kiểu "dox_ajax_player" (yanhh3d và các trang cùng nhóm)
+        val playerUrl = if (scripts.contains("dox_ajax_player")) {
+            Regex("""url:\s*['"]([^'"]*player\.php)['"]""").find(scripts)?.groupValues?.get(1)?.let { resolve(epUrl, it) }
+                ?: resolve(epUrl, "/player/player.php")
+        } else {
+            null
         }
-        return EpisodeSource(epUrl, servers, postId, ep, playerUrl, direct)
+        // Bỏ qua iframe giữ chỗ src="" (absUrl của chuỗi rỗng ra chính địa chỉ trang)
+        val direct = doc.select("#video-player iframe, .player-frame iframe, #halim-player-wrapper iframe")
+            .firstOrNull { it.attr("src").let { s -> s.startsWith("http") || s.startsWith("//") } }
+            ?.absUrl("src")
+        val pageMode = (playerUrl == null || servers.isEmpty() || postId.isEmpty()) && direct == null
+        return EpisodeSource(epUrl, servers, postId, ep, sv, playerUrl, direct, pageMode)
     }
 
     /** Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server. */
     fun embedUrl(src: EpisodeSource, server: Server?): String {
-        if (server == null) return src.directEmbed ?: throw IOException("Không có server")
-        val url = src.playerUrl + "?action=dox_ajax_player&post_id=" + enc(src.postId) +
-            "&chapter_st=" + enc(src.ep) + "&type=" + enc(server.type) + "&sv=1"
+        val playerUrl = src.playerUrl
+        if (server == null || playerUrl == null) return src.directEmbed ?: throw IOException("Không có server")
+        val url = playerUrl + "?action=dox_ajax_player&post_id=" + enc(src.postId) +
+            "&chapter_st=" + enc(src.ep) + "&type=" + enc(server.type) + "&sv=" + enc(src.sv)
         val r = Http.get(url, mapOf("Referer" to src.epUrl, "X-Requested-With" to "XMLHttpRequest"))
         val doc = Jsoup.parse(r.body, src.epUrl)
         doc.selectFirst("iframe[src]")?.absUrl("src")?.takeIf { it.startsWith("http") }?.let { return it }

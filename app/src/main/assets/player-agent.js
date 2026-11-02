@@ -1,9 +1,12 @@
-// Chèn vào đầu mọi tài liệu iframe của trình phát (xem PlayerActivity.shouldInterceptRequest).
+// Chèn vào đầu mọi tài liệu iframe của trình phát (xem PlayerActivity.shouldInterceptRequest),
+// và vào khung trên cùng khi app mở thẳng trang tập phim (chế độ pageMode).
 // Nhận lệnh {chimto:'cmd'} qua postMessage, điều khiển <video>, báo trạng thái {chimto:'state'} lên khung cha.
 // Khung không có <video> thì chuyển lệnh xuống iframe con, và chuyển trạng thái của con lên trên.
+// Ở khung trên cùng: lưu trạng thái vào window.__chimtoState và cung cấp window.chimtoCmd() cho app gọi.
 (function () {
   if (window.__chimtoAgent) return;
   window.__chimtoAgent = 1;
+  var isTop = window.top === window;
   var userActed = false;
 
   // Ẩn thanh điều khiển của jwplayer — app đã có thanh thời gian riêng điều khiển bằng remote.
@@ -13,8 +16,17 @@
     (document.head || document.documentElement).appendChild(st);
   } catch (e) {}
 
-  function video() { return document.querySelector('video'); }
-  function up(msg) { try { if (window.parent !== window) window.parent.postMessage(msg, '*'); } catch (e) {} }
+  function video() {
+    // Khung trên cùng của trang tập: nếu trình phát được chọn là iframe thì để iframe đó xử lý
+    // (tránh nhầm sang video quảng cáo / xem trước nằm trong trang).
+    var focus = document.querySelector('.chimto-focus');
+    if (focus) return focus.tagName === 'VIDEO' ? focus : focus.querySelector('video');
+    return document.querySelector('video');
+  }
+  function up(msg) {
+    if (isTop) { window.__chimtoState = msg; return; }
+    try { window.parent.postMessage(msg, '*'); } catch (e) {}
+  }
   function down(msg) {
     var fs = document.getElementsByTagName('iframe');
     for (var i = 0; i < fs.length; i++) try { fs[i].contentWindow.postMessage(msg, '*'); } catch (e) {}
@@ -30,11 +42,7 @@
   }
   function play(v) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
 
-  window.addEventListener('message', function (e) {
-    var m = e.data;
-    if (!m || typeof m !== 'object') return;
-    if (m.chimto === 'state') { if (e.source !== window) up(m); return; }
-    if (m.chimto !== 'cmd') return;
+  function handle(m) {
     var v = video();
     if (!v) { down(m); return; }
     userActed = true;
@@ -49,9 +57,34 @@
       case 'seekTo': v.currentTime = m.arg; break;
     }
     var s = state(); if (s) up(s);
-  });
+  }
 
-  setInterval(function () { var s = state(); if (s) up(s); }, 1000);
+  window.addEventListener('message', function (e) {
+    var m = e.data;
+    if (!m || typeof m !== 'object') return;
+    if (m.chimto === 'state') { if (e.source !== window) up(m); return; }
+    if (m.chimto === 'cmd') handle(m);
+  });
+  if (isTop) window.chimtoCmd = function (c, a) { handle({ chimto: 'cmd', cmd: c, arg: a }); return true; };
+
+  // Gỡ kẹt: một số trình phát (MSE) treo ở trạng thái "đang tua" dù dữ liệu phía trước đã tải xong
+  // (hay gặp khi lệnh xem tiếp trùng lúc trình phát tự bỏ qua giới thiệu). Đứng yên ≥ 4 giây → đẩy nhẹ 0,5 giây.
+  var lastT = -1, still = 0;
+  function buffered(v, t) {
+    for (var i = 0; i < v.buffered.length; i++) if (v.buffered.start(i) <= t && t < v.buffered.end(i)) return true;
+    return false;
+  }
+  function unstick(v) {
+    if (!v || v.paused || v.ended) { still = 0; return; }
+    still = Math.abs(v.currentTime - lastT) < 0.01 ? still + 1 : 0;
+    lastT = v.currentTime;
+    if (still >= 4 && buffered(v, v.currentTime + 0.5)) { v.currentTime = v.currentTime + 0.5; still = 0; }
+  }
+
+  setInterval(function () {
+    unstick(video());
+    var s = state(); if (s) up(s);
+  }, 1000);
 
   // Tự phát khi trình phát sẵn sàng; dừng thử khi đã chạy hoặc người xem đã bấm phím.
   var tries = 0;

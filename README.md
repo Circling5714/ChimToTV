@@ -2,8 +2,23 @@
 
 ![ChimTo TV](design/banner-1280.png)
 
-App Android TV xem phim từ trang web (mặc định `https://yanhh3d.ee`) bằng remote hoặc bàn phím.
+App Android TV xem phim hoạt hình 3D từ trang web bằng remote hoặc bàn phím.
 Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, nên trang đổi tên miền chỉ cần sửa link trong **Cài đặt**.
+
+## Trang phim hỗ trợ
+
+Có sẵn trong danh sách (menu **Đổi trang phim**):
+
+| Trang | Kiểu giao diện | Cách phát |
+| --- | --- | --- |
+| yanhh3d.ee | yanhh3d (`flw-item`) | `player.php` → iframe |
+| hoathinh3d.ee | HaLim, chia Việt Sub / Thuyết Minh | `player.php` → iframe |
+| hhkungfu.ee | HaLim, chia Vietsub / Thuyết Minh | `player.php` → iframe |
+| hoathinh3d.pw | HaLimMovies | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
+
+App không viết riêng cho từng trang mà nhận dạng theo mẫu giao diện, nên trang khác cùng kiểu (yanhh3d / theme HaLim)
+thường cũng chạy: nhập tên miền trong **Cài đặt** → **Lưu** → **Kiểm tra kết nối**. Trang nào không có `player.php`
+thì app tự mở trang tập và phóng trình phát ra toàn màn hình.
 
 ## Cài lên tivi
 
@@ -52,3 +67,13 @@ Trình phát nhúng của trang chỉ chạy khi nằm trong iframe của chính
 `assets/player.html` (origin = địa chỉ tập phim), đặt trình phát vào iframe; khi WebView tải tài liệu của iframe,
 app tự tải hộ và chèn `assets/player-agent.js` vào đầu. Agent nhận lệnh phát / dừng / tua qua `postMessage`
 và báo trạng thái lên trang bọc; app đọc trạng thái mỗi giây để vẽ thanh thời gian, nhớ vị trí và tự chuyển tập.
+
+Trang không có `player.php` (chế độ trang tập): WebView mở thẳng trang tập, `assets/page-focus.js` phóng iframe /
+video lớn nhất ra toàn màn hình, agent chạy cả ở khung trên cùng lẫn trong iframe.
+
+Bộ đọc trang nằm ở `Site.kt`. Kiểm tra nó trên HTML thật đã tải về (không cần TV):
+
+```powershell
+$env:CHIMTO_FIXTURES = "<thư mục chứa fixtures.txt và các tệp .html>"
+.\gradlew.bat :app:testReleaseUnitTest --tests vn.chimto.tv.SiteProbeTest --rerun
+```

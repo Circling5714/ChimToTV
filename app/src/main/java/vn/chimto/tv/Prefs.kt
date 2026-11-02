@@ -14,6 +14,9 @@ data class HistoryItem(
 /** Cài đặt + lịch sử xem, lưu trong SharedPreferences. */
 object Prefs {
     const val DEFAULT_BASE = "https://yanhh3d.ee"
+
+    /** Các trang mẫu có sẵn trong danh sách lần đầu cài. */
+    val PRESET_SITES = listOf(DEFAULT_BASE, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee")
     private const val MAX_HISTORY = 60
     private const val MAX_POSITIONS = 400
 
@@ -23,33 +26,34 @@ object Prefs {
         sp = context.getSharedPreferences("chimto", Context.MODE_PRIVATE)
     }
 
-    /** Địa chỉ gốc của trang phim, không có dấu / ở cuối. */
+    /** Trang phim đang dùng (địa chỉ gốc, không có dấu / ở cuối). Đặt trang mới thì tự thêm vào danh sách. */
     var baseUrl: String
         get() = sp.getString("base_url", null) ?: DEFAULT_BASE
         set(value) {
             sp.edit().putString("base_url", value).apply()
-            addRecent(value)
+            if (value !in sites) sites = sites + value
         }
 
-    val recentUrls: List<String>
-        get() = sp.getString("recent_urls", null)?.let { s ->
-            val a = JSONArray(s)
-            List(a.length()) { a.getString(it) }
-        } ?: listOf(DEFAULT_BASE)
+    /** Danh sách trang phim để chọn nhanh (mặc định: các trang mẫu; bản 1.x cũ lưu ở "recent_urls"). */
+    var sites: List<String>
+        get() {
+            val s = sp.getString("sites", null) ?: sp.getString("recent_urls", null)
+            val saved = s?.let { j -> JSONArray(j).let { a -> List(a.length()) { a.getString(it) } } }.orEmpty()
+            return if (sp.contains("sites")) saved else (PRESET_SITES + saved).distinct()
+        }
+        set(value) = sp.edit().putString("sites", JSONArray(value.distinct()).toString()).apply()
 
-    private fun addRecent(url: String) {
-        val list = (listOf(url) + recentUrls.filter { it != url }).take(6)
-        sp.edit().putString("recent_urls", JSONArray(list).toString()).apply()
+    /** data-type của server người xem chọn lần gần nhất trên từng trang (vd "tiktik"). */
+    fun serverType(host: String?): String? =
+        sp.getString("server_type@$host", null) ?: sp.getString("server_type", null)
+
+    fun serverLabel(host: String?): String? =
+        sp.getString("server_label@$host", null) ?: sp.getString("server_label", null)
+
+    fun setServer(host: String?, type: String?, label: String?) {
+        sp.edit().putString("server_type@$host", type).putString("server_label@$host", label)
+            .remove("server_type").remove("server_label").apply()
     }
-
-    /** data-type của server người xem chọn lần gần nhất (vd "tiktik"). */
-    var serverType: String?
-        get() = sp.getString("server_type", null)
-        set(value) = sp.edit().putString("server_type", value).apply()
-
-    var serverLabel: String?
-        get() = sp.getString("server_label", null)
-        set(value) = sp.edit().putString("server_label", value).apply()
 
     var seekStep: Int
         get() = sp.getInt("seek_step", 10)

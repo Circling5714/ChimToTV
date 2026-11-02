@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -26,9 +27,11 @@ class DetailActivity : Activity() {
     private lateinit var btnFirst: TextView
     private lateinit var btnOrder: TextView
     private lateinit var epLabel: TextView
+    private lateinit var groupRow: LinearLayout
 
     private val adapter = EpisodeAdapter(::play)
     private var detail: FilmDetail? = null
+    private var group: EpisodeGroup? = null
     private var ascending = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,6 +45,7 @@ class DetailActivity : Activity() {
         btnFirst = findViewById(R.id.btnFirst)
         btnOrder = findViewById(R.id.btnOrder)
         epLabel = findViewById(R.id.epLabel)
+        groupRow = findViewById(R.id.groupRow)
 
         findViewById<TextView>(R.id.title).text = intent.getStringExtra("title")
         intent.getStringExtra("poster")?.let {
@@ -92,23 +96,43 @@ class DetailActivity : Activity() {
             ImageLoader.load(findViewById(R.id.poster), it)
             ImageLoader.load(findViewById(R.id.backdrop), it, maxWidth = 200)
         }
-        if (d.episodes.isEmpty()) {
+        if (d.groups.isEmpty()) {
             status.message("Phim này chưa có tập nào.")
         } else {
             status.hide()
         }
+        // Mở sẵn bản (Việt Sub / Thuyết Minh…) đang xem dở
+        group = Prefs.historyFor(d.url)?.let { d.groupOf(it.epUrl) } ?: d.groups.firstOrNull()
+        buildGroupButtons(d)
         showEpisodes()
         updateButtons()
         btnPlay.requestFocusFromTouch()
     }
 
+    private fun buildGroupButtons(d: FilmDetail) {
+        groupRow.removeAllViews()
+        if (d.groups.size < 2) return
+        val inflater = LayoutInflater.from(this)
+        for (g in d.groups) {
+            val b = inflater.inflate(R.layout.item_button, groupRow, false) as TextView
+            b.text = "${g.name} (${g.episodes.size})"
+            b.isActivated = g == group
+            b.setOnClickListener {
+                group = g
+                for (i in 0 until groupRow.childCount) groupRow.getChildAt(i).isActivated = groupRow.getChildAt(i) == b
+                showEpisodes()
+                updateButtons()
+            }
+            groupRow.addView(b)
+        }
+    }
+
     private fun showEpisodes() {
-        val d = detail ?: return
-        val list = if (ascending) d.episodes else d.episodes.reversed()
-        adapter.submit(list)
-        epLabel.text = "Danh sách tập (${d.episodes.size})"
+        val eps = group?.episodes.orEmpty()
+        adapter.submit(if (ascending) eps else eps.reversed())
+        epLabel.text = "Danh sách tập (${eps.size})"
         btnOrder.text = if (ascending) "Thứ tự: cũ → mới" else "Thứ tự: mới → cũ"
-        btnOrder.visibility = if (d.episodes.size > 1) View.VISIBLE else View.GONE
+        btnOrder.visibility = if (eps.size > 1) View.VISIBLE else View.GONE
         scrollToResume()
     }
 
@@ -122,10 +146,11 @@ class DetailActivity : Activity() {
 
     private fun updateButtons() {
         val d = detail ?: return
-        val eps = d.episodes
+        val eps = group?.episodes.orEmpty()
         if (eps.isEmpty()) return
         val latest = eps.last()
-        val resume = Prefs.historyFor(d.url)?.let { h -> eps.firstOrNull { it.url == h.epUrl } }
+        // Tập xem dở có thể thuộc bản khác với bản đang hiển thị
+        val resume = Prefs.historyFor(d.url)?.let { h -> d.groups.firstNotNullOfOrNull { g -> g.episodes.firstOrNull { it.url == h.epUrl } } }
 
         btnPlay.visibility = View.VISIBLE
         btnPlay.text = when {

@@ -65,14 +65,23 @@ class PlayerActivity : Activity() {
     private lateinit var panel: View
     private lateinit var panelTitle: TextView
     private lateinit var serverRow: LinearLayout
+    private lateinit var serverLabel: View
+    private lateinit var groupRow: LinearLayout
+    private lateinit var groupLabel: View
     private lateinit var notice: Notice
 
     private var agentJs = ""
+    private var focusJs = ""
     private var wrapperHtml = ""
     private lateinit var filmUrl: String
 
     private var detail: FilmDetail? = null
+    private var group: EpisodeGroup? = null
+    private val episodes get() = group?.episodes.orEmpty()
     private var index = 0
+
+    // Chế độ mở thẳng trang tập (trang có trình phát tự xác thực, vd hoathinh3d.pw)
+    private var pageMode = false
     private var source: EpisodeSource? = null
     private var server: Server? = null
     private var token = 0
@@ -125,9 +134,13 @@ class PlayerActivity : Activity() {
         panel = findViewById(R.id.panel)
         panelTitle = findViewById(R.id.panelTitle)
         serverRow = findViewById(R.id.serverRow)
+        serverLabel = findViewById(R.id.serverLabel)
+        groupRow = findViewById(R.id.groupRow)
+        groupLabel = findViewById(R.id.groupLabel)
         notice = Notice(findViewById(R.id.notice))
 
         agentJs = assets.open("player-agent.js").use { it.readBytes().toString(Charsets.UTF_8) }
+        focusJs = assets.open("page-focus.js").use { it.readBytes().toString(Charsets.UTF_8) }
         wrapperHtml = assets.open("player.html").use { it.readBytes().toString(Charsets.UTF_8) }
         setupWebView()
         setupPanel()
@@ -147,7 +160,10 @@ class PlayerActivity : Activity() {
 
     private fun start(d: FilmDetail, epUrl: String) {
         detail = d
-        openEpisode(d.episodes.indexOfFirst { it.url == epUrl }.coerceAtLeast(0))
+        val g = d.groupOf(epUrl) ?: d.groups.firstOrNull() ?: return showError("Phim này chưa có tập nào.")
+        group = g
+        buildGroupButtons(d)
+        openEpisode(g.episodes.indexOfFirst { it.url == epUrl }.coerceAtLeast(0))
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -170,13 +186,20 @@ class PlayerActivity : Activity() {
 
         web.webViewClient = object : WebViewClient() {
             // Chặn mọi điều hướng cả trang do trang tự gây ra (quảng cáo); app tự nạp trang bằng code.
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = request.isForMainFrame
+            // Chuyển hướng phía máy chủ (vd http → https của trang tập) thì cho qua.
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) =
+                request.isForMainFrame && !request.isRedirect
 
             @Deprecated("Deprecated in Java")
             override fun shouldOverrideUrlLoading(view: WebView, url: String) = true
 
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 intercept(request)
+
+            // Chế độ trang tập: phóng trình phát ra toàn màn hình + agent ở khung trên cùng
+            override fun onPageCommitVisible(view: WebView, url: String) = injectPageScripts(url)
+
+            override fun onPageFinished(view: WebView, url: String) = injectPageScripts(url)
         }
         web.webChromeClient = object : WebChromeClient() {
             override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message) = false
@@ -276,15 +299,17 @@ class PlayerActivity : Activity() {
 
     private fun openEpisode(i: Int) {
         val d = detail ?: return
-        val ep = d.episodes.getOrNull(i) ?: return
+        val ep = episodes.getOrNull(i) ?: return
         index = i
         val t = ++token
         stopVideo()
         episodeUrl = ep.url
         source = null
         serverRow.removeAllViews()
-        osdTitle.text = "${d.title} — ${ep.title}"
+        val groupName = group?.name?.takeIf { d.groups.size > 1 }?.let { " ($it)" } ?: ""
+        osdTitle.text = "${d.title} — ${ep.title}$groupName"
         panelTitle.text = osdTitle.text
+        for (j in 0 until groupRow.childCount) groupRow.getChildAt(j).let { it.isActivated = it.tag == group?.name }
         resumeAt = Prefs.position(ep.url)
         Prefs.addHistory(HistoryItem(d.url, d.title, d.poster, ep.title, ep.url, System.currentTimeMillis()))
         showLoading("Đang mở ${ep.title}…")
@@ -293,9 +318,28 @@ class PlayerActivity : Activity() {
             r.onSuccess { src ->
                 source = src
                 buildServerButtons(src)
-                playServer(src.servers.firstOrNull { it.type == Prefs.serverType } ?: src.servers.firstOrNull())
+                if (src.pageMode) {
+                    playPage(src)
+                } else {
+                    val host = Site.hostOf(src.epUrl)
+                    playServer(src.servers.firstOrNull { it.type == Prefs.serverType(host) } ?: src.servers.firstOrNull())
+                }
             }.onFailure { showError("Không mở được ${ep.title}.\n${it.friendly()}") }
         }
+    }
+
+    /** Mở thẳng trang tập: trang tự nạp trình phát, injectPageScripts() phóng nó ra toàn màn hình. */
+    private fun playPage(src: EpisodeSource) {
+        stopVideo()
+        pageMode = true
+        loadStartedAt = System.currentTimeMillis()
+        showLoading("Đang mở trang tập phim…")
+        web.loadUrl(src.epUrl)
+    }
+
+    private fun injectPageScripts(url: String) {
+        if (!pageMode || !url.startsWith("http")) return
+        web.evaluateJavascript(focusJs + "\n" + agentJs, null)
     }
 
     private fun playServer(s: Server?) {
@@ -320,6 +364,7 @@ class PlayerActivity : Activity() {
 
     private fun stopVideo() {
         savePosition()
+        pageMode = false
         embedUrl = null
         state = null
         started = false
@@ -332,14 +377,15 @@ class PlayerActivity : Activity() {
 
     private fun buildServerButtons(src: EpisodeSource) {
         serverRow.removeAllViews()
+        val servers = if (src.pageMode) emptyList() else src.servers
+        serverLabel.visibility = if (servers.isEmpty()) View.GONE else View.VISIBLE
         val inflater = LayoutInflater.from(this)
-        for (s in src.servers) {
+        for (s in servers) {
             val b = inflater.inflate(R.layout.item_button, serverRow, false) as TextView
             b.text = s.label
             b.tag = s.type
             b.setOnClickListener {
-                Prefs.serverType = s.type
-                Prefs.serverLabel = s.label
+                Prefs.setServer(Site.hostOf(src.epUrl), s.type, s.label)
                 // Đổi server giữa chừng: xem tiếp từ chỗ đang xem
                 state?.takeIf { started && it.t > 5 }?.let { resumeAt = it.t.toInt() }
                 hidePanel()
@@ -349,13 +395,43 @@ class PlayerActivity : Activity() {
         }
     }
 
+    /** Nút đổi bản (Việt Sub / Thuyết Minh…) khi trang chia tập theo nhóm. */
+    private fun buildGroupButtons(d: FilmDetail) {
+        groupRow.removeAllViews()
+        groupLabel.visibility = if (d.groups.size > 1) View.VISIBLE else View.GONE
+        if (d.groups.size < 2) return
+        val inflater = LayoutInflater.from(this)
+        for (g in d.groups) {
+            val b = inflater.inflate(R.layout.item_button, groupRow, false) as TextView
+            b.text = g.name
+            b.tag = g.name
+            b.setOnClickListener {
+                hidePanel()
+                if (g == group) return@setOnClickListener
+                // Sang bản khác: mở tập cùng tên (vd "Tập 165"), không có thì tập cùng vị trí
+                val cur = episodes.getOrNull(index)
+                val target = g.episodes.indexOfFirst { it.title == cur?.title }.takeIf { it >= 0 }
+                    ?: index.coerceAtMost(g.episodes.size - 1)
+                state?.takeIf { started && it.t > 5 }?.let { Prefs.savePosition(g.episodes[target].url, it.t.toInt()) }
+                group = g
+                openEpisode(target)
+            }
+            groupRow.addView(b)
+        }
+    }
+
     private fun setupPanel() {
         findViewById<View>(R.id.btnPrev).setOnClickListener { hidePanel(); prev() }
         findViewById<View>(R.id.btnNext).setOnClickListener { hidePanel(); next() }
         findViewById<View>(R.id.btnReload).setOnClickListener {
             hidePanel()
             state?.takeIf { started && it.t > 5 }?.let { resumeAt = it.t.toInt() }
-            if (source != null) playServer(server) else openEpisode(index)
+            val src = source
+            when {
+                src == null -> openEpisode(index)
+                src.pageMode -> playPage(src)
+                else -> playServer(server)
+            }
         }
         findViewById<View>(R.id.btnEpisodes).setOnClickListener { finish() }
         findViewById<View>(R.id.btnWebPage).setOnClickListener {
@@ -366,8 +442,7 @@ class PlayerActivity : Activity() {
     }
 
     private fun next() {
-        val d = detail ?: return
-        if (index + 1 < d.episodes.size) openEpisode(index + 1) else notice.show("Đây là tập mới nhất.")
+        if (index + 1 < episodes.size) openEpisode(index + 1) else notice.show("Đây là tập mới nhất.")
     }
 
     private fun prev() {
@@ -416,9 +491,8 @@ class PlayerActivity : Activity() {
         }
         if (s.ended && !endedHandled) {
             endedHandled = true
-            val d = detail
-            if (Prefs.autoNext && d != null && index + 1 < d.episodes.size) {
-                notice.show("Hết tập — chuyển sang ${d.episodes[index + 1].title}")
+            if (Prefs.autoNext && index + 1 < episodes.size) {
+                notice.show("Hết tập — chuyển sang ${episodes[index + 1].title}")
                 openEpisode(index + 1)
             }
         }
@@ -546,7 +620,8 @@ class PlayerActivity : Activity() {
     private fun showPanel() {
         osd.visibility = View.GONE
         panel.visibility = View.VISIBLE
-        val active = (0 until serverRow.childCount).map { serverRow.getChildAt(it) }.firstOrNull { it.isActivated }
+        val active = ((0 until serverRow.childCount).map { serverRow.getChildAt(it) } +
+            (0 until groupRow.childCount).map { groupRow.getChildAt(it) }).firstOrNull { it.isActivated }
         (active ?: findViewById(R.id.btnNext)).requestFocus()
     }
 

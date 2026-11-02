@@ -15,6 +15,7 @@ class SettingsActivity : Activity() {
     private lateinit var url: EditText
     private lateinit var result: TextView
     private lateinit var recent: LinearLayout
+    private lateinit var serverBtn: TextView
     private var testToken = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,6 +39,7 @@ class SettingsActivity : Activity() {
             url.setText(Prefs.DEFAULT_BASE)
             save()
         }
+        findViewById<View>(R.id.btnRemove).setOnClickListener { removeCurrent() }
 
         val seek = findViewById<TextView>(R.id.btnSeek)
         val steps = listOf(5, 10, 15, 30, 60)
@@ -60,14 +62,10 @@ class SettingsActivity : Activity() {
             showAutoNext()
         }
 
-        val serverBtn = findViewById<TextView>(R.id.btnServer)
-        fun showServer() {
-            serverBtn.text = "Server ưu tiên: ${Prefs.serverLabel ?: "server đầu tiên"}"
-        }
+        serverBtn = findViewById(R.id.btnServer)
         showServer()
         serverBtn.setOnClickListener {
-            Prefs.serverType = null
-            Prefs.serverLabel = null
+            Prefs.setServer(Site.hostOf(Prefs.baseUrl), null, null)
             showServer()
             toast("Đã đặt lại. App sẽ nhớ server được chọn lần tới trong lúc xem.")
         }
@@ -85,22 +83,42 @@ class SettingsActivity : Activity() {
         val version = packageManager.getPackageInfo(packageName, 0).versionName
         findViewById<TextView>(R.id.about).text =
             "ChimTo TV $version — xem phim từ trang web trên tivi bằng remote / bàn phím."
-        showRecent()
+        showSites()
         url.requestFocus()
     }
 
-    private fun showRecent() {
+    private fun showServer() {
+        serverBtn.text = "Server ưu tiên (${Site.hostOf(Prefs.baseUrl)}): ${Prefs.serverLabel(Site.hostOf(Prefs.baseUrl)) ?: "server đầu tiên"}"
+    }
+
+    private fun showSites() {
         recent.removeAllViews()
         val inflater = LayoutInflater.from(this)
-        for (u in Prefs.recentUrls) {
+        for (u in Prefs.sites) {
             val b = inflater.inflate(R.layout.item_button, recent, false) as TextView
             b.text = Site.hostOf(u) ?: u
+            b.isActivated = u == Prefs.baseUrl
             b.setOnClickListener {
                 url.setText(u)
                 save()
             }
             recent.addView(b)
         }
+    }
+
+    private fun removeCurrent() {
+        val cur = Prefs.baseUrl
+        val rest = Prefs.sites.filter { it != cur }
+        if (rest.isEmpty()) {
+            toast("Danh sách cần ít nhất một trang.")
+            return
+        }
+        Prefs.sites = rest
+        Prefs.baseUrl = rest.first()
+        url.setText(rest.first())
+        showSites()
+        showServer()
+        toast("Đã xoá ${Site.hostOf(cur)} — đang dùng ${Site.hostOf(rest.first())}")
     }
 
     private fun save() {
@@ -110,9 +128,10 @@ class SettingsActivity : Activity() {
             return
         }
         url.setText(normalized)
-        if (normalized != Prefs.baseUrl) {
+        if (normalized != Prefs.baseUrl || normalized !in Prefs.sites) {
             Prefs.baseUrl = normalized
-            showRecent()
+            showSites()
+            showServer()
         }
         toast("Đã lưu: ${Site.hostOf(normalized)}")
         test()
