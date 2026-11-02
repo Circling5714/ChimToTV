@@ -1,0 +1,245 @@
+<!doctype html>
+<!--
+  Nguồn logo ChimTo TV (vẽ bằng SVG, phong cách hoạt hình 3D tiên hiệp).
+  Xuất PNG: node design/render.mjs  (xem cách dùng ở đầu file đó)
+  ?mode=preview            : xem cả 3 phương án
+  ?mode=export&concept=a   : bày từng tài sản đúng kích thước để chụp
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Be+Vietnam+Pro:wght@500;600&family=Ma+Shan+Zheng&display=block" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: transparent; }
+  body.preview { background: #1e2026; font-family: "Be Vietnam Pro", sans-serif; color: #eee; padding: 24px; }
+  .row { display: flex; align-items: center; gap: 28px; margin-bottom: 28px; }
+  .label { width: 150px; font-size: 20px; font-weight: 600; }
+  .label small { display: block; font-size: 14px; font-weight: 500; color: #aab; margin-top: 4px; }
+  .asset { position: absolute; left: 0; top: 0; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<script>
+const P = new URLSearchParams(location.search);
+
+// ---------- Phần dùng chung ----------
+const GOLD = `
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff3c4"/><stop offset=".45" stop-color="#f7c95a"/>
+    <stop offset=".75" stop-color="#d9962a"/><stop offset="1" stop-color="#a8651a"/>
+  </linearGradient>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
+  <filter id="softglow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>`;
+
+// Tiên hạc (sếu đầu đỏ) đang bay — toạ độ cục bộ ~300×180
+function crane() {
+  return `
+  <g>
+    <path d="M140 104 C170 142 212 162 262 172 C244 152 238 142 242 131 C222 129 212 119 214 108 Z" fill="#c9d6e6"/>
+    <path d="M188 106 L294 130" stroke="#1a1d24" stroke-width="4" stroke-linecap="round"/>
+    <path d="M186 111 L288 140" stroke="#1a1d24" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="152" cy="101" rx="42" ry="15" transform="rotate(8 152 101)" fill="#ffffff"/>
+    <path d="M184 97 C206 95 224 101 236 111 C218 114 201 111 186 107 Z" fill="#14161c"/>
+    <path d="M120 93 C140 40 192 8 254 -2 C234 18 226 32 232 43 C213 45 203 57 207 68 C190 70 178 82 180 97 Z" fill="#ffffff"/>
+    <path d="M254 -2 C234 18 226 32 232 43 C220 44 212 50 209 57 C224 40 236 22 254 -2 Z" fill="#14161c"/>
+    <path d="M44 71 Q82 80 122 97" stroke="#ffffff" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <path d="M44 71 Q60 74 74 79" stroke="#14161c" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <circle cx="40" cy="70" r="8" fill="#ffffff"/>
+    <circle cx="40" cy="65" r="3.6" fill="#e3342f"/>
+    <path d="M34 69 L4 77 L34 74 Z" fill="#f2c14e"/>
+  </g>`;
+}
+
+// Phi kiếm: thân kiếm dọc, mũi hướng lên, tâm ~ (256,256) trong hệ 512
+function sword() {
+  return `
+  <g>
+    <path d="M256 70 L256 330" stroke="#ffd36a" stroke-width="40" opacity=".35" filter="url(#glow)"/>
+    <path d="M256 62 L272 104 L272 330 L256 330 Z" fill="#9fb2c8"/>
+    <path d="M256 62 L240 104 L240 330 L256 330 Z" fill="#f4f8ff"/>
+    <path d="M256 92 L256 322" stroke="#7f93ab" stroke-width="2"/>
+    <path d="M192 330 Q256 312 320 330 L310 354 Q256 340 202 354 Z" fill="url(#gold)"/>
+    <circle cx="256" cy="336" r="9" fill="#2bd4a8"/>
+    <rect x="246" y="354" width="20" height="74" rx="4" fill="#7a1f24"/>
+    <path d="M246 366 L266 376 M246 382 L266 392 M246 398 L266 408 M246 414 L266 424" stroke="#b23a3a" stroke-width="5"/>
+    <circle cx="256" cy="438" r="13" fill="url(#gold)"/>
+    <path d="M256 450 C250 474 232 486 214 494" stroke="#c62f2f" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M256 450 C258 476 246 492 234 504" stroke="#e04848" stroke-width="5" fill="none" stroke-linecap="round"/>
+  </g>`;
+}
+
+// Ấn triện đỏ chữ 仙 (tiên) — tâm (cx,cy), cạnh s
+function seal(cx, cy, s) {
+  const x = cx - s / 2, y = cy - s / 2, b = s * .09;
+  return `
+  <g filter="url(#stamp)">
+    <rect x="${x}" y="${y}" width="${s}" height="${s}" rx="${s * .08}" fill="#c3272b"/>
+    <rect x="${x + b}" y="${y + b}" width="${s - 2 * b}" height="${s - 2 * b}" rx="${s * .04}" fill="none" stroke="#f6e3c0" stroke-width="${s * .035}"/>
+    <text x="${cx}" y="${cy + s * .29}" text-anchor="middle" font-family="Ma Shan Zheng" font-size="${s * .78}" fill="#f6e3c0">仙</text>
+  </g>`;
+}
+
+const STAMP = `
+  <filter id="stamp" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="6"/>
+  </filter>
+  <filter id="brush" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".035 .6" numOctaves="2" seed="3" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="14"/>
+  </filter>`;
+
+// Nét bút vòng tròn (ensō) vàng
+function enso(cx, cy, r, w) {
+  const a0 = -100 * Math.PI / 180, a1 = 235 * Math.PI / 180;
+  const p = (a, rr) => `${cx + rr * Math.cos(a)} ${cy + rr * Math.sin(a)}`;
+  return `
+  <g filter="url(#brush)">
+    <path d="M${p(a0, r)} A${r} ${r} 0 1 1 ${p(a1, r)}" stroke="url(#gold)" stroke-width="${w}" fill="none" stroke-linecap="round"/>
+    <path d="M${p(a0 + .25, r + w * .32)} A${r + w * .32} ${r + w * .32} 0 1 1 ${p(a1 - .35, r + w * .32)}" stroke="#fff1c2" stroke-width="${w * .12}" fill="none" opacity=".55"/>
+  </g>`;
+}
+
+function mountains(w, h, top, colors) {
+  // hai lớp núi + dải sương; top = độ cao đỉnh (tỉ lệ h)
+  const H = y => h * y;
+  return `
+  <path d="M0 ${H(top + .2)} L${w * .14} ${H(top + .06)} L${w * .23} ${H(top + .13)} L${w * .37} ${H(top)} L${w * .49} ${H(top + .15)} L${w * .59} ${H(top + .08)} L${w * .7} ${H(top + .2)} L${w * .84} ${H(top + .05)} L${w} ${H(top + .17)} V${h} H0 Z" fill="${colors[0]}"/>
+  <rect y="${H(top + .08)}" width="${w}" height="${H(.25)}" fill="url(#mist)"/>
+  <path d="M0 ${H(top + .3)} L${w * .18} ${H(top + .17)} L${w * .31} ${H(top + .27)} L${w * .47} ${H(top + .14)} L${w * .62} ${H(top + .29)} L${w * .78} ${H(top + .19)} L${w} ${H(top + .3)} V${h} H0 Z" fill="${colors[1]}"/>`;
+}
+
+const MIST = `<linearGradient id="mist" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#bfe3ff" stop-opacity="0"/><stop offset=".6" stop-color="#bfe3ff" stop-opacity=".22"/>
+  <stop offset="1" stop-color="#bfe3ff" stop-opacity="0"/></linearGradient>`;
+
+// ---------- 3 phương án: mỗi cái có icon (512) và banner (640×360) ----------
+// layer: 'full' (icon vuông bo góc), 'bg' / 'fg' (2 lớp icon thích ứng 108dp, vùng an toàn 66dp)
+const concepts = {
+  a: {
+    name: 'Hạc & Trăng', note: 'Tiên hạc bay qua trăng vàng, núi sương',
+    bgDefs: `<radialGradient id="bgA" cx="55%" cy="35%" r="80%"><stop offset="0" stop-color="#1d2d5c"/><stop offset=".55" stop-color="#0b1431"/><stop offset="1" stop-color="#04060f"/></radialGradient>
+      <radialGradient id="moon" cx="42%" cy="38%" r="65%"><stop offset="0" stop-color="#fff7d9"/><stop offset=".5" stop-color="#ffd36a"/><stop offset="1" stop-color="#df9420"/></radialGradient>`,
+    bg: (w, h) => `<rect width="${w}" height="${h}" fill="url(#bgA)"/>`,
+    mark: () => `
+      <circle cx="268" cy="226" r="150" fill="#ffc94d" opacity=".45" filter="url(#glow)"/>
+      <circle cx="268" cy="226" r="134" fill="url(#moon)"/>
+      <g transform="translate(96 140) scale(1.12)">${crane()}</g>`,
+    icon: () => `${mountains(512, 512, .66, ['#10283a', '#071422'])}`,
+    banner: () => `
+      <circle cx="505" cy="150" r="118" fill="#ffc94d" opacity=".4" filter="url(#glow)"/>
+      <circle cx="505" cy="150" r="104" fill="url(#moon)"/>
+      <g transform="translate(372 92) scale(.86)">${crane()}</g>
+      ${mountains(640, 360, .62, ['#10283a', '#071422'])}`,
+  },
+  b: {
+    name: 'Phi kiếm', note: 'Kiếm bay trong vòng linh khí ngọc bích',
+    bgDefs: `<radialGradient id="bgB" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="#123a3c"/><stop offset=".6" stop-color="#0a1a22"/><stop offset="1" stop-color="#05090f"/></radialGradient>
+      <linearGradient id="jade" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8affd9"/><stop offset=".5" stop-color="#2bd4a8"/><stop offset="1" stop-color="#127a68"/></linearGradient>`,
+    bg: (w, h) => `<rect width="${w}" height="${h}" fill="url(#bgB)"/>`,
+    mark: () => `
+      <circle cx="256" cy="256" r="168" fill="none" stroke="#2bd4a8" stroke-width="30" opacity=".5" filter="url(#glow)"/>
+      <circle cx="256" cy="256" r="168" fill="none" stroke="url(#jade)" stroke-width="12"/>
+      <path d="M120 180 A150 150 0 0 1 300 108" stroke="#b8fff0" stroke-width="5" fill="none" stroke-linecap="round" opacity=".8"/>
+      <path d="M392 332 A150 150 0 0 1 212 404" stroke="#b8fff0" stroke-width="5" fill="none" stroke-linecap="round" opacity=".8"/>
+      <g transform="rotate(38 256 256) translate(0 -14)">${sword()}</g>
+      <g fill="#ffe08a"><circle cx="150" cy="140" r="4"/><circle cx="378" cy="126" r="3"/><circle cx="402" cy="380" r="4"/><circle cx="118" cy="352" r="3"/><circle cx="330" cy="430" r="2.5"/></g>`,
+    icon: () => ``,
+    banner: () => `
+      ${mountains(640, 360, .7, ['#0f2c2f', '#071518'])}
+      <g transform="translate(372 44) scale(.53)">${concepts.b.mark()}</g>`,
+  },
+  c: {
+    name: 'Ấn triện', note: 'Ấn đỏ chữ 仙 trong vòng bút mực vàng',
+    bgDefs: `<radialGradient id="bgC" cx="50%" cy="42%" r="78%"><stop offset="0" stop-color="#3a2416"/><stop offset=".6" stop-color="#1a0f0a"/><stop offset="1" stop-color="#080504"/></radialGradient>`,
+    bg: (w, h) => `<rect width="${w}" height="${h}" fill="url(#bgC)"/>`,
+    mark: () => `
+      <circle cx="256" cy="256" r="170" fill="#f0b443" opacity=".18" filter="url(#glow)"/>
+      ${enso(256, 256, 170, 38)}
+      ${seal(256, 262, 190)}`,
+    icon: () => ``,
+    banner: () => `
+      ${mountains(640, 360, .74, ['#24170f', '#0f0907'])}
+      <g transform="translate(372 44) scale(.53)">${concepts.c.mark()}</g>`,
+  },
+};
+
+function defs(c) {
+  return `<defs>${GOLD}${STAMP}${MIST}${c.bgDefs}
+    <clipPath id="clipIcon"><rect width="512" height="512" rx="112"/></clipPath></defs>`;
+}
+
+// Icon vuông bo góc (launcher cũ) — 512 hệ toạ độ
+function iconSvg(c, px) {
+  return `<svg width="${px}" height="${px}" viewBox="0 0 512 512">${defs(c)}
+    <g clip-path="url(#clipIcon)">${c.bg(512, 512)}${c.icon()}${c.mark()}</g></svg>`;
+}
+
+// Icon thích ứng: hệ 108dp → 512; vùng an toàn 66dp ≈ 313px, dấu hình thu vào giữa
+function adaptiveSvg(c, px, layer) {
+  const k = 313 / 512, off = (512 - 512 * k) / 2;
+  const body = layer === 'bg' ? `${c.bg(512, 512)}${c.icon()}`
+    : `<g transform="translate(${off} ${off}) scale(${k})">${c.mark()}</g>`;
+  return `<svg width="${px}" height="${px}" viewBox="0 0 512 512">${defs(c)}${body}</svg>`;
+}
+
+// Banner TV 16:9 — 640×360 hệ toạ độ
+function bannerSvg(c, w) {
+  const h = w * 9 / 16;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 640 360">${defs(c)}
+    ${c.bg(640, 360)}${c.banner()}
+    <g filter="url(#softglow)" opacity=".55">
+      <text x="44" y="186" font-family="Cinzel" font-weight="900" font-size="74" fill="#f7c95a">ChimTo</text></g>
+    <text x="44" y="186" font-family="Cinzel" font-weight="900" font-size="74" fill="url(#gold)">ChimTo</text>
+    <text x="48" y="240" font-family="Cinzel" font-weight="700" font-size="40" fill="#ffffff" letter-spacing="3">TV</text>
+    <rect x="112" y="225" width="160" height="2" fill="url(#gold)" opacity=".8"/>
+    <text x="48" y="284" font-family="Be Vietnam Pro" font-weight="600" font-size="19" fill="#e8d9b0" letter-spacing="4">HOẠT HÌNH 3D · TIÊN HIỆP</text>
+  </svg>`;
+}
+
+function render() {
+  if (P.get('mode') === 'export') {
+    const c = concepts[P.get('concept') || 'a'];
+    const items = [];
+    for (const [d, px] of [['mdpi', 48], ['hdpi', 72], ['xhdpi', 96], ['xxhdpi', 144], ['xxxhdpi', 192]]) {
+      items.push([`mipmap-${d}/ic_launcher.png`, iconSvg(c, px)]);
+      const ap = px * 108 / 48;
+      items.push([`mipmap-${d}/ic_launcher_background.png`, adaptiveSvg(c, ap, 'bg')]);
+      items.push([`mipmap-${d}/ic_launcher_foreground.png`, adaptiveSvg(c, ap, 'fg')]);
+    }
+    for (const [d, w] of [['xhdpi', 320], ['xxhdpi', 480], ['xxxhdpi', 640]]) {
+      items.push([`drawable-${d}/banner.png`, bannerSvg(c, w)]);
+    }
+    items.push(['drawable-nodpi/logo.png', iconSvg(c, 192)]);
+    items.push(['../../../../design/logo-512.png', iconSvg(c, 512)]);
+    items.push(['../../../../design/banner-1280.png', bannerSvg(c, 1280)]);
+    let y = 0;
+    for (const [name, svg] of items) {
+      const div = document.createElement('div');
+      div.className = 'asset';
+      div.dataset.name = name;
+      div.style.top = y + 'px';
+      div.innerHTML = svg;
+      document.body.appendChild(div);
+      y += div.firstElementChild.getAttribute('height') * 1 + 20;
+    }
+  } else {
+    document.body.className = 'preview';
+    for (const [k, c] of Object.entries(concepts)) {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<div class="label">${k.toUpperCase()}. ${c.name}<small>${c.note}</small></div>
+        ${iconSvg(c, 220)}${iconSvg(c, 72)}${bannerSvg(c, 512)}`;
+      document.body.appendChild(row);
+    }
+  }
+}
+document.fonts.load('900 40px Cinzel').then(() => document.fonts.load('40px "Ma Shan Zheng"', '仙'))
+  .then(() => document.fonts.load('600 20px "Be Vietnam Pro"', 'HOẠT HÌNH'))
+  .then(() => document.fonts.ready).then(() => { render(); document.title = 'ready'; });
+</script>
+</body>
+</html>

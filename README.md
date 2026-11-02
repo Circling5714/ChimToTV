@@ -1,5 +1,7 @@
 # ChimTo TV
 
+![ChimTo TV](design/banner-1280.png)
+
 App Android TV xem phim từ trang web (mặc định `https://yanhh3d.ee`) bằng remote hoặc bàn phím.
 Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, nên trang đổi tên miền chỉ cần sửa link trong **Cài đặt**.
 
@@ -12,7 +14,7 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 ## Phím điều khiển
 
 | Màn hình | Phím |
-|---|---|
+| --- | --- |
 | Trang chủ / danh sách | Mũi tên: di chuyển • OK/Enter: mở phim • Back: về menu bên trái, Back lần nữa để thoát |
 | Chi tiết phim | OK: xem tiếp / xem tập mới nhất • ▼: vào danh sách tập (ô xanh = đã xem) |
 | Đang xem phim | OK/Space: dừng–phát • ◀ ▶: tua (giữ để tua nhanh) • ▲: xem thời gian • ▼/Menu: đổi server, đổi tập • Số 0–9: nhảy tới 0–90% • CH+/CH−, N/P: tập sau/trước • Back: thoát |
@@ -33,6 +35,16 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 
 Cần JDK 17 (`%USERPROFILE%\.jdks\jdk-17.0.20.1+1`) và Android SDK (`%LOCALAPPDATA%\Android\Sdk`).
 Thư mục `keys\` chứa khoá ký app — **giữ lại**, mất khoá thì bản mới không cài đè lên bản cũ được.
+
+## Logo
+
+Logo và banner TV vẽ bằng SVG trong `design/logo.html` (phương án C — ấn triện chữ 仙 trong vòng bút mực vàng).
+Sửa xong thì xuất lại toàn bộ icon / icon thích ứng / banner (xhdpi → xxxhdpi) bằng Chrome headless:
+
+```powershell
+node design/render.mjs preview xem-truoc.png   # xem cả 3 phương án
+node design/render.mjs export c                 # ghi PNG vào app/src/main/res
+```
 
 ## Cách phát video (cho người sửa code)
 
