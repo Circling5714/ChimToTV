@@ -3,6 +3,8 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Tự cài bản cập nhật tải từ GitHub Releases (Android vẫn hỏi xác nhận) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Chạy được trên tivi (không cảm ứng) lẫn điện thoại / TV box -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -54,5 +56,19 @@
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:screenOrientation="sensorLandscape"
             android:windowSoftInputMode="adjustPan|stateHidden" />
+
+        <!-- Kết quả phiên cài đặt (PackageInstaller): mở hộp xác nhận của hệ thống / báo lỗi -->
+        <receiver
+            android:name=".InstallReceiver"
+            android:exported="false" />
+
+        <!-- Cài xong bản mới: mở lại app -->
+        <receiver
+            android:name=".UpdatedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

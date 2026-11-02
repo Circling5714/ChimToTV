@@ -51,6 +51,24 @@ thì app tự mở trang tập và phóng trình phát ra toàn màn hình.
 Cần JDK 17 (`%USERPROFILE%\.jdks\jdk-17.0.20.1+1`) và Android SDK (`%LOCALAPPDATA%\Android\Sdk`).
 Thư mục `keys\` chứa khoá ký app — **giữ lại**, mất khoá thì bản mới không cài đè lên bản cũ được.
 
+## Phát hành bản mới (app tự cập nhật)
+
+App (từ bản 1.3) tự hỏi GitHub Releases khi mở / quay lại màn hình chính (tối đa 2 giờ một lần). Có bản mới thì
+tải APK ngầm, kiểm tra cùng gói + cùng chữ ký + số hiệu lớn hơn, rồi hỏi **Cài đặt ngay**.
+Lần đầu Android hỏi cho phép ChimTo TV "cài ứng dụng không rõ nguồn" (app tự mở đúng trang cài đặt).
+Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ lần thứ hai trở đi cập nhật hoàn toàn tự động.
+
+1. Tăng `versionCode` / `versionName` trong `app/build.gradle.kts`.
+2. `.\build.ps1` → `dist\ChimToTV-<phiên bản>.apk` (ký bằng `keys\` — phải cùng khoá thì app mới nhận).
+3. Tạo release tag `v<phiên bản>` và đính kèm APK, ví dụ:
+   `gh release create v1.4 dist\ChimToTV-1.4.apk --title "ChimTo TV 1.4" --notes-file ghi-chu.md`
+   Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập nhật trên TV.
+
+Thử OTA không cần phát hành thật: bản debug hỏi `http://127.0.0.1:8765/latest.json` (cùng định dạng GitHub API).
+Dựng bản giả số hiệu cao hơn bằng `gradlew assembleDebug "-Pvc=5" "-Pvn=1.4"`, phục vụ JSON + APK từ máy tính
+rồi `adb reverse tcp:8765 tcp:8765`. Tệp APK lớn nên phục vụ ngay trên TV (`toybox nc`) vì `adb reverse` qua mạng
+hay cắt giữa chừng.
+
 ## Logo
 
 Logo và banner TV vẽ bằng SVG trong `design/logo.html` (phương án C — ấn triện chữ 仙 trong vòng bút mực vàng).

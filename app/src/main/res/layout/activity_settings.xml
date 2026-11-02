@@ -160,6 +160,36 @@
         </LinearLayout>
 
         <TextView
+            style="@style/SettingsLabel"
+            android:text="Cập nhật app" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnUpdateCheck"
+                style="@style/TvButton" />
+
+            <TextView
+                android:id="@+id/btnAutoUpdate"
+                style="@style/TvButton" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/updateResult"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="App tự tìm bản mới trên GitHub khi mở (tối đa 2 giờ một lần), tải sẵn rồi hỏi cài. Android luôn yêu cầu bấm xác nhận cài."
+            android:textColor="@color/text_dim"
+            android:textSize="14sp" />
+
+        <TextView
             android:id="@+id/about"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

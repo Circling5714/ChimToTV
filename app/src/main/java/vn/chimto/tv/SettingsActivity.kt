@@ -80,6 +80,21 @@ class SettingsActivity : Activity() {
             toast("Đã xoá ảnh và cookie đã lưu.")
         }
 
+        val updateResult = findViewById<TextView>(R.id.updateResult)
+        findViewById<TextView>(R.id.btnUpdateCheck).apply {
+            text = "Kiểm tra cập nhật (đang dùng ${BuildConfig.VERSION_NAME})"
+            setOnClickListener { Updater.checkNow(this@SettingsActivity) { updateResult.text = it } }
+        }
+        val autoUpdate = findViewById<TextView>(R.id.btnAutoUpdate)
+        fun showAutoUpdate() {
+            autoUpdate.text = "Tự động cập nhật: ${if (Prefs.autoUpdate) "Bật" else "Tắt"}"
+        }
+        showAutoUpdate()
+        autoUpdate.setOnClickListener {
+            Prefs.autoUpdate = !Prefs.autoUpdate
+            showAutoUpdate()
+        }
+
         val version = packageManager.getPackageInfo(packageName, 0).versionName
         findViewById<TextView>(R.id.about).text =
             "ChimTo TV $version — xem phim từ trang web trên tivi bằng remote / bàn phím."

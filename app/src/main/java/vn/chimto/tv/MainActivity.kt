@@ -87,6 +87,7 @@ class MainActivity : Activity() {
         } else if (active?.kind == Kind.HISTORY) {
             showHistory(focusFirst = false)
         }
+        Updater.autoCheck(this)
     }
 
     private fun reloadSite() {

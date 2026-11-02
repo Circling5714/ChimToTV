@@ -20,6 +20,12 @@ android {
         targetSdk = 35
         versionCode = 4
         versionName = "1.3"
+        // Thử cập nhật OTA với bản giả số hiệu cao hơn: gradlew assembleDebug -Pvc=5 -Pvn=1.4
+        (findProperty("vc") as String?)?.let { versionCode = it.toInt() }
+        (findProperty("vn") as String?)?.let { versionName = it }
+
+        // Nơi app hỏi bản phát hành mới nhất (GitHub Releases của repo)
+        buildConfigField("String", "UPDATE_URL", "\"https://api.github.com/repos/Circling5714/ChimToTV/releases/latest\"")
     }
     signingConfigs {
         if (kyFile.exists()) {
@@ -37,6 +43,8 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            // Bản gỡ lỗi hỏi máy chủ giả trên máy tính (adb reverse tcp:8765 tcp:8765) để thử OTA mà không phát hành thật
+            buildConfigField("String", "UPDATE_URL", "\"http://127.0.0.1:8765/latest.json\"")
         }
         release {
             isMinifyEnabled = true

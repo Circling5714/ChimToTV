@@ -63,6 +63,24 @@ object Prefs {
         get() = sp.getBoolean("auto_next", true)
         set(value) = sp.edit().putBoolean("auto_next", value).apply()
 
+    // ---- Cập nhật OTA ----
+
+    var autoUpdate: Boolean
+        get() = sp.getBoolean("auto_update", true)
+        set(value) = sp.edit().putBoolean("auto_update", value).apply()
+
+    var lastUpdateCheck: Long
+        get() = sp.getLong("last_update_check", 0)
+        set(value) = sp.edit().putLong("last_update_check", value).apply()
+
+    /** Người xem chọn "Để sau" cho bản này → không hỏi lại tới thời điểm này. */
+    fun snoozeUpdate(version: String, until: Long) {
+        sp.edit().putString("snooze_version", version).putLong("snooze_until", until).apply()
+    }
+
+    fun isUpdateSnoozed(version: String): Boolean =
+        sp.getString("snooze_version", null) == version && System.currentTimeMillis() < sp.getLong("snooze_until", 0)
+
     /** Chuẩn hoá chuỗi người dùng gõ ("yanhh3d.ee", "https://yanhh3d.ee/") → "https://yanhh3d.ee"; sai thì null. */
     fun normalizeUrl(input: String): String? {
         var s = input.trim().trimEnd('/')
