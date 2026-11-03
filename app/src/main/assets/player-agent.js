@@ -16,6 +16,61 @@
     (document.head || document.documentElement).appendChild(st);
   } catch (e) {}
 
+  // Bộ đệm: JW Player (trình phát streamfree của yanhh3d / hoathinh3d.ee / hhkungfu) để preload "metadata" nên ép
+  // hls.js maxMaxBufferLength = 1 → chỉ tải trước đúng một đoạn (đoạn dài 10–19 s) → mạng TV hụt một nhịp là đứng
+  // hình. JW chỉ cho qua hlsjsConfig.onHlsInit (không cho maxBufferLength) và trang có onHlsInit riêng, nên bọc
+  // jwplayer(...).setup: chạy onHlsInit của trang trước rồi nâng bộ đệm lên 120 s, bỏ qua lệnh ép về mức quá nhỏ
+  // (vẫn để hls.js tự hạ khi TV hết bộ nhớ video), chỉ giữ 30 s đã xem cho đỡ tốn RAM.
+  var BUFFER = 120, BUFFER_FLOOR = 10;
+  function bigBuffer(hls) {
+    var c = hls.config, max = 600;
+    c.maxBufferLength = BUFFER;
+    c.backBufferLength = 30;
+    try {
+      Object.defineProperty(c, 'maxMaxBufferLength', {
+        configurable: true, enumerable: true,
+        get: function () { return max; },
+        set: function (v) { if (v >= BUFFER_FLOOR) max = v; }
+      });
+    } catch (e) { c.maxMaxBufferLength = max; }
+    window.__chimtoBuffer = BUFFER;
+  }
+  function patchSetup(cfg) {
+    if (!cfg || typeof cfg !== 'object') return cfg;
+    var h = cfg.hlsjsConfig || (cfg.hlsjsConfig = {});
+    var theirs = h.onHlsInit;
+    h.onHlsInit = function (hls) {
+      if (typeof theirs === 'function') try { theirs(hls); } catch (e) {}
+      try { bigBuffer(hls); } catch (e) {}
+    };
+    return cfg;
+  }
+  function wrapJw(jw) {
+    if (typeof jw !== 'function' || jw.__chimto || typeof Proxy !== 'function') return jw;
+    jw.__chimto = 1;
+    return new Proxy(jw, {
+      apply: function (target, self, args) {
+        var api = Reflect.apply(target, self, args);
+        if (api && typeof api.setup === 'function' && !api.__chimtoSetup) {
+          var setup = api.setup;
+          api.setup = function (cfg) { return setup.call(this, patchSetup(cfg)); };
+          api.__chimtoSetup = 1;
+        }
+        return api;
+      }
+    });
+  }
+  if (!window.jwplayer) {
+    try {
+      var jwReal;
+      Object.defineProperty(window, 'jwplayer', {
+        configurable: true, enumerable: true,
+        get: function () { return jwReal; },
+        set: function (v) { jwReal = wrapJw(v); }
+      });
+    } catch (e) {}
+  }
+
   function video() {
     // Khung trên cùng của trang tập: nếu trình phát được chọn là iframe thì để iframe đó xử lý
     // (tránh nhầm sang video quảng cáo / xem trước nằm trong trang).
@@ -36,12 +91,17 @@
     if (!v) return null;
     // Khung hình rớt (TV giải mã / vẽ không kịp) — để app phân biệt "TV yếu" với "mạng chậm"
     var q = v.getVideoPlaybackQuality ? v.getVideoPlaybackQuality() : null;
+    var t = v.currentTime || 0, ahead = 0;
+    for (var i = 0; i < v.buffered.length; i++) {
+      if (v.buffered.start(i) <= t + 0.5 && t < v.buffered.end(i)) ahead = v.buffered.end(i) - t;
+    }
     return {
-      chimto: 'state', ready: v.readyState > 0, t: v.currentTime || 0,
+      chimto: 'state', ready: v.readyState > 0, t: t,
       d: isFinite(v.duration) ? v.duration : 0, paused: v.paused, ended: v.ended,
       waiting: !v.paused && v.readyState < 3,
       df: q ? q.droppedVideoFrames : (v.webkitDroppedFrameCount || 0),
-      tf: q ? q.totalVideoFrames : (v.webkitDecodedFrameCount || 0)
+      tf: q ? q.totalVideoFrames : (v.webkitDecodedFrameCount || 0),
+      ahead: Math.round(ahead), buf: window.__chimtoBuffer || 0
     };
   }
   function play(v) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
