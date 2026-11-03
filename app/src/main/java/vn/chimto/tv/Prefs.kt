@@ -81,6 +81,47 @@ object Prefs {
         }
         set(value) = sp.edit().putString("play_stats", value.toString()).apply()
 
+    // ---- Proxy SOCKS5 (xem AppProxy) ----
+
+    var proxyOn: Boolean
+        get() = sp.getBoolean("proxy_on", false)
+        set(value) = sp.edit().putBoolean("proxy_on", value).apply()
+
+    var proxyHost: String
+        get() = sp.getString("proxy_host", "") ?: ""
+        set(value) = sp.edit().putString("proxy_host", value).apply()
+
+    var proxyPort: Int
+        get() = sp.getInt("proxy_port", 1080)
+        set(value) = sp.edit().putInt("proxy_port", value).apply()
+
+    var proxyUser: String
+        get() = sp.getString("proxy_user", "") ?: ""
+        set(value) = sp.edit().putString("proxy_user", value).apply()
+
+    /** Lưu trong bộ nhớ riêng của app (app khác không đọc được), không mã hoá. */
+    var proxyPass: String
+        get() = sp.getString("proxy_pass", "") ?: ""
+        set(value) = sp.edit().putString("proxy_pass", value).apply()
+
+    /** true: DNS của proxy; false: DNS của thiết bị. */
+    var proxyRemoteDns: Boolean
+        get() = sp.getBoolean("proxy_remote_dns", true)
+        set(value) = sp.edit().putBoolean("proxy_remote_dns", value).apply()
+
+    /** true: chỉ trang phim đi qua proxy; false: toàn bộ app. */
+    var proxySitesOnly: Boolean
+        get() = sp.getBoolean("proxy_sites_only", false)
+        set(value) = sp.edit().putBoolean("proxy_sites_only", value).apply()
+
+    /** Proxy đang dùng; null = tắt (hoặc chưa nhập máy chủ / cổng hợp lệ). */
+    fun proxyConfig(): SocksConfig? {
+        if (!proxyOn) return null
+        val host = proxyHost.trim()
+        if (host.isEmpty() || proxyPort !in 1..65535) return null
+        return SocksConfig(host, proxyPort, proxyUser, proxyPass, proxyRemoteDns, proxySitesOnly)
+    }
+
     // ---- Cập nhật OTA ----
 
     var autoUpdate: Boolean

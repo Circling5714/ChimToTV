@@ -25,7 +25,7 @@ object Http {
     fun open(url: String, headers: Map<String, String> = emptyMap()): HttpURLConnection {
         var current = url
         repeat(8) {
-            val c = URL(current).openConnection() as HttpURLConnection
+            val c = connection(current)
             c.instanceFollowRedirects = false
             c.connectTimeout = 15_000
             c.readTimeout = 20_000
@@ -42,6 +42,12 @@ object Http {
         throw IOException("Chuyển hướng quá nhiều lần: $url")
     }
 
+    /** Bật proxy thì đi qua cổng SOCKS5 nội bộ của AppProxy, không thì theo mạng mặc định của máy. */
+    private fun connection(url: String): HttpURLConnection {
+        val proxy = AppProxy.javaProxy()
+        return (if (proxy != null) URL(url).openConnection(proxy) else URL(url).openConnection()) as HttpURLConnection
+    }
+
     /**
      * Kết nối giữ lại từ lần tải trước có thể đã bị mạng / máy chủ ngắt ngầm (TX3 gặp với phimmoir.fun:
      * "unexpected end of stream") → thử lại một lần bằng kết nối mới. Lỗi chắc chắn lặp lại (mã lỗi HTTP, tên miền
@@ -54,9 +60,10 @@ object Http {
         getOnce(url, headers + ("Connection" to "close"))
     }
 
-    private fun dropped(e: IOException) =
-        e is EOFException || (e is SocketException && e !is ConnectException) ||
-            e.message.orEmpty().let { it.contains("unexpected end of stream") || it.contains("connection reset", true) }
+    /** Lỗi do proxy (cổng nội bộ báo "SOCKS: …") thì không thử lại — proxy hỏng, thử lại cũng vậy. */
+    private fun dropped(e: IOException) = !e.message.orEmpty().contains("SOCKS") &&
+        (e is EOFException || (e is SocketException && e !is ConnectException) ||
+            e.message.orEmpty().let { it.contains("unexpected end of stream") || it.contains("connection reset", true) })
 
     private fun getOnce(url: String, headers: Map<String, String>): Response {
         val c = open(url, headers)
@@ -72,7 +79,7 @@ object Http {
 
     /** POST dạng form (dùng cho admin-ajax.php của WordPress). */
     fun post(url: String, form: Map<String, String>, headers: Map<String, String> = emptyMap()): Response {
-        val c = URL(url).openConnection() as HttpURLConnection
+        val c = connection(url)
         try {
             c.requestMethod = "POST"
             c.doOutput = true

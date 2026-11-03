@@ -346,10 +346,11 @@ class PlayerActivity : Activity() {
                     playPage(src)
                 } else {
                     val host = Site.hostOf(src.epUrl)
+                    val stats = AppProxy.statsHost(host)
                     val usual = src.servers.firstOrNull { it.type == Prefs.serverType(host) } ?: src.servers.firstOrNull()
-                    val pick = PlayStats.choose(host, src.servers, usual)
+                    val pick = PlayStats.choose(stats, src.servers, usual)
                     if (usual != null && pick != usual) {
-                        val why = PlayStats.score(host, usual.type).label ?: "hay giật"
+                        val why = PlayStats.score(stats, usual.type).label ?: "hay giật"
                         notice.show("${usual.label} $why gần đây — mở ${pick?.label} (▼ để đổi server).", 6000)
                     }
                     playServer(pick)
@@ -363,7 +364,7 @@ class PlayerActivity : Activity() {
         stopVideo()
         pageMode = true
         loadStartedAt = System.currentTimeMillis()
-        session = PlaySession(Site.hostOf(src.epUrl), "page", loadStartedAt)
+        session = PlaySession(AppProxy.statsHost(Site.hostOf(src.epUrl)), "page", loadStartedAt)
         showLoading("Đang mở trang tập phim…")
         web.loadUrl(src.epUrl)
     }
@@ -385,7 +386,7 @@ class PlayerActivity : Activity() {
             r.onSuccess { v ->
                 val url = v.url
                 loadStartedAt = System.currentTimeMillis()
-                session = PlaySession(Site.hostOf(src.epUrl), s?.type ?: "embed", loadStartedAt)
+                session = PlaySession(AppProxy.statsHost(Site.hostOf(src.epUrl)), s?.type ?: "embed", loadStartedAt)
                 if (Uri.parse(url).path.orEmpty().endsWith(".m3u8")) {
                     hlsUrl = url
                     val page = hlsHtml.replace("{{SRC}}", JSONObject.quote(url))
@@ -428,7 +429,7 @@ class PlayerActivity : Activity() {
         val servers = if (src.pageMode) emptyList() else src.servers
         serverLabel.visibility = if (servers.isEmpty()) View.GONE else View.VISIBLE
         val inflater = LayoutInflater.from(this)
-        val host = Site.hostOf(src.epUrl)
+        val host = AppProxy.statsHost(Site.hostOf(src.epUrl))
         for (s in servers) {
             val b = inflater.inflate(R.layout.item_button, serverRow, false) as TextView
             b.text = serverText(host, s)
@@ -456,7 +457,7 @@ class PlayerActivity : Activity() {
         suggested = true // mỗi lần phát chỉ gợi ý một lần (không có server khác thì thôi)
         val src = source?.takeIf { !it.pageMode } ?: return
         val cur = server ?: return
-        val (alt, score) = PlayStats.alternative(Site.hostOf(src.epUrl), src.servers, cur) ?: return
+        val (alt, score) = PlayStats.alternative(AppProxy.statsHost(Site.hostOf(src.epUrl)), src.servers, cur) ?: return
         suggestion = alt
         suggestionUntil = now + 15_000
         val why = score.summary?.let { " ($it)" } ?: ""
@@ -540,7 +541,7 @@ class PlayerActivity : Activity() {
             hintShown = true
             hideLoading()
             val other = if (pageMode) "▼ → Tải lại / Mở trang Web" else "▼ để đổi server"
-            notice.show("Video chưa chạy? Nhấn OK để thử phát, hoặc $other.", 10_000)
+            notice.show("Video chưa chạy? Nhấn OK để thử phát, hoặc $other." + AppProxy.videoNote(), 10_000)
         }
         if (json == null || json == "null") return
         val o = try {
@@ -567,9 +568,9 @@ class PlayerActivity : Activity() {
             errShown = true
             session?.fail()
             if (started) {
-                notice.show("Mất kết nối video ($err).\nNhấn ▼ → Tải lại, hoặc chọn server khác.", 10_000)
+                notice.show("Mất kết nối video ($err).\nNhấn ▼ → Tải lại, hoặc chọn server khác." + AppProxy.videoNote(), 10_000)
             } else {
-                showError("${server?.label ?: "Server"} không phát được video ($err).\nNhấn ▼ để chọn server khác.")
+                showError("${server?.label ?: "Server"} không phát được video ($err).\nNhấn ▼ để chọn server khác." + AppProxy.videoNote())
                 showPanel()
             }
         }
@@ -744,7 +745,7 @@ class PlayerActivity : Activity() {
     private fun showPanel() {
         osd.visibility = View.GONE
         // Điểm server mới nhất + tình hình lần xem này
-        val host = source?.let { Site.hostOf(it.epUrl) }
+        val host = source?.let { AppProxy.statsHost(Site.hostOf(it.epUrl)) }
         for (i in 0 until serverRow.childCount) {
             val b = serverRow.getChildAt(i) as TextView
             source?.servers?.firstOrNull { it.type == b.tag }?.let { b.text = serverText(host, it) }

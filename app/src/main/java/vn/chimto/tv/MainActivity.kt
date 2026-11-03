@@ -38,6 +38,7 @@ class MainActivity : Activity() {
     private var nextUrl: String? = null
     private var loadingMore = false
     private var loadedBase: String? = null
+    private var loadedProxy: SocksConfig? = null
     private var lastBack = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,10 +81,10 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        siteLabel.text = Site.hostOf(Prefs.baseUrl)
+        showSiteLabel()
         val active = menuAdapter.active
-        if (loadedBase != null && loadedBase != Prefs.baseUrl) {
-            // Link trang vừa đổi trong Cài đặt → tải lại từ đầu
+        if (loadedBase != null && (loadedBase != Prefs.baseUrl || loadedProxy != Prefs.proxyConfig())) {
+            // Link trang hoặc proxy vừa đổi trong Cài đặt → tải lại từ đầu
             reloadSite()
         } else if (active?.kind == Kind.HISTORY) {
             showHistory(focusFirst = false)
@@ -91,8 +92,13 @@ class MainActivity : Activity() {
         Updater.autoCheck(this)
     }
 
+    /** Tên trang đang dùng, kèm "proxy" khi đang bật proxy SOCKS5 (để nhớ là app đang đi qua proxy). */
+    private fun showSiteLabel() {
+        siteLabel.text = Site.hostOf(Prefs.baseUrl) + if (AppProxy.active) "  ·  proxy" else ""
+    }
+
     private fun reloadSite() {
-        siteLabel.text = Site.hostOf(Prefs.baseUrl)
+        showSiteLabel()
         categories = emptyList()
         rebuildMenu()
         onMenu(menuAdapter.items.first())
@@ -196,6 +202,7 @@ class MainActivity : Activity() {
     private fun showHome() {
         val t = ++token
         val base = Prefs.baseUrl
+        loadedProxy = Prefs.proxyConfig()
         nextUrl = null
         gridAdapter.clear()
         status.loading("Đang tải trang chủ ${Site.hostOf(base)}…")
@@ -204,7 +211,7 @@ class MainActivity : Activity() {
             r.onSuccess { home ->
                 home.movedTo?.let {
                     Prefs.baseUrl = it
-                    siteLabel.text = Site.hostOf(it)
+                    showSiteLabel()
                     toast("Trang đã chuyển sang ${Site.hostOf(it)} — đã tự cập nhật link.")
                 }
                 loadedBase = Prefs.baseUrl

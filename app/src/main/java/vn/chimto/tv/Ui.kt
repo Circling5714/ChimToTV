@@ -30,11 +30,17 @@ fun <T> Activity.background(work: () -> T, done: (Result<T>) -> Unit) {
 
 fun Context.dp(v: Int): Int = (v * resources.displayMetrics.density).roundToInt()
 
-fun Throwable.friendly(): String = when (this) {
-    is UnknownHostException -> "Không tìm thấy trang. Kiểm tra mạng hoặc đổi link trong Cài đặt."
-    is SocketTimeoutException -> "Trang phản hồi quá chậm, thử lại sau."
-    is SSLException -> "Lỗi kết nối bảo mật (SSL) tới trang."
-    else -> message ?: javaClass.simpleName
+fun Throwable.friendly(): String {
+    // Đang bật proxy mà proxy vừa báo lỗi (sai mật khẩu, proxy chết…): nói rõ là do proxy
+    if (AppProxy.active && this !is Http.HttpError) {
+        AppProxy.recentError()?.let { return "Proxy: $it.\nKiểm tra Cài đặt → Proxy SOCKS5, hoặc tắt proxy." }
+    }
+    return when (this) {
+        is UnknownHostException -> "Không tìm thấy trang. Kiểm tra mạng hoặc đổi link trong Cài đặt."
+        is SocketTimeoutException -> "Trang phản hồi quá chậm, thử lại sau."
+        is SSLException -> "Lỗi kết nối bảo mật (SSL) tới trang."
+        else -> message ?: javaClass.simpleName
+    } + AppProxy.note()
 }
 
 /**

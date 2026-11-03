@@ -68,6 +68,8 @@ android {
 dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("org.jsoup:jsoup:1.18.1")
+    // ProxyController: cho WebView đi qua proxy SOCKS5 (1.14 là bản cuối còn chạy Android 5; 1.15+ cần Android 6+)
+    implementation("androidx.webkit:webkit:1.14.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
     testImplementation("junit:junit:4.13.2")
     // org.json của Android trong test JVM chỉ là vỏ rỗng — NextSite đọc JSON nên test cần bản thật

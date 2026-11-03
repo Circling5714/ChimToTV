@@ -33,6 +33,19 @@
         <item name="android:stateListAnimator">@null</item>
     </style>
 
+    <!-- Ô nhập của mục Proxy (giống ô địa chỉ trang phim), xếp ngang theo layout_weight -->
+    <style name="ProxyInput">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_input</item>
+        <item name="android:imeOptions">actionNext|flagNoExtractUi</item>
+        <item name="android:padding">12dp</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textColorHint">@color/text_dim</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
     <style name="SettingsLabel">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>

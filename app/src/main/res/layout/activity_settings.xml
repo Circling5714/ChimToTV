@@ -113,6 +113,102 @@
 
         <TextView
             style="@style/SettingsLabel"
+            android:text="Proxy SOCKS5" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnProxy"
+                style="@style/TvButton" />
+
+            <TextView
+                android:id="@+id/btnProxyDns"
+                style="@style/TvButton" />
+
+            <TextView
+                android:id="@+id/btnProxyScope"
+                style="@style/TvButton" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/proxyHost"
+                style="@style/ProxyInput"
+                android:layout_weight="3"
+                android:hint="Máy chủ proxy (vd 103.1.2.3 hoặc dán socks5://user:pass@host:cổng)"
+                android:inputType="textUri" />
+
+            <EditText
+                android:id="@+id/proxyPort"
+                style="@style/ProxyInput"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:hint="Cổng (vd 1080)"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/proxyUser"
+                style="@style/ProxyInput"
+                android:layout_weight="1"
+                android:hint="Tên đăng nhập (bỏ trống nếu không có)"
+                android:inputType="text" />
+
+            <EditText
+                android:id="@+id/proxyPass"
+                style="@style/ProxyInput"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:hint="Mật khẩu (bỏ trống nếu không có)"
+                android:inputType="textPassword" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnProxySave"
+                style="@style/TvButton"
+                android:text="Lưu proxy" />
+
+            <TextView
+                android:id="@+id/btnProxyTest"
+                style="@style/TvButton"
+                android:text="Kiểm tra proxy" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/proxyResult"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textColor="@color/text_dim"
+            android:textSize="14sp" />
+
+        <TextView
+            style="@style/SettingsLabel"
             android:text="Phát video" />
 
         <LinearLayout
