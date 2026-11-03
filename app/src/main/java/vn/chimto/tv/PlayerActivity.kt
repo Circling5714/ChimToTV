@@ -102,6 +102,7 @@ class PlayerActivity : Activity() {
     // Đang phát link HLS bằng hls.html (không qua iframe)
     private var hlsUrl: String? = null
     private var errShown = false
+    private var lastAdAt = 0L
 
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null
@@ -412,6 +413,7 @@ class PlayerActivity : Activity() {
         embedUrl = null
         hlsUrl = null
         errShown = false
+        lastAdAt = 0
         state = null
         started = false
         endedHandled = false
@@ -529,12 +531,16 @@ class PlayerActivity : Activity() {
     // ---- Trạng thái phát ----
 
     private fun onState(json: String?) {
-        // Mở 25 giây mà video chưa chạy (chưa nạp, hoặc nạp rồi mà đứng yên) — trừ lúc trình phát đang quảng cáo
-        val waited = System.currentTimeMillis() - loadStartedAt
-        if (!started && (embedUrl != null || hlsUrl != null) && !hintShown && waited > 25_000 && json?.contains("\"ad\":true") != true) {
+        // Mở 25 giây mà video chưa chạy (chưa nạp, hoặc nạp rồi mà đứng yên). Không tính lúc trình phát chạy quảng
+        // cáo (đếm lại từ khi hết quảng cáo), không đè lên thông báo lỗi server đang hiện.
+        val inAd = json?.contains("\"ad\":true") == true
+        if (inAd) lastAdAt = System.currentTimeMillis()
+        val waited = System.currentTimeMillis() - maxOf(loadStartedAt, lastAdAt)
+        if (!started && !errShown && !hintShown && !inAd && (embedUrl != null || hlsUrl != null || pageMode) && waited > 25_000) {
             hintShown = true
             hideLoading()
-            notice.show("Video chưa chạy? Nhấn OK để thử phát, hoặc ▼ để đổi server.", 10_000)
+            val other = if (pageMode) "▼ → Tải lại / Mở trang Web" else "▼ để đổi server"
+            notice.show("Video chưa chạy? Nhấn OK để thử phát, hoặc $other.", 10_000)
         }
         if (json == null || json == "null") return
         val o = try {
@@ -542,8 +548,9 @@ class PlayerActivity : Activity() {
         } catch (e: Exception) {
             return
         }
-        if (o.optBoolean("ad")) {
+        if (inAd) {
             // Trình phát đang chạy quảng cáo (agent tự bỏ qua khi được phép) — chưa phải phim
+            session?.ad()
             if (!started) showLoading("Trình phát đang chạy quảng cáo — tự bỏ qua khi được phép…")
             return
         }

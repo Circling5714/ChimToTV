@@ -115,6 +115,17 @@ class NextSiteTest {
     }
 
     @Test
+    fun oddPosterDoesNotBreakList() {
+        // Ảnh bìa dạng lạ (data:…) chỉ làm mất ảnh của thẻ đó, không làm hỏng cả danh sách
+        val odd = movie(1, "phim-a", "Phim A", "Vietsub 3").replace("/public/images/posters/phim-a.webp", "data:image/png;base64,AAAA")
+        val url = "$base/loc-phim?type=phim-bo"
+        val p = Site.parseList(page(url, """{"movies":[$odd,${movie(2, "phim-b", "Phim B", "Full")}],"total":2,"page":1,"limit":21}"""), url)
+        assertEquals(listOf("Phim A", "Phim B"), p.films.map { it.title })
+        assertNull(p.films[0].poster)
+        assertEquals("$base/public/images/posters/phim-b.webp", p.films[1].poster)
+    }
+
+    @Test
     fun badge() {
         assertEquals("Tập 8", NextSite.badge("Song Ngữ 4, Thuyết Minh 8, Vietsub 8"))
         assertEquals("Full", NextSite.badge("Thuyết Minh Full, Vietsub Full"))

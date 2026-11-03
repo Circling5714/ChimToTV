@@ -127,18 +127,23 @@ object NextSite {
         val ep = episodeData(data) ?: return d
         val origin = origin(doc)
         val slug = movie(data, url)?.let { str(it, "slug") }.orEmpty().ifEmpty { return d }
-        val firstEp = d.groups.firstOrNull()?.episodes?.firstOrNull()?.url?.let { epSlug(it) }?.ifEmpty { null } ?: "tap-1"
+        // Trang chỉ trả danh sách tập của một ngôn ngữ khi tập được hỏi có ở ngôn ngữ đó (không có → danh sách rỗng),
+        // nên hỏi tập đầu, không được thì tập cuối của danh sách chính (bản Thuyết Minh có thể bắt đầu muộn hơn)
+        val mainEps = d.groups.firstOrNull()?.episodes.orEmpty()
+        val probes = listOfNotNull(mainEps.firstOrNull(), mainEps.lastOrNull()).map { epSlug(it.url) }
+            .filter { it.isNotEmpty() }.distinct().ifEmpty { listOf("tap-1") }
         val extra = languages(ep).entries.filter { (_, name) -> d.groups.none { it.name == name } }
         val found = arrayOfNulls<EpisodeGroup>(extra.size)
         extra.mapIndexed { i, (lang, name) ->
             thread {
                 val server = bestServer(ep, lang) ?: return@thread
-                found[i] = runCatching {
-                    val r = Http.get("$origin/xem-phim/$slug/$firstEp/$lang?server=$server")
-                    val page = Jsoup.parse(r.body, r.url)
-                    val e = episodeData(data(page) ?: return@runCatching null) ?: return@runCatching null
-                    if (str(e, "current_language") != lang) null else episodes(e, origin, slug, lang)
-                }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { EpisodeGroup(name, it) }
+                found[i] = probes.firstNotNullOfOrNull { probe ->
+                    runCatching {
+                        val r = Http.get("$origin/xem-phim/$slug/$probe/$lang?server=$server")
+                        val e = episodeData(data(Jsoup.parse(r.body, r.url)) ?: return@runCatching null) ?: return@runCatching null
+                        if (str(e, "current_language") != lang) null else episodes(e, origin, slug, lang)
+                    }.getOrNull()?.takeIf { it.isNotEmpty() }
+                }?.let { EpisodeGroup(name, it) }
             }
         }.forEach { it.join() }
         return d.copy(groups = d.groups + found.filterNotNull())
@@ -257,7 +262,7 @@ object NextSite {
     private fun videoOf(ep: JSONObject, origin: String): Video? {
         val v = ep.optJSONObject("video") ?: return null
         val url = str(v, "link_m3u8").ifEmpty { str(v, "link_embed") }.ifEmpty { return null }
-        return Video(abs(origin, url), subtitle(v.optJSONArray("subtitles"), origin))
+        return Video(abs(origin, url) ?: return null, subtitle(v.optJSONArray("subtitles"), origin))
     }
 
     /** Phụ đề rời (bản Song Ngữ của server HD không in chữ vào hình): bản mặc định, không có thì tiếng Việt. */
@@ -323,5 +328,8 @@ object NextSite {
 
     private fun origin(doc: Document) = Site.originOf(doc.location()) ?: Prefs.baseUrl
 
-    private fun abs(origin: String, ref: String): String = if (ref.startsWith("http")) ref else URL(URL("$origin/"), ref).toString()
+    /** Đường dẫn tuyệt đối; dạng lạ (vd "data:…") thì null — bỏ một ảnh / link chứ không hỏng cả trang. */
+    private fun abs(origin: String, ref: String): String? = runCatching {
+        URL(URL("$origin/"), ref).toString().takeIf { it.startsWith("http") }
+    }.getOrNull()
 }

@@ -1,9 +1,11 @@
 package vn.chimto.tv
 
+import java.io.EOFException
 import java.io.IOException
 import java.io.InputStream
+import java.net.ConnectException
 import java.net.HttpURLConnection
-import java.net.SocketTimeoutException
+import java.net.SocketException
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.Charset
@@ -42,18 +44,19 @@ object Http {
 
     /**
      * Kết nối giữ lại từ lần tải trước có thể đã bị mạng / máy chủ ngắt ngầm (TX3 gặp với phimmoir.fun:
-     * "unexpected end of stream") → lỗi kết nối thì thử lại một lần bằng kết nối mới.
-     * Quá thời gian chờ thì thôi (trang chết hẳn không bắt chờ gấp đôi).
+     * "unexpected end of stream") → thử lại một lần bằng kết nối mới. Lỗi chắc chắn lặp lại (mã lỗi HTTP, tên miền
+     * không phân giải, chứng chỉ, chuyển hướng vòng…) hay quá thời gian chờ thì thôi (trang chết hẳn không bắt chờ gấp đôi).
      */
     fun get(url: String, headers: Map<String, String> = emptyMap()): Response = try {
         getOnce(url, headers)
-    } catch (e: HttpError) {
-        throw e
-    } catch (e: SocketTimeoutException) {
-        throw e
     } catch (e: IOException) {
+        if (!dropped(e)) throw e
         getOnce(url, headers + ("Connection" to "close"))
     }
+
+    private fun dropped(e: IOException) =
+        e is EOFException || (e is SocketException && e !is ConnectException) ||
+            e.message.orEmpty().let { it.contains("unexpected end of stream") || it.contains("connection reset", true) }
 
     private fun getOnce(url: String, headers: Map<String, String>): Response {
         val c = open(url, headers)

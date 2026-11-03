@@ -177,6 +177,7 @@ class PlaySession(private val host: String?, private val server: String, private
     private var stallRun = 0
     private var afterSeek = false
     private var lastPaused = false
+    private var inAd = false
     private val recent = ArrayDeque<Long>()
     private var frames0 = -1
     private var dropped0 = 0
@@ -188,7 +189,13 @@ class PlaySession(private val host: String?, private val server: String, private
         afterSeek = true
     }
 
+    /** Trình phát đang chạy quảng cáo: chưa phải phim, rời đi lúc này không tính là server lỗi. */
+    fun ad() {
+        inAd = true
+    }
+
     fun update(now: Long, paused: Boolean, waiting: Boolean, ready: Boolean, droppedFrames: Int, totalFrames: Int) {
+        inAd = false
         lastPaused = paused
         if (totalFrames > 0) {
             if (frames0 < 0 || totalFrames < frames0) {
@@ -253,8 +260,8 @@ class PlaySession(private val host: String?, private val server: String, private
     /** Ghi phần chưa ghi vào thống kê (khi đổi server / tập, hoặc rời màn hình). */
     fun save(now: Long) {
         if (firstPlay < 0) {
-            // Chờ ≥ 20 giây mà video vẫn chưa chạy (không phải do người xem dừng) → tính là lỗi
-            if (!failSaved && !lastPaused && now - openedAt >= 20_000) {
+            // Chờ ≥ 20 giây mà video vẫn chưa chạy (không phải do người xem dừng, không phải đang quảng cáo) → tính là lỗi
+            if (!failSaved && !lastPaused && !inAd && now - openedAt >= 20_000) {
                 failSaved = true
                 PlayStats.record(host, server, -1, 0, 0, 0, failed = true)
             }
