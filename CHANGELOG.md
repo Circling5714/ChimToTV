@@ -4,6 +4,15 @@ Côn Bằng TV — từ 1.0 đến 1.4 tên là ChimTo TV. Tải bản mới nh�
 Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b`), cài đè
 được lên nhau và giữ nguyên lịch sử xem.
 
+## 1.6 — 03/11/2026
+
+- **Video 1080 mượt hơn trên yanhh3d.ee, hoathinh3d.ee, hhkungfu.ee** (3 trang dùng chung trình phát streamfree): trình
+  phát này trước chỉ tải trước đúng 1 đoạn phim (1–13 giây), mạng TV hụt một nhịp là đứng hình; nay tải trước tới
+  2 phút. Đo trên TV box TX3, cùng tập, cùng server Thuyết minh 1080, 3 phút: trước giật 12 lần (18 giây), nay 0 lần.
+- Thời gian mở phim không đổi; hoathinh3d.pw (trình phát riêng) không bị ảnh hưởng.
+- versionCode 7 · tag `v1.6` · commit `6dc1522` · SHA-256 APK
+  `774a9395501e5d623be6614020c890ffd75c5039f5c5f32a977c8a8faaee661d`
+
 ## 1.5 — 02/11/2026
 
 - **ChimTo TV đổi tên thành Côn Bằng TV** (鯤鵬 — chim thần khổng lồ trong truyện tiên hiệp). Vẫn là app cũ: cài đè, giữ

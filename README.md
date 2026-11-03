@@ -108,6 +108,11 @@ và báo trạng thái lên trang bọc; app đọc trạng thái mỗi giây đ
 Trang không có `player.php` (chế độ trang tập): WebView mở thẳng trang tập, `assets/page-focus.js` phóng iframe /
 video lớn nhất ra toàn màn hình, agent chạy cả ở khung trên cùng lẫn trong iframe.
 
+Bộ đệm (từ 1.6): yanhh3d.ee, hoathinh3d.ee, hhkungfu.ee nhúng chung trình phát streamfree.vip (JW Player 8.24 + hls.js,
+một chất lượng, đoạn 10–19 s ngụy trang ảnh PNG trên CDN). JW để preload "metadata" nên ép hls.js
+`maxMaxBufferLength = 1` (chỉ tải trước một đoạn). `player-agent.js` bọc `jwplayer(...).setup`, chạy `onHlsInit` của
+trang rồi đặt `maxBufferLength` 120 s, bỏ qua lệnh ép < 10 s; agent báo `ahead` (giây đã tải trước) để đo.
+
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server
 trong `Prefs.playStats`. Cách chọn / gợi ý server (cùng ngôn ngữ, không nét hơn khi chưa thử) có test riêng:
