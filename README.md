@@ -2,8 +2,8 @@
 
 ![Côn Bằng TV](design/banner-1280.png)
 
-App Android TV xem phim hoạt hình 3D từ trang web bằng remote hoặc bàn phím (trước đây tên là ChimTo TV — vẫn cùng một
-app, cài đè và tự cập nhật bình thường).
+App Android TV xem phim hoạt hình 3D (và phim bộ / phim lẻ ở phimmoir.fun) từ trang web bằng remote hoặc bàn phím
+(trước đây tên là ChimTo TV — vẫn cùng một app, cài đè và tự cập nhật bình thường).
 Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, nên trang đổi tên miền chỉ cần sửa link trong **Cài đặt**.
 
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
@@ -23,10 +23,16 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | hoathinh3d.ee | HaLim, chia Việt Sub / Thuyết Minh | `player.php` → iframe |
 | hhkungfu.ee | HaLim, chia Vietsub / Thuyết Minh | `player.php` → iframe |
 | hoathinh3d.pw | HaLimMovies | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
+| phimmoir.fun | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
 
-App không viết riêng cho từng trang mà nhận dạng theo mẫu giao diện, nên trang khác cùng kiểu (yanhh3d / theme HaLim)
-thường cũng chạy: nhập tên miền trong **Cài đặt** → **Lưu** → **Kiểm tra kết nối**. Trang nào không có `player.php`
-thì app tự mở trang tập và phóng trình phát ra toàn màn hình.
+App không viết riêng cho từng trang mà nhận dạng theo mẫu giao diện, nên trang khác cùng kiểu (yanhh3d / theme HaLim /
+Next.js kiểu PhimMoi) thường cũng chạy: nhập tên miền trong **Cài đặt** → **Lưu** → **Kiểm tra kết nối**. Trang nào
+không có `player.php` thì app tự mở trang tập và phóng trình phát ra toàn màn hình.
+
+phimmoir.fun là trang tổng hợp: ngoài hoạt hình 3D (khối "Hoạt hình Trung Quốc mới cập nhật" đầu trang chủ) còn phim
+bộ / phim lẻ Hàn, Trung, Âu Mỹ, Nhật, Thái. Menu có Hoạt hình, Phim bộ mới, Phim lẻ mới, 5 mục theo nước và 10 thể
+loại trên menu của trang; thể loại / nước khác thì dùng **Tìm kiếm**. Server: **KK Phim** (nhanh nhất), **NguonC**
+(app tự bỏ qua quảng cáo trước phim), **HD** (bản Song Ngữ, có phụ đề tiếng Việt), OPhim (đang hỏng).
 
 ## Cài lên tivi
 
@@ -76,7 +82,7 @@ Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ l�
 1. Tăng `versionCode` / `versionName` trong `app/build.gradle.kts`.
 2. `.\build.ps1` → `dist\ChimToTV-<phiên bản>.apk` (ký bằng `keys\` — phải cùng khoá thì app mới nhận).
 3. Tạo release tag `v<phiên bản>` và đính kèm APK, ví dụ:
-   `gh release create v1.5 dist\ChimToTV-1.5.apk --title "Côn Bằng TV 1.5" --notes-file ghi-chu.md`
+   `gh release create v1.7 dist\ChimToTV-1.7.apk --title "Côn Bằng TV 1.7" --notes-file ghi-chu.md`
    Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập nhật trên TV.
 
 Thử OTA không cần phát hành thật: bản debug hỏi `http://127.0.0.1:8765/latest.json` (cùng định dạng GitHub API).
@@ -113,9 +119,21 @@ một chất lượng, đoạn 10–19 s ngụy trang ảnh PNG trên CDN). JW �
 `maxMaxBufferLength = 1` (chỉ tải trước một đoạn). `player-agent.js` bọc `jwplayer(...).setup`, chạy `onHlsInit` của
 trang rồi đặt `maxBufferLength` 120 s, bỏ qua lệnh ép < 10 s; agent báo `ahead` (giây đã tải trước) để đo.
 
+Trang Next.js (từ 1.7, phimmoir.fun — `NextSite.kt`): không đọc HTML mà đọc dữ liệu trong các đoạn
+`self.__next_f.push([1,"…"])` của trang (phim, đủ danh sách tập theo từng ngôn ngữ, server, link video). Server cho link
+`.m3u8` (KK Phim, server HD của trang) → `PlayerActivity` dựng `assets/hls.html` (origin = địa chỉ tập) với hls.js
+1.5.20 light đóng kèm (`assets/hls.light.min.js`, trả ở đường dẫn `/__chimto/hls.js`), agent nằm ngay trong trang,
+bộ đệm 120 s. hls.js bỏ khối quảng cáo ~30 s chèn giữa phim (khối DISCONTINUITY mà mọi đoạn đều dạng
+`/vN/<32 hex>/segment_NNNN.ts`; khối `convertvN/` là phim có chữ quảng cáo đè lên — giữ). Phụ đề rời của server HD
+(WebVTT ngụy trang ảnh PNG) được bóc phần ảnh rồi gắn `<track>`. NguonC chỉ có trình phát nhúng (có Cloudflare
+Turnstile — cố ý không gỡ để lấy link) → chạy qua iframe như các trang khác; agent tự bỏ qua quảng cáo JW
+(`.jw-flag-ads`, nút bỏ qua) và chọn "Xem lại từ đầu" ở hộp thoại xem tiếp của trình phát (app tự tua tới chỗ cũ).
+Test: `.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.NextSiteTest`.
+
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server
-trong `Prefs.playStats`. Cách chọn / gợi ý server (cùng ngôn ngữ, không nét hơn khi chưa thử) có test riêng:
+trong `Prefs.playStats`. Cách chọn / gợi ý server (cùng ngôn ngữ, không nét hơn khi chưa thử; server quen mà "hay
+lỗi" thì lúc mở tập sang server cùng ngôn ngữ còn phát được) có test riêng:
 `.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.PlayStatsTest`.
 
 Bộ đọc trang nằm ở `Site.kt`. Kiểm tra nó trên HTML thật đã tải về (không cần TV):
