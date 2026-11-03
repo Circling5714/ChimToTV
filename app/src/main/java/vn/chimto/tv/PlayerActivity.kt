@@ -202,8 +202,8 @@ class PlayerActivity : Activity() {
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             useWideViewPort = true
             loadWithOverviewMode = true
-            userAgentString = AdBlock.browserUserAgent(userAgentString)
         }
+        Privacy.apply(web)
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
 
@@ -275,7 +275,12 @@ class PlayerActivity : Activity() {
 
     private fun fetchWithAgent(url: String, requestHeaders: Map<String, String>): WebResourceResponse {
         val headers = HashMap<String, String>()
-        for ((k, v) in requestHeaders) if (!k.equals("Accept-Encoding", true)) headers[k] = v
+        for ((k, v) in requestHeaders) {
+            if (k.equals("Accept-Encoding", true)) continue
+            // Header WebView chép sang có thể còn tên gói app — không gửi (xem Privacy); "XMLHttpRequest" thì giữ
+            if (k.equals("X-Requested-With", true) && v == packageName) continue
+            headers[k] = v
+        }
         if (url == embedUrl || headers.keys.none { it.equals("Referer", true) }) {
             headers.keys.removeAll { it.equals("Referer", true) }
             headers["Referer"] = episodeUrl

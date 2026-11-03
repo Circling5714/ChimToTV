@@ -11,7 +11,8 @@ import java.net.URLEncoder
 import java.nio.charset.Charset
 
 object Http {
-    const val UA = "Mozilla/5.0 (Linux; Android 11; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    /** Cùng User-Agent rút gọn với WebView của app (xem Privacy). */
+    val UA: String get() = Privacy.userAgent
 
     class Response(val url: String, val code: Int, val body: String)
 

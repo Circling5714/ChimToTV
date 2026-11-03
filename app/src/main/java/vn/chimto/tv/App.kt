@@ -7,6 +7,7 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
+        Privacy.init(this)
         AppProxy.apply()
         ImageLoader.init(this)
         if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)

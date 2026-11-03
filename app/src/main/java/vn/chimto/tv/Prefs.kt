@@ -81,6 +81,11 @@ object Prefs {
         }
         set(value) = sp.edit().putString("play_stats", value.toString()).apply()
 
+    /** User-Agent rút gọn dựng từ WebView của máy (xem Privacy), để Http.kt có ngay lúc mở app. */
+    var userAgent: String?
+        get() = sp.getString("ua_reduced", null)
+        set(value) = sp.edit().putString("ua_reduced", value).apply()
+
     // ---- Proxy SOCKS5 (xem AppProxy) ----
 
     var proxyOn: Boolean

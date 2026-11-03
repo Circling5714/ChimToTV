@@ -69,8 +69,8 @@ class WebActivity : Activity() {
             useWideViewPort = true
             loadWithOverviewMode = true
             setSupportZoom(false)
-            userAgentString = AdBlock.browserUserAgent(userAgentString)
         }
+        Privacy.apply(web)
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
 
         web.webViewClient = object : WebViewClient() {

@@ -18,8 +18,4 @@ object AdBlock {
     }
 
     fun empty() = WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
-
-    /** UA của WebView có "; wv" — một số trình phát chặn WebView, nên giả làm Chrome thường. */
-    fun browserUserAgent(webViewUa: String): String =
-        webViewUa.replace("; wv", "").replace(Regex("""Version/\d+(\.\d+)* """), "")
 }
