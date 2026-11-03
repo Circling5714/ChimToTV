@@ -6,6 +6,7 @@
 <style>
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
   video { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; }
+  video::cue { background: rgba(0, 0, 0, .6); }
 </style>
 <script>{{AGENT}}</script>
 </head>
@@ -17,9 +18,23 @@
 // (PlayerActivity trả tệp cho đường dẫn /__chimto/hls.js). player-agent.js ở trên điều khiển <video> như mọi trang.
 // Lỗi hẳn (vd server chết, không tải được video) thì đặt window.__chimtoErr để app báo và gợi ý đổi server.
 (function () {
-  var SRC = {{SRC}}, BUFFER = 120;
+  var SRC = {{SRC}}, SUB = {{SUB}}, BUFFER = 120;
   var v = document.getElementById('v');
   window.__chimtoBuffer = BUFFER;
+
+  // Phụ đề rời (bản Song Ngữ của server HD không in chữ vào hình): tệp WebVTT ngụy trang ảnh PNG (ảnh 1×1 đứng
+  // trước chữ "WEBVTT") → tải về, bỏ phần ảnh, gắn vào <video> dạng track để WebView tự hiện chữ.
+  if (SUB) {
+    fetch(SUB).then(function (r) { return r.text(); }).then(function (t) {
+      var i = t.indexOf('WEBVTT');
+      if (i < 0) return;
+      var tr = document.createElement('track');
+      tr.kind = 'subtitles'; tr.srclang = 'vi'; tr.default = true;
+      tr.src = URL.createObjectURL(new Blob([t.slice(i)], { type: 'text/vtt' }));
+      v.appendChild(tr);
+      tr.track.mode = 'showing';
+    }).catch(function () {});
+  }
 
   // KKPhim chèn quảng cáo cờ bạc ~30 s giữa phim: một khối DISCONTINUITY mà mọi đoạn đều có dạng
   // /vN/<32 ký tự hex>/segment_NNNN.ts (đoạn phim tên ngẫu nhiên nằm cạnh index.m3u8) → bỏ cả khối.

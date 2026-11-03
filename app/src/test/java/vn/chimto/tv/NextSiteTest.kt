@@ -94,11 +94,24 @@ class NextSiteTest {
         assertTrue(s.next)
         assertTrue(!s.pageMode)
         assertEquals(listOf("kk" to "KK Phim", "nc" to "NguonC"), s.servers.map { it.type to it.label })
-        assertEquals(mapOf("kk" to "https://cdn.test/a/index.m3u8"), s.links)
+        assertEquals(mapOf("kk" to Video("https://cdn.test/a/index.m3u8")), s.links)
         assertEquals("tap-3", s.ep)
         // Server chỉ có trình phát nhúng: dùng link_embed
         val embed = Site.parseSource(page(epUrl, data.replace("https://cdn.test/a/index.m3u8", "")), epUrl)
-        assertEquals("https://player.test/?url=x", embed.links["kk"])
+        assertEquals("https://player.test/?url=x", embed.links["kk"]?.url)
+    }
+
+    @Test
+    fun ownServerWithSubtitles() {
+        // Server HD của trang (bản Song Ngữ): link cùng tên miền, phụ đề rời — chọn bản mặc định
+        val epUrl = "$base/xem-phim/bac-si-x/tap-1/song-ngu"
+        val data = """{"episode":{"episodes":${eps(1, "song-ngu")},"current_language":"song-ngu",""" +
+            """"episode_sources":[{"server":{"id":9,"name":"HD","slug":"hd"},"language":{"name":"Song Ngữ","slug":"song-ngu"},"is_lock":false}],""" +
+            """"current_server":{"id":9,"name":"HD","slug":"hd"},"video":{"id":1,"link_embed":"/embed/v2/abc","link_m3u8":"/public/m3u8/job_1.m3u8",""" +
+            """"is_embed":false,"subtitles":[{"url":"https://sub.test/zh","lang":"chi","label":"Chinese","isDefault":false},""" +
+            """{"url":"https://sub.test/vi","lang":"vie","label":"Vietnamese","isDefault":true}]}}}"""
+        val s = Site.parseSource(page(epUrl, data), epUrl)
+        assertEquals(Video("$base/public/m3u8/job_1.m3u8", "https://sub.test/vi"), s.links["hd"])
     }
 
     @Test

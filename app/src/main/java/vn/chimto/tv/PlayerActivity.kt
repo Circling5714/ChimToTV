@@ -379,14 +379,17 @@ class PlayerActivity : Activity() {
         val t = ++token
         stopVideo()
         showLoading("Đang tải ${s?.label ?: "trình phát"}…")
-        background({ Site.embedUrl(src, s) }) { r ->
+        background({ Site.video(src, s) }) { r ->
             if (t != token) return@background
-            r.onSuccess { url ->
+            r.onSuccess { v ->
+                val url = v.url
                 loadStartedAt = System.currentTimeMillis()
                 session = PlaySession(Site.hostOf(src.epUrl), s?.type ?: "embed", loadStartedAt)
                 if (Uri.parse(url).path.orEmpty().endsWith(".m3u8")) {
                     hlsUrl = url
-                    val page = hlsHtml.replace("{{SRC}}", JSONObject.quote(url)).replace("{{AGENT}}", agentJs)
+                    val page = hlsHtml.replace("{{SRC}}", JSONObject.quote(url))
+                        .replace("{{SUB}}", v.subtitle?.let { JSONObject.quote(it) } ?: "null")
+                        .replace("{{AGENT}}", agentJs)
                     web.loadDataWithBaseURL(src.epUrl, page, "text/html", "utf-8", null)
                 } else {
                     embedUrl = url

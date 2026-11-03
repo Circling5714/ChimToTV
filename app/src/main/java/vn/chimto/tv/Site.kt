@@ -35,6 +35,9 @@ data class FilmDetail(
 
 data class Server(val label: String, val type: String)
 
+/** Link phát của một server: iframe trình phát / trang tập, hoặc luồng .m3u8 (kèm phụ đề rời nếu có). */
+data class Video(val url: String, val subtitle: String? = null)
+
 /**
  * Cách phát một tập.
  * - Có player.php (yanhh3d, hoathinh3d.ee, hhkungfu): xin địa chỉ iframe rồi phát trong trang bọc của app.
@@ -46,7 +49,7 @@ data class Server(val label: String, val type: String)
 data class EpisodeSource(
     val epUrl: String, val servers: List<Server>, val postId: String, val ep: String, val sv: String,
     val playerUrl: String?, val directEmbed: String?, val pageMode: Boolean,
-    val links: Map<String, String> = emptyMap(), val next: Boolean = false,
+    val links: Map<String, Video> = emptyMap(), val next: Boolean = false,
 )
 
 /**
@@ -329,15 +332,15 @@ object Site {
     }
 
     /** Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server (trang Next.js: link .m3u8 / iframe). */
-    fun embedUrl(src: EpisodeSource, server: Server?): String {
+    fun video(src: EpisodeSource, server: Server?): Video {
         if (src.next) return NextSite.video(src, server ?: throw IOException("Không có server"))
         val playerUrl = src.playerUrl
-        if (server == null || playerUrl == null) return src.directEmbed ?: throw IOException("Không có server")
+        if (server == null || playerUrl == null) return Video(src.directEmbed ?: throw IOException("Không có server"))
         val url = playerUrl + "?action=dox_ajax_player&post_id=" + enc(src.postId) +
             "&chapter_st=" + enc(src.ep) + "&type=" + enc(server.type) + "&sv=" + enc(src.sv)
         val r = Http.get(url, mapOf("Referer" to src.epUrl, "X-Requested-With" to "XMLHttpRequest"))
         val doc = Jsoup.parse(r.body, src.epUrl)
-        doc.selectFirst("iframe[src]")?.absUrl("src")?.takeIf { it.startsWith("http") }?.let { return it }
+        doc.selectFirst("iframe[src]")?.absUrl("src")?.takeIf { it.startsWith("http") }?.let { return Video(it) }
         throw IOException("Server \"${server.label}\" chưa có video cho tập này")
     }
 

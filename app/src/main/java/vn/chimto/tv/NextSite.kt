@@ -10,6 +10,7 @@ import java.io.IOException
 import java.net.URL
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.concurrent.thread
 
 /**
  * Trang phim dựng bằng Next.js, giao diện kiểu "PhimMoi" (vd phimmoir.fun; nguồn KKPhim / NguonC / OPhim).
@@ -26,12 +27,20 @@ object NextSite {
     private val MOVIE = Regex("""\{"id":\d+,"name":"""")
     private val PAGING = Regex(""""total":(\d+),"page":(\d+),"limit":(\d+)""")
 
-    /** Trang không có sẵn mục hoạt hình trên menu → thêm mục cố định (đường dẫn bộ lọc của chính trang). */
+    /**
+     * Menu của trang chỉ có 10 thể loại, không có mục hoạt hình / quốc gia → thêm mục cố định (đường dẫn bộ lọc
+     * của chính trang, mới cập nhật lên đầu).
+     */
     private val MENU = listOf(
         "Hoạt hình Trung Quốc" to "/loc-phim?genre=hoat-hinh&country=trung-quoc&sort=updated_at&order=desc",
         "Hoạt hình" to "/loc-phim?genre=hoat-hinh&sort=updated_at&order=desc",
         "Phim bộ mới" to "/loc-phim?type=phim-bo&sort=updated_at&order=desc",
         "Phim lẻ mới" to "/loc-phim?type=phim-le&sort=updated_at&order=desc",
+        "Phim Hàn Quốc" to "/loc-phim?country=han-quoc&sort=updated_at&order=desc",
+        "Phim Trung Quốc" to "/loc-phim?country=trung-quoc&sort=updated_at&order=desc",
+        "Phim Âu Mỹ" to "/loc-phim?country=au-my&sort=updated_at&order=desc",
+        "Phim Nhật Bản" to "/loc-phim?country=nhat-ban&sort=updated_at&order=desc",
+        "Phim Thái Lan" to "/loc-phim?country=thai-lan&sort=updated_at&order=desc",
     )
 
     /** Trang đã gặp là Next.js (để tìm kiếm đi thẳng /tim-kiem thay cho ?s= của WordPress). */
@@ -109,25 +118,30 @@ object NextSite {
 
     // ---- Chi tiết phim ----
 
-    /** Chi tiết + danh sách tập của các ngôn ngữ khác (trang phim chỉ có sẵn danh sách của một ngôn ngữ). */
+    /**
+     * Chi tiết + danh sách tập của các ngôn ngữ khác (trang phim chỉ có sẵn danh sách của một ngôn ngữ; phim có thể
+     * có tới 4: Vietsub, Thuyết Minh, Lồng Tiếng, Song Ngữ → tải song song, TV mạng chậm đỡ chờ).
+     */
     fun detail(doc: Document, data: String, url: String): FilmDetail {
         val d = parseDetail(doc, data, url)
         val ep = episodeData(data) ?: return d
         val origin = origin(doc)
         val slug = movie(data, url)?.let { str(it, "slug") }.orEmpty().ifEmpty { return d }
         val firstEp = d.groups.firstOrNull()?.episodes?.firstOrNull()?.url?.let { epSlug(it) }?.ifEmpty { null } ?: "tap-1"
-        val groups = d.groups.toMutableList()
-        for ((lang, name) in languages(ep)) {
-            if (groups.any { it.name == name }) continue
-            val server = bestServer(ep, lang) ?: continue
-            runCatching {
-                val r = Http.get("$origin/xem-phim/$slug/$firstEp/$lang?server=$server")
-                val page = Jsoup.parse(r.body, r.url)
-                val e = episodeData(data(page) ?: return@runCatching null) ?: return@runCatching null
-                if (str(e, "current_language") != lang) null else episodes(e, origin, slug, lang)
-            }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { groups += EpisodeGroup(name, it) }
-        }
-        return d.copy(groups = groups)
+        val extra = languages(ep).entries.filter { (_, name) -> d.groups.none { it.name == name } }
+        val found = arrayOfNulls<EpisodeGroup>(extra.size)
+        extra.mapIndexed { i, (lang, name) ->
+            thread {
+                val server = bestServer(ep, lang) ?: return@thread
+                found[i] = runCatching {
+                    val r = Http.get("$origin/xem-phim/$slug/$firstEp/$lang?server=$server")
+                    val page = Jsoup.parse(r.body, r.url)
+                    val e = episodeData(data(page) ?: return@runCatching null) ?: return@runCatching null
+                    if (str(e, "current_language") != lang) null else episodes(e, origin, slug, lang)
+                }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { EpisodeGroup(name, it) }
+            }
+        }.forEach { it.join() }
+        return d.copy(groups = d.groups + found.filterNotNull())
     }
 
     fun parseDetail(doc: Document, data: String, url: String): FilmDetail {
@@ -215,7 +229,7 @@ object NextSite {
         }
         servers = servers.filter { it.type.isNotEmpty() }.distinctBy { it.type }.map { if (it.label.isEmpty()) it.copy(label = it.type) else it }
         val cur = currentServer(ep)
-        val links = videoLink(ep)?.takeIf { cur.isNotEmpty() }?.let { mapOf(cur to it) }.orEmpty()
+        val links = videoOf(ep, origin(doc))?.takeIf { cur.isNotEmpty() }?.let { mapOf(cur to it) }.orEmpty()
         return EpisodeSource(epUrl, servers, "", epSlug(epUrl), "", null, null, false, links, next = true)
     }
 
@@ -223,13 +237,14 @@ object NextSite {
     private fun epSlug(epUrl: String) = epUrl.trimEnd('/').split('/').let { it.getOrNull(it.size - 2) }.orEmpty()
 
     /** Link video của một server: đã có sẵn thì dùng, không thì mở trang tập với ?server=… để lấy. */
-    fun video(src: EpisodeSource, server: Server): String {
+    fun video(src: EpisodeSource, server: Server): Video {
         src.links[server.type]?.let { return it }
         val r = Http.get(src.epUrl + "?server=" + URLEncoder.encode(server.type, "UTF-8"))
-        val ep = data(Jsoup.parse(r.body, r.url))?.let { episodeData(it) } ?: throw IOException("Không đọc được trang tập phim")
+        val doc = Jsoup.parse(r.body, r.url)
+        val ep = data(doc)?.let { episodeData(it) } ?: throw IOException("Không đọc được trang tập phim")
         // Tập chưa có trên server này thì trang tự mở server khác → coi như chưa có
         if (currentServer(ep) != server.type) throw IOException("Server \"${server.label}\" chưa có video cho tập này")
-        return videoLink(ep) ?: throw IOException("Server \"${server.label}\" chưa có video cho tập này")
+        return videoOf(ep, origin(doc)) ?: throw IOException("Server \"${server.label}\" chưa có video cho tập này")
     }
 
     private fun currentServer(ep: JSONObject): String = when (val c = ep.opt("current_server")) {
@@ -238,8 +253,19 @@ object NextSite {
         else -> ""
     }
 
-    private fun videoLink(ep: JSONObject): String? =
-        ep.optJSONObject("video")?.let { v -> str(v, "link_m3u8").ifEmpty { str(v, "link_embed") } }?.takeIf { it.startsWith("http") }
+    /** Server riêng của trang ("HD") cho link dạng /public/m3u8/… (cùng tên miền) và phụ đề rời. */
+    private fun videoOf(ep: JSONObject, origin: String): Video? {
+        val v = ep.optJSONObject("video") ?: return null
+        val url = str(v, "link_m3u8").ifEmpty { str(v, "link_embed") }.ifEmpty { return null }
+        return Video(abs(origin, url), subtitle(v.optJSONArray("subtitles"), origin))
+    }
+
+    /** Phụ đề rời (bản Song Ngữ của server HD không in chữ vào hình): bản mặc định, không có thì tiếng Việt. */
+    private fun subtitle(a: JSONArray?, origin: String): String? {
+        val subs = objects(a).filter { str(it, "url").isNotEmpty() }
+        val s = subs.firstOrNull { it.optBoolean("isDefault") } ?: subs.firstOrNull { str(it, "lang") == "vie" } ?: subs.firstOrNull()
+        return s?.let { abs(origin, str(it, "url")) }
+    }
 
     // ---- Tiện ích ----
 
