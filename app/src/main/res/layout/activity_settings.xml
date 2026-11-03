@@ -48,7 +48,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d và theme HaLim (hoathinh3d, hhkungfu…). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật."
+            android:text="Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…) và kiểu PhimMoi (phimmoir). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật."
             android:textColor="@color/text_dim"
             android:textSize="14sp" />
 
