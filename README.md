@@ -62,6 +62,22 @@ loại trên menu của trang; thể loại / nước khác thì dùng **Tìm ki
   "không đọc được phim" = vào được nhưng không có danh sách phim (có thể là trang chặn của nhà mạng).
 - **Trang đổi giao diện** (app không đọc được danh sách): dùng mục **Duyệt web** để xem bằng con trỏ.
 
+## Proxy SOCKS5
+
+**Cài đặt → Proxy SOCKS5** (từ 1.8.0, mặc định tắt):
+
+- Nhập máy chủ, cổng, tên đăng nhập / mật khẩu (bỏ trống nếu proxy không cần), hoặc dán nguyên
+  `socks5://user:pass@máy-chủ:cổng`. **Kiểm tra proxy** thử ngay (chưa cần lưu): báo IP ra ngoài, nơi đặt máy, thời
+  gian. **Proxy: Bật / Tắt** — tắt thì app đi mạng mặc định của TV.
+- **DNS: của proxy** (proxy tự tìm địa chỉ trang — vượt được chặn tên miền của nhà mạng) / **của thiết bị** (TV tự tìm
+  rồi chỉ gửi IP cho proxy).
+- **Dùng cho: toàn bộ app** (trang, ảnh, video, kiểm tra cập nhật) / **chỉ trang phim** (chỉ các trang trong danh sách;
+  video, ảnh từ CDN, GitHub đi thẳng mạng nhà — đỡ tốn proxy).
+- Proxy lỗi (chết, sai mật khẩu) thì app báo rõ, **không tự đi thẳng**; màn hình chính ghi "· proxy" khi đang bật.
+  Máy chủ video có thể chặn IP của proxy (đã gặp với CDN của KK Phim trên phimmoir.fun): video lỗi khi bật proxy thì
+  chọn "chỉ trang phim".
+- Mật khẩu proxy lưu trong bộ nhớ riêng của app (app khác không đọc được), không mã hoá.
+
 ## Dựng lại
 
 ```powershell
@@ -82,7 +98,7 @@ Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ l�
 1. Tăng `versionCode` / `versionName` trong `app/build.gradle.kts`.
 2. `.\build.ps1` → `dist\ChimToTV-<phiên bản>.apk` (ký bằng `keys\` — phải cùng khoá thì app mới nhận).
 3. Tạo release tag `v<phiên bản>` và đính kèm APK, ví dụ:
-   `gh release create v1.7 dist\ChimToTV-1.7.apk --title "Côn Bằng TV 1.7" --notes-file ghi-chu.md`
+   `gh release create v1.8.0 dist\ChimToTV-1.8.0.apk --title "Côn Bằng TV 1.8.0" --notes-file ghi-chu.md`
    Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập nhật trên TV.
 
 Thử OTA không cần phát hành thật: bản debug hỏi `http://127.0.0.1:8765/latest.json` (cùng định dạng GitHub API).
@@ -129,6 +145,14 @@ bộ đệm 120 s. hls.js bỏ khối quảng cáo ~30 s chèn giữa phim (kh�
 Turnstile — cố ý không gỡ để lấy link) → chạy qua iframe như các trang khác; agent tự bỏ qua quảng cáo JW
 (`.jw-flag-ads`, nút bỏ qua) và chọn "Xem lại từ đầu" ở hộp thoại xem tiếp của trình phát (app tự tua tới chỗ cũ).
 Test: `.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.NextSiteTest`.
+
+Proxy (từ 1.8.0 — `AppProxy.kt`, `Socks5.kt`): WebView (Chromium) không đăng nhập được SOCKS5 có mật khẩu và luôn
+để proxy phân giải tên miền, nên app mở cổng SOCKS5 nội bộ `Socks5Bridge` (chỉ nghe 127.0.0.1, không mật khẩu). WebView
+(androidx.webkit `ProxyController`, bản 1.14 — bản cuối còn chạy Android 5) và `Http.kt` đều đi qua cổng này; cổng nội
+bộ đăng nhập proxy thật (RFC 1929), gửi tên miền (DNS của proxy) hoặc tự phân giải rồi gửi IP (DNS của thiết bị), ở chế
+độ "chỉ trang phim" cho đích khác đi thẳng. Đổi cài đặt → mở cổng mới, đóng kết nối cũ (kết nối keep-alive không giữ
+cài đặt cũ). Điểm server khi video đi qua proxy chấm riêng (`<trang>·proxy`). Test:
+`.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.Socks5BridgeTest` (proxy SOCKS5 giả trong test).
 
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server
