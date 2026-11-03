@@ -40,15 +40,19 @@ data class Server(val label: String, val type: String)
  * - Có player.php (yanhh3d, hoathinh3d.ee, hhkungfu): xin địa chỉ iframe rồi phát trong trang bọc của app.
  * - pageMode: trang tự nạp trình phát bằng cơ chế riêng (vd hoathinh3d.pw có khoá xác thực) → mở thẳng
  *   trang tập trong WebView, app chỉ phóng trình phát ra toàn màn hình.
+ * - next: trang Next.js (phimmoir.fun) — link video (.m3u8 hoặc trình phát nhúng) đọc từ dữ liệu trang tập;
+ *   links = link đã có sẵn theo server.
  */
 data class EpisodeSource(
     val epUrl: String, val servers: List<Server>, val postId: String, val ep: String, val sv: String,
     val playerUrl: String?, val directEmbed: String?, val pageMode: Boolean,
+    val links: Map<String, String> = emptyMap(), val next: Boolean = false,
 )
 
 /**
  * Đọc dữ liệu từ trang phim. Không viết riêng cho từng trang: nhận dạng theo các mẫu giao diện phổ biến của
  * trang hoạt hình 3D (thẻ "flw-item" kiểu yanhh3d, thẻ "halim-item" của theme HaLim) và có phương án dự phòng.
+ * Trang dựng bằng Next.js (kiểu PhimMoi) thì chuyển cho NextSite.
  * Mọi đường dẫn lấy từ chính trang → đổi tên miền / thêm trang tương tự trong Cài đặt là chạy.
  */
 object Site {
@@ -72,7 +76,8 @@ object Site {
     fun home(base: String = Prefs.baseUrl): Home {
         val doc = fetch("$base/")
         val movedTo = originOf(doc.location())?.takeIf { hostOf(it) != hostOf(base) }
-        return parseHome(doc).copy(movedTo = movedTo)
+        val home = NextSite.data(doc)?.let { NextSite.home(doc, it) } ?: parseHome(doc)
+        return home.copy(movedTo = movedTo)
     }
 
     /** Thời gian tính phần tải qua mạng, không tính lúc đọc HTML (TV yếu đọc chậm, không phải lỗi của trang). */
@@ -85,6 +90,7 @@ object Site {
 
     /** Gom thẻ phim theo tiêu đề khối đứng trước nó (theo thứ tự trong trang). */
     fun parseHome(doc: Document): Home {
+        NextSite.data(doc)?.let { return NextSite.parseHome(doc, it) }
         val groups = LinkedHashMap<Element?, MutableList<Element>>()
         var heading: Element? = null
         for (el in doc.select("$HEADING, $CARD")) {
@@ -161,6 +167,7 @@ object Site {
     }
 
     fun parseList(doc: Document, url: String): FilmPage {
+        NextSite.data(doc)?.let { return NextSite.parseList(doc, it, url) }
         val main = doc.select("#main-content, #main-contents, main").firstOrNull { parseCards(it).isNotEmpty() }
         // Trang lịch chiếu yanhh3d: khung chính trống, chỉ có bảng xếp hạng ở cột phụ → để list() nạp theo ngày
         val films = when {
@@ -192,15 +199,29 @@ object Site {
         }
     }
 
-    /** Trang WordPress nhận ?s= (trang HaLim tự chuyển sang /search/…). */
-    fun search(query: String): FilmPage =
-        list("${Prefs.baseUrl}/?s=" + URLEncoder.encode(query.trim(), "UTF-8"))
+    /**
+     * Trang WordPress nhận ?s= (trang HaLim tự chuyển sang /search/…); trang Next.js tìm ở /tim-kiem
+     * (chưa biết loại trang thì thử ?s= trước, ra trang Next.js thì tìm lại đúng chỗ).
+     */
+    fun search(query: String): FilmPage {
+        val base = Prefs.baseUrl
+        if (!NextSite.isKnown(base)) {
+            val page = list("$base/?s=" + URLEncoder.encode(query.trim(), "UTF-8"))
+            if (!NextSite.isKnown(base)) return page
+        }
+        return list(NextSite.searchUrl(base, query))
+    }
 
     // ---- Chi tiết phim ----
 
-    fun detail(url: String): FilmDetail = parseDetail(fetch(url), url).also { detailCache.put(url, it) }
+    fun detail(url: String): FilmDetail {
+        val doc = fetch(url)
+        val d = NextSite.data(doc)?.let { NextSite.detail(doc, it, url) } ?: parseDetail(doc, url)
+        return d.also { detailCache.put(url, it) }
+    }
 
     fun parseDetail(doc: Document, url: String): FilmDetail {
+        NextSite.data(doc)?.let { return NextSite.parseDetail(doc, it, url) }
         val title = doc.selectFirst(".anisc-detail .film-name, h1.film-name, h1")?.text()?.trim()
             ?.takeIf { it.isNotEmpty() } ?: meta(doc, "og:title") ?: url
         val other = doc.selectFirst(".film-name-real, .info-hero__alt, .movie-detail .original_title, h2.org_title")
@@ -276,6 +297,7 @@ object Site {
     fun source(epUrl: String): EpisodeSource = parseSource(fetch(epUrl), epUrl)
 
     fun parseSource(doc: Document, epUrl: String): EpisodeSource {
+        NextSite.data(doc)?.let { return NextSite.parseSource(doc, it, epUrl) }
         val scripts = doc.select("script").joinToString("\n") { it.data() }
         val servers = doc.select("#list_sv [data-type], .get-eps[data-type], .btn3dsv[data-type]")
             .map { Server(it.text().trim(), it.attr("data-type")) }
@@ -306,8 +328,9 @@ object Site {
         return EpisodeSource(epUrl, servers, postId, ep, sv, playerUrl, direct, pageMode)
     }
 
-    /** Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server. */
+    /** Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server (trang Next.js: link .m3u8 / iframe). */
     fun embedUrl(src: EpisodeSource, server: Server?): String {
+        if (src.next) return NextSite.video(src, server ?: throw IOException("Không có server"))
         val playerUrl = src.playerUrl
         if (server == null || playerUrl == null) return src.directEmbed ?: throw IOException("Không có server")
         val url = playerUrl + "?action=dox_ajax_player&post_id=" + enc(src.postId) +

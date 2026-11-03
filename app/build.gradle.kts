@@ -70,4 +70,6 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
     testImplementation("junit:junit:4.13.2")
+    // org.json của Android trong test JVM chỉ là vỏ rỗng — NextSite đọc JSON nên test cần bản thật
+    testImplementation("org.json:json:20240303")
 }

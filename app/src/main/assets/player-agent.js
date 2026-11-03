@@ -1,5 +1,5 @@
 // Chèn vào đầu mọi tài liệu iframe của trình phát (xem PlayerActivity.shouldInterceptRequest),
-// và vào khung trên cùng khi app mở thẳng trang tập phim (chế độ pageMode).
+// vào khung trên cùng khi app mở thẳng trang tập phim (chế độ pageMode), và vào trang phát HLS của app (hls.html).
 // Nhận lệnh {chimto:'cmd'} qua postMessage, điều khiển <video>, báo trạng thái {chimto:'state'} lên khung cha.
 // Khung không có <video> thì chuyển lệnh xuống iframe con, và chuyển trạng thái của con lên trên.
 // Ở khung trên cùng: lưu trạng thái vào window.__chimtoState và cung cấp window.chimtoCmd() cho app gọi.
@@ -7,7 +7,7 @@
   if (window.__chimtoAgent) return;
   window.__chimtoAgent = 1;
   var isTop = window.top === window;
-  var userActed = false;
+  var userActed = false, restarted = false;
 
   // Ẩn thanh điều khiển của jwplayer — app đã có thanh thời gian riêng điều khiển bằng remote.
   try {
@@ -78,6 +78,15 @@
     if (focus) return focus.tagName === 'VIDEO' ? focus : focus.querySelector('video');
     return document.querySelector('video');
   }
+  // Quảng cáo của trình phát JW (vd NguonC chạy quảng cáo cá cược ~2 phút trước phim): báo app là đang quảng cáo
+  // (app không coi là phim: không tua, không nhớ vị trí) và bỏ qua ngay khi trình phát cho phép.
+  function adPlaying() { return !!document.querySelector('.jwplayer.jw-flag-ads'); }
+  function skipAd() {
+    var b = document.querySelector('.jw-skip.jw-skippable');
+    if (b) { b.click(); return; }
+    try { var p = window.jwplayer && window.jwplayer(); if (p && p.skipAd) p.skipAd(); } catch (e) {}
+  }
+
   function up(msg) {
     if (isTop) { window.__chimtoState = msg; return; }
     try { window.parent.postMessage(msg, '*'); } catch (e) {}
@@ -87,6 +96,7 @@
     for (var i = 0; i < fs.length; i++) try { fs[i].contentWindow.postMessage(msg, '*'); } catch (e) {}
   }
   function state() {
+    if (adPlaying()) return { chimto: 'state', ad: true };
     var v = video();
     if (!v) return null;
     // Khung hình rớt (TV giải mã / vẽ không kịp) — để app phân biệt "TV yếu" với "mạng chậm"
@@ -101,15 +111,24 @@
       waiting: !v.paused && v.readyState < 3,
       df: q ? q.droppedVideoFrames : (v.webkitDroppedFrameCount || 0),
       tf: q ? q.totalVideoFrames : (v.webkitDecodedFrameCount || 0),
-      ahead: Math.round(ahead), buf: window.__chimtoBuffer || 0
+      ahead: Math.round(ahead), buf: window.__chimtoBuffer || 0,
+      err: window.__chimtoErr || '' // trang phát HLS của app (hls.html) báo lỗi hẳn
     };
   }
-  function play(v) { var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+  function play(v) {
+    // JW Player còn ở màn "bấm để phát" (trình phát không tự phát, vd NguonC) → nhờ JW phát để nó tắt màn đó
+    try {
+      var jw = window.jwplayer && window.jwplayer();
+      if (jw && jw.getState && jw.getState() === 'idle') { jw.play(); return; }
+    } catch (e) {}
+    var p = v.play(); if (p && p.catch) p.catch(function () {});
+  }
 
   function handle(m) {
     var v = video();
     if (!v) { down(m); return; }
-    userActed = true;
+    // Chỉ phím phát / dừng mới tắt tự phát (lệnh tua có thể là app tua tới chỗ xem dở ngay lúc mở)
+    if (m.cmd === 'toggle' || m.cmd === 'play' || m.cmd === 'pause') userActed = true;
     switch (m.cmd) {
       case 'toggle': if (v.paused) play(v); else v.pause(); break;
       case 'play': play(v); break;
@@ -146,7 +165,11 @@
   }
 
   setInterval(function () {
-    unstick(video());
+    if (adPlaying()) skipAd(); else unstick(video());
+    // NguonC tự hỏi "Tiếp tục xem?" và chờ bấm (remote không bấm được trong iframe): app đã tự nhớ chỗ xem dở
+    // và tua tới đó khi phim chạy → chọn "Xem lại từ đầu"
+    var restart = !restarted && document.querySelector('.stream-resume #restartBtn');
+    if (restart && restart.getBoundingClientRect().width > 0) { restarted = true; restart.click(); }
     var s = state(); if (s) up(s);
   }, 1000);
 

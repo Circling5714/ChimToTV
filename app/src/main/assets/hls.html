@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+  video { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; }
+</style>
+<script>{{AGENT}}</script>
+</head>
+<body>
+<video id="v" playsinline></video>
+<script src="/__chimto/hls.js"></script>
+<script>
+// Phát thẳng luồng HLS (.m3u8) của trang Next.js kiểu PhimMoi (nguồn KKPhim…) bằng hls.js đóng kèm app
+// (PlayerActivity trả tệp cho đường dẫn /__chimto/hls.js). player-agent.js ở trên điều khiển <video> như mọi trang.
+// Lỗi hẳn (vd server chết, không tải được video) thì đặt window.__chimtoErr để app báo và gợi ý đổi server.
+(function () {
+  var SRC = {{SRC}}, BUFFER = 120;
+  var v = document.getElementById('v');
+  window.__chimtoBuffer = BUFFER;
+
+  // KKPhim chèn quảng cáo cờ bạc ~30 s giữa phim: một khối DISCONTINUITY mà mọi đoạn đều có dạng
+  // /vN/<32 ký tự hex>/segment_NNNN.ts (đoạn phim tên ngẫu nhiên nằm cạnh index.m3u8) → bỏ cả khối.
+  // Khối convertvN/… (~24 s) là phim có dòng chữ quảng cáo đè lên: giữ lại, bỏ là mất đoạn phim.
+  var AD = /\/v\d+\/[0-9a-f]{32}\/segment_\d+\.ts/;
+  function isUri(l) { return l && l.charAt(0) !== '#'; }
+  function strip(text) {
+    if (text.indexOf('#EXT-X-DISCONTINUITY') < 0) return text;
+    var lines = text.split('\n'), out = [], blocks = [], cur = null, i;
+    for (i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      if (l.indexOf('#EXT-X-DISCONTINUITY') === 0 && l.indexOf('#EXT-X-DISCONTINUITY-SEQUENCE') !== 0) {
+        cur = [l];
+        blocks.push(cur);
+      } else if (cur || l.indexOf('#EXTINF') === 0 || isUri(l)) {
+        if (!cur) blocks.push(cur = []);
+        cur.push(l);
+      } else {
+        out.push(l); // phần đầu danh sách (#EXTM3U, #EXT-X-TARGETDURATION…)
+      }
+    }
+    for (i = 0; i < blocks.length; i++) {
+      var segs = blocks[i].filter(isUri);
+      if (segs.length && segs.every(function (u) { return AD.test(u); })) continue;
+      out = out.concat(blocks[i]);
+    }
+    return out.join('\n');
+  }
+
+  if (!window.Hls || !Hls.isSupported()) {
+    v.src = SRC; // WebView không có MediaSource: thử để Android tự phát HLS (không bỏ được quảng cáo)
+    return;
+  }
+  var Base = Hls.DefaultConfig.loader;
+  function AdFreeLoader(config) {
+    var l = new Base(config), load = l.load.bind(l);
+    l.load = function (ctx, cfg, cb) {
+      if (ctx.type === 'manifest' || ctx.type === 'level') {
+        var ok = cb.onSuccess;
+        cb.onSuccess = function (resp, stats, c, nd) {
+          if (typeof resp.data === 'string') resp.data = strip(resp.data);
+          ok(resp, stats, c, nd);
+        };
+      }
+      load(ctx, cfg, cb);
+    };
+    return l;
+  }
+
+  var hls = new Hls({ pLoader: AdFreeLoader, maxBufferLength: BUFFER, maxMaxBufferLength: 600, backBufferLength: 30 });
+  var mediaFixes = 0, netFixes = 0;
+  hls.on(Hls.Events.ERROR, function (e, d) {
+    if (!d.fatal) return;
+    if (d.type === Hls.ErrorTypes.MEDIA_ERROR && mediaFixes++ < 2) { hls.recoverMediaError(); return; }
+    // Đang xem mà mạng chập chờn: thử tải tiếp vài lần. Chưa phát được giây nào thì báo lỗi luôn (server hỏng).
+    if (d.type === Hls.ErrorTypes.NETWORK_ERROR && v.currentTime > 0 && netFixes++ < 5) {
+      setTimeout(function () { hls.startLoad(); }, 3000);
+      return;
+    }
+    window.__chimtoErr = d.details || d.type;
+  });
+  hls.on(Hls.Events.MANIFEST_PARSED, function () { var p = v.play(); if (p && p.catch) p.catch(function () {}); });
+  hls.loadSource(SRC);
+  hls.attachMedia(v);
+})();
+</script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.os.Message
 import android.view.KeyEvent
@@ -36,11 +37,16 @@ import kotlin.math.min
  * (assets/player.html) với origin = địa chỉ tập phim, đặt trình phát vào iframe, rồi khi WebView tải
  * tài liệu của iframe thì app tự tải hộ và chèn assets/player-agent.js vào đầu. Agent nhận lệnh
  * (phát / dừng / tua) qua postMessage và báo trạng thái lên trang bọc; app đọc trạng thái mỗi giây.
+ * Server cho link HLS trực tiếp (.m3u8, trang Next.js kiểu PhimMoi): app phát bằng trang riêng assets/hls.html
+ * (hls.js đóng kèm, bỏ quảng cáo chèn giữa phim), agent nằm ngay trong trang đó.
  */
 class PlayerActivity : Activity() {
     companion object {
         fun intent(context: Context, film: FilmDetail, ep: Episode): Intent =
             Intent(context, PlayerActivity::class.java).putExtra("film", film.url).putExtra("ep", ep.url)
+
+        /** hls.html tải hls.js từ đường dẫn này (cùng origin với trang tập), app trả tệp trong assets. */
+        private const val HLS_JS = "/__chimto/hls.js"
 
         private val DROP_HEADERS = setOf(
             "content-security-policy", "content-security-policy-report-only", "content-length",
@@ -75,6 +81,7 @@ class PlayerActivity : Activity() {
     private var agentJs = ""
     private var focusJs = ""
     private var wrapperHtml = ""
+    private var hlsHtml = ""
     private lateinit var filmUrl: String
 
     private var detail: FilmDetail? = null
@@ -91,6 +98,10 @@ class PlayerActivity : Activity() {
     // Đọc từ luồng của shouldInterceptRequest
     @Volatile private var embedUrl: String? = null
     @Volatile private var episodeUrl: String = ""
+
+    // Đang phát link HLS bằng hls.html (không qua iframe)
+    private var hlsUrl: String? = null
+    private var errShown = false
 
     private var customView: View? = null
     private var customCallback: WebChromeClient.CustomViewCallback? = null
@@ -152,6 +163,7 @@ class PlayerActivity : Activity() {
         agentJs = assets.open("player-agent.js").use { it.readBytes().toString(Charsets.UTF_8) }
         focusJs = assets.open("page-focus.js").use { it.readBytes().toString(Charsets.UTF_8) }
         wrapperHtml = assets.open("player.html").use { it.readBytes().toString(Charsets.UTF_8) }
+        hlsHtml = assets.open("hls.html").use { it.readBytes().toString(Charsets.UTF_8) }
         setupWebView()
         setupPanel()
 
@@ -247,6 +259,7 @@ class PlayerActivity : Activity() {
     // ---- Chèn agent vào tài liệu iframe của trình phát (chạy ở luồng nền của WebView) ----
 
     private fun intercept(req: WebResourceRequest): WebResourceResponse? {
+        if (req.url.path == HLS_JS) return WebResourceResponse("application/javascript", "utf-8", assets.open("hls.light.min.js"))
         if (AdBlock.isAd(req.url.host)) return AdBlock.empty()
         if (req.isForMainFrame || req.method != "GET") return null
         val url = req.url.toString()
@@ -335,7 +348,8 @@ class PlayerActivity : Activity() {
                     val usual = src.servers.firstOrNull { it.type == Prefs.serverType(host) } ?: src.servers.firstOrNull()
                     val pick = PlayStats.choose(host, src.servers, usual)
                     if (usual != null && pick != usual) {
-                        notice.show("${usual.label} hay giật gần đây — mở ${pick?.label} (▼ để đổi server).", 6000)
+                        val why = PlayStats.score(host, usual.type).label ?: "hay giật"
+                        notice.show("${usual.label} $why gần đây — mở ${pick?.label} (▼ để đổi server).", 6000)
                     }
                     playServer(pick)
                 }
@@ -368,10 +382,16 @@ class PlayerActivity : Activity() {
         background({ Site.embedUrl(src, s) }) { r ->
             if (t != token) return@background
             r.onSuccess { url ->
-                embedUrl = url
                 loadStartedAt = System.currentTimeMillis()
                 session = PlaySession(Site.hostOf(src.epUrl), s?.type ?: "embed", loadStartedAt)
-                web.loadDataWithBaseURL(src.epUrl, wrapperHtml.replace("{{SRC}}", htmlAttr(url)), "text/html", "utf-8", null)
+                if (Uri.parse(url).path.orEmpty().endsWith(".m3u8")) {
+                    hlsUrl = url
+                    val page = hlsHtml.replace("{{SRC}}", JSONObject.quote(url)).replace("{{AGENT}}", agentJs)
+                    web.loadDataWithBaseURL(src.epUrl, page, "text/html", "utf-8", null)
+                } else {
+                    embedUrl = url
+                    web.loadDataWithBaseURL(src.epUrl, wrapperHtml.replace("{{SRC}}", htmlAttr(url)), "text/html", "utf-8", null)
+                }
             }.onFailure {
                 showError("${it.friendly()}\nNhấn ▼ để chọn server khác.")
                 showPanel()
@@ -387,6 +407,8 @@ class PlayerActivity : Activity() {
         dismissSuggestion()
         pageMode = false
         embedUrl = null
+        hlsUrl = null
+        errShown = false
         state = null
         started = false
         endedHandled = false
@@ -455,11 +477,16 @@ class PlayerActivity : Activity() {
             b.setOnClickListener {
                 hidePanel()
                 if (g == group) return@setOnClickListener
-                // Sang bản khác: mở tập cùng tên (vd "Tập 165"), không có thì tập cùng vị trí
+                // Sang bản khác: mở tập cùng tên (vd "Tập 165") và xem tiếp đúng chỗ đang xem. Bản đó chưa có tập này
+                // (vd Thuyết Minh mới tới Tập 107) thì mở tập cùng vị trí / tập cuối của bản đó, không mang giờ sang
                 val cur = episodes.getOrNull(index)
-                val target = g.episodes.indexOfFirst { it.title == cur?.title }.takeIf { it >= 0 }
-                    ?: index.coerceAtMost(g.episodes.size - 1)
-                state?.takeIf { started && it.t > 5 }?.let { Prefs.savePosition(g.episodes[target].url, it.t.toInt()) }
+                val same = g.episodes.indexOfFirst { it.title == cur?.title }
+                val target = same.takeIf { it >= 0 } ?: index.coerceAtMost(g.episodes.size - 1)
+                if (same >= 0) {
+                    state?.takeIf { started && it.t > 5 }?.let { Prefs.savePosition(g.episodes[target].url, it.t.toInt()) }
+                } else {
+                    notice.show("${g.name} chưa có ${cur?.title} — mở ${g.episodes[target].title}.", 6000)
+                }
                 group = g
                 openEpisode(target)
             }
@@ -499,18 +526,22 @@ class PlayerActivity : Activity() {
     // ---- Trạng thái phát ----
 
     private fun onState(json: String?) {
-        if (json == null || json == "null") {
-            val waited = System.currentTimeMillis() - loadStartedAt
-            if (!started && embedUrl != null && !hintShown && waited > 25_000) {
-                hintShown = true
-                hideLoading()
-                notice.show("Video chưa chạy? Nhấn OK để thử phát, hoặc ▼ để đổi server.", 10_000)
-            }
-            return
+        // Mở 25 giây mà video chưa chạy (chưa nạp, hoặc nạp rồi mà đứng yên) — trừ lúc trình phát đang quảng cáo
+        val waited = System.currentTimeMillis() - loadStartedAt
+        if (!started && (embedUrl != null || hlsUrl != null) && !hintShown && waited > 25_000 && json?.contains("\"ad\":true") != true) {
+            hintShown = true
+            hideLoading()
+            notice.show("Video chưa chạy? Nhấn OK để thử phát, hoặc ▼ để đổi server.", 10_000)
         }
+        if (json == null || json == "null") return
         val o = try {
             JSONObject(json)
         } catch (e: Exception) {
+            return
+        }
+        if (o.optBoolean("ad")) {
+            // Trình phát đang chạy quảng cáo (agent tự bỏ qua khi được phép) — chưa phải phim
+            if (!started) showLoading("Trình phát đang chạy quảng cáo — tự bỏ qua khi được phép…")
             return
         }
         val s = PlayState(
@@ -521,11 +552,24 @@ class PlayerActivity : Activity() {
         val wasPaused = state?.paused
         state = s
         val now = System.currentTimeMillis()
+        val err = o.optString("err")
+        if (err.isNotEmpty() && !errShown) {
+            errShown = true
+            session?.fail()
+            if (started) {
+                notice.show("Mất kết nối video ($err).\nNhấn ▼ → Tải lại, hoặc chọn server khác.", 10_000)
+            } else {
+                showError("${server?.label ?: "Server"} không phát được video ($err).\nNhấn ▼ để chọn server khác.")
+                showPanel()
+            }
+        }
         session?.let {
             it.update(now, s.paused, s.waiting, s.ready, s.droppedFrames, s.totalFrames)
             if (!suggested && it.struggling(now)) suggestServer(now)
         }
-        if (!started && s.ready) {
+        // Bắt đầu khi video thật sự chạy (không phải lúc mới nạp xong mà còn dừng: trình phát như NguonC còn chạy
+        // quảng cáo rồi phát lại từ đầu, tua xem tiếp lúc đó sẽ mất)
+        if (!started && s.ready && !s.paused) {
             started = true
             hideLoading()
             if (resumeAt > 30 && (s.d <= 0 || resumeAt < s.d - 30)) {

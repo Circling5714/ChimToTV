@@ -80,4 +80,17 @@ class PlayStatsTest {
         // Không tự đổi sang Thuyết minh dù chấm tốt hơn
         assertEquals(v1, PlayStats.choose(all, v1, scores(v1 to bad, tm to smooth)))
     }
+
+    @Test
+    fun leavesFailingServerForAnyWorkingOne() {
+        val dead = PlayStats.Score(3, null, 0.0)
+        // Server quen không phát được: sang server cùng ngôn ngữ còn phát được dù hay giật, trước server chưa thử
+        assertEquals(v2, PlayStats.choose(all, v1, scores(v1 to dead, v2 to bad)))
+        assertEquals(v2, PlayStats.choose(listOf(v1, v2), v1, scores(v1 to dead)))
+        // … nhưng không đổi ngôn ngữ, không sang 4K chưa thử, không sang server cũng hay lỗi
+        assertEquals(v1, PlayStats.choose(listOf(v1, k1, tm), v1, scores(v1 to dead, tm to smooth)))
+        assertEquals(v1, PlayStats.choose(listOf(v1, v2), v1, scores(v1 to dead, v2 to dead)))
+        // Hay giật (chưa tới mức lỗi) mà không có server tốt hơn thì giữ như cũ
+        assertEquals(v1, PlayStats.choose(listOf(v1, v2), v1, scores(v1 to bad)))
+    }
 }

@@ -16,7 +16,10 @@ object Prefs {
     const val DEFAULT_BASE = "https://yanhh3d.ee"
 
     /** Các trang mẫu có sẵn trong danh sách lần đầu cài. */
-    val PRESET_SITES = listOf(DEFAULT_BASE, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee")
+    val PRESET_SITES = listOf(DEFAULT_BASE, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmoir.fun")
+
+    /** Trang mẫu thêm ở bản sau: thêm một lần vào danh sách người xem đã lưu (xoá đi thì thôi, không thêm lại). */
+    private val ADDED_SITES = listOf("https://phimmoir.fun")
     private const val MAX_HISTORY = 60
     private const val MAX_POSITIONS = 400
 
@@ -24,6 +27,12 @@ object Prefs {
 
     fun init(context: Context) {
         sp = context.getSharedPreferences("chimto", Context.MODE_PRIVATE)
+        for (url in ADDED_SITES) {
+            val key = "preset_added@$url"
+            if (sp.getBoolean(key, false)) continue
+            if (sp.contains("sites") && url !in sites) sites = sites + url
+            sp.edit().putBoolean(key, true).apply()
+        }
     }
 
     /** Trang phim đang dùng (địa chỉ gốc, không có dấu / ở cuối). Đặt trang mới thì tự thêm vào danh sách. */

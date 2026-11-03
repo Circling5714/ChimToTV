@@ -3,6 +3,7 @@ package vn.chimto.tv
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.Charset
@@ -11,6 +12,9 @@ object Http {
     const val UA = "Mozilla/5.0 (Linux; Android 11; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
     class Response(val url: String, val code: Int, val body: String)
+
+    /** Trang trả lời bằng mã lỗi (4xx / 5xx): thử lại cũng vậy. */
+    class HttpError(code: Int) : IOException("Trang trả về lỗi HTTP $code")
 
     /**
      * Mở kết nối, tự đi theo chuyển hướng (kể cả http → https, đổi tên miền).
@@ -36,11 +40,26 @@ object Http {
         throw IOException("Chuyển hướng quá nhiều lần: $url")
     }
 
-    fun get(url: String, headers: Map<String, String> = emptyMap()): Response {
+    /**
+     * Kết nối giữ lại từ lần tải trước có thể đã bị mạng / máy chủ ngắt ngầm (TX3 gặp với phimmoir.fun:
+     * "unexpected end of stream") → lỗi kết nối thì thử lại một lần bằng kết nối mới.
+     * Quá thời gian chờ thì thôi (trang chết hẳn không bắt chờ gấp đôi).
+     */
+    fun get(url: String, headers: Map<String, String> = emptyMap()): Response = try {
+        getOnce(url, headers)
+    } catch (e: HttpError) {
+        throw e
+    } catch (e: SocketTimeoutException) {
+        throw e
+    } catch (e: IOException) {
+        getOnce(url, headers + ("Connection" to "close"))
+    }
+
+    private fun getOnce(url: String, headers: Map<String, String>): Response {
         val c = open(url, headers)
         try {
             val code = c.responseCode
-            if (code >= 400) throw IOException("Trang trả về lỗi HTTP $code")
+            if (code >= 400) throw HttpError(code)
             val body = c.inputStream.use { readText(it, c.contentType) }
             return Response(c.url.toString(), code, body)
         } finally {

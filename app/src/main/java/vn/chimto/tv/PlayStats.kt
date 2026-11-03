@@ -86,15 +86,21 @@ object PlayStats {
     /**
      * Server nên mở cho một tập (current = server người xem đã chọn, chưa chọn thì server đầu tiên của trang):
      * giữ nguyên, trừ khi nó hay giật / hay lỗi mà có server cùng ngôn ngữ đã chấm tốt.
+     * Riêng server hay lỗi (không phát được, vd OPhim của phimmoir.fun khi tên miền video chết): sang server cùng
+     * ngôn ngữ còn phát được dù hay giật, rồi tới server chưa thử (không sang server chưa thử mà nét hơn).
      */
     fun choose(host: String?, servers: List<Server>, current: Server?): Server? =
         choose(servers, current) { score(host, it.type) }
 
     fun choose(servers: List<Server>, current: Server?, score: (Server) -> Score): Server? {
         if (current == null || score(current).level < 2) return current
-        return servers.filter { sameLang(it, current) }.map { it to score(it) }
-            .filter { it.second.level in 0..1 }
-            .minWithOrNull(compareBy({ it.second.level }, { it.second.stallPct }))?.first ?: current
+        val same = servers.filter { sameLang(it, current) }.map { it to score(it) }
+        same.filter { it.second.level in 0..1 }
+            .minWithOrNull(compareBy({ it.second.level }, { it.second.stallPct }))?.let { return it.first }
+        if (score(current).level < 3) return current
+        val r = resolution(current.label)
+        return same.filter { (s, sc) -> s != current && sc.level != 3 && (sc.level >= 0 || r == null || (resolution(s.label) ?: r) <= r) }
+            .minWithOrNull(compareBy({ if (it.second.level < 0) 3 else it.second.level }, { it.second.stallPct }))?.first ?: current
     }
 
     /**
@@ -235,6 +241,13 @@ class PlaySession(private val host: String?, private val server: String, private
             parts += "TV rớt ${dropped * 100 / frames}% khung hình (TV xử lý không kịp, đổi server không đỡ)"
         }
         return parts.joinToString(" · ")
+    }
+
+    /** Trình phát báo lỗi hẳn (vd không tải được video) → tính là lỗi ngay, không chờ 20 giây. */
+    fun fail() {
+        if (firstPlay >= 0 || failSaved) return
+        failSaved = true
+        PlayStats.record(host, server, -1, 0, 0, 0, failed = true)
     }
 
     /** Ghi phần chưa ghi vào thống kê (khi đổi server / tập, hoặc rời màn hình). */
