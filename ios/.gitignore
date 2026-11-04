@@ -1,0 +1,7 @@
+# Sinh ra khi dựng (xcodegen / xcodebuild)
+ConBangTV.xcodeproj/
+ConBangTV/Info.plist
+build/
+dist/
+*.xcuserstate
+DerivedData/

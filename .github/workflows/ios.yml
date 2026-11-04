@@ -1,0 +1,77 @@
+# Bản iPad (iPadOS 15+, cài bằng TrollStore): dựng trên máy macOS của GitHub (repo công khai → miễn phí).
+# - Đẩy nhánh `ios` (đổi gì trong ios/ hoặc assets JS dùng chung) → test lõi trên macOS + dựng IPA bản thử (Beta).
+# - Chạy tay (workflow_dispatch) với release = true → dựng thêm IPA bản chính (Release).
+# IPA chưa ký: ký giả bằng ldid, TrollStore cài được; không cần tài khoản Apple.
+name: iOS
+
+on:
+  push:
+    branches: [ios]
+    paths: ['ios/**', 'app/src/main/assets/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Dựng cả bản chính (Release)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: '1'
+  HOMEBREW_NO_INSTALL_CLEANUP: '1'
+
+jobs:
+  test:
+    name: Test lõi (macOS)
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Công cụ
+        run: brew install xcodegen xcbeautify
+      - name: Dựng project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Test
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test -project ConBangTV.xcodeproj -scheme CoreTests -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO | xcbeautify --renderer github-actions
+
+  build:
+    name: IPA
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Công cụ
+        run: brew install xcodegen ldid xcbeautify
+      - name: Dựng project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Dựng bản thử (Beta)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Beta -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath build CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= | xcbeautify --renderer github-actions
+      - name: Dựng bản chính (Release)
+        if: ${{ inputs.release }}
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= | xcbeautify --renderer github-actions
+      - name: Đóng gói IPA
+        run: bash ios/scripts/package.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: ios/dist/*.ipa
+          retention-days: 14

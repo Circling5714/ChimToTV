@@ -1,0 +1,280 @@
+import SwiftUI
+
+/// Trang phim (bản Android: DetailActivity): thông tin, Xem tiếp / Xem tập mới nhất, theo dõi, bản phim, danh sách tập.
+@MainActor
+final class DetailModel: ObservableObject {
+    let film: Film
+    @Published private(set) var detail: FilmDetail?
+    @Published private(set) var error: String?
+    @Published var group: EpisodeGroup?
+    @Published var ascending = true
+    @Published private(set) var watched: Set<String> = []
+    @Published private(set) var resumeEp: Episode?
+    @Published private(set) var following = false
+    @Published var jumpText = ""
+    @Published var scrollTarget: String?
+    @Published var flash: String?
+    @Published var toast: String?
+
+    init(film: Film) {
+        self.film = film
+        if let d = Site.cachedDetail(film.url) { apply(d) }
+    }
+
+    /// Hiện dữ liệu phim (giữ bản đang chọn nếu còn; chưa chọn thì bản đang xem dở).
+    private func apply(_ d: FilmDetail) {
+        detail = d
+        let keep = group.flatMap { g in d.groups.first { $0.name == g.name } }
+        group = keep ?? Prefs.historyFor(d.url).flatMap { d.groupOf($0.epUrl) } ?? d.groups.first
+        refresh()
+    }
+
+    func load() async {
+        error = nil
+        do {
+            let d = try await Site.detail(film.url)
+            bind(d)
+        } catch {
+            if detail == nil { self.error = "Không tải được thông tin phim.\n\(friendly(error))" }
+        }
+    }
+
+    private func bind(_ d: FilmDetail) {
+        apply(d)
+        // Đang theo dõi: mở phim là đã thấy các tập mới
+        if let latest = d.latestEpisode { Prefs.updateFollow(d.url, count: d.episodeCount, latest: latest.title, seen: true) }
+        refresh()
+        AppModel.shared.rebuildMenu()
+        if let r = resumeEp { scrollTarget = r.url }
+    }
+
+    /// Quay lại từ trình phát: cập nhật "Xem tiếp" và đánh dấu tập đã xem.
+    func refresh() {
+        watched = Prefs.watchedEpisodes()
+        following = Prefs.followOf(film.url) != nil || (detail.map { Prefs.followOf($0.url) != nil } ?? false)
+        guard let d = detail else { return }
+        // Tập xem dở có thể thuộc bản khác với bản đang hiển thị
+        resumeEp = Prefs.historyFor(d.url).flatMap { h in
+            d.groups.lazy.compactMap { g in g.episodes.first { $0.url == h.epUrl } }.first
+        }
+    }
+
+    var episodes: [Episode] {
+        let eps = group?.episodes ?? []
+        return ascending ? eps : eps.reversed()
+    }
+
+    func play(_ ep: Episode) {
+        guard let d = detail else { return }
+        Router.play(filmUrl: d.url, epUrl: ep.url)
+    }
+
+    func toggleFollow() {
+        guard let d = detail else { return }
+        if Prefs.followOf(d.url) != nil {
+            Prefs.unfollow(d.url)
+            showToast("Đã bỏ theo dõi.")
+        } else {
+            Prefs.follow(d)
+            showToast("Đã theo dõi — trang chủ sẽ báo khi phim có tập mới.")
+        }
+        refresh()
+        AppModel.shared.rebuildMenu()
+    }
+
+    private static let number = Rx(#"\d+"#)
+
+    /// Đến tập số n (số đầu tiên trong tên tập: "Tập 120", "Tập 01", "120 - Vietsub").
+    func jump() {
+        guard let n = Int(jumpText.trimmed) else { return }
+        jumpText = ""
+        guard let ep = episodes.first(where: { Self.number.group(0, in: $0.title).flatMap { Int($0) } == n }) else {
+            showToast("Không có tập \(n) trong danh sách này.")
+            return
+        }
+        flash = ep.url
+        scrollTarget = ep.url
+    }
+
+    private func showToast(_ t: String) {
+        toast = t
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if self?.toast == t { self?.toast = nil }
+        }
+    }
+}
+
+struct DetailView: View {
+    @EnvironmentObject var app: AppModel
+    @StateObject private var m: DetailModel
+    @FocusState private var jumpFocused: Bool
+    @State private var expanded = false
+
+    init(film: Film) {
+        _m = StateObject(wrappedValue: DetailModel(film: film))
+    }
+
+    private var title: String { m.detail?.title ?? m.film.title }
+    private var poster: String? { m.detail?.poster ?? m.film.poster }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    header
+                    if let d = m.detail {
+                        actions(d)
+                        if d.groups.isEmpty {
+                            Text("Phim này chưa có tập nào.").foregroundColor(Theme.dim)
+                        } else {
+                            episodesSection(d)
+                        }
+                    } else if let e = m.error {
+                        VStack(alignment: .leading, spacing: 14) {
+                            Text(e).foregroundColor(Theme.text)
+                            Button("Thử lại") { Task { await m.load() } }
+                                .buttonStyle(.borderedProminent)
+                                .tint(Theme.brand)
+                        }
+                    } else {
+                        ProgressView().tint(Theme.text).frame(maxWidth: .infinity).padding(40)
+                    }
+                }
+                .padding(24)
+            }
+            .onChange(of: m.scrollTarget) { t in
+                guard let t = t else { return }
+                withAnimation { proxy.scrollTo(t, anchor: .center) }
+                m.scrollTarget = nil
+            }
+        }
+        .background(
+            ZStack(alignment: .top) {
+                Theme.bg
+                PosterImage(url: poster, maxPixel: 200)
+                    .frame(height: 420)
+                    .frame(maxWidth: .infinity)
+                    .blur(radius: 28)
+                    .opacity(0.35)
+                    .clipped()
+                LinearGradient(colors: [.clear, Theme.bg], startPoint: .top, endPoint: .bottom).frame(height: 420)
+            }
+            .ignoresSafeArea()
+        )
+        .overlay(alignment: .bottom) {
+            if let t = m.toast { ToastView(text: t).allowsHitTesting(false) }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarHidden(false)
+        .task { await m.load() }
+        .onChange(of: app.historyVersion) { _ in m.refresh() }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 22) {
+            Color.clear
+                .frame(width: 190, height: 285)
+                .overlay(PosterImage(url: poster))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 10) {
+                Text(title).font(.system(size: 30, weight: .bold)).foregroundColor(Theme.text)
+                if let o = m.detail?.otherTitle { Text(o).font(.system(size: 17)).foregroundColor(Theme.dim) }
+                if let i = m.detail?.info { Text(i).font(.system(size: 15)).foregroundColor(Theme.dim) }
+                if let desc = m.detail?.description {
+                    Text(desc)
+                        .font(.system(size: 16))
+                        .foregroundColor(Theme.text.opacity(0.9))
+                        .lineLimit(expanded ? nil : 5)
+                        .onTapGesture { expanded.toggle() }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func actions(_ d: FilmDetail) -> some View {
+        let eps = m.group?.episodes ?? []
+        if let latest = eps.last {
+            let resume = m.resumeEp
+            let cols = [GridItem(.adaptive(minimum: 200), spacing: 12, alignment: .leading)]
+            LazyVGrid(columns: cols, alignment: .leading, spacing: 12) {
+                ChipButton(text: resume.map { "Xem tiếp \($0.title)" } ?? (eps.count == 1 ? "Xem phim" : "Xem \(latest.title) (mới nhất)"),
+                           icon: "play.fill", active: true) { m.play(resume ?? latest) }
+                if let r = resume, r != latest {
+                    ChipButton(text: "Mới nhất: \(latest.title)", icon: "forward.end") { m.play(latest) }
+                }
+                if eps.count > 1, let first = eps.first {
+                    ChipButton(text: "Xem từ \(first.title)", icon: "backward.end") { m.play(first) }
+                }
+                ChipButton(text: m.following ? "✓ Đang theo dõi" : "＋ Theo dõi", icon: "bell") { m.toggleFollow() }
+                ChipButton(text: "Mở trang web", icon: "safari") { Router.browse(d.url) }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func episodesSection(_ d: FilmDetail) -> some View {
+        if d.groups.count > 1 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(d.groups) { g in
+                        ChipButton(text: "\(g.name) (\(g.episodes.count))", active: g == m.group) { m.group = g }
+                            .fixedSize()
+                    }
+                }
+            }
+        }
+        let count = m.group?.episodes.count ?? 0
+        HStack(spacing: 12) {
+            Text("Danh sách tập (\(count))").font(.system(size: 20, weight: .semibold)).foregroundColor(Theme.text)
+            Spacer()
+            if count > 1 {
+                Button { m.ascending.toggle() } label: {
+                    Label(m.ascending ? "Cũ → mới" : "Mới → cũ", systemImage: "arrow.up.arrow.down")
+                }
+                .tint(Theme.dim)
+            }
+            if count > 20 {
+                HStack(spacing: 6) {
+                    TextField("Đến tập…", text: $m.jumpText)
+                        .keyboardType(.numberPad)
+                        .focused($jumpFocused)
+                        .frame(width: 96)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.surface2))
+                        .onSubmit { m.jump() }
+                    Button("Đến") {
+                        jumpFocused = false
+                        m.jump()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.brand)
+                }
+            }
+        }
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 10)], spacing: 10) {
+            ForEach(m.episodes) { ep in
+                let seen = m.watched.contains(ep.url)
+                let isResume = m.resumeEp?.url == ep.url
+                Button { m.play(ep) } label: {
+                    Text(ep.title)
+                        .font(.system(size: 15, weight: isResume ? .bold : .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .foregroundColor(Theme.text)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 6)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(seen ? Theme.watched : Theme.surface2))
+                        .overlay(RoundedRectangle(cornerRadius: 8)
+                            .stroke(m.flash == ep.url ? Theme.focus : (isResume ? Theme.brand : Color.clear), lineWidth: 2))
+                }
+                .buttonStyle(PressScale())
+                .id(ep.url)
+            }
+        }
+    }
+}

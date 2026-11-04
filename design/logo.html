@@ -187,6 +187,11 @@ function adaptiveSvg(c, px, layer) {
   return `<svg width="${px}" height="${px}" viewBox="0 0 512 512">${defs(c)}${body}</svg>`;
 }
 
+// Icon iOS: vuông đầy, không bo góc (iOS tự bo), không trong suốt
+function iosIconSvg(c, px) {
+  return `<svg width="${px}" height="${px}" viewBox="0 0 512 512">${defs(c)}${c.bg(512, 512)}${c.icon()}${c.mark()}</svg>`;
+}
+
 // Banner TV 16:9 — 640×360 hệ toạ độ
 function bannerSvg(c, w) {
   const h = w * 9 / 16;
@@ -202,7 +207,24 @@ function bannerSvg(c, w) {
 }
 
 function render() {
-  if (P.get('mode') === 'export') {
+  if (P.get('mode') === 'ios') {
+    // Bản iPad: chỉ icon 1024 + logo trong app (không đụng ảnh của bản Android)
+    const c = concepts[P.get('concept') || 'a'];
+    const items = [
+      ['../../../../ios/ConBangTV/Assets.xcassets/AppIcon.appiconset/icon-1024.png', iosIconSvg(c, 1024)],
+      ['../../../../ios/ConBangTV/Assets.xcassets/Logo.imageset/logo.png', iconSvg(c, 192)],
+    ];
+    let y = 0;
+    for (const [name, svg] of items) {
+      const div = document.createElement('div');
+      div.className = 'asset';
+      div.dataset.name = name;
+      div.style.top = y + 'px';
+      div.innerHTML = svg;
+      document.body.appendChild(div);
+      y += div.firstElementChild.getAttribute('height') * 1 + 20;
+    }
+  } else if (P.get('mode') === 'export') {
     const c = concepts[P.get('concept') || 'a'];
     const items = [];
     for (const [d, px] of [['mdpi', 48], ['hdpi', 72], ['xhdpi', 96], ['xxhdpi', 144], ['xxxhdpi', 192]]) {
