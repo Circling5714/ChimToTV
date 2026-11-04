@@ -9,6 +9,9 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
+**Bản iPad** (iPadOS 15+, cài bằng TrollStore): [release `ios-v1.0`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.0)
+— xem mục [Bản iPad](#bản-ipad).
+
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
 **Liên hệ**.
 
@@ -42,6 +45,24 @@ loại trên menu của trang, và **Thể loại…** / **Quốc gia…** (từ
   dùng app "Send Files to TV" rồi mở bằng trình quản lý file trên tivi.
 - Qua mạng (tivi/box bật gỡ lỗi ADB): `.\build.ps1 -Install <IP-tivi>` (dựng từ mã nguồn rồi cài).
 - Đã có bản 1.3 trở lên thì không cần cài tay nữa: app tự tìm bản mới và hỏi cài.
+
+## Bản iPad
+
+Cùng app cho iPad (iPadOS 15 trở lên, cài bằng TrollStore), viết riêng bằng Swift (thư mục `ios/`), đủ các tính năng
+chính của bản TV, điều khiển bằng chạm:
+
+- **Cài:** cần TrollStore trên iPad. Tải `ConBangTV-iPad-<bản>.ipa` ở release `ios-v<bản>` → mở bằng TrollStore →
+  Install. Bản sau app tự tìm trên GitHub (release `ios-v…`) và mở TrollStore để cài đè, giữ lịch sử xem.
+- **Màn chính:** menu bên trái (iPad dọc / chia đôi màn hình thì ẩn vào nút ☰), lưới phim, hàng **Có tập mới** và
+  **Xem tiếp** (chạm là phát tiếp; giữ ngón tay để xoá khỏi lịch sử / bỏ theo dõi), tìm cùng lúc mọi trang, Đổi trang
+  phim (đo tốc độ), Duyệt web, Cài đặt.
+- **Xem phim:** chạm vào phim để hiện / ẩn thanh nút (Thoát, tập trước / sau, lùi / tới 10 giây, dừng / phát, Menu) và
+  thanh thời gian kéo để tua; chạm đúp nửa trái / phải: lùi / tới 10 giây. Menu: đổi server (kèm điểm), đổi bản, nhạc mở
+  đầu, tốc độ, khung hình, hẹn giờ tắt, mở trang web của tập.
+- **Bàn phím rời:** Space / K dừng–phát, ◀ ▶ (J / L) tua (giữ để tua nhanh), ▲ hiện thanh, ▼ / M menu, N / P tập
+  sau / trước, số 0–9 nhảy tới 0–90%, Esc thoát / đóng menu; trong Duyệt web Esc = lùi trang.
+- **Khác bản TV:** chưa có proxy SOCKS5 và DNS mã hoá (iOS 15 không cho app đặt proxy riêng cho WKWebView — cần thì
+  dùng VPN / hồ sơ DNS của iPad); không có con trỏ ảo (chạm thẳng vào trang web).
 
 ## Phím điều khiển
 
@@ -141,6 +162,17 @@ Cho TV box nối màn cảm ứng và điện thoại — chạm thay remote lú
 Cần JDK 17 (`%USERPROFILE%\.jdks\jdk-17.0.20.1+1`) và Android SDK (`%LOCALAPPDATA%\Android\Sdk`).
 Thư mục `keys\` chứa khoá ký app — **giữ lại**, mất khoá thì bản mới không cài đè lên bản cũ được.
 
+**Bản iPad** dựng trên máy macOS của GitHub Actions (`.github/workflows/ios.yml`, repo công khai nên miễn phí) — không
+cần Mac:
+
+- Đẩy nhánh `ios` (đổi gì trong `ios/` hoặc các tệp JS dùng chung ở `app/src/main/assets/`) → test phần lõi trên macOS
+  (`CoreTests`) + IPA bản thử (cấu hình Beta: mã gói `vn.chimto.tv.debug`, tên "Côn Bằng (thử)", có cổng gỡ lỗi trong
+  mạng LAN, cổng 8790). Tải IPA ở artifact `ipa` của lượt chạy (`gh run download <id> -n ipa`).
+- Chạy tay `gh workflow run ios.yml --ref main -f release=true` → thêm IPA bản chính (`vn.chimto.tv`, "Côn Bằng TV").
+- Project Xcode sinh bằng XcodeGen từ `ios/project.yml`; đọc HTML bằng SwiftSoup. IPA ký giả bằng `ldid` (không cần
+  tài khoản Apple) → chỉ cài được bằng TrollStore.
+- Icon: `node design/render.mjs ios c` (icon 1024 + logo trong app, không đụng ảnh của bản Android).
+
 ## Phát hành bản mới (app tự cập nhật)
 
 App (từ bản 1.3) tự hỏi GitHub Releases khi mở / quay lại màn hình chính (tối đa 2 giờ một lần). Có bản mới thì
@@ -153,6 +185,12 @@ Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ l�
 3. Tạo release tag `v<phiên bản>` và đính kèm APK, ví dụ:
    `gh release create v1.8.0 dist\ChimToTV-1.8.0.apk --title "Côn Bằng TV 1.8.0" --notes-file ghi-chu.md`
    Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập nhật trên TV.
+
+**Bản iPad** phát hành bằng tag riêng `ios-v<bản>` (vd `ios-v1.0`) và **không bao giờ đánh dấu "latest"**
+(`gh release create ios-v1.0 ConBangTV-iPad-1.0.ipa --latest=false …`): app TV hỏi `releases/latest` rồi lấy tệp `.apk`,
+release iPad mà thành latest thì mọi TV hết thấy bản mới. Bản iPad duyệt danh sách release, lấy tag `ios-v*` có tệp
+`.ipa` (bỏ bản nháp / thử nghiệm) và mở `apple-magnifier://install?url=<link .ipa>` để TrollStore cài. Số bản ở
+`MARKETING_VERSION` trong `ios/project.yml`; ghi chú phát hành cũng cần mục `## Có gì mới`.
 
 Thử OTA không cần phát hành thật: bản debug hỏi `http://127.0.0.1:8765/latest.json` (cùng định dạng GitHub API).
 Dựng bản giả số hiệu cao hơn bằng `gradlew assembleDebug "-Pvc=5" "-Pvn=1.4"`, phục vụ JSON + APK từ máy tính
@@ -244,6 +282,16 @@ lệnh `rate` / `fit` cho agent, agent đặt lại mỗi giây. DoH: `Doh.kt` (
 TTL ≤ 5 phút, chỉ IPv4); cổng nội bộ chạy cả khi không có proxy (`RouteConfig(socks, doh)`); bản debug ghi tên miền đã
 hỏi vào logcat `ChimToDoh` (cũng là cách đo trang gọi tới những đâu). Mật khẩu proxy: `Secret.kt` (AES-GCM, khoá trong
 AndroidKeyStore).
+
+Bản iPad (`ios/ConBangTV/Sources`): `Core/` chuyển gần như từng dòng từ Kotlin (Site, NextSite, Prefs, PlayStats,
+Follows, AdBlock — giữ cùng tên hàm / bộ chọn CSS, sửa bộ đọc trang thì sửa cả hai bên); dữ liệu Next.js đọc bằng
+`JSONScan` (bóc một giá trị JSON tại chỗ, thay JSONTokener). Trình phát dùng nguyên `player.html` / `player-agent.js` /
+`hls.html` / `hls.light.min.js` / `page-focus.js`: trang bọc nạp bằng `loadHTMLString` với baseURL = địa chỉ tập; agent
+chèn vào **mọi khung** (kể cả iframe khác tên miền) bằng `WKUserScript` thay cho việc chặn yêu cầu như Android; hls.js
+chèn ở khung trên cùng (bỏ thẻ `/__chimto/hls.js`). WKWebView trên iPad có MediaSource nên hls.js chạy. Khác Android:
+JW Player trên Safari không tự tải trước video → app tự gửi lệnh phát khi trình phát đứng chờ chưa có dữ liệu; JW giữ khung
+16:9 → `WebSetup.fillCss` phóng `.jwplayer` kín iframe, nền trang nhúng đen (màn iPad ≈ 4:3). Chặn quảng cáo bằng
+`WKContentRuleList`. Test lõi: `CoreTests` (macOS, chạy trên CI).
 
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server

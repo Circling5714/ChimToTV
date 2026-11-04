@@ -4,6 +4,30 @@ Côn Bằng TV — từ 1.0 đến 1.4 tên là ChimTo TV. Tải bản mới nh�
 Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b`), cài đè
 được lên nhau và giữ nguyên lịch sử xem.
 
+Bản iPad (iPadOS 15+, cài bằng TrollStore) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
+
+## iPad 1.0 — 04/11/2026
+
+- **Bản đầu tiên cho iPad** (iPadOS 15 trở lên, cài bằng TrollStore — tải `ConBangTV-iPad-1.0.ipa`, mở bằng TrollStore):
+  cùng 5 trang phim và các tính năng chính của bản TV, điều khiển bằng chạm và bàn phím rời — trang chủ, thể loại, lịch
+  chiếu, tìm trên mọi trang, trang phim (Việt Sub / Thuyết Minh, đến tập), Xem tiếp, phim theo dõi + Có tập mới, Đổi
+  trang phim (đo tốc độ), Duyệt web, Xem riêng, tự xoá dữ liệu web.
+- Trình phát: chạm để hiện thanh nút (tập trước / sau, lùi / tới 10 giây, dừng / phát, Menu, Thoát), kéo thanh thời gian,
+  chạm đúp hai bên để tua; menu đổi server (kèm điểm), đổi bản, nhạc mở đầu, tốc độ, khung hình, hẹn giờ tắt; xem tiếp
+  đúng chỗ, tự sang tập, gợi ý đổi server khi giật, chặn quảng cáo; trình phát phủ kín màn iPad.
+- Tự kiểm tra bản iPad mới trên GitHub và mở TrollStore để cài đè.
+- Chưa có: proxy SOCKS5, DNS mã hoá (iOS 15 không cho app đặt riêng cho trình duyệt trong app).
+- bản 1.0 (CFBundleVersion 1) · mã gói `vn.chimto.tv` · tag `ios-v1.0` · commit `2ac27fc` · SHA-256 IPA
+  `649f3d49c33959ec71428bb299757ebf02a64597b29d6541c8da9a5cff6384d1`
+
+## 1.9.4 — 04/11/2026
+
+- **Hàng Xem tiếp / Lịch sử xem:** phim của hoathinh3d.ee và hoathinh3d.pw trước đây cùng ghi "· hoathinh3d" — nay ghi
+  đủ tên miền (vd "Linh Cảnh Hành Giả · hoathinh3d.pw"); phim của các trang khác vẫn ghi tên ngắn.
+- Chặn thêm quảng cáo trong trang tập của hoathinh3d.pw (`atroblxac.in`, gặp khi thử bản iPad).
+- versionCode 17 · tag `v1.9.4` · commit `2ac27fc` · SHA-256 APK
+  `fbb10fedfaa0effe4764e1165e8cedc36736bf2c12de9d55b030bdd9eb0d95b6`
+
 ## 1.9.3 — 04/11/2026
 
 - **Điều khiển bằng màn hình cảm ứng** (TV box nối màn cảm ứng, điện thoại) — trước đây màn xem phim không điều khiển

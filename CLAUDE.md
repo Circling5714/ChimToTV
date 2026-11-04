@@ -20,6 +20,16 @@ Trước đây tên là ChimTo TV: chỉ đổi tên hiển thị / logo — mã
    Ghi chú phải có mục `## Có gì mới` — app hiện mục này trong hộp thoại cập nhật trên TV.
 5. Kiểm sau phát hành: API `releases/latest` trả đúng tag + có tệp `.apk`; tải từ link công khai, SHA-256 khớp.
 
+## Phát hành bản iPad (`ios/`, cài bằng TrollStore)
+
+1. Tăng `MARKETING_VERSION` trong `ios/project.yml`; gộp nhánh `ios` vào `main` (nhánh `ios` em được tự đẩy để dựng
+   bản thử; `main` + phát hành chờ anh bảo).
+2. `gh workflow run ios.yml --ref main -f release=true` → artifact `ipa` có `ConBangTV-iPad-<bản>.ipa` (mã gói
+   `vn.chimto.tv`, không có cổng gỡ lỗi). Kiểm Info.plist (mã gói, tên, bản), cài thử lên iPad thật.
+3. `gh release create ios-v<bản> ConBangTV-iPad-<bản>.ipa --title "Côn Bằng TV cho iPad <bản>" --notes-file … --latest=false`
+   — **luôn `--latest=false`**: app TV đọc `releases/latest` + tệp `.apk`. Ghi chú cũng phải có `## Có gì mới`.
+4. Kiểm: `releases/latest` vẫn là bản Android; release iPad có `.ipa`; tải từ link công khai, SHA-256 khớp.
+
 ## Luật lâu dài: phát hành thành công xong thì luôn cập nhật markdown
 
 Sau **mỗi** lần phát hành thành công (đã qua bước 5 ở trên), làm đủ các việc sau rồi mới báo xong:
