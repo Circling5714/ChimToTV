@@ -25,6 +25,12 @@ data class SocksConfig(
     val sitesOnly: Boolean = false,
 )
 
+/**
+ * Cài đặt của cổng nội bộ: proxy SOCKS5 (null = đi thẳng) và DNS mã hoá cho các tên miền thiết bị tự phân giải
+ * (null = DNS của thiết bị / nhà mạng).
+ */
+data class RouteConfig(val socks: SocksConfig?, val doh: Doh.Server?)
+
 /** Lỗi khi mở kết nối; code = mã trả lời SOCKS5 gửi lại bên gọi; viaProxy = lỗi ở phía proxy (để báo người xem). */
 class SocksError(val code: Int, message: String, val viaProxy: Boolean = true) : IOException(message)
 
@@ -39,7 +45,7 @@ object Socks5 {
      * Kết nối tới host:port qua proxy c. ip != null: đích đã là IP. DNS của proxy: gửi tên miền để proxy phân giải;
      * DNS của thiết bị: tự phân giải ở đây rồi gửi IP.
      */
-    fun connect(c: SocksConfig, host: String, ip: InetAddress?, port: Int): Socket {
+    fun connect(c: SocksConfig, host: String, ip: InetAddress?, port: Int, resolve: (String) -> InetAddress = ::resolve): Socket {
         val s = Socket()
         try {
             s.connect(InetSocketAddress(c.host, c.port), 10_000)
@@ -51,7 +57,7 @@ object Socks5 {
             s.tcpNoDelay = true
             s.keepAlive = true
             s.soTimeout = 15_000
-            handshake(s, c, host, ip, port)
+            handshake(s, c, host, ip, port, resolve)
             s.soTimeout = 0
             return s
         } catch (e: IOException) {
@@ -60,7 +66,7 @@ object Socks5 {
         }
     }
 
-    private fun handshake(s: Socket, c: SocksConfig, host: String, ip: InetAddress?, port: Int) {
+    private fun handshake(s: Socket, c: SocksConfig, host: String, ip: InetAddress?, port: Int, resolve: (String) -> InetAddress) {
         val i = DataInputStream(s.getInputStream())
         val o = s.getOutputStream()
         val login = c.user.isNotEmpty()
@@ -79,7 +85,7 @@ object Socks5 {
             }
             else -> throw SocksError(1, if (login) "proxy không nhận cách đăng nhập này" else "proxy cần tên đăng nhập / mật khẩu")
         }
-        o.write(byteArrayOf(5, 1, 0) + address(c, host, ip) + byteArrayOf((port shr 8).toByte(), port.toByte()))
+        o.write(byteArrayOf(5, 1, 0) + address(c, host, ip, resolve) + byteArrayOf((port shr 8).toByte(), port.toByte()))
         if (i.readUnsignedByte() != 5) throw SocksError(1, "proxy trả lời sai giao thức")
         val rep = i.readUnsignedByte()
         i.readUnsignedByte()
@@ -92,7 +98,7 @@ object Socks5 {
         if (rep != 0) throw SocksError(rep, "proxy không mở được $host:$port (${REPLIES[rep] ?: "mã $rep"})")
     }
 
-    private fun address(c: SocksConfig, host: String, ip: InetAddress?): ByteArray {
+    private fun address(c: SocksConfig, host: String, ip: InetAddress?, resolve: (String) -> InetAddress): ByteArray {
         val a = ip ?: if (c.remoteDns) null else resolve(host)
         return when {
             a is Inet4Address -> byteArrayOf(1) + a.address
@@ -134,7 +140,7 @@ object Socks5 {
  * config() = proxy của cổng này (đổi cài đặt thì AppProxy mở cổng mới); siteHosts() = tên miền các trang phim, đọc
  * lại mỗi kết nối (chế độ "chỉ trang phim": đích khác đi thẳng). Proxy lỗi thì trả lỗi cho bên gọi, không tự đi thẳng.
  */
-class Socks5Bridge(private val config: () -> SocksConfig?, private val siteHosts: () -> Collection<String>) {
+class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts: () -> Collection<String>) {
     private val server = ServerSocket(0, 64, InetAddress.getByName("127.0.0.1"))
     private val pool = Executors.newCachedThreadPool { r -> Thread(r, "chimto-socks").apply { isDaemon = true } }
     private val open: MutableSet<Socket> = Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap())
@@ -219,11 +225,21 @@ class Socks5Bridge(private val config: () -> SocksConfig?, private val siteHosts
         }
     }
 
-    private fun route(c: SocksConfig, host: String, ip: InetAddress?, port: Int): Socket {
-        if (!c.sitesOnly || isSite(host)) return Socks5.connect(c, host, ip, port)
+    private fun route(c: RouteConfig, host: String, ip: InetAddress?, port: Int): Socket {
+        val doh = c.doh
+        val socks = c.socks
+        if (socks != null && (!socks.sitesOnly || isSite(host))) {
+            return Socks5.connect(socks, host, ip, port) { h -> doh?.let { Doh.resolve(it, h) } ?: Socks5.resolve(h) }
+        }
+        // Đi thẳng: DNS mã hoá lỗi thì báo (ghi vào lỗi gần nhất); DNS thiết bị lỗi như kết nối thẳng thường
+        val addr = ip ?: doh?.let { Doh.resolve(it, host) } ?: try {
+            Socks5.resolve(host)
+        } catch (e: SocksError) {
+            throw SocksError(e.code, e.message ?: "", viaProxy = false)
+        }
         val s = Socket()
         try {
-            s.connect(InetSocketAddress(ip ?: Socks5.resolve(host), port), 10_000)
+            s.connect(InetSocketAddress(addr, port), 10_000)
         } catch (e: IOException) {
             s.close()
             throw if (e is SocksError) SocksError(e.code, e.message ?: "", viaProxy = false)

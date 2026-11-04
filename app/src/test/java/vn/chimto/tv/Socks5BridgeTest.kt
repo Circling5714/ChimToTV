@@ -94,7 +94,7 @@ class Socks5BridgeTest {
     private fun proxy(login: Pair<String, String>? = null) = FakeProxy(login).also { p -> closers += { p.server.close() } }
 
     private fun bridge(c: SocksConfig, sites: List<String> = emptyList()) =
-        Socks5Bridge({ c }, { sites }).also { b -> closers += { b.close() } }
+        Socks5Bridge({ RouteConfig(c, null) }, { sites }).also { b -> closers += { b.close() } }
 
     /** Gọi qua cổng nội bộ như Http.kt (Java tự gửi tên miền chưa phân giải), trả lời của máy echo. */
     private fun call(b: Socks5Bridge, host: String): String {

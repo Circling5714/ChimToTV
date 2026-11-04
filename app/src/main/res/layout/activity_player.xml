@@ -229,6 +229,18 @@
                     android:text="Danh sách tập" />
 
                 <TextView
+                    android:id="@+id/btnSpeed"
+                    style="@style/TvButton" />
+
+                <TextView
+                    android:id="@+id/btnFit"
+                    style="@style/TvButton" />
+
+                <TextView
+                    android:id="@+id/btnSleep"
+                    style="@style/TvButton" />
+
+                <TextView
                     android:id="@+id/btnWebPage"
                     style="@style/TvButton"
                     android:text="Mở trang Web" />

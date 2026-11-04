@@ -48,6 +48,10 @@ fun Throwable.friendly(): String {
     if (AppProxy.active && this !is Http.HttpError) {
         AppProxy.recentError()?.let { return "Proxy: $it.\nKiểm tra Cài đặt → Proxy SOCKS5, hoặc tắt proxy." }
     }
+    // DNS mã hoá vừa lỗi (máy chủ DoH bị chặn / không trả lời): nói rõ
+    if (AppProxy.dohActive && !AppProxy.active && this !is Http.HttpError) {
+        AppProxy.recentError()?.let { return "DNS mã hoá: $it.\nThử máy chủ DNS khác hoặc tắt trong Cài đặt → DNS mã hoá." }
+    }
     return when (this) {
         is UnknownHostException -> "Không tìm thấy trang. Kiểm tra mạng hoặc đổi link trong Cài đặt."
         is SocketTimeoutException -> "Trang phản hồi quá chậm, thử lại sau."

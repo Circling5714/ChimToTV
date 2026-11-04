@@ -19,7 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
 
 class MainActivity : Activity() {
-    private enum class Kind { HOME, SEARCH, HISTORY, FOLLOWS, CATEGORY, SITE, WEB, CLEAR, SETTINGS }
+    private enum class Kind { HOME, SEARCH, HISTORY, FOLLOWS, CATEGORY, FILTER, SITE, WEB, CLEAR, SETTINGS }
 
     private data class Entry(val title: String, val kind: Kind, val url: String? = null)
 
@@ -106,6 +106,7 @@ class MainActivity : Activity() {
     /** Tên trang đang dùng, kèm "proxy" khi đang bật proxy SOCKS5 (để nhớ là app đang đi qua proxy). */
     private fun showSiteLabel() {
         siteLabel.text = Site.hostOf(Prefs.baseUrl) + (if (AppProxy.active) "  ·  proxy" else "") +
+            (if (AppProxy.dohActive) "  ·  DoH" else "") +
             if (Prefs.privateMode) "  ·  xem riêng" else ""
     }
 
@@ -149,6 +150,35 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Thể loại / quốc gia đã tải của trang đang dùng (đổi trang thì tải lại). */
+    private var filters: Pair<String, Pair<List<Category>, List<Category>>>? = null
+
+    private fun pickFilter(entry: Entry) {
+        val base = Prefs.baseUrl
+        val cached = filters?.takeIf { it.first == base }?.second
+        if (cached == null) toast("Đang tải danh sách…")
+        background({ cached ?: NextSite.filters(base) }) { r ->
+            r.onSuccess { f ->
+                filters = base to f
+                val list = if (entry.url == "genre") f.first else f.second
+                if (list.isEmpty()) {
+                    toast("Trang không có danh sách này.")
+                    return@onSuccess
+                }
+                AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                    .setTitle(entry.title.trimEnd('…'))
+                    .setItems(list.map { it.title }.toTypedArray()) { _, which ->
+                        val c = list[which]
+                        menuAdapter.active = entry
+                        titleView.text = c.title
+                        search.visibility = View.GONE
+                        showList(c.url)
+                    }
+                    .show()
+            }.onFailure { toast("Không tải được danh sách: ${it.friendly()}") }
+        }
+    }
+
     /** Xoá nhanh cookie + dữ liệu duyệt web ngay từ menu (Cài đặt có nút tương tự, kèm xoá ảnh đã lưu). */
     private fun confirmClearBrowsingData() {
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
@@ -186,6 +216,11 @@ class MainActivity : Activity() {
             Entry(followsTitle(), Kind.FOLLOWS),
         )
         categories.forEach { items += Entry(it.title, Kind.CATEGORY, it.url) }
+        // Trang kiểu PhimMoi: đủ thể loại / quốc gia của bộ lọc (menu trang chỉ có vài mục)
+        if (NextSite.isKnown(Prefs.baseUrl)) {
+            items += Entry("Thể loại…", Kind.FILTER, "genre")
+            items += Entry("Quốc gia…", Kind.FILTER, "country")
+        }
         items += Entry("Đổi trang phim", Kind.SITE)
         items += Entry("Duyệt web", Kind.WEB)
         items += Entry("Xoá dữ liệu web", Kind.CLEAR)
@@ -232,6 +267,10 @@ class MainActivity : Activity() {
                 confirmClearBrowsingData()
                 return
             }
+            Kind.FILTER -> {
+                pickFilter(entry)
+                return
+            }
             else -> Unit
         }
         menuAdapter.active = entry
@@ -242,7 +281,7 @@ class MainActivity : Activity() {
             Kind.SEARCH -> {
                 token++
                 gridAdapter.clear()
-                status.message("Gõ tên phim cần tìm rồi nhấn OK / Enter.")
+                status.message("Gõ tên phim cần tìm rồi nhấn OK / Enter — app tìm cùng lúc trên mọi trang trong danh sách.")
                 search.requestFocusFromTouch()
                 showKeyboard(search)
             }
@@ -342,8 +381,8 @@ class MainActivity : Activity() {
         val q = search.text.toString().trim()
         if (q.isEmpty()) return
         hideKeyboard(search)
-        titleView.text = "Tìm: $q"
-        showList(q) { Site.search(q) }
+        titleView.text = "Tìm: $q (mọi trang)"
+        showList(q) { Site.searchAll(q) }
     }
 
     /** Đầu trang chủ: "Có tập mới" (phim theo dõi vừa ra tập) rồi "Xem tiếp" (phim xem gần nhất, mọi trang). */

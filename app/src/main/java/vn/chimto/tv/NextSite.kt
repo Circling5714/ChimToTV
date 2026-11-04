@@ -94,6 +94,36 @@ object NextSite {
         return out.values.toList()
     }
 
+    /**
+     * Bộ lọc của trang (/loc-phim): đủ thể loại và quốc gia (menu của trang chỉ có vài mục). Bỏ mục rác (năm, mã hai
+     * chữ) và tên trùng.
+     */
+    fun filters(base: String): Pair<List<Category>, List<Category>> {
+        val r = Http.get("$base/loc-phim")
+        val doc = Jsoup.parse(r.body, r.url)
+        return parseFilters(doc, data(doc) ?: throw IOException("Trang không còn dạng Next.js"))
+    }
+
+    fun parseFilters(doc: Document, d: String): Pair<List<Category>, List<Category>> {
+        val origin = origin(doc)
+        fun read(key: String, param: String): List<Category> {
+            // Phim trong trang cũng có "genres":[…] của riêng nó → lấy danh sách dài nhất (bộ lọc của trang)
+            val tag = "\"$key\":[{"
+            var arr: JSONArray? = null
+            var i = d.indexOf(tag)
+            while (i >= 0) {
+                (value(d, i + key.length + 3) as? JSONArray)?.takeIf { it.length() > (arr?.length() ?: 0) }?.let { arr = it }
+                i = d.indexOf(tag, i + tag.length)
+            }
+            return objects(arr).filter { it.optBoolean("is_active", true) }
+                .map { str(it, "name") to str(it, "slug") }
+                .filter { (name, slug) -> slug.isNotEmpty() && name.any { it.isLetter() } && !(name.length <= 2 && name.all { it.isUpperCase() }) }
+                .distinctBy { it.first.lowercase() }
+                .map { (name, slug) -> Category(name, "$origin/loc-phim?$param=${URLEncoder.encode(slug, "UTF-8")}&sort=updated_at&order=desc") }
+        }
+        return read("genres", "genre") to read("countries", "country")
+    }
+
     private fun list(url: String): FilmPage {
         val r = Http.get(url)
         val doc = Jsoup.parse(r.body, r.url)

@@ -35,13 +35,30 @@
     } catch (e) { c.maxMaxBufferLength = max; }
     window.__chimtoBuffer = BUFFER;
   }
+  // Chỗ bắt đầu app báo trước (xem tiếp / đã đánh dấu nhạc mở đầu): trình phát tải thẳng đoạn ở chỗ đó, khỏi tải đoạn
+  // đầu tập (mỗi đoạn 10–19 s, CDN chậm có khi mất 6–7 giây) rồi mới tua.
+  var START = window.__chimtoStart || 0;
+  // JW tự gọi hls.startLoad(0) (bỏ qua starttime) → lần tải đầu tiên không có vị trí thì bắt đầu ở START
+  function startAt(hls) {
+    hls.config.startPosition = START;
+    var orig = hls.startLoad, first = true;
+    hls.startLoad = function (pos) {
+      if (first) { first = false; if (!(pos > 0)) pos = START; }
+      return orig.call(this, pos);
+    };
+  }
   function patchSetup(cfg) {
     if (!cfg || typeof cfg !== 'object') return cfg;
+    if (START > 0) {
+      cfg.starttime = START;
+      if (Array.isArray(cfg.playlist)) cfg.playlist.forEach(function (p) { if (p && typeof p === 'object') p.starttime = START; });
+    }
     var h = cfg.hlsjsConfig || (cfg.hlsjsConfig = {});
     var theirs = h.onHlsInit;
     h.onHlsInit = function (hls) {
       if (typeof theirs === 'function') try { theirs(hls); } catch (e) {}
       try { bigBuffer(hls); } catch (e) {}
+      if (START > 0) try { startAt(hls); } catch (e) {}
     };
     return cfg;
   }
@@ -112,7 +129,8 @@
       df: q ? q.droppedVideoFrames : (v.webkitDroppedFrameCount || 0),
       tf: q ? q.totalVideoFrames : (v.webkitDecodedFrameCount || 0),
       ahead: Math.round(ahead), buf: window.__chimtoBuffer || 0,
-      err: window.__chimtoErr || '' // trang phát HLS của app (hls.html) báo lỗi hẳn
+      err: window.__chimtoErr || '', // trang phát HLS của app (hls.html) báo lỗi hẳn
+      rate: v.playbackRate
     };
   }
   function play(v) {
@@ -138,6 +156,8 @@
         v.currentTime = Math.max(0, Math.min(max, v.currentTime + m.arg));
         break;
       case 'seekTo': v.currentTime = m.arg; break;
+      case 'rate': want.rate = m.arg; applyView(v); break;
+      case 'fit': want.fit = m.arg; applyView(v); break;
     }
     var s = state(); if (s) up(s);
   }
@@ -152,6 +172,18 @@
 
   // Gỡ kẹt: một số trình phát (MSE) treo ở trạng thái "đang tua" dù dữ liệu phía trước đã tải xong
   // (hay gặp khi lệnh xem tiếp trùng lúc trình phát tự bỏ qua giới thiệu). Đứng yên ≥ 4 giây → đẩy nhẹ 0,5 giây.
+  // Tốc độ / khung hình người xem chọn trong app (null = để trình phát tự lo). Đặt lại mỗi giây: trình phát như JW
+  // đặt lại tốc độ / kiểu co giãn khi đổi nguồn hoặc tua.
+  var want = { rate: null, fit: null };
+  function applyView(v) {
+    if (!v) return;
+    if (want.rate && Math.abs(v.playbackRate - want.rate) > 0.01) v.playbackRate = want.rate;
+    if (want.fit === null) return;
+    // Lấp đầy: video rộng (21:9) phóng cho hết viền đen trên / dưới, cắt bớt hai bên
+    var fit = want.fit ? 'cover' : 'contain';
+    if (v.style.getPropertyValue('object-fit') !== fit) v.style.setProperty('object-fit', fit, 'important');
+  }
+
   var lastT = -1, still = 0;
   function buffered(v, t) {
     for (var i = 0; i < v.buffered.length; i++) if (v.buffered.start(i) <= t && t < v.buffered.end(i)) return true;
@@ -165,7 +197,7 @@
   }
 
   setInterval(function () {
-    if (adPlaying()) skipAd(); else unstick(video());
+    if (adPlaying()) skipAd(); else { unstick(video()); applyView(video()); }
     // NguonC tự hỏi "Tiếp tục xem?" và chờ bấm (remote không bấm được trong iframe): app đã tự nhớ chỗ xem dở
     // và tua tới đó khi phim chạy → chọn "Xem lại từ đầu"
     var restart = !restarted && document.querySelector('.stream-resume #restartBtn');

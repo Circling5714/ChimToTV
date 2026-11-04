@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Message
+import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -31,6 +32,7 @@ import android.widget.TextView
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
+import kotlin.math.abs
 import kotlin.math.min
 
 /**
@@ -52,6 +54,13 @@ class PlayerActivity : Activity() {
         fun resume(context: Context, item: HistoryItem): Intent =
             Intent(context, PlayerActivity::class.java).putExtra("film", item.filmUrl).putExtra("ep", item.epUrl)
                 .putExtra("continue", true)
+
+        private val RATES = listOf(1.0, 1.25, 1.5, 2.0, 0.75)
+
+        /** Hẹn giờ tắt (phút); -1 = hết tập đang xem. */
+        private val SLEEP = listOf(0, 30, 60, 90, -1)
+
+        private fun rateText(r: Double) = (if (r % 1.0 == 0.0) "${r.toInt()}" else r.toString().replace('.', ',')) + "×"
 
         /** hls.html tải hls.js từ đường dẫn này (cùng origin với trang tập), app trả tệp trong assets. */
         private const val HLS_JS = "/__chimto/hls.js"
@@ -89,6 +98,9 @@ class PlayerActivity : Activity() {
     private lateinit var btnIntroStart: TextView
     private lateinit var btnIntroEnd: TextView
     private lateinit var btnIntroClear: TextView
+    private lateinit var btnSpeed: TextView
+    private lateinit var btnFit: TextView
+    private lateinit var btnSleep: TextView
 
     private var agentJs = ""
     private var focusJs = ""
@@ -140,6 +152,20 @@ class PlayerActivity : Activity() {
     private var loadStartedAt = 0L
     private var lastSave = 0L
     private var seekTarget: Double? = null
+
+    /** Tốc độ phát (cả lần xem này, mọi tập), mặc định 1×. */
+    private var rate = 1.0
+
+    /** Hẹn giờ tắt: lựa chọn (chỉ số trong SLEEP), giờ hết hẹn; hết giờ thì dừng phim, chờ 60 giây rồi thoát ra màn hình chính TV. */
+    private var sleepChoice = 0
+    private var sleepAt = 0L
+    private var sleepGraceUntil = 0L
+
+    /**
+     * Chỗ bắt đầu báo trước cho trình phát của trang nạp tiếp theo (giây; 0 = đầu tập): chỗ xem dở, hoặc chỗ hết nhạc mở
+     * đầu khi nhạc nằm ngay đầu tập. Đọc từ luồng của shouldInterceptRequest (chèn vào agent).
+     */
+    @Volatile private var startHint = 0
 
     /** Tập này đã qua đoạn nhạc mở đầu (đã tự tua qua, xem tiếp từ giữa, hoặc tự xem qua). */
     private var introDone = false
@@ -193,6 +219,9 @@ class PlayerActivity : Activity() {
         btnIntroStart = findViewById(R.id.btnIntroStart)
         btnIntroEnd = findViewById(R.id.btnIntroEnd)
         btnIntroClear = findViewById(R.id.btnIntroClear)
+        btnSpeed = findViewById(R.id.btnSpeed)
+        btnFit = findViewById(R.id.btnFit)
+        btnSleep = findViewById(R.id.btnSleep)
 
         agentJs = assets.open("player-agent.js").use { it.readBytes().toString(Charsets.UTF_8) }
         focusJs = assets.open("page-focus.js").use { it.readBytes().toString(Charsets.UTF_8) }
@@ -312,6 +341,7 @@ class PlayerActivity : Activity() {
     }
 
     private fun fetchWithAgent(url: String, requestHeaders: Map<String, String>): WebResourceResponse {
+        trace("bắt đầu tải khung trình phát")
         val headers = HashMap<String, String>()
         for ((k, v) in requestHeaders) {
             if (k.equals("Accept-Encoding", true)) continue
@@ -355,7 +385,7 @@ class PlayerActivity : Activity() {
     }
 
     private fun injectAgent(html: String): String {
-        val tag = "<script>$agentJs</script>"
+        val tag = "<script>window.__chimtoStart=$startHint;\n$agentJs</script>"
         val at = (Regex("<head(\\s[^>]*)?>", RegexOption.IGNORE_CASE).find(html)
             ?: Regex("<html(\\s[^>]*)?>", RegexOption.IGNORE_CASE).find(html))
             ?.range?.last?.plus(1) ?: 0
@@ -364,7 +394,15 @@ class PlayerActivity : Activity() {
 
     // ---- Mở tập / server ----
 
+    /** Mốc thời gian lúc mở tập (chỉ bản debug, logcat ChimToOpen) — đo xem mở phim chậm ở bước nào. */
+    private var openAt = 0L
+
+    private fun trace(step: String) {
+        if (BuildConfig.DEBUG) Log.d("ChimToOpen", "$step ${System.currentTimeMillis() - openAt} ms")
+    }
+
     private fun openEpisode(i: Int) {
+        openAt = System.currentTimeMillis()
         val d = detail ?: return
         val ep = episodes.getOrNull(i) ?: return
         index = i
@@ -382,6 +420,7 @@ class PlayerActivity : Activity() {
         if (!Prefs.privateMode) Prefs.addHistory(HistoryItem(d.url, d.title, d.poster, ep.title, ep.url, System.currentTimeMillis()))
         showLoading("Đang mở ${ep.title}…")
         background({ Site.source(ep.url) }) { r ->
+            trace("trang tập")
             if (t != token) return@background
             r.onSuccess { src ->
                 source = src
@@ -410,6 +449,7 @@ class PlayerActivity : Activity() {
         loadStartedAt = System.currentTimeMillis()
         session = PlaySession(AppProxy.statsHost(Site.hostOf(src.epUrl)), "page", loadStartedAt)
         showLoading("Đang mở trang tập phim…")
+        startHint = startFor()
         web.loadUrl(src.epUrl)
     }
 
@@ -426,6 +466,7 @@ class PlayerActivity : Activity() {
         stopVideo()
         showLoading("Đang tải ${s?.label ?: "trình phát"}…")
         background({ Site.video(src, s) }) { r ->
+            trace("link trình phát")
             if (t != token) return@background
             r.onSuccess { v ->
                 val url = v.url
@@ -433,12 +474,14 @@ class PlayerActivity : Activity() {
                 session = PlaySession(AppProxy.statsHost(Site.hostOf(src.epUrl)), s?.type ?: "embed", loadStartedAt)
                 if (Uri.parse(url).path.orEmpty().endsWith(".m3u8")) {
                     hlsUrl = url
-                    val page = hlsHtml.replace("{{SRC}}", JSONObject.quote(url))
+                    startHint = startFor()
+                    val page = hlsHtml.replace("{{SRC}}", JSONObject.quote(url)).replace("{{START}}", startHint.toString())
                         .replace("{{SUB}}", v.subtitle?.let { JSONObject.quote(it) } ?: "null")
                         .replace("{{AGENT}}", agentJs)
                     web.loadDataWithBaseURL(src.epUrl, marked(page), "text/html", "utf-8", null)
                 } else {
                     embedUrl = url
+                    startHint = startFor()
                     web.loadDataWithBaseURL(src.epUrl, marked(wrapperHtml.replace("{{SRC}}", htmlAttr(url))), "text/html", "utf-8", null)
                 }
             }.onFailure {
@@ -567,6 +610,47 @@ class PlayerActivity : Activity() {
             startActivity(WebActivity.intent(this, episodeUrl))
         }
         findViewById<View>(R.id.btnClose).setOnClickListener { hidePanel() }
+        btnSpeed.setOnClickListener {
+            rate = RATES[(RATES.indexOf(rate) + 1) % RATES.size]
+            cmd("rate", rate)
+            showViewButtons()
+        }
+        btnFit.setOnClickListener {
+            Prefs.videoFill = !Prefs.videoFill
+            cmd("fit", if (Prefs.videoFill) 1 else 0)
+            showViewButtons()
+        }
+        btnSleep.setOnClickListener {
+            sleepChoice = (sleepChoice + 1) % SLEEP.size
+            val min = SLEEP[sleepChoice]
+            sleepAt = if (min > 0) System.currentTimeMillis() + min * 60_000L else 0
+            showViewButtons()
+        }
+    }
+
+    private fun showViewButtons() {
+        btnSpeed.text = "Tốc độ: ${rateText(rate)}"
+        btnFit.text = if (Prefs.videoFill) "Khung hình: Lấp đầy" else "Khung hình: Vừa màn hình"
+        btnSleep.text = "Hẹn giờ tắt: " + when {
+            sleepAt > 0 -> "còn ${((sleepAt - System.currentTimeMillis()) / 60_000 + 1).coerceAtLeast(1)} phút"
+            SLEEP[sleepChoice] < 0 -> "hết tập này"
+            else -> "Tắt"
+        }
+    }
+
+    /** Hết giờ hẹn: dừng phim, cho 60 giây bấm phím bất kỳ để xem tiếp. */
+    private fun sleepNow() {
+        sleepAt = 0
+        sleepChoice = 0
+        cmd("pause")
+        sleepGraceUntil = System.currentTimeMillis() + 60_000
+        notice.show("Hết giờ hẹn tắt. Nhấn phím bất kỳ trong 60 giây để xem tiếp, không thì app tự thoát.", 60_000)
+    }
+
+    /** Không ai bấm: lưu chỗ xem, thoát ra màn hình chính của TV (TV tự tắt màn hình / bảo vệ màn hình như thường). */
+    private fun exitForSleep() {
+        finish()
+        startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
     private fun next() {
@@ -615,6 +699,7 @@ class PlayerActivity : Activity() {
             o.optInt("df"), o.optInt("tf"),
         )
         val wasPaused = state?.paused
+        if (s.ready && state?.ready != true && !started) trace("trình phát sẵn sàng t=${s.t.toInt()}")
         state = s
         val now = System.currentTimeMillis()
         val err = o.optString("err")
@@ -636,16 +721,32 @@ class PlayerActivity : Activity() {
         // quảng cáo rồi phát lại từ đầu, tua xem tiếp lúc đó sẽ mất)
         if (!started && s.ready && !s.paused) {
             started = true
+            trace("video chạy t=${s.t.toInt()}, báo trước $startHint")
             hideLoading()
             if (resumeAt > 30 && (s.d <= 0 || resumeAt < s.d - 30)) {
                 introDone = true // xem tiếp đúng chỗ, không tua thêm qua nhạc mở đầu
-                resumePending = true
-                resumeIssuedAt = now
-                session?.seeked()
-                cmd("seekTo", resumeAt)
+                // Trình phát đã bắt đầu đúng chỗ (app báo trước) thì khỏi tua lại
+                if (abs(s.t - resumeAt) > 10) {
+                    resumePending = true
+                    resumeIssuedAt = now
+                    session?.seeked()
+                    cmd("seekTo", resumeAt)
+                }
                 notice.show("Xem tiếp từ ${formatTime(resumeAt.toDouble())}")
+            } else if (startHint > 0 && s.t >= startHint - 10) {
+                // Bắt đầu thẳng ở chỗ hết nhạc mở đầu (app báo trước)
+                introDone = true
+                notice.show("Đã bỏ qua nhạc mở đầu (tới ${formatTime(startHint.toDouble())}) — ◀ để xem lại.")
             }
+            // Tốc độ / khung hình đã chọn: trang tập mới chưa biết
+            if (rate != 1.0) cmd("rate", rate)
+            if (Prefs.videoFill) cmd("fit", 1)
             showOsd()
+        }
+        if (sleepAt in 1..now) sleepNow()
+        if (sleepGraceUntil in 1..now) {
+            sleepGraceUntil = 0
+            exitForSleep()
         }
         if (resumePending && (s.t >= resumeAt - 5 || now - resumeIssuedAt > 30_000)) resumePending = false
         if (started && !introDone && !s.paused) skipIntro(s)
@@ -658,7 +759,9 @@ class PlayerActivity : Activity() {
         }
         if (s.ended && !endedHandled) {
             endedHandled = true
-            if (Prefs.autoNext && index + 1 < episodes.size) {
+            if (SLEEP[sleepChoice] < 0) {
+                sleepNow()
+            } else if (Prefs.autoNext && index + 1 < episodes.size) {
                 notice.show("Hết tập — chuyển sang ${episodes[index + 1].title}")
                 openEpisode(index + 1)
             }
@@ -683,6 +786,13 @@ class PlayerActivity : Activity() {
         session?.seeked()
         cmd("seekTo", end)
         notice.show("Đã bỏ qua nhạc mở đầu (tới ${formatTime(end.toDouble())}) — ◀ để xem lại.")
+    }
+
+    /** Chỗ bắt đầu báo trước cho lần nạp trang này: chỗ xem dở; hoặc hết nhạc mở đầu nếu nhạc nằm ngay đầu tập. */
+    private fun startFor(): Int {
+        if (resumeAt > 30) return resumeAt
+        val (start, end) = Prefs.intro(introKey) ?: return 0
+        return if (!introDone && start <= 1 && end > start) end else 0
     }
 
     /** Hàng "Nhạc mở đầu" trong menu ▼: đánh dấu ở thời điểm đang xem. */
@@ -743,6 +853,11 @@ class PlayerActivity : Activity() {
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
         val code = e.keyCode
+        // Đang đếm 60 giây sau khi hết giờ hẹn: có người bấm → thôi thoát (phím vẫn làm việc của nó, vd OK để phát)
+        if (sleepGraceUntil > 0 && e.action == KeyEvent.ACTION_DOWN) {
+            sleepGraceUntil = 0
+            notice.show("Đã huỷ hẹn giờ tắt — xem tiếp.")
+        }
         if (panel.visibility == View.VISIBLE) {
             if (code == KeyEvent.KEYCODE_BACK || code == KeyEvent.KEYCODE_ESCAPE || code == KeyEvent.KEYCODE_MENU) {
                 if (e.action == KeyEvent.ACTION_UP) hidePanel()
@@ -873,6 +988,7 @@ class PlayerActivity : Activity() {
         }
         serverLabel.text = session?.describe()?.let { "Server — lần xem này: $it" } ?: serverHint
         showIntroRow()
+        showViewButtons()
         panel.visibility = View.VISIBLE
         val active = ((0 until serverRow.childCount).map { serverRow.getChildAt(it) } +
             (0 until groupRow.childCount).map { groupRow.getChildAt(it) }).firstOrNull { it.isActivated }

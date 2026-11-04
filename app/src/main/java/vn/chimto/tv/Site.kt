@@ -8,6 +8,9 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 data class Film(val url: String, val title: String, val poster: String?, val badge: String?)
 data class Section(val title: String, val films: List<Film>)
@@ -209,13 +212,34 @@ object Site {
      * Trang WordPress nhận ?s= (trang HaLim tự chuyển sang /search/…); trang Next.js tìm ở /tim-kiem
      * (chưa biết loại trang thì thử ?s= trước, ra trang Next.js thì tìm lại đúng chỗ).
      */
-    fun search(query: String): FilmPage {
-        val base = Prefs.baseUrl
+    fun search(query: String, base: String = Prefs.baseUrl): FilmPage {
         if (!NextSite.isKnown(base)) {
             val page = list("$base/?s=" + URLEncoder.encode(query.trim(), "UTF-8"))
             if (!NextSite.isKnown(base)) return page
         }
         return list(NextSite.searchUrl(base, query))
+    }
+
+    /**
+     * Tìm cùng lúc trên mọi trang trong danh sách: mỗi trang một nhóm ("yanhh3d.ee — 12 phim"), trang đang dùng đứng
+     * đầu. Trang lỗi / chậm quá 20 giây thì bỏ qua; mọi trang đều lỗi thì báo lỗi của trang đang dùng.
+     */
+    fun searchAll(query: String): FilmPage {
+        val sites = (listOf(Prefs.baseUrl) + Prefs.sites).distinct()
+        val pool = Executors.newFixedThreadPool(minOf(sites.size, 4))
+        try {
+            val jobs = sites.map { base -> pool.submit(Callable { search(query, base) }) }
+            val results = jobs.map { runCatching { it.get(20, TimeUnit.SECONDS) } }
+            if (results.all { it.isFailure }) throw results.first().exceptionOrNull()!!
+            val sections = sites.indices.mapNotNull { i ->
+                val page = results[i].getOrNull() ?: return@mapNotNull null
+                val films = (page.films + page.sections.flatMap { it.films }).distinctBy { it.url }
+                if (films.isEmpty()) null else Section("${hostOf(sites[i]) ?: sites[i]} — ${films.size} phim", films)
+            }
+            return FilmPage(emptyList(), null, sections)
+        } finally {
+            pool.shutdownNow()
+        }
     }
 
     // ---- Chi tiết phim ----

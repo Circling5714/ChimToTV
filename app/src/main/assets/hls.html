@@ -18,7 +18,7 @@
 // (PlayerActivity trả tệp cho đường dẫn /__chimto/hls.js). player-agent.js ở trên điều khiển <video> như mọi trang.
 // Lỗi hẳn (vd server chết, không tải được video) thì đặt window.__chimtoErr để app báo và gợi ý đổi server.
 (function () {
-  var SRC = {{SRC}}, SUB = {{SUB}}, BUFFER = 120;
+  var SRC = {{SRC}}, SUB = {{SUB}}, START = {{START}}, BUFFER = 120;
   var v = document.getElementById('v');
   window.__chimtoBuffer = BUFFER;
 
@@ -94,8 +94,9 @@
       timeoutRetry: { maxNumRetry: 2, retryDelayMs: 0, maxRetryDelayMs: 0 },
       errorRetry: { maxNumRetry: 3, retryDelayMs: 1000, maxRetryDelayMs: 8000 } } };
   }
+  // START > 0: app báo trước chỗ bắt đầu (xem tiếp / hết nhạc mở đầu) → tải thẳng đoạn ở đó
   var hls = new Hls({ pLoader: AdFreeLoader, maxBufferLength: BUFFER, maxMaxBufferLength: 600, backBufferLength: 30,
-    manifestLoadPolicy: load(Infinity), playlistLoadPolicy: load(10000) });
+    manifestLoadPolicy: load(Infinity), playlistLoadPolicy: load(10000), startPosition: START > 0 ? START : -1 });
 
   // Phục hồi khi lỗi hẳn: tối đa vài lần trong 2 phút (phim dài, mạng rớt lẻ tẻ cách xa nhau vẫn phục hồi được)
   var fixes = { media: [], net: [] };

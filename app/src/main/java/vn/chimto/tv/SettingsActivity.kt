@@ -91,6 +91,17 @@ class SettingsActivity : Activity() {
             ImageLoader.clearDisk()
             BrowsingData.clear(this) { toast("Đã xoá ảnh, cookie và dữ liệu duyệt web.") }
         }
+        val dohBtn = findViewById<TextView>(R.id.btnDoh)
+        fun showDoh() {
+            dohBtn.text = "DNS mã hoá: ${Prefs.dohServer?.label ?: "Tắt"}"
+        }
+        showDoh()
+        dohBtn.setOnClickListener {
+            val all = listOf(null) + Doh.Server.values()
+            Prefs.dohServer = all[(all.indexOf(Prefs.dohServer) + 1) % all.size]
+            AppProxy.apply()
+            showDoh()
+        }
         val privateBtn = findViewById<TextView>(R.id.btnPrivate)
         fun showPrivate() {
             privateBtn.text = "Xem riêng (không lưu lịch sử): ${if (Prefs.privateMode) "Bật" else "Tắt"}"

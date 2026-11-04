@@ -16,14 +16,18 @@ import java.net.Proxy
  */
 object AppProxy {
     private var bridge: Socks5Bridge? = null
-    private var bridgeConfig: SocksConfig? = null
+    private var bridgeConfig: RouteConfig? = null
     private var webViewSet = false
 
     /** WebView của TV không có ProxyController (bản quá cũ) → trình phát / Duyệt web vẫn đi thẳng. */
     var webViewSupported = true
         private set
 
-    val active: Boolean get() = bridgeConfig != null
+    /** Đang bật proxy SOCKS5. */
+    val active: Boolean get() = bridgeConfig?.socks != null
+
+    /** Đang bật DNS mã hoá (DoH) — cổng nội bộ chạy cả khi không có proxy. */
+    val dohActive: Boolean get() = bridgeConfig?.doh != null
 
     /**
      * Cổng cho Http.kt / WebView; null = tắt (đi mạng mặc định của máy như trước). Bật mà cổng nội bộ không mở được
@@ -39,24 +43,29 @@ object AppProxy {
      * Http.kt buộc phải kết nối lại theo cài đặt mới ngay (không dùng lại kết nối keep-alive đi theo cài đặt cũ).
      */
     fun apply() {
-        val c = Prefs.proxyConfig()
+        val c = RouteConfig(Prefs.proxyConfig(), Prefs.dohServer).takeIf { it.socks != null || it.doh != null }
         if (c == bridgeConfig && (c == null) == (bridge == null)) return
         bridge?.close()
+        Doh.clearCache()
         bridge = c?.let { cfg -> runCatching { Socks5Bridge({ cfg }, ::siteHosts) }.getOrNull() }
         bridgeConfig = c
         setWebView(localPort())
     }
 
     /** Lỗi proxy trong 30 giây gần đây, để ghép vào thông báo lỗi (vd "proxy báo sai tên đăng nhập / mật khẩu"). */
-    fun recentError(): String? = if (active && bridge == null) "không mở được cổng proxy nội bộ"
+    fun recentError(): String? = if (bridgeConfig != null && bridge == null) "không mở được cổng nội bộ"
     else bridge?.takeIf { System.currentTimeMillis() - it.lastErrorAt < 30_000 }?.lastError
 
     /** Câu nhắc thêm vào thông báo lỗi khi đang bật proxy. */
-    fun note(): String = if (!active) "" else "\nĐang bật proxy" + (recentError()?.let { ": $it" } ?: "") +
-        " — kiểm tra Cài đặt → Proxy SOCKS5, hoặc tắt proxy."
+    fun note(): String = when {
+        active -> "\nĐang bật proxy" + (recentError()?.let { ": $it" } ?: "") + " — kiểm tra Cài đặt → Proxy SOCKS5, hoặc tắt proxy."
+        dohActive -> "\nĐang bật DNS mã hoá" + (recentError()?.let { ": $it" } ?: "") +
+            " — thử máy chủ DNS khác hoặc tắt trong Cài đặt → DNS mã hoá."
+        else -> ""
+    }
 
     /** Video cũng đi qua proxy (chế độ "toàn bộ app"). */
-    private val videoViaProxy get() = bridgeConfig?.sitesOnly == false
+    private val videoViaProxy get() = bridgeConfig?.socks?.sitesOnly == false
 
     /**
      * Câu nhắc cho lỗi video: máy chủ video hay chặn IP của proxy (vd CDN của KK Phim trả 404 với IP của proxy dù

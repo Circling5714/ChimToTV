@@ -112,10 +112,38 @@ object Prefs {
         get() = sp.getString("proxy_user", "") ?: ""
         set(value) = sp.edit().putString("proxy_user", value).apply()
 
-    /** Lưu trong bộ nhớ riêng của app (app khác không đọc được), không mã hoá. */
+    /** Mật khẩu proxy đã giải mã (đọc Keystore chậm, proxyConfig() được gọi nhiều lần). */
+    @Volatile private var proxyPassCache: String? = null
+
+    /**
+     * Lưu mã hoá bằng khoá trong Android Keystore (Secret) từ 1.9.1; bản cũ lưu chữ thường ở "proxy_pass" → đọc lần
+     * đầu thì mã hoá lại và xoá bản chữ thường. Android 5 (không có Keystore AES) vẫn lưu như cũ.
+     */
     var proxyPass: String
-        get() = sp.getString("proxy_pass", "") ?: ""
-        set(value) = sp.edit().putString("proxy_pass", value).apply()
+        get() {
+            proxyPassCache?.let { return it }
+            val enc = sp.getString("proxy_pass_enc", null)
+            val plain = sp.getString("proxy_pass", null)
+            val v = when {
+                enc != null -> Secret.decrypt(enc).orEmpty()
+                plain != null -> plain.also { if (it.isNotEmpty() && Secret.supported) proxyPass = it }
+                else -> ""
+            }
+            proxyPassCache = v
+            return v
+        }
+        set(value) {
+            proxyPassCache = value
+            val enc = if (Secret.supported && value.isNotEmpty()) Secret.encrypt(value) else null
+            val e = sp.edit()
+            if (enc != null) e.putString("proxy_pass_enc", enc).remove("proxy_pass") else e.putString("proxy_pass", value).remove("proxy_pass_enc")
+            e.apply()
+        }
+
+    /** DNS mã hoá (DoH) cho tên miền thiết bị tự phân giải; null = tắt. */
+    var dohServer: Doh.Server?
+        get() = sp.getString("doh", null)?.let { n -> Doh.Server.values().firstOrNull { it.name == n } }
+        set(value) = sp.edit().putString("doh", value?.name).apply()
 
     /** true: DNS của proxy; false: DNS của thiết bị. */
     var proxyRemoteDns: Boolean
@@ -283,6 +311,11 @@ object Prefs {
     fun setIntro(filmUrl: String, start: Int, end: Int) = sp.edit().putString("intro@$filmUrl", "$start,$end").apply()
 
     fun clearIntro(filmUrl: String) = sp.edit().remove("intro@$filmUrl").apply()
+
+    /** Lấp đầy màn hình: video rộng (21:9) phóng cho hết viền đen, cắt bớt hai bên. */
+    var videoFill: Boolean
+        get() = sp.getBoolean("video_fill", false)
+        set(value) = sp.edit().putBoolean("video_fill", value).apply()
 
     // ---- Riêng tư ----
 

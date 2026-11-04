@@ -31,6 +31,23 @@ class NextSiteTest {
         """{"server_name":"KK Phim","server_slug":"kk","language_name":"Thuyết Minh","language_slug":"thuyetminh","total_episodes":2,"priority_order":2}]"""
 
     @Test
+    fun filters() {
+        fun item(id: Int, name: String, slug: String, active: Boolean = true) =
+            """{"id":$id,"name":"$name","slug":"$slug","is_active":$active}"""
+        val data = """1:{"results":[${movie(1, "a", "A", "Tập 1")}],"genres":[""" +
+            listOf(item(1, "Âm Nhạc", "am-nhac"), item(2, "Cổ Trang", "co-trang"), item(3, "Ẩn", "an", active = false)).joinToString(",") +
+            """],"countries":[""" +
+            listOf(item(54, "1983", "1983"), item(10, "Anh", "anh"), item(60, "KW", "kw"), item(61, "Hàn Quốc", "han-quoc"), item(62, "hàn quốc", "han-quoc-2"))
+                .joinToString(",") + "]}\n"
+        val (genres, countries) = NextSite.parseFilters(page("$base/loc-phim", data), data)
+        assertEquals(listOf("Âm Nhạc", "Cổ Trang"), genres.map { it.title })
+        assertEquals("$base/loc-phim?genre=co-trang&sort=updated_at&order=desc", genres[1].url)
+        // Bỏ năm, mã hai chữ, tên trùng (khác hoa / thường)
+        assertEquals(listOf("Anh", "Hàn Quốc"), countries.map { it.title })
+        assertEquals("$base/loc-phim?country=han-quoc&sort=updated_at&order=desc", countries[1].url)
+    }
+
+    @Test
     fun notNextJs() {
         assertNull(NextSite.data(Jsoup.parse("<html><body><script>var a=1</script><div class=flw-item></div></body></html>", "$base/")))
     }
