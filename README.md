@@ -45,8 +45,8 @@ loại trên menu của trang; thể loại / nước khác thì dùng **Tìm ki
 
 | Màn hình | Phím |
 | --- | --- |
-| Trang chủ / danh sách | Mũi tên: di chuyển • OK/Enter: mở phim • Back: về menu bên trái, Back lần nữa để thoát |
-| Chi tiết phim | OK: xem tiếp / xem tập mới nhất • ▼: vào danh sách tập (ô xanh = đã xem) |
+| Trang chủ / danh sách | Mũi tên: di chuyển • OK/Enter: mở phim (hàng **Xem tiếp**: phát tiếp luôn) • Giữ OK / Menu trên phim ở Xem tiếp, Lịch sử xem: xoá khỏi lịch sử • Back: về menu bên trái, Back lần nữa để thoát |
+| Chi tiết phim | OK: xem tiếp / xem tập mới nhất • ▼: vào danh sách tập (ô xanh = đã xem) • Số 0–9 hoặc nút **Đến tập…**: nhảy tới tập theo số |
 | Đang xem phim | OK/Space: dừng–phát • ◀ ▶: tua (giữ để tua nhanh) • ▲: xem thời gian • ▼/Menu: đổi server (kèm điểm từng server), đổi tập • Số 0–9: nhảy tới 0–90% • CH+/CH−, N/P: tập sau/trước • Back: thoát |
 | Gợi ý đổi server (hiện khi video giật nhiều) | OK: chuyển sang server được gợi ý, xem tiếp đúng chỗ • Back: bỏ qua |
 | Duyệt web | Mũi tên: di chuyển con trỏ (chạm mép thì cuộn) • OK: bấm • CH+/CH−: cuộn nhanh • Menu: tải lại • Back: lùi trang |
@@ -84,6 +84,13 @@ loại trên menu của trang; thể loại / nước khác thì dùng **Tìm ki
   IndexedDB…), bộ nhớ đệm và mật khẩu HTTP đã nhớ của trình duyệt trong app. Lịch sử xem, chỗ đang xem dở, điểm
   server, cài đặt và proxy giữ nguyên. **Cài đặt → Dữ liệu → "Xoá ảnh & dữ liệu duyệt web"** làm việc tương tự và xoá
   thêm ảnh bìa đã lưu.
+- **Cài đặt → Dữ liệu** (từ 1.8.2): **Xem riêng** — không ghi phim đã xem và chỗ đang xem (chỗ xem chỉ giữ trong bộ nhớ
+  tới khi tắt app; màn hình chính ghi "· xem riêng"); **Tự xoá dữ liệu web khi rời app** — xoá như mục trên mỗi khi rời
+  app (Home, Back thoát), trừ lúc trình phát còn mở giữa chừng; app bị tắt trước khi kịp xoá thì lần mở sau tự xoá.
+- **Xoá một phim khỏi lịch sử:** giữ OK (hoặc nhấn Menu) trên phim ở hàng Xem tiếp / mục Lịch sử xem — xoá cả chỗ
+  đang xem các tập của phim đó.
+- Từ 1.8.2 app không cho sao lưu dữ liệu (lịch sử xem, mật khẩu proxy, cookie) lên đám mây, không chuyển sang máy mới
+  và không lấy ra được bằng `adb backup`; WebView không gửi số liệu sử dụng / chẩn đoán của app về Google.
 - Trang phim thấy app như một trình duyệt Chromium trên Android: app gửi chung một User-Agent rút gọn
   (`Android 10; K … Chrome/<bản chính>.0.0.0`), không có tên mẫu TV hay số bản build Android; client hints ghi
   "Chromium" thay vì "Android WebView". Khi app tự tải trang hộ trình phát thì không gửi tên gói app. Riêng các yêu cầu
@@ -172,6 +179,12 @@ Riêng tư (từ 1.8.1 — `Privacy.kt`, `BrowsingData.kt`): User-Agent rút g�
 khi giá trị là tên gói. `BrowsingData.clear` gom `WebStorage.deleteAllData`, xoá cache qua một WebView tạm,
 `WebViewDatabase.clearHttpAuthUsernamePassword` và `CookieManager.removeAllCookies` (`Http.kt` không có kho cookie
 riêng). Test: `.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.PrivacyTest`.
+
+Từ 1.8.2: `AutoClear.kt` đếm Activity đang hiện (ActivityLifecycleCallbacks) — về 0 là rời app → xoá nếu không còn
+`PlayerActivity` / `WebActivity` sống và `Prefs.webDirty` (WebView đã chạy từ lần xoá trước); tiến trình mới thì thử
+xoá sau 1,5 s. Chỗ đang xem lưu kèm phim của tập (`pos_film`) để xoá một phim khỏi lịch sử xoá được mọi tập của nó
+(vị trí lưu trước 1.8.2 chỉ xoá được tập cuối). Sao lưu: `allowBackup="false"` + `res/xml/data_extraction_rules.xml`
+(Android 12+); `android.webkit.WebView.MetricsOptOut` trong manifest.
 
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server
