@@ -72,12 +72,17 @@ class MenuAdapter<T>(
 
 sealed interface GridRow
 data class HeaderRow(val title: String) : GridRow
-/** resume: bấm là xem tiếp luôn (hàng "Xem tiếp"); fromHistory: giữ OK / nhấn Menu để xoá khỏi lịch sử. */
-data class FilmRow(val film: Film, val resume: Boolean = false, val fromHistory: Boolean = false) : GridRow
+/**
+ * resume: bấm là xem tiếp luôn (hàng "Xem tiếp"); removable: giữ OK / nhấn Menu để xoá (khỏi lịch sử, hoặc bỏ theo dõi
+ * nếu follow).
+ */
+data class FilmRow(
+    val film: Film, val resume: Boolean = false, val removable: Boolean = false, val follow: Boolean = false,
+) : GridRow
 
 /**
  * Lưới poster; tiêu đề nhóm chiếm cả hàng. onNearEnd: gọi khi duyệt gần cuối để tải trang tiếp. onRemove: giữ OK /
- * nhấn Menu trên phim lấy từ lịch sử.
+ * nhấn Menu trên phim xoá được (lịch sử, phim theo dõi).
  */
 class FilmGridAdapter(
     private val onClick: (FilmRow) -> Unit,
@@ -154,7 +159,7 @@ class FilmGridAdapter(
                 h.badge.visibility = if (f.badge.isNullOrEmpty()) View.GONE else View.VISIBLE
                 ImageLoader.load(h.poster, f.poster)
                 h.itemView.setOnClickListener { onClick(row) }
-                if (row.fromHistory) {
+                if (row.removable) {
                     h.itemView.setOnLongClickListener {
                         onRemove(row)
                         true

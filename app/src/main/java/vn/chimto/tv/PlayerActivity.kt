@@ -28,6 +28,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import kotlin.math.min
@@ -84,6 +85,10 @@ class PlayerActivity : Activity() {
     private lateinit var groupRow: LinearLayout
     private lateinit var groupLabel: View
     private lateinit var notice: Notice
+    private lateinit var introLabel: TextView
+    private lateinit var btnIntroStart: TextView
+    private lateinit var btnIntroEnd: TextView
+    private lateinit var btnIntroClear: TextView
 
     private var agentJs = ""
     private var focusJs = ""
@@ -102,6 +107,12 @@ class PlayerActivity : Activity() {
     private var server: Server? = null
     private var token = 0
 
+    /**
+     * Số thứ tự lần nạp trang phát (gắn vào trang: window.__chimtoLoad). Chuyển tập trên TV chậm, trang cũ còn trả lời
+     * vài giây sau khi đã chuyển — trạng thái của nó (thời gian tập cũ) không được tính cho tập mới.
+     */
+    private var pageLoad = 0
+
     // Đọc từ luồng của shouldInterceptRequest
     @Volatile private var embedUrl: String? = null
     @Volatile private var episodeUrl: String = ""
@@ -117,11 +128,21 @@ class PlayerActivity : Activity() {
     private var state: PlayState? = null
     private var started = false
     private var resumeAt = 0
+
+    /**
+     * Đã ra lệnh tua tới chỗ xem dở (resumeAt) mà trình phát chưa tua xong — TV chậm có khi mất hàng chục giây. Trong
+     * lúc đó thời gian trình phát báo là giây đầu tập: không được lưu đè / mang sang thay cho chỗ xem dở.
+     */
+    private var resumePending = false
+    private var resumeIssuedAt = 0L
     private var endedHandled = false
     private var hintShown = false
     private var loadStartedAt = 0L
     private var lastSave = 0L
     private var seekTarget: Double? = null
+
+    /** Tập này đã qua đoạn nhạc mở đầu (đã tự tua qua, xem tiếp từ giữa, hoặc tự xem qua). */
+    private var introDone = false
 
     // Chấm điểm server: lần phát hiện tại + gợi ý đổi server khi giật nhiều (OK để chuyển)
     private var session: PlaySession? = null
@@ -131,7 +152,7 @@ class PlayerActivity : Activity() {
 
     private val poll = object : Runnable {
         override fun run() {
-            web.evaluateJavascript("window.__chimtoState||null") { onState(it) }
+            web.evaluateJavascript("[window.__chimtoLoad||0,window.__chimtoState||null]") { onState(it) }
             mainHandler.postDelayed(this, 1000)
         }
     }
@@ -139,6 +160,7 @@ class PlayerActivity : Activity() {
     private val flushSeek = Runnable {
         val target = seekTarget ?: return@Runnable
         seekTarget = null
+        resumePending = false // người xem tự tua: từ giờ lấy theo trình phát
         session?.seeked()
         cmd("seekTo", target)
         state = state?.copy(t = target)
@@ -167,6 +189,10 @@ class PlayerActivity : Activity() {
         groupRow = findViewById(R.id.groupRow)
         groupLabel = findViewById(R.id.groupLabel)
         notice = Notice(findViewById(R.id.notice))
+        introLabel = findViewById(R.id.introLabel)
+        btnIntroStart = findViewById(R.id.btnIntroStart)
+        btnIntroEnd = findViewById(R.id.btnIntroEnd)
+        btnIntroClear = findViewById(R.id.btnIntroClear)
 
         agentJs = assets.open("player-agent.js").use { it.readBytes().toString(Charsets.UTF_8) }
         focusJs = assets.open("page-focus.js").use { it.readBytes().toString(Charsets.UTF_8) }
@@ -190,6 +216,8 @@ class PlayerActivity : Activity() {
 
     private fun start(d: FilmDetail, epUrl: String) {
         detail = d
+        // Phim đang theo dõi: đã vào xem thì không còn là "tập mới"
+        d.latestEpisode?.let { Prefs.updateFollow(d.url, d.episodeCount, it.title, seen = true) }
         val g = d.groupOf(epUrl) ?: d.groups.firstOrNull() ?: return showError("Phim này chưa có tập nào.")
         group = g
         buildGroupButtons(d)
@@ -350,6 +378,7 @@ class PlayerActivity : Activity() {
         panelTitle.text = osdTitle.text
         for (j in 0 until groupRow.childCount) groupRow.getChildAt(j).let { it.isActivated = it.tag == group?.name }
         resumeAt = Prefs.position(ep.url)
+        introDone = false
         if (!Prefs.privateMode) Prefs.addHistory(HistoryItem(d.url, d.title, d.poster, ep.title, ep.url, System.currentTimeMillis()))
         showLoading("Đang mở ${ep.title}…")
         background({ Site.source(ep.url) }) { r ->
@@ -386,7 +415,7 @@ class PlayerActivity : Activity() {
 
     private fun injectPageScripts(url: String) {
         if (!pageMode || !url.startsWith("http")) return
-        web.evaluateJavascript(focusJs + "\n" + agentJs, null)
+        web.evaluateJavascript("window.__chimtoLoad=$pageLoad;\n" + focusJs + "\n" + agentJs, null)
     }
 
     private fun playServer(s: Server?) {
@@ -407,10 +436,10 @@ class PlayerActivity : Activity() {
                     val page = hlsHtml.replace("{{SRC}}", JSONObject.quote(url))
                         .replace("{{SUB}}", v.subtitle?.let { JSONObject.quote(it) } ?: "null")
                         .replace("{{AGENT}}", agentJs)
-                    web.loadDataWithBaseURL(src.epUrl, page, "text/html", "utf-8", null)
+                    web.loadDataWithBaseURL(src.epUrl, marked(page), "text/html", "utf-8", null)
                 } else {
                     embedUrl = url
-                    web.loadDataWithBaseURL(src.epUrl, wrapperHtml.replace("{{SRC}}", htmlAttr(url)), "text/html", "utf-8", null)
+                    web.loadDataWithBaseURL(src.epUrl, marked(wrapperHtml.replace("{{SRC}}", htmlAttr(url))), "text/html", "utf-8", null)
                 }
             }.onFailure {
                 showError("${it.friendly()}\nNhấn ▼ để chọn server khác.")
@@ -432,12 +461,16 @@ class PlayerActivity : Activity() {
         lastAdAt = 0
         state = null
         started = false
+        resumePending = false
         endedHandled = false
         hintShown = false
         seekTarget = null
         mainHandler.removeCallbacks(flushSeek)
+        pageLoad++
         web.loadUrl("about:blank")
     }
+
+    private fun marked(html: String) = html.replaceFirst("<head>", "<head><script>window.__chimtoLoad=$pageLoad</script>")
 
     private fun buildServerButtons(src: EpisodeSource) {
         serverRow.removeAllViews()
@@ -462,7 +495,7 @@ class PlayerActivity : Activity() {
     private fun switchServer(s: Server) {
         val src = source ?: return
         Prefs.setServer(Site.hostOf(src.epUrl), s.type, s.label)
-        state?.takeIf { started && it.t > 5 }?.let { resumeAt = it.t.toInt() }
+        currentTime()?.let { resumeAt = it }
         hidePanel()
         playServer(s)
     }
@@ -504,7 +537,7 @@ class PlayerActivity : Activity() {
                 val same = g.episodes.indexOfFirst { it.title == cur?.title }
                 val target = same.takeIf { it >= 0 } ?: index.coerceAtMost(g.episodes.size - 1)
                 if (same >= 0) {
-                    state?.takeIf { started && it.t > 5 }?.let { Prefs.savePosition(g.episodes[target].url, it.t.toInt(), d.url) }
+                    currentTime()?.let { Prefs.savePosition(g.episodes[target].url, it, d.url) }
                 } else {
                     notice.show("${g.name} chưa có ${cur?.title} — mở ${g.episodes[target].title}.", 6000)
                 }
@@ -520,7 +553,7 @@ class PlayerActivity : Activity() {
         findViewById<View>(R.id.btnNext).setOnClickListener { hidePanel(); next() }
         findViewById<View>(R.id.btnReload).setOnClickListener {
             hidePanel()
-            state?.takeIf { started && it.t > 5 }?.let { resumeAt = it.t.toInt() }
+            currentTime()?.let { resumeAt = it }
             val src = source
             when {
                 src == null -> openEpisode(index)
@@ -546,7 +579,13 @@ class PlayerActivity : Activity() {
 
     // ---- Trạng thái phát ----
 
-    private fun onState(json: String?) {
+    private fun onState(raw: String?) {
+        // [lần nạp trang, trạng thái]: trạng thái của trang tập cũ (còn trả lời ngay sau khi chuyển tập) thì bỏ
+        val json = try {
+            JSONArray(raw).takeIf { it.optInt(0) == pageLoad }?.optJSONObject(1)?.toString()
+        } catch (e: Exception) {
+            null
+        }
         // Mở 25 giây mà video chưa chạy (chưa nạp, hoặc nạp rồi mà đứng yên). Không tính lúc trình phát chạy quảng
         // cáo (đếm lại từ khi hết quảng cáo), không đè lên thông báo lỗi server đang hiện.
         val inAd = json?.contains("\"ad\":true") == true
@@ -599,12 +638,17 @@ class PlayerActivity : Activity() {
             started = true
             hideLoading()
             if (resumeAt > 30 && (s.d <= 0 || resumeAt < s.d - 30)) {
+                introDone = true // xem tiếp đúng chỗ, không tua thêm qua nhạc mở đầu
+                resumePending = true
+                resumeIssuedAt = now
                 session?.seeked()
                 cmd("seekTo", resumeAt)
                 notice.show("Xem tiếp từ ${formatTime(resumeAt.toDouble())}")
             }
             showOsd()
         }
+        if (resumePending && (s.t >= resumeAt - 5 || now - resumeIssuedAt > 30_000)) resumePending = false
+        if (started && !introDone && !s.paused) skipIntro(s)
         if (osd.visibility == View.VISIBLE) updateOsd()
         if (wasPaused != null && wasPaused != s.paused) showOsd()
 
@@ -621,9 +665,71 @@ class PlayerActivity : Activity() {
         }
     }
 
+    private val introKey get() = detail?.url ?: filmUrl
+
+    /**
+     * Phim đã đánh dấu nhạc mở đầu: video vừa chạy tới mốc đầu (trễ tối đa 8 giây — mỗi tập lệch vài giây) thì tua tới
+     * mốc hết, một lần mỗi tập. Qua mốc mà chưa tua (vd người xem tự tua) thì thôi, ◀ lùi lại xem được.
+     */
+    private fun skipIntro(s: PlayState) {
+        val (start, end) = Prefs.intro(introKey) ?: return
+        if (end <= start || seekTarget != null) return
+        if (s.t >= start + 8 || s.t >= end - 3) {
+            introDone = true
+            return
+        }
+        if (s.t < start - 1 || (s.d > 0 && end > s.d - 30)) return
+        introDone = true
+        session?.seeked()
+        cmd("seekTo", end)
+        notice.show("Đã bỏ qua nhạc mở đầu (tới ${formatTime(end.toDouble())}) — ◀ để xem lại.")
+    }
+
+    /** Hàng "Nhạc mở đầu" trong menu ▼: đánh dấu ở thời điểm đang xem. */
+    private fun showIntroRow() {
+        val t = (state?.t ?: 0.0).toInt()
+        val mark = Prefs.intro(introKey)
+        introLabel.text = "Nhạc mở đầu (cả phim): " + when {
+            mark == null -> "chưa đánh dấu — đang ở đầu / cuối nhạc thì bấm nút tương ứng"
+            mark.second < 0 -> "bắt đầu ${formatTime(mark.first.toDouble())}, chưa đánh dấu chỗ hết"
+            else -> "${formatTime(mark.first.toDouble())} → ${formatTime(mark.second.toDouble())}, tự bỏ qua ở các tập"
+        }
+        btnIntroStart.text = "Bắt đầu ở ${formatTime(t.toDouble())}"
+        btnIntroEnd.text = "Hết nhạc ở ${formatTime(t.toDouble())}"
+        btnIntroClear.visibility = if (mark != null) View.VISIBLE else View.GONE
+        val enabled = started
+        btnIntroStart.isEnabled = enabled
+        btnIntroEnd.isEnabled = enabled
+        btnIntroStart.setOnClickListener {
+            hidePanel()
+            val end = Prefs.intro(introKey)?.second?.takeIf { it > t } ?: -1
+            Prefs.setIntro(introKey, t, end)
+            notice.show(
+                if (end > t) "Nhạc mở đầu: ${formatTime(t.toDouble())} → ${formatTime(end.toDouble())}, các tập sẽ tự bỏ qua."
+                else "Đã đánh dấu đầu nhạc mở đầu. Hết nhạc thì nhấn ▼ → «Hết nhạc ở …».",
+                6000,
+            )
+        }
+        btnIntroEnd.setOnClickListener {
+            hidePanel()
+            val start = Prefs.intro(introKey)?.first?.takeIf { it < t } ?: 0
+            Prefs.setIntro(introKey, start, t)
+            introDone = true
+            notice.show("Nhạc mở đầu: ${formatTime(start.toDouble())} → ${formatTime(t.toDouble())}, các tập sẽ tự bỏ qua.", 6000)
+        }
+        btnIntroClear.setOnClickListener {
+            hidePanel()
+            Prefs.clearIntro(introKey)
+            notice.show("Đã bỏ mốc nhạc mở đầu của phim này.")
+        }
+    }
+
+    /** Chỗ đang xem để mang sang (đổi server / tải lại / đổi bản): lệnh tua xem tiếp chưa xong thì vẫn là chỗ cũ. */
+    private fun currentTime(): Int? = if (resumePending) resumeAt else state?.takeIf { started && it.t > 5 }?.t?.toInt()
+
     private fun savePosition() {
         val s = state ?: return
-        if (!started || episodeUrl.isEmpty()) return
+        if (!started || episodeUrl.isEmpty() || resumePending) return
         // Xem gần hết thì coi như xong (lần sau mở lại từ đầu)
         val done = s.ended || (s.d > 0 && s.t > s.d - 90)
         Prefs.savePosition(episodeUrl, if (done) 0 else s.t.toInt(), detail?.url ?: filmUrl)
@@ -766,6 +872,7 @@ class PlayerActivity : Activity() {
             source?.servers?.firstOrNull { it.type == b.tag }?.let { b.text = serverText(host, it) }
         }
         serverLabel.text = session?.describe()?.let { "Server — lần xem này: $it" } ?: serverHint
+        showIntroRow()
         panel.visibility = View.VISIBLE
         val active = ((0 until serverRow.childCount).map { serverRow.getChildAt(it) } +
             (0 until groupRow.childCount).map { groupRow.getChildAt(it) }).firstOrNull { it.isActivated }

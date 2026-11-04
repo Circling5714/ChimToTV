@@ -19,7 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
 
 class MainActivity : Activity() {
-    private enum class Kind { HOME, SEARCH, HISTORY, CATEGORY, SITE, WEB, CLEAR, SETTINGS }
+    private enum class Kind { HOME, SEARCH, HISTORY, FOLLOWS, CATEGORY, SITE, WEB, CLEAR, SETTINGS }
 
     private data class Entry(val title: String, val kind: Kind, val url: String? = null)
 
@@ -31,7 +31,7 @@ class MainActivity : Activity() {
     private lateinit var status: StatusView
 
     private val menuAdapter = MenuAdapter<Entry>({ it.title }, ::onMenu)
-    private val gridAdapter = FilmGridAdapter(::openFilm, ::loadMore, ::confirmRemoveHistory)
+    private val gridAdapter = FilmGridAdapter(::openFilm, ::loadMore, ::confirmRemove)
 
     private var categories: List<Category> = emptyList()
     private var token = 0
@@ -92,9 +92,14 @@ class MainActivity : Activity() {
             reloadSite()
         } else if (active?.kind == Kind.HISTORY) {
             showHistory(focusFirst = false)
+        } else if (active?.kind == Kind.FOLLOWS) {
+            showFollows(focusFirst = false)
         } else if (homeToken == token) {
             refreshHead()
         }
+        // Mở phim có tập mới rồi quay ra: số "mới" trên menu đổi theo
+        if (menuAdapter.items.firstOrNull { it.kind == Kind.FOLLOWS }?.title != followsTitle()) rebuildMenu()
+        if (homeToken == token || active?.kind == Kind.FOLLOWS) Follows.check(this, done = ::onFollowsChecked)
         Updater.autoCheck(this)
     }
 
@@ -178,13 +183,35 @@ class MainActivity : Activity() {
             Entry("Trang chủ", Kind.HOME),
             Entry("Tìm kiếm", Kind.SEARCH),
             Entry("Lịch sử xem", Kind.HISTORY),
+            Entry(followsTitle(), Kind.FOLLOWS),
         )
         categories.forEach { items += Entry(it.title, Kind.CATEGORY, it.url) }
         items += Entry("Đổi trang phim", Kind.SITE)
         items += Entry("Duyệt web", Kind.WEB)
         items += Entry("Xoá dữ liệu web", Kind.CLEAR)
         items += Entry("Cài đặt", Kind.SETTINGS)
+        // Giữ mục đang chọn (tên mục "Phim theo dõi" có thể đổi theo số tập mới)
+        val active = menuAdapter.active
         menuAdapter.submit(items)
+        menuAdapter.active = items.firstOrNull { it.kind == active?.kind && it.url == active?.url }
+    }
+
+    private fun followsTitle(): String {
+        val n = Prefs.follows.count { it.newCount > 0 }
+        return if (n > 0) "Theo dõi ($n mới)" else "Phim theo dõi"
+    }
+
+    /** Vừa kiểm xong phim theo dõi: phim nào có tập mới thì báo, cập nhật menu / hàng "Có tập mới". */
+    private fun onFollowsChecked(fresh: List<Follow>) {
+        rebuildMenu()
+        when {
+            menuAdapter.active?.kind == Kind.FOLLOWS -> showFollows(focusFirst = false)
+            homeToken == token -> refreshHead()
+        }
+        if (fresh.isNotEmpty()) {
+            toast("Có tập mới: " + fresh.take(3).joinToString(", ") { "${it.title} (${it.latest})" } +
+                if (fresh.size > 3) "…" else "")
+        }
     }
 
     private fun onMenu(entry: Entry) {
@@ -220,6 +247,10 @@ class MainActivity : Activity() {
                 showKeyboard(search)
             }
             Kind.HISTORY -> showHistory(focusFirst = true)
+            Kind.FOLLOWS -> {
+                showFollows(focusFirst = true)
+                Follows.check(this, done = ::onFollowsChecked)
+            }
             Kind.CATEGORY -> showList(entry.url!!)
             else -> Unit
         }
@@ -243,9 +274,7 @@ class MainActivity : Activity() {
                 loadedBase = Prefs.baseUrl
                 if (home.categories.isNotEmpty() && home.categories != categories) {
                     categories = home.categories
-                    val active = menuAdapter.active
                     rebuildMenu()
-                    menuAdapter.active = active
                 }
                 val rows = home.sections.flatMap { s -> listOf(HeaderRow(s.title)) + s.films.map { FilmRow(it) } }
                 if (rows.isEmpty()) {
@@ -255,9 +284,10 @@ class MainActivity : Activity() {
                     )
                 } else {
                     status.hide()
-                    head = continueRows()
+                    head = headRows()
                     homeToken = t
                     gridAdapter.submit(head + rows, focusFirst = true)
+                    Follows.check(this, done = ::onFollowsChecked)
                 }
             }.onFailure {
                 loadedBase = base
@@ -316,11 +346,43 @@ class MainActivity : Activity() {
         showList(q) { Site.search(q) }
     }
 
-    /** "Xem tiếp": các phim xem gần nhất (mọi trang), một hàng. */
-    private fun continueRows(): List<GridRow> {
+    /** Đầu trang chủ: "Có tập mới" (phim theo dõi vừa ra tập) rồi "Xem tiếp" (phim xem gần nhất, mọi trang). */
+    private fun headRows(): List<GridRow> {
+        val rows = ArrayList<GridRow>()
+        val fresh = Prefs.follows.filter { it.newCount > 0 }
+        if (fresh.isNotEmpty()) {
+            rows += HeaderRow("Có tập mới")
+            fresh.forEach { rows += FilmRow(followFilm(it), removable = true, follow = true) }
+        }
         val items = Prefs.history.take(gridAdapter.spanCount)
-        if (items.isEmpty()) return emptyList()
-        return listOf(HeaderRow("Xem tiếp")) + items.map { FilmRow(historyFilm(it), resume = true, fromHistory = true) }
+        if (items.isNotEmpty()) {
+            rows += HeaderRow("Xem tiếp")
+            items.forEach { rows += FilmRow(historyFilm(it), resume = true, removable = true) }
+        }
+        return rows
+    }
+
+    /** vd badge "Tập 166 mới", "+3 · Tập 168", hoặc tập mới nhất khi đã xem hết. */
+    private fun followFilm(f: Follow): Film {
+        val badge = when (f.newCount) {
+            0 -> f.latest
+            1 -> "${f.latest} mới"
+            else -> "+${f.newCount} · ${f.latest}"
+        }
+        return Film(f.filmUrl, f.title, f.poster, badge.ifEmpty { null })
+    }
+
+    private fun showFollows(focusFirst: Boolean) {
+        token++
+        nextUrl = null
+        val items = Prefs.follows.sortedByDescending { it.newCount > 0 }
+        if (items.isEmpty()) {
+            gridAdapter.clear()
+            status.message("Chưa theo dõi phim nào.\nMở một phim rồi chọn «＋ Theo dõi» — trang chủ sẽ báo khi phim có tập mới.")
+            return
+        }
+        status.hide()
+        gridAdapter.submit(items.map { FilmRow(followFilm(it), removable = true, follow = true) }, focusFirst)
     }
 
     /** Phim trong lịch sử; phim của trang khác ghi thêm tên trang (vd hai bản "Tiên Nghịch" ở hai trang). */
@@ -331,7 +393,7 @@ class MainActivity : Activity() {
     }
 
     private fun refreshHead() {
-        val rows = continueRows()
+        val rows = headRows()
         if (rows == head) return
         val focused = grid.focusedChild?.let { grid.getChildAdapterPosition(it) } ?: -1
         // Đang đứng trong hàng "Xem tiếp": tiêu điểm đi theo phim (phim vừa xem lên đầu); phim bị xoá thì sang ô kế,
@@ -353,6 +415,31 @@ class MainActivity : Activity() {
                 if (pos >= 0) grid.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
             }
         }
+    }
+
+    private fun confirmRemove(row: FilmRow) {
+        if (row.follow) confirmUnfollow(row) else confirmRemoveHistory(row)
+    }
+
+    private fun confirmUnfollow(row: FilmRow) {
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("Bỏ theo dõi?")
+            .setMessage("«${row.film.title}» — app sẽ không báo tập mới của phim này nữa.")
+            .setPositiveButton("Bỏ theo dõi") { _, _ ->
+                val pos = gridAdapter.positionOf(row)
+                Prefs.unfollow(row.film.url)
+                rebuildMenu()
+                if (menuAdapter.active?.kind == Kind.FOLLOWS) {
+                    showFollows(focusFirst = false)
+                    val i = minOf(pos, Prefs.follows.size - 1)
+                    if (i >= 0) grid.post { grid.findViewHolderForAdapterPosition(i)?.itemView?.requestFocus() }
+                } else if (homeToken == token) {
+                    refreshHead()
+                }
+            }
+            .setNegativeButton("Huỷ", null)
+            .show()
+            .getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
     }
 
     private fun confirmRemoveHistory(row: FilmRow) {
@@ -385,7 +472,7 @@ class MainActivity : Activity() {
             return
         }
         status.hide()
-        gridAdapter.submit(items.map { FilmRow(historyFilm(it), fromHistory = true) }, focusFirst)
+        gridAdapter.submit(items.map { FilmRow(historyFilm(it), removable = true) }, focusFirst)
     }
 
     private fun openFilm(row: FilmRow) {

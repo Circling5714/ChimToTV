@@ -129,6 +129,12 @@
                         android:visibility="gone" />
 
                     <TextView
+                        android:id="@+id/btnFollow"
+                        style="@style/TvButton"
+                        android:nextFocusUp="@id/btnFollow"
+                        android:visibility="gone" />
+
+                    <TextView
                         android:id="@+id/btnJump"
                         style="@style/TvButton"
                         android:nextFocusUp="@id/btnJump"

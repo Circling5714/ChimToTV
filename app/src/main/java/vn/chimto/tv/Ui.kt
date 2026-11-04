@@ -26,6 +26,14 @@ val mainHandler = Handler(Looper.getMainLooper())
 private val io = Executors.newFixedThreadPool(3)
 
 /** Chạy work ở luồng nền rồi trả kết quả về luồng chính (bỏ qua nếu màn hình đã đóng). */
+/** Như background nhưng luôn gọi done (việc nền không gắn với một màn hình, vd kiểm phim theo dõi). */
+fun <T> inBackground(work: () -> T, done: (Result<T>) -> Unit) {
+    io.execute {
+        val r = runCatching(work)
+        mainHandler.post { done(r) }
+    }
+}
+
 fun <T> Activity.background(work: () -> T, done: (Result<T>) -> Unit) {
     io.execute {
         val r = runCatching(work)

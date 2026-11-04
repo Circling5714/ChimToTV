@@ -36,6 +36,7 @@ class DetailActivity : Activity() {
     private lateinit var btnFirst: TextView
     private lateinit var btnOrder: TextView
     private lateinit var btnJump: TextView
+    private lateinit var btnFollow: TextView
     private lateinit var epLabel: TextView
     private lateinit var groupRow: LinearLayout
 
@@ -65,6 +66,7 @@ class DetailActivity : Activity() {
         btnFirst = findViewById(R.id.btnFirst)
         btnOrder = findViewById(R.id.btnOrder)
         btnJump = findViewById(R.id.btnJump)
+        btnFollow = findViewById(R.id.btnFollow)
         epLabel = findViewById(R.id.epLabel)
         groupRow = findViewById(R.id.groupRow)
 
@@ -133,7 +135,26 @@ class DetailActivity : Activity() {
         buildGroupButtons(d)
         showEpisodes()
         updateButtons()
+        // Đang theo dõi: mở phim là đã thấy các tập mới
+        d.latestEpisode?.let { Prefs.updateFollow(d.url, d.episodeCount, it.title, seen = true) }
+        showFollow(d)
         btnPlay.requestFocusFromTouch()
+    }
+
+    private fun showFollow(d: FilmDetail) {
+        if (d.groups.isEmpty()) return
+        btnFollow.visibility = View.VISIBLE
+        btnFollow.text = if (Prefs.followOf(d.url) != null) "✓ Đang theo dõi" else "＋ Theo dõi"
+        btnFollow.setOnClickListener {
+            if (Prefs.followOf(d.url) != null) {
+                Prefs.unfollow(d.url)
+                Toast.makeText(this, "Đã bỏ theo dõi.", Toast.LENGTH_SHORT).show()
+            } else {
+                Prefs.follow(d)
+                Toast.makeText(this, "Đã theo dõi — trang chủ sẽ báo khi phim có tập mới.", Toast.LENGTH_LONG).show()
+            }
+            showFollow(d)
+        }
     }
 
     private fun buildGroupButtons(d: FilmDetail) {

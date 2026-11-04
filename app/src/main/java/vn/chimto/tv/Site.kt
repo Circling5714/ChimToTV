@@ -30,6 +30,9 @@ data class FilmDetail(
     val description: String?, val info: String?, val groups: List<EpisodeGroup>,
 ) {
     val episodeCount get() = groups.maxOfOrNull { it.episodes.size } ?: 0
+
+    /** Tập mới nhất của bản nhiều tập nhất (bản Vietsub thường ra trước Thuyết Minh). */
+    val latestEpisode get() = groups.maxByOrNull { it.episodes.size }?.episodes?.lastOrNull()
     fun groupOf(epUrl: String): EpisodeGroup? = groups.firstOrNull { g -> g.episodes.any { it.url == epUrl } }
 }
 

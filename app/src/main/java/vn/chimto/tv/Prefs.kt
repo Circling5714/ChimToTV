@@ -11,6 +11,14 @@ data class HistoryItem(
     val epTitle: String, val epUrl: String, val time: Long,
 )
 
+/** Phim theo dõi: count = số tập lần kiểm gần nhất, seen = số tập lúc người xem mở phim lần cuối. */
+data class Follow(
+    val filmUrl: String, val title: String, val poster: String?,
+    val count: Int, val latest: String, val seen: Int,
+) {
+    val newCount get() = (count - seen).coerceAtLeast(0)
+}
+
 /** Cài đặt + lịch sử xem, lưu trong SharedPreferences. */
 object Prefs {
     const val DEFAULT_BASE = "https://yanhh3d.ee"
@@ -211,6 +219,70 @@ object Prefs {
             .putString("positions", o.toString())
             .putString("pos_film", films.toString()).apply()
     }
+
+    // ---- Phim theo dõi ----
+
+    val follows: List<Follow>
+        get() {
+            val a = JSONArray(sp.getString("follows", "[]"))
+            return List(a.length()) { i ->
+                val o = a.getJSONObject(i)
+                Follow(
+                    o.getString("film"), o.getString("title"), o.optString("poster").ifEmpty { null },
+                    o.optInt("count"), o.optString("latest"), o.optInt("seen"),
+                )
+            }
+        }
+
+    private fun saveFollows(list: List<Follow>) {
+        val a = JSONArray()
+        list.forEach {
+            a.put(
+                JSONObject().put("film", it.filmUrl).put("title", it.title).put("poster", it.poster ?: "")
+                    .put("count", it.count).put("latest", it.latest).put("seen", it.seen)
+            )
+        }
+        sp.edit().putString("follows", a.toString()).apply()
+    }
+
+    fun followOf(filmUrl: String): Follow? = follows.firstOrNull { it.filmUrl == filmUrl }
+
+    fun follow(d: FilmDetail) {
+        val n = d.episodeCount
+        saveFollows(listOf(Follow(d.url, d.title, d.poster, n, d.latestEpisode?.title.orEmpty(), n)) +
+            follows.filter { it.filmUrl != d.url })
+    }
+
+    fun unfollow(filmUrl: String) = saveFollows(follows.filter { it.filmUrl != filmUrl })
+
+    /** Cập nhật số tập mới nhất; seen = true: người xem vừa mở phim (hết "tập mới"). */
+    fun updateFollow(filmUrl: String, count: Int, latest: String, seen: Boolean) {
+        val list = follows
+        if (list.none { it.filmUrl == filmUrl }) return
+        saveFollows(
+            list.map {
+                if (it.filmUrl != filmUrl) it
+                // Trang bớt tập (gộp / sửa danh sách) thì không để "tập mới" kẹt mãi
+                else it.copy(count = count, latest = latest, seen = if (seen || count < it.seen) count else it.seen)
+            }
+        )
+    }
+
+    var lastFollowCheck: Long
+        get() = sp.getLong("last_follow_check", 0)
+        set(value) = sp.edit().putLong("last_follow_check", value).apply()
+
+    // ---- Nhạc mở đầu (mốc riêng từng phim, giây) ----
+
+    /** (đầu, hết) nhạc mở đầu; hết = -1 là mới đánh dấu đầu. */
+    fun intro(filmUrl: String): Pair<Int, Int>? {
+        val p = sp.getString("intro@$filmUrl", null)?.split(',') ?: return null
+        return (p.getOrNull(0)?.toIntOrNull() ?: return null) to (p.getOrNull(1)?.toIntOrNull() ?: -1)
+    }
+
+    fun setIntro(filmUrl: String, start: Int, end: Int) = sp.edit().putString("intro@$filmUrl", "$start,$end").apply()
+
+    fun clearIntro(filmUrl: String) = sp.edit().remove("intro@$filmUrl").apply()
 
     // ---- Riêng tư ----
 
