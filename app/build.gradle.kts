@@ -18,8 +18,8 @@ android {
         // Android 5.0 trở lên: chạy được cả trên các TV box đời cũ.
         minSdk = 21
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.9"
+        versionCode = 14
+        versionName = "1.9.1"
         // Thử cập nhật OTA với bản giả số hiệu cao hơn: gradlew assembleDebug -Pvc=5 -Pvn=1.4
         (findProperty("vc") as String?)?.let { versionCode = it.toInt() }
         (findProperty("vn") as String?)?.let { versionName = it }
