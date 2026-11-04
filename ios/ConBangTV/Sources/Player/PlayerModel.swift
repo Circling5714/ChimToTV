@@ -87,6 +87,9 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     private var session: PlaySession?
     private var suggested = false
     private var shownByTap = false
+    /// Số lần tự bấm phát hộ người xem (trình phát JW trên iPad không tự tải trước video như trên Android).
+    private var autoPlays = 0
+    private var lastAutoPlay: Int64 = 0
     private var expectedURL = ""
     private var expectedHost: String?
     private var timers: [String: Task<Void, Never>] = [:]
@@ -273,6 +276,8 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         resumePending = false
         endedHandled = false
         hintShown = false
+        autoPlays = 0
+        lastAutoPlay = 0
         seekTarget = nil
         cancel("seek")
         pageLoad += 1
@@ -421,6 +426,14 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
                 showError("\(server?.label ?? "Server") không phát được video (\(err)).\nMở Menu để chọn server khác.")
                 showPanel()
             }
+        }
+        // Trình phát JW trên iPad (Safari) không tự tải trước video khi chưa ai bấm phát — khác Android (agent chỉ tự
+        // phát khi video đã có dữ liệu). Còn dừng, chưa có dữ liệu sau vài giây → bấm ▶ hộ người xem, tối đa 4 lần.
+        if !started && s.paused && !s.ready && !errShown && now - loadStartedAt > 2500 && autoPlays < 4 && now - lastAutoPlay > 4000 {
+            autoPlays += 1
+            lastAutoPlay = now
+            Log.d("Player", "trình phát đứng chờ — tự bấm phát (lần \(autoPlays))")
+            cmd("play")
         }
         if let sess = session {
             sess.update(now, paused: s.paused, waiting: s.waiting, ready: s.ready, droppedFrames: s.droppedFrames, totalFrames: s.totalFrames)
