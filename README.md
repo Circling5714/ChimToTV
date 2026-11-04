@@ -46,10 +46,20 @@ loại trên menu của trang; thể loại / nước khác thì dùng **Tìm ki
 | Màn hình | Phím |
 | --- | --- |
 | Trang chủ / danh sách | Mũi tên: di chuyển • OK/Enter: mở phim (hàng **Xem tiếp**: phát tiếp luôn) • Giữ OK / Menu trên phim ở Xem tiếp, Lịch sử xem: xoá khỏi lịch sử • Back: về menu bên trái, Back lần nữa để thoát |
-| Chi tiết phim | OK: xem tiếp / xem tập mới nhất • ▼: vào danh sách tập (ô xanh = đã xem) • Số 0–9 hoặc nút **Đến tập…**: nhảy tới tập theo số |
+| Chi tiết phim | OK: xem tiếp / xem tập mới nhất • ▼: vào danh sách tập (ô xanh = đã xem) • Số 0–9 hoặc nút **Đến tập…**: nhảy tới tập theo số • **＋ Theo dõi**: báo khi phim có tập mới |
 | Đang xem phim | OK/Space: dừng–phát • ◀ ▶: tua (giữ để tua nhanh) • ▲: xem thời gian • ▼/Menu: đổi server (kèm điểm từng server), đổi tập • Số 0–9: nhảy tới 0–90% • CH+/CH−, N/P: tập sau/trước • Back: thoát |
 | Gợi ý đổi server (hiện khi video giật nhiều) | OK: chuyển sang server được gợi ý, xem tiếp đúng chỗ • Back: bỏ qua |
 | Duyệt web | Mũi tên: di chuyển con trỏ (chạm mép thì cuộn) • OK: bấm • CH+/CH−: cuộn nhanh • Menu: tải lại • Back: lùi trang |
+
+## Phim theo dõi và nhạc mở đầu (từ 1.9)
+
+- **Theo dõi:** trong trang phim bấm **＋ Theo dõi**. Mỗi lần mở trang chủ (tối đa 30 phút một lần) app hỏi lại trang
+  các phim đang theo dõi; phim ra tập mới thì đầu trang chủ có hàng **Có tập mới** (vd "Tập 166 mới"), menu ghi
+  "Theo dõi (1 mới)" và hiện thông báo. Mở phim (hoặc phát phim đó) là hết "mới". Mục menu **Phim theo dõi** liệt kê
+  tất cả; giữ OK / nhấn Menu trên một phim để bỏ theo dõi. App chỉ báo khi đang mở (không chạy ngầm khi tắt app).
+- **Nhạc mở đầu:** lúc xem nhấn ▼ → hàng **Nhạc mở đầu**: bấm **Hết nhạc ở …** đúng lúc hết nhạc (nhạc không nằm ngay
+  đầu tập thì bấm **Bắt đầu ở …** lúc nhạc bắt đầu trước). Mốc lưu cho cả phim: các tập sau vừa chạy tới mốc đầu (lệch
+  tối đa 8 giây) là tự tua tới mốc hết, ◀ để xem lại. Xem tiếp từ giữa tập thì không tua; **Bỏ mốc** để tắt.
 
 ## Khi trang thay đổi
 
@@ -185,6 +195,12 @@ Từ 1.8.2: `AutoClear.kt` đếm Activity đang hiện (ActivityLifecycleCallba
 xoá sau 1,5 s. Chỗ đang xem lưu kèm phim của tập (`pos_film`) để xoá một phim khỏi lịch sử xoá được mọi tập của nó
 (vị trí lưu trước 1.8.2 chỉ xoá được tập cuối). Sao lưu: `allowBackup="false"` + `res/xml/data_extraction_rules.xml`
 (Android 12+); `android.webkit.WebView.MetricsOptOut` trong manifest.
+
+Từ 1.9: `Follows.kt` kiểm phim theo dõi trên một luồng (`inBackground`, không gắn màn hình), lần lượt `Site.detail`
+từng phim; `Prefs.follows` lưu `count` (số tập lần kiểm gần nhất, theo bản nhiều tập nhất) và `seen` (số tập lúc mở phim
+lần cuối). Mốc nhạc mở đầu: `intro@<phim>` = "đầu,hết" (giây). Trình phát gắn số lần nạp trang (`window.__chimtoLoad`,
+`pageLoad`) vào trang phát và bỏ trạng thái của trang cũ; `resumePending` giữ chỗ xem dở cho tới khi trình phát tua
+xong (TV chậm có khi mất hàng chục giây) — lưu vị trí / đổi server / đổi bản trong lúc đó dùng chỗ cũ.
 
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server

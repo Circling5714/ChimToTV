@@ -4,6 +4,21 @@ Côn Bằng TV — từ 1.0 đến 1.4 tên là ChimTo TV. Tải bản mới nh�
 Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b`), cài đè
 được lên nhau và giữ nguyên lịch sử xem.
 
+## 1.9 — 04/11/2026
+
+- **Phim theo dõi + báo tập mới:** trang phim có nút "＋ Theo dõi"; menu có mục **Phim theo dõi** (ghi "Theo dõi (2 mới)"
+  khi có phim ra tập). App hỏi lại trang các phim đang theo dõi khi mở trang chủ (tối đa 30 phút một lần); phim có tập
+  mới hiện ở hàng **"Có tập mới"** đầu trang chủ (vd "Tập 166 mới", "+2 · Tập 168") kèm thông báo; mở phim là hết "mới".
+  Giữ OK / nhấn Menu trên phim theo dõi để bỏ theo dõi.
+- **Bỏ qua nhạc mở đầu:** lúc xem nhấn ▼ → hàng "Nhạc mở đầu": "Bắt đầu ở …" (nếu nhạc không nằm ngay đầu tập) và
+  "Hết nhạc ở …". Mốc lưu cho cả phim; các tập sau vừa chạy tới mốc đầu là tự tua qua (◀ để xem lại). Xem tiếp từ giữa
+  tập thì không tua; "Bỏ mốc" để tắt.
+- **Sửa lỗi trên TV chậm:** xem tiếp một tập xem dở mà thoát / chuyển tập trước khi trình phát kịp tua tới chỗ cũ thì
+  chỗ xem dở bị ghi đè bằng giây đầu tập; chuyển tập có thể ghi giờ của tập cũ sang tập mới (trang tập cũ còn trả lời
+  vài giây). Cả hai đã sửa.
+- versionCode 13 · tag `v1.9` · commit `5c5bf8c` · SHA-256 APK
+  `b221ffc045d4c9161f60f64211b3588bdc9fade237d6030247441bca2d18be7a`
+
 ## 1.8.2 — 04/11/2026
 
 - **Hàng "Xem tiếp"** ở đầu trang chủ (5 phim xem gần nhất, mọi trang): bấm là phát tiếp đúng chỗ, tập đã xem hết thì
