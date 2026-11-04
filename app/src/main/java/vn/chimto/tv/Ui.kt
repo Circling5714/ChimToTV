@@ -2,6 +2,7 @@ package vn.chimto.tv
 
 import android.app.Activity
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Handler
@@ -17,6 +18,10 @@ import java.net.UnknownHostException
 import java.util.concurrent.Executors
 import javax.net.ssl.SSLException
 import kotlin.math.roundToInt
+
+/** Context.getColorStateList chỉ có từ Android 6. */
+fun Context.colorStateOf(id: Int): ColorStateList =
+    if (Build.VERSION.SDK_INT >= 23) getColorStateList(id) else @Suppress("DEPRECATION") resources.getColorStateList(id)
 
 /** Context.getColor chỉ có từ Android 6; app chạy từ Android 5. */
 fun Context.colorOf(id: Int): Int =

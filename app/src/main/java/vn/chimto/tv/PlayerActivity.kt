@@ -2,7 +2,6 @@ package vn.chimto.tv
 
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -12,8 +11,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.util.Log
+import android.view.GestureDetector
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -28,6 +29,7 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.SeekBar
 import android.widget.TextView
 import org.json.JSONArray
 import org.json.JSONObject
@@ -45,7 +47,10 @@ import kotlin.math.min
  * Server cho link HLS trực tiếp (.m3u8, trang Next.js kiểu PhimMoi): app phát bằng trang riêng assets/hls.html
  * (hls.js đóng kèm, bỏ quảng cáo chèn giữa phim), agent nằm ngay trong trang đó.
  */
-class PlayerActivity : Activity() {
+class PlayerActivity : BaseActivity() {
+    // Có thanh điều khiển cảm ứng riêng (có nút Thoát), khỏi nút "‹ Quay lại" chung
+    override val touchBackLabel: String? = null
+
     companion object {
         fun intent(context: Context, film: FilmDetail, ep: Episode): Intent =
             Intent(context, PlayerActivity::class.java).putExtra("film", film.url).putExtra("ep", ep.url)
@@ -99,6 +104,15 @@ class PlayerActivity : Activity() {
     private lateinit var btnIntroEnd: TextView
     private lateinit var btnIntroClear: TextView
     private lateinit var btnSpeed: TextView
+    private lateinit var touchLayer: View
+    private lateinit var touchBar: View
+    private lateinit var touchTitle: TextView
+    private lateinit var touchTime: TextView
+    private lateinit var touchDuration: TextView
+    private lateinit var touchSeek: SeekBar
+    private lateinit var touchPlay: TextView
+    private var touchDragging = false
+    private val hideTouchBar = Runnable { touchBar.visibility = View.INVISIBLE }
     private lateinit var btnFit: TextView
     private lateinit var btnSleep: TextView
 
@@ -220,6 +234,13 @@ class PlayerActivity : Activity() {
         btnIntroEnd = findViewById(R.id.btnIntroEnd)
         btnIntroClear = findViewById(R.id.btnIntroClear)
         btnSpeed = findViewById(R.id.btnSpeed)
+        touchLayer = findViewById(R.id.touchLayer)
+        touchBar = findViewById(R.id.touchBar)
+        touchTitle = findViewById(R.id.touchTitle)
+        touchTime = findViewById(R.id.touchTime)
+        touchDuration = findViewById(R.id.touchDuration)
+        touchSeek = findViewById(R.id.touchSeek)
+        touchPlay = findViewById(R.id.touchPlay)
         btnFit = findViewById(R.id.btnFit)
         btnSleep = findViewById(R.id.btnSleep)
 
@@ -229,6 +250,7 @@ class PlayerActivity : Activity() {
         hlsHtml = assets.open("hls.html").use { it.readBytes().toString(Charsets.UTF_8) }
         setupWebView()
         setupPanel()
+        setupTouch()
 
         filmUrl = intent.getStringExtra("film")!!
         val epUrl = intent.getStringExtra("ep")!!
@@ -751,6 +773,7 @@ class PlayerActivity : Activity() {
         if (resumePending && (s.t >= resumeAt - 5 || now - resumeIssuedAt > 30_000)) resumePending = false
         if (started && !introDone && !s.paused) skipIntro(s)
         if (osd.visibility == View.VISIBLE) updateOsd()
+        if (touchBar.visibility == View.VISIBLE) updateTouchBar()
         if (wasPaused != null && wasPaused != s.paused) showOsd()
 
         if (started && now - lastSave > 5000) {
@@ -853,6 +876,9 @@ class PlayerActivity : Activity() {
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
         val code = e.keyCode
+        // Bấm remote / bàn phím: thôi chế độ cảm ứng
+        keyUsed(e)
+        if (e.action == KeyEvent.ACTION_DOWN && touchBar.visibility == View.VISIBLE) hideTouch()
         // Đang đếm 60 giây sau khi hết giờ hẹn: có người bấm → thôi thoát (phím vẫn làm việc của nó, vd OK để phát)
         if (sleepGraceUntil > 0 && e.action == KeyEvent.ACTION_DOWN) {
             sleepGraceUntil = 0
@@ -957,6 +983,12 @@ class PlayerActivity : Activity() {
     // ---- Giao diện phủ ----
 
     private fun showOsd(ms: Long = 4000) {
+        // Đang hiện thanh cảm ứng (có thời gian riêng): khỏi chồng thêm thanh thời gian của remote; tính lại giờ tự ẩn
+        // (vd vừa chạm Dừng: trình phát báo đã dừng sau ~1 giây → thanh ở lại để chạm Phát)
+        if (touchBar.visibility == View.VISIBLE) {
+            showTouch()
+            return
+        }
         osd.visibility = View.VISIBLE
         updateOsd()
         osd.removeCallbacks(hideOsd)
@@ -982,6 +1014,7 @@ class PlayerActivity : Activity() {
 
     private fun showPanel() {
         osd.visibility = View.GONE
+        hideTouch()
         // Điểm server mới nhất + tình hình lần xem này
         val host = source?.let { AppProxy.statsHost(Site.hostOf(it.epUrl)) }
         for (i in 0 until serverRow.childCount) {
@@ -997,20 +1030,141 @@ class PlayerActivity : Activity() {
         (active ?: findViewById(R.id.btnNext)).requestFocus()
     }
 
+    // ---- Màn hình cảm ứng ----
+
+    // Lớp chạm chỉ cho màn cảm ứng: remote / bàn phím (và dịch vụ trợ năng) đã có đường phím riêng
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupTouch() {
+        val gestures = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            /** Thanh vừa hiện do lần chạm này (khỏi ẩn ngay khi xác nhận là chạm một lần). */
+            private var shownByTap = false
+
+            override fun onDown(e: MotionEvent) = true
+
+            // Hiện thanh ngay khi nhấc tay, không chờ 0,3 giây xem có chạm đúp không: TV chậm mà người xem chạm tiếp
+            // vào nút ngay thì nút đã có sẵn (chạm đúp để tua thì thanh hiện luôn cũng tiện xem giờ)
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                if (panel.visibility != View.VISIBLE && touchBar.visibility != View.VISIBLE) {
+                    showTouch()
+                    shownByTap = true
+                }
+                return true
+            }
+
+            // Chạm một lần khi thanh / menu đang hiện: ẩn đi
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                if (shownByTap) {
+                    shownByTap = false
+                    return true
+                }
+                if (panel.visibility == View.VISIBLE) hidePanel() else hideTouch()
+                return true
+            }
+
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                shownByTap = false
+                val back = e.x < touchLayer.width / 2f
+                seekBy(if (back) -10.0 else 10.0)
+                notice.show(if (back) "◀◀ 10 giây" else "10 giây ▶▶", 1200)
+                if (panel.visibility != View.VISIBLE) showTouch()
+                return true
+            }
+        })
+        touchLayer.setOnTouchListener { _, ev ->
+            gestures.onTouchEvent(ev)
+            true
+        }
+        // Bấm nút nào cũng giữ thanh thêm 5 giây
+        fun button(id: Int, action: () -> Unit) = findViewById<View>(id).setOnClickListener {
+            action()
+            showTouch()
+        }
+        button(R.id.touchPrev) { prev() }
+        button(R.id.touchBack10) { seekBy(-10.0) }
+        button(R.id.touchPlay) { cmd(if (started) "toggle" else "play") }
+        button(R.id.touchFwd10) { seekBy(10.0) }
+        button(R.id.touchNext) { next() }
+        findViewById<View>(R.id.touchMenu).setOnClickListener { showPanel() }
+        findViewById<View>(R.id.touchExit).setOnClickListener { finish() }
+        touchSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar, p: Int, fromUser: Boolean) {
+                val d = state?.d ?: 0.0
+                if (fromUser && d > 0) touchTime.text = formatTime(d * p / 1000)
+            }
+
+            override fun onStartTrackingTouch(bar: SeekBar) {
+                touchDragging = true
+                touchBar.removeCallbacks(hideTouchBar)
+            }
+
+            override fun onStopTrackingTouch(bar: SeekBar) {
+                touchDragging = false
+                val d = state?.d ?: 0.0
+                if (started && d > 0) {
+                    val target = (d * bar.progress / 1000).coerceIn(0.0, d - 1)
+                    resumePending = false // người xem tự tua
+                    session?.seeked()
+                    cmd("seekTo", target)
+                    state = state?.copy(t = target)
+                }
+                showTouch()
+            }
+        })
+    }
+
+    private fun showTouch() {
+        osd.visibility = View.GONE
+        touchBar.visibility = View.VISIBLE
+        updateTouchBar()
+        touchBar.removeCallbacks(hideTouchBar)
+        // Đang dừng thì giữ thanh trên màn hình (như thanh thời gian khi dùng remote)
+        if (state?.paused != true || !started) touchBar.postDelayed(hideTouchBar, 5000)
+    }
+
+    private fun hideTouch() {
+        touchBar.removeCallbacks(hideTouchBar)
+        touchBar.visibility = View.INVISIBLE
+    }
+
+    private fun updateTouchBar() {
+        val s = state
+        touchTitle.text = osdTitle.text
+        val d = s?.d ?: 0.0
+        val t = seekTarget ?: s?.t ?: 0.0
+        if (!touchDragging) {
+            touchTime.text = formatTime(t)
+            touchSeek.progress = if (d > 0) (t / d * 1000).toInt() else 0
+        }
+        touchDuration.text = if (d > 0) formatTime(d) else "--:--"
+        touchSeek.isEnabled = started && d > 0
+        touchPlay.text = if (!started || s?.paused == true) "▶ Phát" else "Dừng"
+    }
+
     private fun hidePanel() {
         panel.visibility = View.GONE
     }
 
     private fun showLoading(text: String) {
+        showLoadingHint()
         loading.visibility = View.VISIBLE
         loadingProgress.visibility = View.VISIBLE
         loadingText.text = text
     }
 
     private fun showError(text: String) {
+        showLoadingHint()
         loading.visibility = View.VISIBLE
         loadingProgress.visibility = View.GONE
         loadingText.text = text
+    }
+
+    /** Dòng hướng dẫn dưới màn chờ: phím remote, hoặc cách dùng khi đang dùng cảm ứng. */
+    private fun showLoadingHint() {
+        findViewById<TextView>(R.id.loadingHint).text = if (TouchUi.active) {
+            "Chạm vào phim để hiện nút điều khiển (dừng / phát, tua, đổi tập, menu, thoát)  •  Chạm đúp trái / phải: lùi / tới 10 giây"
+        } else {
+            "OK: Dừng / Phát   •   ◀ ▶: Tua   •   ▼: Menu (đổi server, đổi tập)   •   Back: Thoát"
+        }
     }
 
     private fun hideLoading() {

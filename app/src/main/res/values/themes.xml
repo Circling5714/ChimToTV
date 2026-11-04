@@ -15,6 +15,18 @@
         <item name="android:windowBackground">@android:color/black</item>
     </style>
 
+    <!-- Nút của thanh điều khiển cảm ứng trong trình phát: không nhận tiêu điểm (remote đi thẳng vào phim) -->
+    <style name="TouchButton" parent="TvButton">
+        <item name="android:textSize">16sp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:layout_marginStart">5dp</item>
+        <item name="android:layout_marginEnd">5dp</item>
+        <item name="android:focusable">false</item>
+    </style>
+
     <style name="TvButton">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>

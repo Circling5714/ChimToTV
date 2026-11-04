@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/black">
@@ -42,6 +43,7 @@
             android:textSize="18sp" />
 
         <TextView
+            android:id="@+id/loadingHint"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
@@ -50,6 +52,13 @@
             android:textColor="@color/text_dim"
             android:textSize="14sp" />
     </LinearLayout>
+
+    <!-- Màn hình cảm ứng: lớp nhận chạm phủ lên phim — chạm: hiện / ẩn thanh điều khiển; chạm đúp nửa trái / phải: lùi /
+         tới 10 giây. Chặn luôn chạm vào trang web (khỏi bấm nhầm quảng cáo trong trình phát của trang). -->
+    <View
+        android:id="@+id/touchLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
     <LinearLayout
         android:id="@+id/osd"
@@ -114,6 +123,111 @@
             android:text="OK: Dừng / Phát   •   ◀ ▶: Tua (giữ để tua nhanh)   •   ▼: Menu   •   Số 0–9: nhảy tới 0–90%"
             android:textColor="@color/text_dim"
             android:textSize="13sp" />
+    </LinearLayout>
+
+    <!-- Thanh điều khiển cảm ứng (hiện khi chạm vào phim). Ẩn bằng invisible (không phải gone): luôn được xếp chỗ, vừa hiện
+         là chạm trúng nút ngay (gone thì lần đầu hiện phải chờ khung hình sau mới có chỗ) -->
+    <LinearLayout
+        android:id="@+id/touchBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_osd"
+        android:clickable="true"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        tools:ignore="KeyboardInaccessibleWidget"
+        android:paddingTop="40dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="16dp"
+        android:visibility="invisible">
+
+        <TextView
+            android:id="@+id/touchTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:textColor="@color/text"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/touchTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text"
+                android:textSize="15sp" />
+
+            <SeekBar
+                android:id="@+id/touchSeek"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:focusable="false"
+                android:max="1000"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
+                android:progressTint="@color/focus"
+                android:thumbTint="@color/focus" />
+
+            <TextView
+                android:id="@+id/touchDuration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/touchPrev"
+                style="@style/TouchButton"
+                android:text="|◀ Tập trước" />
+
+            <TextView
+                android:id="@+id/touchBack10"
+                style="@style/TouchButton"
+                android:text="◀◀ 10 giây" />
+
+            <TextView
+                android:id="@+id/touchPlay"
+                style="@style/TouchButton"
+                android:minWidth="96dp"
+                android:text="Dừng" />
+
+            <TextView
+                android:id="@+id/touchFwd10"
+                style="@style/TouchButton"
+                android:text="10 giây ▶▶" />
+
+            <TextView
+                android:id="@+id/touchNext"
+                style="@style/TouchButton"
+                android:text="Tập sau ▶|" />
+
+            <TextView
+                android:id="@+id/touchMenu"
+                style="@style/TouchButton"
+                android:text="Menu" />
+
+            <TextView
+                android:id="@+id/touchExit"
+                style="@style/TouchButton"
+                android:text="Thoát" />
+        </LinearLayout>
     </LinearLayout>
 
     <LinearLayout

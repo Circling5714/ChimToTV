@@ -1,6 +1,5 @@
 package vn.chimto.tv
 
-import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
@@ -22,7 +21,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
 
-class DetailActivity : Activity() {
+class DetailActivity : BaseActivity() {
     companion object {
         fun intent(context: Context, film: Film): Intent = Intent(context, DetailActivity::class.java)
             .putExtra("url", film.url).putExtra("title", film.title).putExtra("poster", film.poster)
@@ -138,7 +137,7 @@ class DetailActivity : Activity() {
         // Đang theo dõi: mở phim là đã thấy các tập mới
         d.latestEpisode?.let { Prefs.updateFollow(d.url, d.episodeCount, it.title, seen = true) }
         showFollow(d)
-        btnPlay.requestFocusFromTouch()
+        btnPlay.focusForRemote()
     }
 
     private fun showFollow(d: FilmDetail) {
@@ -189,8 +188,6 @@ class DetailActivity : Activity() {
         val n = group?.episodes?.size ?: 0
         epLabel.text = if (typed.isEmpty()) "Danh sách tập ($n)" else "Danh sách tập ($n) — đến tập $typed…"
     }
-
-    override fun dispatchKeyEvent(e: KeyEvent): Boolean = escapeAsBack(e) || super.dispatchKeyEvent(e)
 
     /** Phím số trên remote / bàn phím: gõ số tập, ngừng 1,2 giây là nhảy tới tập đó (không cần bấm nút "Đến tập…"). */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -243,7 +240,7 @@ class DetailActivity : Activity() {
             return
         }
         (episodes.layoutManager as GridLayoutManager).scrollToPositionWithOffset(i, 0)
-        episodes.post { episodes.findViewHolderForAdapterPosition(i)?.itemView?.requestFocusFromTouch() }
+        episodes.post { episodes.findViewHolderForAdapterPosition(i)?.itemView?.focusForRemote() }
     }
 
     /** Cuộn lưới tới tập đang xem dở để bấm ▼ là vào đúng chỗ. */

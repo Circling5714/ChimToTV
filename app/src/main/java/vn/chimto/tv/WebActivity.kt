@@ -2,7 +2,6 @@ package vn.chimto.tv
 
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -10,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.os.SystemClock
+import android.view.Gravity
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -32,7 +32,7 @@ import kotlin.math.min
  * Duyệt nguyên trang web bằng con trỏ ảo — dự phòng khi trang đổi giao diện làm phần đọc dữ liệu không chạy.
  * Mũi tên: di chuyển con trỏ (chạm mép thì cuộn trang) • OK: bấm • CH+/CH−: cuộn nhanh • Back: lùi trang.
  */
-class WebActivity : Activity() {
+class WebActivity : BaseActivity() {
     companion object {
         fun intent(context: Context, url: String): Intent =
             Intent(context, WebActivity::class.java).putExtra("url", url)
@@ -136,6 +136,7 @@ class WebActivity : Activity() {
     }
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
+        keyUsed(e)
         if (escapeAsBack(e)) return true
         val down = e.action == KeyEvent.ACTION_DOWN
         when (e.keyCode) {
@@ -237,6 +238,16 @@ class WebActivity : Activity() {
             .apply { source = InputDevice.SOURCE_MOUSE }
         touchTarget().dispatchGenericMotionEvent(ev)
         ev.recycle()
+    }
+
+    // Góc trên của trang web thường là thanh đầu dính cố định (nút đăng nhập, tìm kiếm…) → đặt nút ở góc dưới bên trái,
+    // nội dung dưới đó cuộn ra được
+    override val touchBackGravity = Gravity.BOTTOM or Gravity.START
+
+    // Đang chạm thẳng vào trang: con trỏ của remote chỉ vướng mắt. Ẩn bằng invisible (không phải gone) để con trỏ vẫn
+    // được xếp chỗ: phím remote đầu tiên sau khi chạm vừa hiện lại con trỏ vừa dịch nó đi ngay
+    override fun onTouchUiChanged(active: Boolean) {
+        if (::cursor.isInitialized) cursor.visibility = if (active) View.INVISIBLE else View.VISIBLE
     }
 
     @Deprecated("Deprecated in Java")

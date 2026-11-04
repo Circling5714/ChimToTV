@@ -30,7 +30,7 @@ class StatusView(private val root: View) {
         text.text = message
         retry.visibility = if (onRetry != null) View.VISIBLE else View.GONE
         retry.setOnClickListener { onRetry?.invoke() }
-        if (onRetry != null) retry.requestFocusFromTouch()
+        if (onRetry != null) retry.focusForRemote()
     }
 
     fun hide() {
@@ -178,7 +178,7 @@ class FilmGridAdapter(
         }
         if (position == focusPosition) {
             focusPosition = -1
-            holder.itemView.post { holder.itemView.requestFocusFromTouch() }
+            holder.itemView.post { holder.itemView.focusForRemote() }
         }
         if (position >= rows.size - spanCount * 2) holder.itemView.post(onNearEnd)
     }

@@ -39,6 +39,7 @@ class CursorView(context: Context) : View(context) {
 
     /** Dịch con trỏ; trả về phần không đi được vì chạm mép (để cuộn trang). */
     fun moveBy(dx: Float, dy: Float): Pair<Float, Float> {
+        if (width <= 0 || height <= 0) return dx to dy // chưa được xếp chỗ
         val nx = (cx + dx).coerceIn(0f, width - 1f)
         val ny = (cy + dy).coerceIn(0f, height - 1f)
         val rest = (cx + dx - nx) to (cy + dy - ny)

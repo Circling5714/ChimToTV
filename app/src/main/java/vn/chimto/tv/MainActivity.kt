@@ -1,6 +1,5 @@
 package vn.chimto.tv
 
-import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
@@ -18,7 +17,12 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
 
-class MainActivity : Activity() {
+class MainActivity : BaseActivity() {
+    // Trang chủ: nút cảm ứng thoát app luôn (remote thì Back hai lần)
+    override val touchBackLabel = "Thoát"
+
+    override fun onTouchBack() = finish()
+
     private enum class Kind { HOME, SEARCH, HISTORY, FOLLOWS, CATEGORY, FILTER, SITE, WEB, CLEAR, SETTINGS }
 
     private data class Entry(val title: String, val kind: Kind, val url: String? = null)
@@ -282,7 +286,7 @@ class MainActivity : Activity() {
                 token++
                 gridAdapter.clear()
                 status.message("Gõ tên phim cần tìm rồi nhấn OK / Enter — app tìm cùng lúc trên mọi trang trong danh sách.")
-                search.requestFocusFromTouch()
+                search.focusForRemote()
                 showKeyboard(search)
             }
             Kind.HISTORY -> showHistory(focusFirst = true)
@@ -518,8 +522,6 @@ class MainActivity : Activity() {
         val item = if (row.resume) Prefs.historyFor(row.film.url) else null
         startActivity(if (item != null) PlayerActivity.resume(this, item) else DetailActivity.intent(this, row.film))
     }
-
-    override fun dispatchKeyEvent(e: KeyEvent): Boolean = escapeAsBack(e) || super.dispatchKeyEvent(e)
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {

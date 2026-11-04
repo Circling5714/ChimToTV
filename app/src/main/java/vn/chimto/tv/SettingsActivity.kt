@@ -1,9 +1,7 @@
 package vn.chimto.tv
 
-import android.app.Activity
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
@@ -11,7 +9,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 
-class SettingsActivity : Activity() {
+class SettingsActivity : BaseActivity() {
     companion object {
         const val CONTACT_URL = "https://t.me/tivikit"
     }
@@ -147,8 +145,6 @@ class SettingsActivity : Activity() {
         setupProxy()
         url.requestFocus()
     }
-
-    override fun dispatchKeyEvent(e: KeyEvent): Boolean = escapeAsBack(e) || super.dispatchKeyEvent(e)
 
     // ---- Proxy SOCKS5 (xem AppProxy) ----
 
