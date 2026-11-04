@@ -25,13 +25,15 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | hoathinh3d.pw | HaLimMovies | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
 | phimmoir.fun | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
 
+**Tìm kiếm** (từ 1.9.1) tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm, trang đang dùng đứng đầu.
+
 App không viết riêng cho từng trang mà nhận dạng theo mẫu giao diện, nên trang khác cùng kiểu (yanhh3d / theme HaLim /
 Next.js kiểu PhimMoi) thường cũng chạy: nhập tên miền trong **Cài đặt** → **Lưu** → **Kiểm tra kết nối**. Trang nào
 không có `player.php` thì app tự mở trang tập và phóng trình phát ra toàn màn hình.
 
 phimmoir.fun là trang tổng hợp: ngoài hoạt hình 3D (khối "Hoạt hình Trung Quốc mới cập nhật" đầu trang chủ) còn phim
-bộ / phim lẻ Hàn, Trung, Âu Mỹ, Nhật, Thái. Menu có Hoạt hình, Phim bộ mới, Phim lẻ mới, 5 mục theo nước và 10 thể
-loại trên menu của trang; thể loại / nước khác thì dùng **Tìm kiếm**. Server: **KK Phim** (nhanh nhất), **NguonC**
+bộ / phim lẻ Hàn, Trung, Âu Mỹ, Nhật, Thái. Menu có Hoạt hình, Phim bộ mới, Phim lẻ mới, 5 mục theo nước, 10 thể
+loại trên menu của trang, và **Thể loại…** / **Quốc gia…** (từ 1.9.1) để chọn trong đủ danh sách của bộ lọc. Server: **KK Phim** (nhanh nhất), **NguonC**
 (app tự bỏ qua quảng cáo trước phim), **HD** (bản Song Ngữ, có phụ đề tiếng Việt), OPhim (đang hỏng).
 
 ## Cài lên tivi
@@ -47,7 +49,7 @@ loại trên menu của trang; thể loại / nước khác thì dùng **Tìm ki
 | --- | --- |
 | Trang chủ / danh sách | Mũi tên: di chuyển • OK/Enter: mở phim (hàng **Xem tiếp**: phát tiếp luôn) • Giữ OK / Menu trên phim ở Xem tiếp, Lịch sử xem: xoá khỏi lịch sử • Back: về menu bên trái, Back lần nữa để thoát |
 | Chi tiết phim | OK: xem tiếp / xem tập mới nhất • ▼: vào danh sách tập (ô xanh = đã xem) • Số 0–9 hoặc nút **Đến tập…**: nhảy tới tập theo số • **＋ Theo dõi**: báo khi phim có tập mới |
-| Đang xem phim | OK/Space: dừng–phát • ◀ ▶: tua (giữ để tua nhanh) • ▲: xem thời gian • ▼/Menu: đổi server (kèm điểm từng server), đổi tập • Số 0–9: nhảy tới 0–90% • CH+/CH−, N/P: tập sau/trước • Back: thoát |
+| Đang xem phim | OK/Space: dừng–phát • ◀ ▶: tua (giữ để tua nhanh) • ▲: xem thời gian • ▼/Menu: đổi server (kèm điểm từng server), đổi tập, tốc độ, khung hình (Vừa / Lấp đầy), hẹn giờ tắt, nhạc mở đầu • Số 0–9: nhảy tới 0–90% • CH+/CH−, N/P: tập sau/trước • Back: thoát |
 | Gợi ý đổi server (hiện khi video giật nhiều) | OK: chuyển sang server được gợi ý, xem tiếp đúng chỗ • Back: bỏ qua |
 | Duyệt web | Mũi tên: di chuyển con trỏ (chạm mép thì cuộn) • OK: bấm • CH+/CH−: cuộn nhanh • Menu: tải lại • Back: lùi trang |
 
@@ -86,7 +88,8 @@ loại trên menu của trang; thể loại / nước khác thì dùng **Tìm ki
 - Proxy lỗi (chết, sai mật khẩu) thì app báo rõ, **không tự đi thẳng**; màn hình chính ghi "· proxy" khi đang bật.
   Máy chủ video có thể chặn IP của proxy (đã gặp với CDN của KK Phim trên phimmoir.fun): video lỗi khi bật proxy thì
   chọn "chỉ trang phim".
-- Mật khẩu proxy lưu trong bộ nhớ riêng của app (app khác không đọc được), không mã hoá.
+- Mật khẩu proxy (từ 1.9.1) lưu mã hoá bằng khoá trong Android Keystore — chép được file dữ liệu của app cũng không
+  đọc được; Android 5 vẫn lưu chữ thường trong bộ nhớ riêng của app.
 
 ## Riêng tư và dữ liệu duyệt web
 
@@ -101,6 +104,12 @@ loại trên menu của trang; thể loại / nước khác thì dùng **Tìm ki
   đang xem các tập của phim đó.
 - Từ 1.8.2 app không cho sao lưu dữ liệu (lịch sử xem, mật khẩu proxy, cookie) lên đám mây, không chuyển sang máy mới
   và không lấy ra được bằng `adb backup`; WebView không gửi số liệu sử dụng / chẩn đoán của app về Google.
+- **DNS mã hoá (DoH)** (Cài đặt, từ 1.9.1): Cloudflare 1.1.1.1 hoặc Google 8.8.8.8 qua HTTPS thay cho DNS nhà mạng —
+  nhà mạng không đọc / chặn được truy vấn DNS, nhưng vẫn thấy tên trang lúc kết nối (TLS SNI) và IP đích. Lỗi thì app
+  báo, không quay về DNS nhà mạng. Bật proxy với "DNS của proxy" thì proxy tự hỏi DNS. Màn hình chính ghi "· DoH".
+- Chặn quảng cáo / theo dõi (`AdBlock.kt`): danh sách cũ + những gì đo được trên 5 trang (11/2026): thống kê
+  Cloudflare, JW Player, Ahrefs, quảng cáo Adcash, tên miền quảng cáo bật cửa sổ của hoathinh3d. Không chặn thứ trình
+  phát cần (JW tải từ `ssl.p.jwpcdn.com`, giấy phép `entitlements.jwplayer.com`, video trên CDN).
 - Trang phim thấy app như một trình duyệt Chromium trên Android: app gửi chung một User-Agent rút gọn
   (`Android 10; K … Chrome/<bản chính>.0.0.0`), không có tên mẫu TV hay số bản build Android; client hints ghi
   "Chromium" thay vì "Android WebView". Khi app tự tải trang hộ trình phát thì không gửi tên gói app. Riêng các yêu cầu
@@ -201,6 +210,16 @@ từng phim; `Prefs.follows` lưu `count` (số tập lần kiểm gần nhất,
 lần cuối). Mốc nhạc mở đầu: `intro@<phim>` = "đầu,hết" (giây). Trình phát gắn số lần nạp trang (`window.__chimtoLoad`,
 `pageLoad`) vào trang phát và bỏ trạng thái của trang cũ; `resumePending` giữ chỗ xem dở cho tới khi trình phát tua
 xong (TV chậm có khi mất hàng chục giây) — lưu vị trí / đổi server / đổi bản trong lúc đó dùng chỗ cũ.
+
+Từ 1.9.1: chỗ bắt đầu báo trước (`startHint` = chỗ xem dở, hoặc hết nhạc mở đầu khi nhạc nằm ngay đầu tập) được chèn
+vào agent (`window.__chimtoStart`) và `hls.html` (`startPosition`). JW Player của streamfree bỏ qua `starttime` và tự gọi
+`hls.startLoad(0)` → agent bọc `startLoad` của hls.js: lần đầu không có vị trí thì bắt đầu ở chỗ báo trước. Đo trên
+TX3 (yanhh3d): trang tập ~1 s, link trình phát ~1,2 s, còn ~10 s là trình phát streamfree khởi động (~4–6 s chạy JS
+trên TV) và đoạn video đầu tiên (6,6 s trên CDN). Bản debug ghi mốc vào logcat `ChimToOpen`. Tốc độ / khung hình:
+lệnh `rate` / `fit` cho agent, agent đặt lại mỗi giây. DoH: `Doh.kt` (JSON qua HTTPS tới IP của máy chủ DNS, nhớ theo
+TTL ≤ 5 phút, chỉ IPv4); cổng nội bộ chạy cả khi không có proxy (`RouteConfig(socks, doh)`); bản debug ghi tên miền đã
+hỏi vào logcat `ChimToDoh` (cũng là cách đo trang gọi tới những đâu). Mật khẩu proxy: `Secret.kt` (AES-GCM, khoá trong
+AndroidKeyStore).
 
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server

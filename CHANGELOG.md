@@ -4,6 +4,25 @@ Côn Bằng TV — từ 1.0 đến 1.4 tên là ChimTo TV. Tải bản mới nh�
 Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b`), cài đè
 được lên nhau và giữ nguyên lịch sử xem.
 
+## 1.9.1 — 04/11/2026
+
+- **Tìm trên mọi trang:** mục Tìm kiếm tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm ("yanhh3d.ee —
+  18 phim"), trang đang dùng đứng đầu; trang lỗi / quá 20 giây thì bỏ qua.
+- **Menu ▼ trong trình phát:** **Tốc độ** 1× → 1,25× → 1,5× → 2× → 0,75× (cho cả lần xem này); **Khung hình**: Vừa màn
+  hình / Lấp đầy (phim màn ảnh rộng 21:9 phóng cho hết viền đen, cắt bớt hai bên; app nhớ lựa chọn); **Hẹn giờ tắt**:
+  30 / 60 / 90 phút hoặc hết tập này — hết giờ thì dừng phim, 60 giây không ai bấm phím thì ra màn hình chính của TV.
+- **phimmoir.fun:** menu có thêm **Thể loại…** (đủ 36 thể loại) và **Quốc gia…** (mọi nước, bỏ mục rác như năm / mã).
+- **Xem tiếp nhanh hơn:** app báo trước chỗ đang xem cho trình phát (trình phát streamfree của yanhh3d / hoathinh3d.ee /
+  hhkungfu và server KK Phim) → tải thẳng đoạn video ở chỗ đó thay vì tải đoạn đầu tập rồi mới tua (mỗi đoạn trên CDN
+  có khi mất 6–7 giây trên TV box); phim đã đánh dấu nhạc mở đầu cũng bắt đầu thẳng ở chỗ hết nhạc. NguonC vẫn tua như
+  cũ.
+- **Riêng tư:** **DNS mã hoá (DoH)** trong Cài đặt (Cloudflare 1.1.1.1 / Google 8.8.8.8, qua HTTPS, cả khi không bật
+  proxy; lỗi thì báo, không quay về DNS nhà mạng); **mật khẩu proxy mã hoá** bằng khoá Android Keystore (Android 6+, tự
+  chuyển từ bản lưu chữ thường); chặn thêm trình theo dõi / quảng cáo đo được trên 5 trang (thống kê Cloudflare, JW
+  Player, Ahrefs, quảng cáo Adcash…).
+- versionCode 14 · tag `v1.9.1` · commit `c3e3da7` · SHA-256 APK
+  `48f6375241806c3023d411c2bff64a3dc7526485962657e7dffdce00b35011e8`
+
 ## 1.9 — 04/11/2026
 
 - **Phim theo dõi + báo tập mới:** trang phim có nút "＋ Theo dõi"; menu có mục **Phim theo dõi** (ghi "Theo dõi (2 mới)"
