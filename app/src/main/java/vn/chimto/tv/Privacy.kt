@@ -1,5 +1,6 @@
 package vn.chimto.tv
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -51,6 +52,7 @@ object Privacy {
     }
 
     /** Gọi khi dựng mỗi WebView của app (trình phát, Duyệt web). */
+    @SuppressLint("RestrictedApi") // REQUESTED_WITH_HEADER_ALLOW_LIST đánh dấu nội bộ nhưng tài liệu androidx.webkit dùng đúng cách này
     fun apply(web: WebView) {
         val s = web.settings
         learn(s.userAgentString)

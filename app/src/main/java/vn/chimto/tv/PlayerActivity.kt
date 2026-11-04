@@ -1,12 +1,14 @@
 package vn.chimto.tv
 
 import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.view.KeyEvent
@@ -44,6 +46,11 @@ class PlayerActivity : Activity() {
     companion object {
         fun intent(context: Context, film: FilmDetail, ep: Episode): Intent =
             Intent(context, PlayerActivity::class.java).putExtra("film", film.url).putExtra("ep", ep.url)
+
+        /** Hàng "Xem tiếp": mở thẳng tập trong lịch sử; tập đó đã xem hết thì mở tập kế tiếp. */
+        fun resume(context: Context, item: HistoryItem): Intent =
+            Intent(context, PlayerActivity::class.java).putExtra("film", item.filmUrl).putExtra("ep", item.epUrl)
+                .putExtra("continue", true)
 
         /** hls.html tải hls.js từ đường dẫn này (cùng origin với trang tập), app trả tệp trong assets. */
         private const val HLS_JS = "/__chimto/hls.js"
@@ -186,7 +193,9 @@ class PlayerActivity : Activity() {
         val g = d.groupOf(epUrl) ?: d.groups.firstOrNull() ?: return showError("Phim này chưa có tập nào.")
         group = g
         buildGroupButtons(d)
-        openEpisode(g.episodes.indexOfFirst { it.url == epUrl }.coerceAtLeast(0))
+        val i = g.episodes.indexOfFirst { it.url == epUrl }.coerceAtLeast(0)
+        val next = intent.getBooleanExtra("continue", false) && Prefs.finished(epUrl) && i + 1 < g.episodes.size
+        openEpisode(if (next) i + 1 else i)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -210,6 +219,7 @@ class PlayerActivity : Activity() {
         web.webViewClient = object : WebViewClient() {
             // Chặn mọi điều hướng cả trang do trang tự gây ra (quảng cáo); app tự nạp trang bằng code.
             // Chuyển hướng phía máy chủ (vd http → https của trang tập) thì cho qua.
+            @TargetApi(Build.VERSION_CODES.N) // Android 5–6 gọi bản (WebView, String) bên dưới
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) =
                 request.isForMainFrame && !request.isRedirect
 
@@ -340,7 +350,7 @@ class PlayerActivity : Activity() {
         panelTitle.text = osdTitle.text
         for (j in 0 until groupRow.childCount) groupRow.getChildAt(j).let { it.isActivated = it.tag == group?.name }
         resumeAt = Prefs.position(ep.url)
-        Prefs.addHistory(HistoryItem(d.url, d.title, d.poster, ep.title, ep.url, System.currentTimeMillis()))
+        if (!Prefs.privateMode) Prefs.addHistory(HistoryItem(d.url, d.title, d.poster, ep.title, ep.url, System.currentTimeMillis()))
         showLoading("Đang mở ${ep.title}…")
         background({ Site.source(ep.url) }) { r ->
             if (t != token) return@background
@@ -494,7 +504,7 @@ class PlayerActivity : Activity() {
                 val same = g.episodes.indexOfFirst { it.title == cur?.title }
                 val target = same.takeIf { it >= 0 } ?: index.coerceAtMost(g.episodes.size - 1)
                 if (same >= 0) {
-                    state?.takeIf { started && it.t > 5 }?.let { Prefs.savePosition(g.episodes[target].url, it.t.toInt()) }
+                    state?.takeIf { started && it.t > 5 }?.let { Prefs.savePosition(g.episodes[target].url, it.t.toInt(), d.url) }
                 } else {
                     notice.show("${g.name} chưa có ${cur?.title} — mở ${g.episodes[target].title}.", 6000)
                 }
@@ -616,7 +626,7 @@ class PlayerActivity : Activity() {
         if (!started || episodeUrl.isEmpty()) return
         // Xem gần hết thì coi như xong (lần sau mở lại từ đầu)
         val done = s.ended || (s.d > 0 && s.t > s.d - 90)
-        Prefs.savePosition(episodeUrl, if (done) 0 else s.t.toInt())
+        Prefs.savePosition(episodeUrl, if (done) 0 else s.t.toInt(), detail?.url ?: filmUrl)
     }
 
     private fun cmd(name: String, arg: Number? = null) {

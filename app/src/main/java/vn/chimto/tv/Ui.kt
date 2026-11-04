@@ -3,6 +3,7 @@ package vn.chimto.tv
 import android.app.Activity
 import android.content.Context
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -16,6 +17,10 @@ import java.net.UnknownHostException
 import java.util.concurrent.Executors
 import javax.net.ssl.SSLException
 import kotlin.math.roundToInt
+
+/** Context.getColor chỉ có từ Android 6; app chạy từ Android 5. */
+fun Context.colorOf(id: Int): Int =
+    if (Build.VERSION.SDK_INT >= 23) getColor(id) else @Suppress("DEPRECATION") resources.getColor(id)
 
 val mainHandler = Handler(Looper.getMainLooper())
 private val io = Executors.newFixedThreadPool(3)
@@ -112,7 +117,7 @@ class PosterView @JvmOverloads constructor(context: Context, attrs: AttributeSet
         settingImage = true
         super.setImageDrawable(drawable)
         // Nền giữ chỗ chỉ cần khi chưa có ảnh (đỡ vẽ chồng một lớp dưới ảnh)
-        setBackgroundColor(if (drawable == null) context.getColor(R.color.surface2) else 0)
+        setBackgroundColor(if (drawable == null) context.colorOf(R.color.surface2) else 0)
         settingImage = false
     }
 

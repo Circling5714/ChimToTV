@@ -1,14 +1,23 @@
 package vn.chimto.tv
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.InputType
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
@@ -26,6 +35,7 @@ class DetailActivity : Activity() {
     private lateinit var btnLatest: TextView
     private lateinit var btnFirst: TextView
     private lateinit var btnOrder: TextView
+    private lateinit var btnJump: TextView
     private lateinit var epLabel: TextView
     private lateinit var groupRow: LinearLayout
 
@@ -33,6 +43,16 @@ class DetailActivity : Activity() {
     private var detail: FilmDetail? = null
     private var group: EpisodeGroup? = null
     private var ascending = true
+
+    /** Số tập đang gõ bằng phím số trên remote (nhảy tới sau khi ngừng gõ). */
+    private var typed = ""
+    private val handler = Handler(Looper.getMainLooper())
+    private val jumpTyped = Runnable {
+        val n = typed.toIntOrNull()
+        typed = ""
+        showEpisodeLabel()
+        n?.let(::jumpTo)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +64,7 @@ class DetailActivity : Activity() {
         btnLatest = findViewById(R.id.btnLatest)
         btnFirst = findViewById(R.id.btnFirst)
         btnOrder = findViewById(R.id.btnOrder)
+        btnJump = findViewById(R.id.btnJump)
         epLabel = findViewById(R.id.epLabel)
         groupRow = findViewById(R.id.groupRow)
 
@@ -62,6 +83,7 @@ class DetailActivity : Activity() {
             ascending = !ascending
             showEpisodes()
         }
+        btnJump.setOnClickListener { askEpisode() }
         findViewById<View>(R.id.btnWeb).setOnClickListener { startActivity(WebActivity.intent(this, url)) }
         load()
     }
@@ -74,6 +96,11 @@ class DetailActivity : Activity() {
             adapter.refreshWatched()
             scrollToResume()
         }
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacks(jumpTyped)
+        super.onDestroy()
     }
 
     private fun load() {
@@ -130,10 +157,70 @@ class DetailActivity : Activity() {
     private fun showEpisodes() {
         val eps = group?.episodes.orEmpty()
         adapter.submit(if (ascending) eps else eps.reversed())
-        epLabel.text = "Danh sách tập (${eps.size})"
+        showEpisodeLabel()
         btnOrder.text = if (ascending) "Thứ tự: cũ → mới" else "Thứ tự: mới → cũ"
         btnOrder.visibility = if (eps.size > 1) View.VISIBLE else View.GONE
+        btnJump.visibility = if (eps.size > 20) View.VISIBLE else View.GONE
         scrollToResume()
+    }
+
+    private fun showEpisodeLabel() {
+        val n = group?.episodes?.size ?: 0
+        epLabel.text = if (typed.isEmpty()) "Danh sách tập ($n)" else "Danh sách tập ($n) — đến tập $typed…"
+    }
+
+    /** Phím số trên remote / bàn phím: gõ số tập, ngừng 1,2 giây là nhảy tới tập đó (không cần bấm nút "Đến tập…"). */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val digit = when (keyCode) {
+            in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> keyCode - KeyEvent.KEYCODE_0
+            in KeyEvent.KEYCODE_NUMPAD_0..KeyEvent.KEYCODE_NUMPAD_9 -> keyCode - KeyEvent.KEYCODE_NUMPAD_0
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        if (group?.episodes.isNullOrEmpty() || typed.length >= 5) return true
+        typed += digit
+        showEpisodeLabel()
+        handler.removeCallbacks(jumpTyped)
+        handler.postDelayed(jumpTyped, 1200)
+        return true
+    }
+
+    private fun askEpisode() {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            imeOptions = EditorInfo.IME_ACTION_GO or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+            isSingleLine = true
+            hint = "Số tập, vd 120"
+        }
+        val pad = (20 * resources.displayMetrics.density).toInt()
+        val box = FrameLayout(this).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        fun go() = input.text.toString().trim().toIntOrNull()?.let(::jumpTo)
+        val dialog = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("Đến tập số")
+            .setView(box)
+            .setPositiveButton("Đến") { _, _ -> go() }
+            .setNegativeButton("Huỷ", null)
+            .show()
+        // Phím ✓ / Enter trên bàn phím số: nhảy luôn
+        input.setOnEditorActionListener { _, _, _ ->
+            dialog.dismiss()
+            go()
+            true
+        }
+        input.requestFocus()
+    }
+
+    /** Đưa tiêu điểm tới tập có số n (số đầu tiên trong tên tập: "Tập 120", "Tập 01", "120 - Vietsub"). */
+    private fun jumpTo(n: Int) {
+        val i = adapter.indexOfNumber(n)
+        if (i < 0) {
+            Toast.makeText(this, "Không có tập $n trong danh sách này.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        (episodes.layoutManager as GridLayoutManager).scrollToPositionWithOffset(i, 0)
+        episodes.post { episodes.findViewHolderForAdapterPosition(i)?.itemView?.requestFocusFromTouch() }
     }
 
     /** Cuộn lưới tới tập đang xem dở để bấm ▼ là vào đúng chỗ. */
@@ -176,6 +263,10 @@ class DetailActivity : Activity() {
 }
 
 class EpisodeAdapter(private val onClick: (Episode) -> Unit) : RecyclerView.Adapter<EpisodeAdapter.Holder>() {
+    companion object {
+        private val NUMBER = Regex("""\d+""")
+    }
+
     class Holder(val text: TextView) : RecyclerView.ViewHolder(text)
 
     private var items: List<Episode> = emptyList()
@@ -193,6 +284,8 @@ class EpisodeAdapter(private val onClick: (Episode) -> Unit) : RecyclerView.Adap
     }
 
     fun indexOf(url: String) = items.indexOfFirst { it.url == url }
+
+    fun indexOfNumber(n: Int) = items.indexOfFirst { NUMBER.find(it.title)?.value?.toIntOrNull() == n }
 
     override fun getItemCount() = items.size
 

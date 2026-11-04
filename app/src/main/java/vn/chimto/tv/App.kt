@@ -10,6 +10,7 @@ class App : Application() {
         Privacy.init(this)
         AppProxy.apply()
         ImageLoader.init(this)
+        AutoClear.init(this)
         if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
     }
 }

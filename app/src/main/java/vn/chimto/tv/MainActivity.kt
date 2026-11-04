@@ -31,7 +31,7 @@ class MainActivity : Activity() {
     private lateinit var status: StatusView
 
     private val menuAdapter = MenuAdapter<Entry>({ it.title }, ::onMenu)
-    private val gridAdapter = FilmGridAdapter(::openFilm, ::loadMore)
+    private val gridAdapter = FilmGridAdapter(::openFilm, ::loadMore, ::confirmRemoveHistory)
 
     private var categories: List<Category> = emptyList()
     private var token = 0
@@ -40,6 +40,10 @@ class MainActivity : Activity() {
     private var loadedBase: String? = null
     private var loadedProxy: SocksConfig? = null
     private var lastBack = 0L
+
+    /** Hàng "Xem tiếp" đang nằm đầu trang chủ (để cập nhật khi xem xong quay lại); homeToken: trang chủ đang hiện. */
+    private var head: List<GridRow> = emptyList()
+    private var homeToken = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,13 +92,16 @@ class MainActivity : Activity() {
             reloadSite()
         } else if (active?.kind == Kind.HISTORY) {
             showHistory(focusFirst = false)
+        } else if (homeToken == token) {
+            refreshHead()
         }
         Updater.autoCheck(this)
     }
 
     /** Tên trang đang dùng, kèm "proxy" khi đang bật proxy SOCKS5 (để nhớ là app đang đi qua proxy). */
     private fun showSiteLabel() {
-        siteLabel.text = Site.hostOf(Prefs.baseUrl) + if (AppProxy.active) "  ·  proxy" else ""
+        siteLabel.text = Site.hostOf(Prefs.baseUrl) + (if (AppProxy.active) "  ·  proxy" else "") +
+            if (Prefs.privateMode) "  ·  xem riêng" else ""
     }
 
     private fun reloadSite() {
@@ -248,7 +255,9 @@ class MainActivity : Activity() {
                     )
                 } else {
                     status.hide()
-                    gridAdapter.submit(rows, focusFirst = true)
+                    head = continueRows()
+                    homeToken = t
+                    gridAdapter.submit(head + rows, focusFirst = true)
                 }
             }.onFailure {
                 loadedBase = base
@@ -307,6 +316,59 @@ class MainActivity : Activity() {
         showList(q) { Site.search(q) }
     }
 
+    /** "Xem tiếp": các phim xem gần nhất (mọi trang), một hàng. */
+    private fun continueRows(): List<GridRow> {
+        val items = Prefs.history.take(gridAdapter.spanCount)
+        if (items.isEmpty()) return emptyList()
+        return listOf(HeaderRow("Xem tiếp")) +
+            items.map { FilmRow(Film(it.filmUrl, it.title, it.poster, it.epTitle), resume = true, fromHistory = true) }
+    }
+
+    private fun refreshHead() {
+        val rows = continueRows()
+        if (rows == head) return
+        val focused = grid.focusedChild?.let { grid.getChildAdapterPosition(it) } ?: -1
+        // Đang đứng trong hàng "Xem tiếp": tiêu điểm đi theo phim (phim vừa xem lên đầu); phim bị xoá thì sang ô kế,
+        // hết phim thì về phim đầu của trang
+        val focusedFilm = (head.getOrNull(focused) as? FilmRow)?.film?.url
+        val target = when {
+            focusedFilm == null -> -1
+            else -> rows.indexOfFirst { (it as? FilmRow)?.film?.url == focusedFilm }.takeIf { it >= 0 }
+                ?: focused.coerceAtMost(rows.size - 1).takeIf { it >= 1 }
+        }
+        // Đang đứng gần đầu trang (hàng đầu của trang phim) → cuộn lên cho thấy hàng "Xem tiếp" vừa đổi / vừa có
+        val nearTop = focused < head.size + gridAdapter.spanCount + 1
+        gridAdapter.replaceHead(head.size, rows)
+        head = rows
+        grid.post {
+            if (nearTop) grid.scrollToPosition(0)
+            grid.post {
+                val pos = target ?: gridAdapter.firstFilmPosition().takeIf { focusedFilm != null } ?: return@post
+                if (pos >= 0) grid.findViewHolderForAdapterPosition(pos)?.itemView?.requestFocus()
+            }
+        }
+    }
+
+    private fun confirmRemoveHistory(row: FilmRow) {
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("Xoá khỏi lịch sử xem?")
+            .setMessage("«${row.film.title}» và chỗ đang xem dở các tập của phim này sẽ bị xoá.")
+            .setPositiveButton("Xoá") { _, _ ->
+                val pos = gridAdapter.positionOf(row)
+                Prefs.removeHistory(row.film.url)
+                if (menuAdapter.active?.kind == Kind.HISTORY) {
+                    showHistory(focusFirst = false)
+                    val i = minOf(pos, Prefs.history.size - 1)
+                    if (i >= 0) grid.post { grid.findViewHolderForAdapterPosition(i)?.itemView?.requestFocus() }
+                } else if (homeToken == token) {
+                    refreshHead()
+                }
+            }
+            .setNegativeButton("Huỷ", null)
+            .show()
+            .getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
+    }
+
     private fun showHistory(focusFirst: Boolean) {
         token++
         nextUrl = null
@@ -317,11 +379,12 @@ class MainActivity : Activity() {
             return
         }
         status.hide()
-        gridAdapter.submit(items.map { FilmRow(Film(it.filmUrl, it.title, it.poster, it.epTitle)) }, focusFirst)
+        gridAdapter.submit(items.map { FilmRow(Film(it.filmUrl, it.title, it.poster, it.epTitle), fromHistory = true) }, focusFirst)
     }
 
-    private fun openFilm(film: Film) {
-        startActivity(DetailActivity.intent(this, film))
+    private fun openFilm(row: FilmRow) {
+        val item = if (row.resume) Prefs.historyFor(row.film.url) else null
+        startActivity(if (item != null) PlayerActivity.resume(this, item) else DetailActivity.intent(this, row.film))
     }
 
     @Deprecated("Deprecated in Java")

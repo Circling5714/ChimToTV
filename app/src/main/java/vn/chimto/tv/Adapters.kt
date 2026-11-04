@@ -1,5 +1,6 @@
 package vn.chimto.tv
 
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -71,12 +72,17 @@ class MenuAdapter<T>(
 
 sealed interface GridRow
 data class HeaderRow(val title: String) : GridRow
-data class FilmRow(val film: Film) : GridRow
+/** resume: bấm là xem tiếp luôn (hàng "Xem tiếp"); fromHistory: giữ OK / nhấn Menu để xoá khỏi lịch sử. */
+data class FilmRow(val film: Film, val resume: Boolean = false, val fromHistory: Boolean = false) : GridRow
 
-/** Lưới poster; tiêu đề nhóm chiếm cả hàng. onNearEnd: gọi khi duyệt gần cuối để tải trang tiếp. */
+/**
+ * Lưới poster; tiêu đề nhóm chiếm cả hàng. onNearEnd: gọi khi duyệt gần cuối để tải trang tiếp. onRemove: giữ OK /
+ * nhấn Menu trên phim lấy từ lịch sử.
+ */
 class FilmGridAdapter(
-    private val onClick: (Film) -> Unit,
+    private val onClick: (FilmRow) -> Unit,
     private val onNearEnd: () -> Unit,
+    private val onRemove: (FilmRow) -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     private val rows = ArrayList<GridRow>()
     private var focusPosition = -1
@@ -111,6 +117,20 @@ class FilmGridAdapter(
 
     fun clear() = submit(emptyList(), false)
 
+    /** Thay count hàng đầu (hàng "Xem tiếp") bằng list, giữ phần còn lại và tiêu điểm đang đứng. */
+    fun replaceHead(count: Int, list: List<GridRow>) {
+        rows.subList(0, count).clear()
+        rows.addAll(0, list)
+        val common = minOf(count, list.size)
+        if (common > 0) notifyItemRangeChanged(0, common)
+        if (list.size > count) notifyItemRangeInserted(count, list.size - count)
+        if (count > list.size) notifyItemRangeRemoved(list.size, count - list.size)
+    }
+
+    fun positionOf(row: GridRow) = rows.indexOf(row)
+
+    fun firstFilmPosition() = rows.indexOfFirst { it is FilmRow }
+
     override fun getItemCount() = rows.size
     override fun getItemViewType(position: Int) = if (rows[position] is HeaderRow) 0 else 1
 
@@ -133,7 +153,22 @@ class FilmGridAdapter(
                 h.badge.text = f.badge
                 h.badge.visibility = if (f.badge.isNullOrEmpty()) View.GONE else View.VISIBLE
                 ImageLoader.load(h.poster, f.poster)
-                h.itemView.setOnClickListener { onClick(f) }
+                h.itemView.setOnClickListener { onClick(row) }
+                if (row.fromHistory) {
+                    h.itemView.setOnLongClickListener {
+                        onRemove(row)
+                        true
+                    }
+                    h.itemView.setOnKeyListener { _, code, e ->
+                        if (code != KeyEvent.KEYCODE_MENU) return@setOnKeyListener false
+                        if (e.action == KeyEvent.ACTION_UP) onRemove(row)
+                        true
+                    }
+                } else {
+                    h.itemView.setOnLongClickListener(null)
+                    h.itemView.isLongClickable = false
+                    h.itemView.setOnKeyListener(null)
+                }
             }
         }
         if (position == focusPosition) {

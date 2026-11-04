@@ -91,6 +91,24 @@ class SettingsActivity : Activity() {
             ImageLoader.clearDisk()
             BrowsingData.clear(this) { toast("Đã xoá ảnh, cookie và dữ liệu duyệt web.") }
         }
+        val privateBtn = findViewById<TextView>(R.id.btnPrivate)
+        fun showPrivate() {
+            privateBtn.text = "Xem riêng (không lưu lịch sử): ${if (Prefs.privateMode) "Bật" else "Tắt"}"
+        }
+        showPrivate()
+        privateBtn.setOnClickListener {
+            Prefs.privateMode = !Prefs.privateMode
+            showPrivate()
+        }
+        val autoClearBtn = findViewById<TextView>(R.id.btnAutoClear)
+        fun showAutoClear() {
+            autoClearBtn.text = "Tự xoá dữ liệu web khi rời app: ${if (Prefs.autoClearWeb) "Bật" else "Tắt"}"
+        }
+        showAutoClear()
+        autoClearBtn.setOnClickListener {
+            Prefs.autoClearWeb = !Prefs.autoClearWeb
+            showAutoClear()
+        }
 
         val updateResult = findViewById<TextView>(R.id.updateResult)
         findViewById<TextView>(R.id.btnUpdateCheck).apply {
@@ -168,7 +186,7 @@ class SettingsActivity : Activity() {
         proxyBtn.text = "Proxy: ${if (Prefs.proxyOn) "Bật" else "Tắt"}"
         proxyDnsBtn.text = "DNS: ${if (Prefs.proxyRemoteDns) "của proxy" else "của thiết bị"}"
         proxyScopeBtn.text = "Dùng cho: ${if (Prefs.proxySitesOnly) "chỉ trang phim" else "toàn bộ app"}"
-        proxyResult.setTextColor(getColor(R.color.text_dim))
+        proxyResult.setTextColor(colorOf(R.color.text_dim))
         val c = Prefs.proxyConfig()
         proxyResult.text = (
             if (c == null) {
@@ -226,14 +244,14 @@ class SettingsActivity : Activity() {
     private fun testProxy() {
         val c = readProxyFields() ?: return
         val t = ++proxyToken
-        proxyResult.setTextColor(getColor(R.color.text_dim))
+        proxyResult.setTextColor(colorOf(R.color.text_dim))
         proxyResult.text = "Đang kiểm tra proxy ${c.host}:${c.port}…"
         val start = System.currentTimeMillis()
         background({ Socks5.check(c) }) { r ->
             if (t != proxyToken) return@background
             val sec = "%.1f s".format((System.currentTimeMillis() - start) / 1000.0).replace('.', ',')
             r.onSuccess {
-                proxyResult.setTextColor(getColor(R.color.brand))
+                proxyResult.setTextColor(colorOf(R.color.brand))
                 proxyResult.text = "✓ Proxy chạy — IP ra ngoài $it, $sec." + if (Prefs.proxyOn) "" else " Nhấn «Proxy: Tắt» để bật."
             }.onFailure {
                 proxyResult.setTextColor(0xFFFF6B6B.toInt())
@@ -300,7 +318,7 @@ class SettingsActivity : Activity() {
         }
         val t = ++testToken
         result.visibility = View.VISIBLE
-        result.setTextColor(getColor(R.color.text_dim))
+        result.setTextColor(colorOf(R.color.text_dim))
         result.text = "Đang kiểm tra ${Site.hostOf(base)}…"
         background({ Site.home(base) }) { r ->
             if (t != testToken) return@background
@@ -308,10 +326,10 @@ class SettingsActivity : Activity() {
                 val count = home.sections.sumOf { it.films.size }
                 val moved = home.movedTo?.let { "\nTrang chuyển hướng sang ${Site.hostOf(it)}." } ?: ""
                 if (count > 0) {
-                    result.setTextColor(getColor(R.color.brand))
+                    result.setTextColor(colorOf(R.color.brand))
                     result.text = "✓ Kết nối được — đọc được $count phim, ${home.categories.size} thể loại.$moved"
                 } else {
-                    result.setTextColor(getColor(R.color.focus))
+                    result.setTextColor(colorOf(R.color.focus))
                     result.text = "Kết nối được nhưng không đọc được danh sách phim (trang khác giao diện?). " +
                         "Vẫn có thể dùng mục «Duyệt web».$moved"
                 }

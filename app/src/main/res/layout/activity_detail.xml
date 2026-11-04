@@ -129,6 +129,13 @@
                         android:visibility="gone" />
 
                     <TextView
+                        android:id="@+id/btnJump"
+                        style="@style/TvButton"
+                        android:nextFocusUp="@id/btnJump"
+                        android:text="Đến tập…"
+                        android:visibility="gone" />
+
+                    <TextView
                         android:id="@+id/btnWeb"
                         style="@style/TvButton"
                         android:nextFocusUp="@id/btnWeb"

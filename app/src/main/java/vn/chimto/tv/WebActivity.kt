@@ -1,10 +1,12 @@
 package vn.chimto.tv
 
 import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.os.SystemClock
@@ -74,6 +76,7 @@ class WebActivity : Activity() {
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
 
         web.webViewClient = object : WebViewClient() {
+            @TargetApi(Build.VERSION_CODES.N) // chỉ được gọi từ Android 7
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 if (!request.isForMainFrame || request.isRedirect) return false
                 val host = request.url.host

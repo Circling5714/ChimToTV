@@ -255,6 +255,31 @@
                 android:text="Xoá ảnh &amp; dữ liệu duyệt web" />
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnPrivate"
+                style="@style/TvButton" />
+
+            <TextView
+                android:id="@+id/btnAutoClear"
+                style="@style/TvButton" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Xem riêng: không ghi phim đã xem và chỗ đang xem (tắt app là quên). Tự xoá: xoá cookie, dữ liệu trang và bộ nhớ đệm mỗi khi rời app. Trong Lịch sử xem / hàng Xem tiếp: giữ OK (hoặc nhấn Menu) trên một phim để xoá riêng phim đó."
+            android:textColor="@color/text_dim"
+            android:textSize="14sp" />
+
         <TextView
             style="@style/SettingsLabel"
             android:text="Cập nhật app" />

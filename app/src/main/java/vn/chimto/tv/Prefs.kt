@@ -176,34 +176,95 @@ object Prefs {
 
     fun addHistory(item: HistoryItem) {
         val list = listOf(item) + history.filter { it.filmUrl != item.filmUrl }
+        sp.edit().putString("history", historyJson(list.take(MAX_HISTORY))).apply()
+    }
+
+    private fun historyJson(list: List<HistoryItem>): String {
         val a = JSONArray()
-        list.take(MAX_HISTORY).forEach {
+        list.forEach {
             a.put(
                 JSONObject().put("film", it.filmUrl).put("title", it.title).put("poster", it.poster ?: "")
                     .put("ep", it.epTitle).put("epUrl", it.epUrl).put("time", it.time)
             )
         }
-        sp.edit().putString("history", a.toString()).apply()
+        return a.toString()
     }
 
     fun clearHistory() {
-        sp.edit().remove("history").remove("positions").apply()
+        privatePositions.clear()
+        sp.edit().remove("history").remove("positions").remove("pos_film").apply()
     }
+
+    /** Xoá một phim khỏi lịch sử, kèm chỗ đang xem / đánh dấu đã xem của các tập phim đó. */
+    fun removeHistory(filmUrl: String) {
+        val item = historyFor(filmUrl)
+        val o = positions()
+        val films = posFilms()
+        // Vị trí lưu trước 1.8.2 không ghi phim → chỉ biết tập cuối trong lịch sử
+        val eps = films.keys().asSequence().filter { films.optString(it) == filmUrl }.toList() + listOfNotNull(item?.epUrl)
+        eps.forEach {
+            o.remove(it)
+            films.remove(it)
+            privatePositions.remove(it)
+        }
+        sp.edit().putString("history", historyJson(history.filter { it.filmUrl != filmUrl }))
+            .putString("positions", o.toString())
+            .putString("pos_film", films.toString()).apply()
+    }
+
+    // ---- Riêng tư ----
+
+    /** Xem riêng: không ghi lịch sử xem và chỗ đang xem (vẫn đọc được chỗ đã lưu từ trước). */
+    var privateMode: Boolean
+        get() = sp.getBoolean("private_mode", false)
+        set(value) = sp.edit().putBoolean("private_mode", value).apply()
+
+    /** Tự xoá dữ liệu duyệt web khi rời app (xem AutoClear). */
+    var autoClearWeb: Boolean
+        get() = sp.getBoolean("auto_clear_web", false)
+        set(value) = sp.edit().putBoolean("auto_clear_web", value).apply()
+
+    /** WebView đã chạy từ lần xoá dữ liệu duyệt web gần nhất (mặc định true: chưa xoá lần nào). */
+    var webDirty: Boolean
+        get() = sp.getBoolean("web_dirty", true)
+        set(value) = sp.edit().putBoolean("web_dirty", value).apply()
 
     // ---- Vị trí đang xem từng tập (giây) ----
 
     private fun positions(): JSONObject = JSONObject(sp.getString("positions", "{}") ?: "{}")
 
-    fun position(epUrl: String): Int = positions().optInt(epUrl, 0)
+    /** Xem riêng: chỗ đang xem chỉ giữ trong bộ nhớ tới khi tắt app (đổi bản / lỡ thoát vẫn xem tiếp được). */
+    private val privatePositions = HashMap<String, Int>()
+
+    fun position(epUrl: String): Int = privatePositions[epUrl] ?: positions().optInt(epUrl, 0)
+
+    /** Tập đã xem hết (lưu vị trí 0 khi xem tới ~90 giây cuối). */
+    fun finished(epUrl: String): Boolean =
+        privatePositions[epUrl]?.let { it == 0 } ?: positions().let { it.has(epUrl) && it.optInt(epUrl) == 0 }
 
     fun watchedEpisodes(): Set<String> = positions().keys().asSequence().toHashSet()
 
-    fun savePosition(epUrl: String, seconds: Int) {
+    /** Tập → phim (để xoá một phim khỏi lịch sử thì xoá được cả chỗ đang xem các tập của nó). */
+    private fun posFilms(): JSONObject = JSONObject(sp.getString("pos_film", "{}") ?: "{}")
+
+    fun savePosition(epUrl: String, seconds: Int, filmUrl: String) {
+        if (privateMode) {
+            privatePositions[epUrl] = seconds
+            return
+        }
+        privatePositions.remove(epUrl)
         val o = positions()
+        val films = posFilms()
         o.remove(epUrl)
         o.put(epUrl, seconds) // JSONObject giữ thứ tự chèn → khoá đầu là cũ nhất
+        films.put(epUrl, filmUrl)
         val keys = o.keys().asSequence().toList()
-        if (keys.size > MAX_POSITIONS) keys.take(keys.size - MAX_POSITIONS).forEach { o.remove(it) }
-        sp.edit().putString("positions", o.toString()).apply()
+        if (keys.size > MAX_POSITIONS) {
+            keys.take(keys.size - MAX_POSITIONS).forEach {
+                o.remove(it)
+                films.remove(it)
+            }
+        }
+        sp.edit().putString("positions", o.toString()).putString("pos_film", films.toString()).apply()
     }
 }

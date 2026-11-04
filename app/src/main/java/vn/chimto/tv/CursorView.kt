@@ -18,7 +18,7 @@ class CursorView(context: Context) : View(context) {
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = context.dp(3).toFloat()
-        color = context.getColor(R.color.focus)
+        color = context.colorOf(R.color.focus)
     }
     private val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
 
