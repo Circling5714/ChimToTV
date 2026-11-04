@@ -17,6 +17,16 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
 
+/**
+ * Tên trang ghi sau tên phim của trang khác (vd "Tiên Nghịch · yanhh3d"): tên ngắn, nhưng hai trang trong danh sách
+ * trùng tên ngắn (hoathinh3d.ee / hoathinh3d.pw) thì ghi đủ tên miền cho khỏi lẫn.
+ */
+fun siteTag(host: String, sites: List<String>): String {
+    val short = host.substringBefore('.')
+    val clash = sites.any { s -> Site.hostOf(s).let { it != null && it != host && it.substringBefore('.') == short } }
+    return if (clash) host else short
+}
+
 class MainActivity : BaseActivity() {
     // Trang chủ: nút cảm ứng thoát app luôn (remote thì Back hai lần)
     override val touchBackLabel = "Thoát"
@@ -431,8 +441,8 @@ class MainActivity : BaseActivity() {
     /** Phim trong lịch sử; phim của trang khác ghi thêm tên trang (vd hai bản "Tiên Nghịch" ở hai trang). */
     private fun historyFilm(h: HistoryItem): Film {
         val host = Site.hostOf(h.filmUrl)
-        val title = if (host != null && host != Site.hostOf(Prefs.baseUrl)) "${h.title} · ${host.substringBefore('.')}" else h.title
-        return Film(h.filmUrl, title, h.poster, h.epTitle)
+        if (host == null || host == Site.hostOf(Prefs.baseUrl)) return Film(h.filmUrl, h.title, h.poster, h.epTitle)
+        return Film(h.filmUrl, "${h.title} · ${siteTag(host, Prefs.sites)}", h.poster, h.epTitle)
     }
 
     private fun refreshHead() {

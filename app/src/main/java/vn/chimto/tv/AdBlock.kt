@@ -17,6 +17,8 @@ object AdBlock {
         // Đo trên 5 trang (11/2026): thống kê của Cloudflare (trình phát streamfree), JW Player (NguonC), Ahrefs
         // (hhkungfu); quảng cáo Adcash (phimmoir) và tên miền quảng cáo bật cửa sổ của hoathinh3d
         "cloudflareinsights.com", "jwpltx.com", "analytics.ahrefs.com", "acscdn.com", "excavatenearbywand.com",
+        // Gặp khi thử bản iPad (11/2026): iframe quảng cáo trong trang tập hoathinh3d.pw
+        "atroblxac.in",
         // Thống kê / theo dõi phổ biến khác (không trang nào cần để phát phim)
         "connect.facebook.net", "clarity.ms", "mc.yandex.ru", "statcounter.com", "hotjar.com",
     )

@@ -11,6 +11,17 @@ class AdBlockTest {
         assertTrue(AdBlock.isAd("prd.jwpltx.com"))
         assertTrue(AdBlock.isAd("www.googletagmanager.com"))
         assertTrue(AdBlock.isAd("ACSCDN.COM"))
+        assertTrue(AdBlock.isAd("atroblxac.in"))
+    }
+
+    /** Phim của trang khác: tên ngắn; hai trang trùng tên ngắn (hoathinh3d.ee / .pw) thì ghi đủ tên miền. */
+    @Test
+    fun siteTags() {
+        val sites = listOf("https://yanhh3d.ee", "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee")
+        assertTrue(siteTag("hhkungfu.ee", sites) == "hhkungfu")
+        assertTrue(siteTag("hoathinh3d.pw", sites) == "hoathinh3d.pw")
+        assertTrue(siteTag("hoathinh3d.ee", sites) == "hoathinh3d.ee")
+        assertTrue(siteTag("hoathinh3d.ee", listOf("https://hoathinh3d.ee")) == "hoathinh3d")
     }
 
     /** Thứ trình phát cần thì không được chặn. */
