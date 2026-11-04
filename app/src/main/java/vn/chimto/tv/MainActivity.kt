@@ -19,7 +19,7 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
 
 class MainActivity : Activity() {
-    private enum class Kind { HOME, SEARCH, HISTORY, CATEGORY, SITE, WEB, SETTINGS }
+    private enum class Kind { HOME, SEARCH, HISTORY, CATEGORY, SITE, WEB, CLEAR, SETTINGS }
 
     private data class Entry(val title: String, val kind: Kind, val url: String? = null)
 
@@ -137,6 +137,20 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Xoá nhanh cookie + dữ liệu duyệt web ngay từ menu (Cài đặt có nút tương tự, kèm xoá ảnh đã lưu). */
+    private fun confirmClearBrowsingData() {
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("Xoá dữ liệu duyệt web?")
+            .setMessage(
+                "Xoá cookie, dữ liệu các trang đã lưu và bộ nhớ đệm của trình duyệt trong app.\n" +
+                    "Lịch sử xem, chỗ đang xem dở, cài đặt và proxy giữ nguyên.",
+            )
+            .setPositiveButton("Xoá") { _, _ -> BrowsingData.clear(this) { toast("Đã xoá cookie và dữ liệu duyệt web.") } }
+            .setNegativeButton("Huỷ", null)
+            .show()
+            .getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
+    }
+
     /** vd "yanhh3d.ee  —  0,4 s · 36 phim · video mượt  ★ nhanh nhất" */
     private fun siteLabel(host: String, check: Result<SiteCheck>?, fastest: Boolean): String {
         val parts = ArrayList<String>()
@@ -161,6 +175,7 @@ class MainActivity : Activity() {
         categories.forEach { items += Entry(it.title, Kind.CATEGORY, it.url) }
         items += Entry("Đổi trang phim", Kind.SITE)
         items += Entry("Duyệt web", Kind.WEB)
+        items += Entry("Xoá dữ liệu web", Kind.CLEAR)
         items += Entry("Cài đặt", Kind.SETTINGS)
         menuAdapter.submit(items)
     }
@@ -177,6 +192,10 @@ class MainActivity : Activity() {
             }
             Kind.SITE -> {
                 pickSite()
+                return
+            }
+            Kind.CLEAR -> {
+                confirmClearBrowsingData()
                 return
             }
             else -> Unit

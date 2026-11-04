@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.webkit.CookieManager
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -90,8 +89,7 @@ class SettingsActivity : Activity() {
         }
         findViewById<View>(R.id.btnClearCache).setOnClickListener {
             ImageLoader.clearDisk()
-            CookieManager.getInstance().removeAllCookies(null)
-            toast("Đã xoá ảnh và cookie đã lưu.")
+            BrowsingData.clear(this) { toast("Đã xoá ảnh, cookie và dữ liệu duyệt web.") }
         }
 
         val updateResult = findViewById<TextView>(R.id.updateResult)
