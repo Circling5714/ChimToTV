@@ -155,6 +155,13 @@ struct Sidebar: View {
                 .padding(.horizontal, 10)
                 .padding(.bottom, 20)
             }
+            #if DEVTOOLS
+            Text("Bản thử · gỡ lỗi: \(DebugServer.shared.addressText)")
+                .font(.system(size: 11))
+                .foregroundColor(Theme.dim)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            #endif
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Theme.surface.ignoresSafeArea())

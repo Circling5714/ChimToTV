@@ -196,7 +196,7 @@ enum NextSite {
                     for probe in probes {
                         guard let r = try? await Http.get("\(origin)/xem-phim/\(slug)/\(probe)/\(lang.slug)?server=\(server)"),
                               let doc = try? Site.parse(r.body, r.url),
-                              let dd = data(doc), let e = episodeData(dd),
+                              let dd = NextSite.data(doc), let e = episodeData(dd),
                               J.str(e, "current_language") == lang.slug else { continue }
                         let eps = episodes(e, origin, slug, lang.slug)
                         if !eps.isEmpty { return (i, EpisodeGroup(name: lang.name, episodes: eps)) }

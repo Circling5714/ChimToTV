@@ -19,7 +19,8 @@ import WebKit
 ///   POST /eval?target=player|browser   (thân = mã JS) chạy JS ở khung trên cùng
 ///   GET  /probe?fn=home|list|detail|source|video|search|searchAll|filters&url=…&q=…&server=…   chạy bộ đọc trang
 ///   GET  /prefs  ·  POST /prefs?key=…&value=…&type=int|bool|string|double|del
-///   POST /update?url=…             cài .ipa qua TrollStore (apple-magnifier://install)
+///   POST /upload  (thân = .ipa)    đẩy bản mới lên iPad  ·  GET /ipa  tải lại tệp đó
+///   POST /update[?url=…]           cài .ipa qua TrollStore (apple-magnifier://install); không url = tệp vừa đẩy lên
 final class DebugServer {
     static let shared = DebugServer()
     let port: UInt16 = 8790
@@ -165,6 +166,25 @@ struct Response {
 
 @MainActor
 enum DebugRoutes {
+    static var uploadFile: URL { FileManager.default.temporaryDirectory.appendingPathComponent("update.ipa") }
+    private static var bgTask: UIBackgroundTaskIdentifier = .invalid
+
+    /// Giữ app chạy thêm ~25 giây khi chuyển sang TrollStore (để TrollStore tải xong .ipa từ cổng này).
+    private static func keepServing() {
+        if bgTask != .invalid { return }
+        bgTask = UIApplication.shared.beginBackgroundTask(withName: "update") {
+            UIApplication.shared.endBackgroundTask(DebugRoutes.bgTask)
+            DebugRoutes.bgTask = .invalid
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 25_000_000_000)
+            if bgTask != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+        }
+    }
+
     static func handle(_ r: Request) async -> Response {
         let q = r.query
         switch r.path {
@@ -225,9 +245,25 @@ enum DebugRoutes {
                 if let d = v as? Data { return (try? JSONSerialization.jsonObject(with: d)) ?? "<\(d.count) byte>" }
                 return v
             })
+        case "/upload":
+            // Máy tính đẩy .ipa bản mới lên (máy tính không mở cổng cho iPad tải được — tường lửa)
+            guard r.method == "POST", r.body.count > 1000 else { return .text("thân rỗng", status: 400) }
+            do {
+                try r.body.write(to: uploadFile, options: .atomic)
+            } catch {
+                return .text("không ghi được: \(error)", status: 500)
+            }
+            Log.d("Debug", "nhận \(r.body.count) byte .ipa")
+            return .json(["ok": true, "bytes": r.body.count])
+        case "/ipa":
+            guard let d = try? Data(contentsOf: uploadFile) else { return .text("chưa có .ipa", status: 404) }
+            return Response(status: 200, type: "application/octet-stream", body: d)
         case "/update":
-            guard let ipa = q["url"], let u = UpdateCheck.trollStoreURL(ipa) else { return .text("thiếu url", status: 400) }
-            UIApplication.shared.open(u)
+            // Không có url: cài .ipa vừa đẩy lên, TrollStore tải từ chính app này (127.0.0.1)
+            let ipa = q["url"] ?? "http://127.0.0.1:\(DebugServer.shared.port)/ipa"
+            guard let u = UpdateCheck.trollStoreURL(ipa) else { return .text("url sai", status: 400) }
+            keepServing()
+            UIApplication.shared.open(u, options: [:]) { ok in Log.d("Debug", "mở TrollStore: \(ok)") }
             return .json(["ok": true, "open": u.absoluteString])
         default:
             return .text("không có \(r.path)", status: 404)
