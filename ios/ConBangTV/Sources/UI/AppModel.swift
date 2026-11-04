@@ -343,9 +343,16 @@ final class AppModel: ObservableObject {
 
     /// Phim trong lịch sử; phim của trang khác ghi thêm tên trang (vd hai bản "Tiên Nghịch" ở hai trang).
     func historyFilm(_ h: HistoryItem) -> Film {
-        let host = Site.hostOf(h.filmUrl)
-        let title = (host != nil && host != Site.hostOf(Prefs.baseUrl)) ? "\(h.title) · \(host!.before("."))" : h.title
-        return Film(url: h.filmUrl, title: title, poster: h.poster, badge: h.epTitle)
+        guard let host = Site.hostOf(h.filmUrl), host != Site.hostOf(Prefs.baseUrl) else {
+            return Film(url: h.filmUrl, title: h.title, poster: h.poster, badge: h.epTitle)
+        }
+        // Hai trang cùng tên ngắn (hoathinh3d.ee / hoathinh3d.pw) → ghi đủ tên miền cho khỏi lẫn
+        let short = host.before(".")
+        let clash = Prefs.sites.contains { s in
+            guard let o = Site.hostOf(s) else { return false }
+            return o != host && o.before(".") == short
+        }
+        return Film(url: h.filmUrl, title: "\(h.title) · \(clash ? host : short)", poster: h.poster, badge: h.epTitle)
     }
 
     func showHistory() {
