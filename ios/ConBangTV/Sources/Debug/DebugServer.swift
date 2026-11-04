@@ -220,8 +220,11 @@ enum DebugRoutes {
             return .json(uiDump())
         case "/press":
             let label = q["label"] ?? ""
-            let ok = press(label: label, index: Int(q["i"] ?? "0") ?? 0)
-            return .json(["ok": ok, "label": label])
+            let (ok, hit) = press(label: label, index: Int(q["i"] ?? "0") ?? 0, partial: q["partial"] == "1")
+            return .json(["ok": ok, "label": label, "hit": hit ?? NSNull()])
+        case "/scroll":
+            // Cuộn khung cuộn lớn nhất đang hiện: dir=top|bottom|up|down
+            return .json(["ok": scroll(q["dir"] ?? "down")])
         case "/type":
             let text = q["text"] ?? r.text
             let ok = UIApplication.shared.sendAction(#selector(UIKeyInput.insertText(_:)), to: nil, from: text, for: nil)
@@ -247,6 +250,7 @@ enum DebugRoutes {
                 case "int": Prefs.store.set(Int(v) ?? 0, forKey: key)
                 case "double": Prefs.store.set(Double(v) ?? 0, forKey: key)
                 case "bool": Prefs.store.set(v == "true" || v == "1", forKey: key)
+                case "json": Prefs.store.set(Data(v.utf8), forKey: key) // vd follows, history (dữ liệu JSON)
                 case "del": Prefs.store.removeObject(forKey: key)
                 default: Prefs.store.set(v, forKey: key)
                 }
@@ -523,21 +527,49 @@ enum DebugRoutes {
         return out
     }
 
-    private static func press(label: String, index: Int) -> Bool {
-        guard let w = keyWindow, !label.isEmpty else { return false }
-        var exact: [NSObject] = [], partial: [NSObject] = []
+    /// Bấm phần tử theo nhãn: khớp đúng nhãn; partial = khớp một phần (dễ trúng nhầm mục khác cùng chữ).
+    private static func press(label: String, index: Int, partial: Bool) -> (Bool, String?) {
+        guard let w = keyWindow, !label.isEmpty else { return (false, nil) }
+        var exact: [NSObject] = [], loose: [NSObject] = []
         var seen = Set<ObjectIdentifier>()
         walk(w, 0) { e in
             guard seen.insert(ObjectIdentifier(e)).inserted, let l = e.accessibilityLabel else { return }
-            if l == label { exact.append(e) } else if l.localizedCaseInsensitiveContains(label) { partial.append(e) }
+            if l == label { exact.append(e) } else if partial && l.localizedCaseInsensitiveContains(label) { loose.append(e) }
         }
-        guard let target = (exact + partial)[safe: index] else { return false }
-        if target.accessibilityActivate() { return true }
+        guard let target = (exact + loose)[safe: index] else { return (false, nil) }
+        let hit = target.accessibilityLabel
+        if target.accessibilityActivate() { return (true, hit) }
         if let c = target as? UIControl {
             c.sendActions(for: .touchUpInside)
-            return true
+            return (true, hit)
         }
-        return false
+        return (false, hit)
+    }
+
+    private static func scroll(_ dir: String) -> Bool {
+        guard let w = keyWindow else { return false }
+        var best: UIScrollView?
+        func find(_ v: UIView) {
+            if v.isHidden || v.alpha < 0.02 { return }
+            if let s = v as? UIScrollView, !(s is UITextView), s.contentSize.height > s.bounds.height + 1,
+               s.bounds.width * s.bounds.height > (best.map { $0.bounds.width * $0.bounds.height } ?? 0) {
+                best = s
+            }
+            v.subviews.forEach(find)
+        }
+        find(w)
+        guard let s = best else { return false }
+        let maxY = max(-s.adjustedContentInset.top, s.contentSize.height - s.bounds.height + s.adjustedContentInset.bottom)
+        let page = s.bounds.height * 0.8
+        var y = s.contentOffset.y
+        switch dir {
+        case "top": y = -s.adjustedContentInset.top
+        case "bottom": y = maxY
+        case "up": y -= page
+        default: y += page
+        }
+        s.setContentOffset(CGPoint(x: s.contentOffset.x, y: min(maxY, max(-s.adjustedContentInset.top, y))), animated: false)
+        return true
     }
 }
 #endif

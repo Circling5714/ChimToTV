@@ -314,7 +314,8 @@ private struct MenuPanel: View {
                             }
                         }
                         PanelLabel("Xem")
-                        LazyVGrid(columns: cols, alignment: .leading, spacing: 10) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 220), spacing: 10, alignment: .leading)],
+                                  alignment: .leading, spacing: 10) {
                             ChipButton(text: "Tốc độ: \(m.rateText)", icon: "speedometer") { m.cycleRate() }
                             ChipButton(text: "Khung hình: \(m.fitText)", icon: "aspectratio") { m.toggleFit() }
                             ChipButton(text: "Hẹn giờ tắt: \(m.sleepText)", icon: "moon.zzz") { m.cycleSleep() }

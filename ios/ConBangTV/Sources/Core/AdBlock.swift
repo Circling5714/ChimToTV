@@ -11,6 +11,8 @@ enum AdBlock {
         "a-ads.com", "histats.com", "adnxs.com", "taboola.com", "outbrain.com",
         // Đo trên 5 trang (11/2026): thống kê Cloudflare, JW Player, Ahrefs; quảng cáo Adcash, cửa sổ quảng cáo hoathinh3d
         "cloudflareinsights.com", "jwpltx.com", "analytics.ahrefs.com", "acscdn.com", "excavatenearbywand.com",
+        // Gặp khi thử bản iPad (11/2026): iframe quảng cáo trong trang tập hoathinh3d.pw
+        "atroblxac.in",
         // Thống kê / theo dõi phổ biến khác
         "connect.facebook.net", "clarity.ms", "mc.yandex.ru", "statcounter.com", "hotjar.com",
     ]
