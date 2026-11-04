@@ -58,6 +58,16 @@ trong `Ui.kt` — không trông vào việc Android tự đổi ESC thành Back,
 WebView chuyển ESC cho trang web, ô nhập / bàn phím ảo cũng có thể nhận). Thử bằng `adb shell input keyevent ESCAPE`
 thì trên TX3 chỉ thấy phần app tự xử lý: bảng phím ảo `Virtual.kcm` không đổi ESC thành Back.
 
+## Màn hình cảm ứng (từ 1.9.3)
+
+Cho TV box nối màn cảm ứng và điện thoại — chạm thay remote lúc nào cũng được, remote / bàn phím vẫn dùng như cũ:
+
+- **Xem phim:** chạm vào phim để hiện / ẩn thanh nút: Tập trước • ◀◀ 10 giây • Dừng / Phát • 10 giây ▶▶ • Tập sau •
+  Menu (như ▼ trên remote) • Thoát; kéo thanh thời gian để tua. Chạm đúp nửa trái / phải màn hình: lùi / tới 10 giây.
+  Thanh tự ẩn sau 5 giây (phim đang dừng thì ở lại).
+- **Các màn khác:** chạm, vuốt, giữ (xoá khỏi lịch sử) như điện thoại; có nút **‹ Quay lại** ở góc trên (trang chủ:
+  **Thoát**; Duyệt web: góc dưới trái). Nút chỉ hiện khi đang dùng cảm ứng, bấm remote là ẩn.
+
 ## Phim theo dõi và nhạc mở đầu (từ 1.9)
 
 - **Theo dõi:** trong trang phim bấm **＋ Theo dõi**. Mỗi lần mở trang chủ (tối đa 30 phút một lần) app hỏi lại trang
@@ -215,6 +225,15 @@ từng phim; `Prefs.follows` lưu `count` (số tập lần kiểm gần nhất,
 lần cuối). Mốc nhạc mở đầu: `intro@<phim>` = "đầu,hết" (giây). Trình phát gắn số lần nạp trang (`window.__chimtoLoad`,
 `pageLoad`) vào trang phát và bỏ trạng thái của trang cũ; `resumePending` giữ chỗ xem dở cho tới khi trình phát tua
 xong (TV chậm có khi mất hàng chục giây) — lưu vị trí / đổi server / đổi bản trong lúc đó dùng chỗ cũ.
+
+Cảm ứng (từ 1.9.3 — `TouchUi.kt`): mọi màn hình kế thừa `BaseActivity` (ESC = Back, nút "‹ Quay lại" khi
+`TouchUi.active` — lần cuối là chạm / chuột). Bấm phím thì thôi chế độ cảm ứng; riêng phím điều hướng đầu tiên sau khi
+chạm bị Android dùng để rời chế độ chạm (không tới `dispatchKeyEvent`) nên nghe thêm `OnTouchModeChangeListener`, và
+app không tự rời chế độ chạm khi đang dùng cảm ứng (`focusForRemote` thay `requestFocusFromTouch`). Trình phát: lớp
+`touchLayer` phủ lên WebView (GestureDetector: chạm hiện thanh ngay lúc nhấc tay, chạm đúp tua) + `touchBar`; thanh ẩn
+bằng `INVISIBLE` (không `GONE`) để luôn được xếp chỗ — vừa hiện là chạm trúng nút. Thử bằng `adb shell input tap /
+swipe` (chạm thật) — trên TX3 lúc đang phát mỗi lệnh `input` mất tới ~6 giây, lâu hơn thời gian thanh tự ẩn: chạy hai
+lệnh chồng nhau (`input tap … & sleep 2; input tap …`) hoặc thử lúc phim đang dừng.
 
 Từ 1.9.1: chỗ bắt đầu báo trước (`startHint` = chỗ xem dở, hoặc hết nhạc mở đầu khi nhạc nằm ngay đầu tập) được chèn
 vào agent (`window.__chimtoStart`) và `hls.html` (`startPosition`). JW Player của streamfree bỏ qua `starttime` và tự gọi

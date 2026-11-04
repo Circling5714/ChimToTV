@@ -4,6 +4,20 @@ Côn Bằng TV — từ 1.0 đến 1.4 tên là ChimTo TV. Tải bản mới nh�
 Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b`), cài đè
 được lên nhau và giữ nguyên lịch sử xem.
 
+## 1.9.3 — 04/11/2026
+
+- **Điều khiển bằng màn hình cảm ứng** (TV box nối màn cảm ứng, điện thoại) — trước đây màn xem phim không điều khiển
+  được bằng chạm và cả app không có nút quay lại trên màn hình:
+  - Màn xem phim: chạm vào phim để hiện / ẩn thanh nút to — Tập trước, lùi 10 giây, Dừng / Phát, tới 10 giây, Tập sau,
+    Menu (menu ▼: server, bản phim, tốc độ, nhạc mở đầu…), Thoát — và thanh thời gian kéo để tua; chạm đúp nửa trái /
+    phải: lùi / tới 10 giây. Thanh tự ẩn sau 5 giây, phim đang dừng thì ở lại. Chạm không còn lọt vào trang web / trình
+    phát của trang (khỏi bấm nhầm quảng cáo).
+  - Các màn khác: có chạm thì hiện nút **"‹ Quay lại"** ở góc trên (trang chủ: **"Thoát"**; Duyệt web: góc dưới trái,
+    khỏi che thanh đầu của trang web); bấm remote / bàn phím là nút tự ẩn. Duyệt web ẩn con trỏ của remote khi đang chạm.
+  - Remote và bàn phím dùng như cũ; nút trên màn hình đổi màu khi đang nhấn.
+- versionCode 16 · tag `v1.9.3` · commit `d0f531c` · SHA-256 APK
+  `05e4ddaa3d1c898595bce4595b4c7f33a4e4ae9eba91330169860f75518699bf`
+
 ## 1.9.2 — 04/11/2026
 
 - **Sửa lỗi phím ESC của bàn phím rời** (điện thoại / TV box cắm bàn phím): ESC giờ luôn là Back ở mọi màn hình —
