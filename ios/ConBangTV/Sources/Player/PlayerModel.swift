@@ -243,6 +243,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         ucc.removeAllUserScripts()
         let prefix = "window.__chimtoStart=\(startHint);window.__chimtoLoad=\(pageLoad);\n"
         ucc.addUserScript(WKUserScript(source: prefix + Assets.agent, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        ucc.addUserScript(WKUserScript(source: WebSetup.fillCss, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         if hls { ucc.addUserScript(WKUserScript(source: Assets.hlsJs, injectionTime: .atDocumentStart, forMainFrameOnly: true)) }
         if page { ucc.addUserScript(WKUserScript(source: Assets.pageFocus, injectionTime: .atDocumentStart, forMainFrameOnly: true)) }
         #if DEVTOOLS

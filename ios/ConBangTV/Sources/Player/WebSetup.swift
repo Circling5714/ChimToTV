@@ -96,6 +96,19 @@ enum WebSetup {
         return w
     }
 
+    /// Trình phát nhúng (JW Player của streamfree / NguonC) tự giữ khung 16:9 theo bề ngang: trên TV 16:9 vừa khít, trên
+    /// iPad (≈ 4:3) lộ dải nền xám của trang nhúng ở dưới (đo: khung 1194×672 trong iframe 1194×834). Phóng trình phát
+    /// ra đủ khung, nền trang đen → phim nằm giữa, viền đen trên dưới như thường.
+    static let fillCss = """
+    (function(){ if (window.__chimtoFill) return; window.__chimtoFill = 1;
+      var s = document.createElement('style');
+      s.textContent = 'html,body{background:#000!important}' +
+        '.jwplayer{position:fixed!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;' +
+        'max-width:none!important;max-height:none!important;margin:0!important}';
+      (document.head || document.documentElement).appendChild(s);
+    })();
+    """
+
     /// Bản thử: chép console.log / lỗi JS của trang phát vào nhật ký (chỉ giá trị đơn giản — không đụng getter của
     /// đối tượng, khỏi làm trình phát tưởng đang mở DevTools).
     static let consoleHook = """
