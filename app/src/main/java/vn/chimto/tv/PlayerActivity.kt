@@ -882,6 +882,8 @@ class PlayerActivity : Activity() {
                 }
             }
         }
+        // ESC = Back (không để WebView chuyển ESC cho trang web / trình phát rồi mất)
+        if (escapeAsBack(e)) return true
         if (!isPlayerKey(code)) return super.dispatchKeyEvent(e)
         if (e.action != KeyEvent.ACTION_DOWN) return true
         val first = e.repeatCount == 0

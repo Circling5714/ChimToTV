@@ -190,6 +190,8 @@ class DetailActivity : Activity() {
         epLabel.text = if (typed.isEmpty()) "Danh sách tập ($n)" else "Danh sách tập ($n) — đến tập $typed…"
     }
 
+    override fun dispatchKeyEvent(e: KeyEvent): Boolean = escapeAsBack(e) || super.dispatchKeyEvent(e)
+
     /** Phím số trên remote / bàn phím: gõ số tập, ngừng 1,2 giây là nhảy tới tập đó (không cần bấm nút "Đến tập…"). */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         val digit = when (keyCode) {

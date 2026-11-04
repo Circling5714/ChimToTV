@@ -41,6 +41,18 @@ fun <T> Activity.background(work: () -> T, done: (Result<T>) -> Unit) {
     }
 }
 
+/**
+ * Phím ESC của bàn phím rời (điện thoại / TV box cắm bàn phím) = Back. Android chỉ tự đổi ESC thành Back khi không ai
+ * nhận ESC trước — WebView chuyển ESC cho trang web / trình phát, bàn phím ảo cũng có thể nhận — nên app tự làm. Gọi ở
+ * đầu dispatchKeyEvent; true = đã xử lý.
+ */
+fun Activity.escapeAsBack(e: KeyEvent): Boolean {
+    if (e.keyCode != KeyEvent.KEYCODE_ESCAPE) return false
+    @Suppress("DEPRECATION")
+    if (e.action == KeyEvent.ACTION_UP && !e.isCanceled) onBackPressed()
+    return true
+}
+
 fun Context.dp(v: Int): Int = (v * resources.displayMetrics.density).roundToInt()
 
 fun Throwable.friendly(): String {

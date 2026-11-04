@@ -519,6 +519,8 @@ class MainActivity : Activity() {
         startActivity(if (item != null) PlayerActivity.resume(this, item) else DetailActivity.intent(this, row.film))
     }
 
+    override fun dispatchKeyEvent(e: KeyEvent): Boolean = escapeAsBack(e) || super.dispatchKeyEvent(e)
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         // Đang ở lưới / ô tìm kiếm → quay về menu; đang ở menu → nhấn 2 lần để thoát
