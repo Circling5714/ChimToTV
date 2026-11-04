@@ -221,7 +221,7 @@ enum DebugRoutes {
         case "/press":
             let label = q["label"] ?? ""
             let (ok, hit) = press(label: label, index: Int(q["i"] ?? "0") ?? 0, partial: q["partial"] == "1")
-            return .json(["ok": ok, "label": label, "hit": hit ?? NSNull()])
+            return .json(["ok": ok, "label": label, "hit": hit ?? ""])
         case "/scroll":
             // Cuộn khung cuộn lớn nhất đang hiện: dir=top|bottom|up|down
             return .json(["ok": scroll(q["dir"] ?? "down")])
