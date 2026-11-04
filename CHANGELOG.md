@@ -4,6 +4,16 @@ Côn Bằng TV — từ 1.0 đến 1.4 tên là ChimTo TV. Tải bản mới nh�
 Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b`), cài đè
 được lên nhau và giữ nguyên lịch sử xem.
 
+## 1.9.2 — 04/11/2026
+
+- **Sửa lỗi phím ESC của bàn phím rời** (điện thoại / TV box cắm bàn phím): ESC giờ luôn là Back ở mọi màn hình —
+  thoát được Cài đặt và màn xem phim (anh báo trên Samsung S10e gắn bàn phím). Trước đây app trông vào việc Android tự
+  đổi ESC thành Back, mà Android chỉ đổi khi không ai nhận ESC trước: trong màn xem phim, WebView chuyển ESC cho trang
+  web / trình phát; trong Cài đặt, ô nhập (bàn phím ảo) có thể nhận. Giờ app tự xử lý ESC; trong màn xem phim, ESC khi
+  đang mở menu ▼ thì đóng menu, đang hiện gợi ý đổi server thì bỏ gợi ý. Phím Back của remote không đổi.
+- versionCode 15 · tag `v1.9.2` · commit `5d2a70b` · SHA-256 APK
+  `90c18b47f147f7362df35d684262665ea47da9b24e739612b1e5cc6fc0bb095b`
+
 ## 1.9.1 — 04/11/2026
 
 - **Tìm trên mọi trang:** mục Tìm kiếm tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm ("yanhh3d.ee —

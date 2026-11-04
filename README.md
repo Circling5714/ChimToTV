@@ -53,6 +53,11 @@ loại trên menu của trang, và **Thể loại…** / **Quốc gia…** (từ
 | Gợi ý đổi server (hiện khi video giật nhiều) | OK: chuyển sang server được gợi ý, xem tiếp đúng chỗ • Back: bỏ qua |
 | Duyệt web | Mũi tên: di chuyển con trỏ (chạm mép thì cuộn) • OK: bấm • CH+/CH−: cuộn nhanh • Menu: tải lại • Back: lùi trang |
 
+Bàn phím rời (điện thoại / TV box cắm bàn phím): **ESC = Back** ở mọi màn hình (từ 1.9.2 app tự xử lý — `escapeAsBack`
+trong `Ui.kt` — không trông vào việc Android tự đổi ESC thành Back, vì Android chỉ đổi khi không ai nhận ESC trước:
+WebView chuyển ESC cho trang web, ô nhập / bàn phím ảo cũng có thể nhận). Thử bằng `adb shell input keyevent ESCAPE`
+thì trên TX3 chỉ thấy phần app tự xử lý: bảng phím ảo `Virtual.kcm` không đổi ESC thành Back.
+
 ## Phim theo dõi và nhạc mở đầu (từ 1.9)
 
 - **Theo dõi:** trong trang phim bấm **＋ Theo dõi**. Mỗi lần mở trang chủ (tối đa 30 phút một lần) app hỏi lại trang
