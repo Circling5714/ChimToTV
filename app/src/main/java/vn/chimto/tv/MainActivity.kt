@@ -320,8 +320,14 @@ class MainActivity : Activity() {
     private fun continueRows(): List<GridRow> {
         val items = Prefs.history.take(gridAdapter.spanCount)
         if (items.isEmpty()) return emptyList()
-        return listOf(HeaderRow("Xem tiếp")) +
-            items.map { FilmRow(Film(it.filmUrl, it.title, it.poster, it.epTitle), resume = true, fromHistory = true) }
+        return listOf(HeaderRow("Xem tiếp")) + items.map { FilmRow(historyFilm(it), resume = true, fromHistory = true) }
+    }
+
+    /** Phim trong lịch sử; phim của trang khác ghi thêm tên trang (vd hai bản "Tiên Nghịch" ở hai trang). */
+    private fun historyFilm(h: HistoryItem): Film {
+        val host = Site.hostOf(h.filmUrl)
+        val title = if (host != null && host != Site.hostOf(Prefs.baseUrl)) "${h.title} · ${host.substringBefore('.')}" else h.title
+        return Film(h.filmUrl, title, h.poster, h.epTitle)
     }
 
     private fun refreshHead() {
@@ -379,7 +385,7 @@ class MainActivity : Activity() {
             return
         }
         status.hide()
-        gridAdapter.submit(items.map { FilmRow(Film(it.filmUrl, it.title, it.poster, it.epTitle), fromHistory = true) }, focusFirst)
+        gridAdapter.submit(items.map { FilmRow(historyFilm(it), fromHistory = true) }, focusFirst)
     }
 
     private fun openFilm(row: FilmRow) {
