@@ -197,20 +197,24 @@ enum DebugRoutes {
                 "bundle": Bundle.main.bundleIdentifier ?? "", "ios": UIDevice.current.systemVersion, "model": UIDevice.current.model,
                 "machine": machine(), "screen": [Int(s.width), Int(s.height), Int(UIScreen.main.scale)],
                 "site": Prefs.baseUrl, "ua": Http.userAgent, "ip": DebugServer.wifiAddress() ?? "",
+                "appState": appState(),
             ])
+        case "/frames":
+            return .json(PlayerModel.current?.frames.map { $0.url } ?? [])
         case "/log":
             let since = Int(q["since"] ?? "0") ?? 0
             let l = Log.since(since)
             return .json(["last": l.last, "lines": l.lines])
         case "/shot":
             let scale = CGFloat(Double(q["scale"] ?? "1") ?? 1)
-            guard let data = screenshot(scale: scale) else { return .text("không chụp được", status: 500) }
+            guard let data = screenshot(scale: scale) else { return .text("không chụp được (app: \(appState()))", status: 409) }
             return Response(status: 200, type: "image/jpeg", body: data)
         case "/state":
             var o: [String: Any] = ["app": AppModel.shared.debugState()]
             if let p = PlayerModel.current { o["player"] = p.debugState() }
             if let b = BrowserController.current { o["browser"] = b.web.url?.absoluteString ?? NSNull() }
             o["top"] = Router.topController.map { String(describing: type(of: $0)) } ?? NSNull()
+            o["appState"] = appState()
             return .json(o)
         case "/ui":
             return .json(uiDump())
@@ -227,7 +231,13 @@ enum DebugRoutes {
         case "/player":
             return player(q)
         case "/eval":
-            return await eval(target: q["target"] ?? "player", js: q["js"] ?? r.text)
+            let js = q["js"] ?? r.text
+            if q["target"] == "frame" {
+                guard let p = PlayerModel.current else { return .text("chưa mở trình phát", status: 400) }
+                let (v, e) = await p.evalInFrame(q["match"] ?? "", js)
+                return .json(e.map { ["error": $0] } ?? ["result": v ?? NSNull()])
+            }
+            return await eval(target: q["target"] ?? "player", js: js)
         case "/probe":
             return await probe(q)
         case "/prefs":
@@ -315,8 +325,21 @@ enum DebugRoutes {
         return .json(["ok": true])
     }
 
+    static func appState() -> String {
+        switch UIApplication.shared.applicationState {
+        case .active: return "active"
+        case .inactive: return "inactive"
+        case .background: return "background"
+        @unknown default: return "?"
+        }
+    }
+
     private static func player(_ q: [String: String]) -> Response {
         guard let m = PlayerModel.current else { return .text("chưa mở trình phát", status: 400) }
+        // App đang ở nền (người dùng sang app khác / tắt màn hình): không tự phát tiếng ở nền
+        if ["play", "toggle"].contains(q["do"] ?? ""), UIApplication.shared.applicationState != .active, q["force"] != "1" {
+            return .json(["ok": false, "why": "app đang ở nền (\(appState())) — thêm force=1 nếu thật sự muốn"])
+        }
         let s = Double(q["s"] ?? "0") ?? 0
         switch q["do"] ?? "" {
         case "toggle": m.togglePlay()
@@ -446,10 +469,18 @@ enum DebugRoutes {
         guard let w = keyWindow else { return nil }
         let fmt = UIGraphicsImageRendererFormat()
         fmt.scale = max(0.2, min(3, scale))
-        let img = UIGraphicsImageRenderer(bounds: w.bounds, format: fmt).image { _ in
-            _ = w.drawHierarchy(in: w.bounds, afterScreenUpdates: false)
+        guard UIApplication.shared.applicationState == .active else { return nil }
+        fmt.opaque = true
+        var ok = false
+        var img = UIGraphicsImageRenderer(bounds: w.bounds, format: fmt).image { _ in
+            ok = w.drawHierarchy(in: w.bounds, afterScreenUpdates: false)
         }
-        return img.jpegData(compressionQuality: 0.75)
+        if !ok {
+            img = UIGraphicsImageRenderer(bounds: w.bounds, format: fmt).image { _ in
+                ok = w.drawHierarchy(in: w.bounds, afterScreenUpdates: true)
+            }
+        }
+        return ok ? img.jpegData(compressionQuality: 0.75) : nil
     }
 
     private static func machine() -> String {

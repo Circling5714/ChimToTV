@@ -92,6 +92,8 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     private var timers: [String: Task<Void, Never>] = [:]
     private var polling: Task<Void, Never>?
     private var logRelay: ScriptRelay?
+    /// Khung con đã gặp trong lần nạp này: địa chỉ → khung (cho cổng gỡ lỗi).
+    private(set) var frames: [(url: String, frame: WKFrameInfo)] = []
 
     init(filmUrl: String, epUrl: String, continueMode: Bool) {
         self.filmUrl = filmUrl
@@ -274,6 +276,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         seekTarget = nil
         cancel("seek")
         pageLoad += 1
+        frames.removeAll()
         expect("about:blank")
         if let blank = URL(string: "about:blank") { web.load(URLRequest(url: blank)) }
     }
@@ -775,6 +778,12 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     @objc(webView:decidePolicyForNavigationAction:decisionHandler:)
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        // Nhớ các khung con (iframe trình phát…) để cổng gỡ lỗi chạy JS ngay trong khung đó
+        if let f = action.targetFrame, !f.isMainFrame, let u = action.request.url?.absoluteString {
+            frames.removeAll { $0.url == u }
+            frames.append((u, f))
+            if frames.count > 40 { frames.removeFirst() }
+        }
         let isMain = action.targetFrame?.isMainFrame ?? true
         guard isMain, let url = action.request.url else {
             decisionHandler(.allow)
@@ -817,6 +826,21 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     }
 
     // MARK: - Gỡ lỗi
+
+    /// Chạy JS trong khung con có địa chỉ chứa `match` (vd "streamfree"); trả (kết quả, lỗi).
+    func evalInFrame(_ match: String, _ js: String) async -> (Any?, String?) {
+        guard let f = frames.last(where: { $0.url.contains(match) })?.frame else {
+            return (nil, "không thấy khung \(match) — có: \(frames.map { $0.url })")
+        }
+        return await withCheckedContinuation { cont in
+            web.evaluateJavaScript(js, in: f, in: .page) { r in
+                switch r {
+                case .success(let v): cont.resume(returning: (v, nil))
+                case .failure(let e): cont.resume(returning: (nil, e.localizedDescription))
+                }
+            }
+        }
+    }
 
     func debugState() -> [String: Any] {
         var o: [String: Any] = [

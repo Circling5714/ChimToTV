@@ -14,6 +14,7 @@ struct ConBangTVApp: App {
                 .preferredColorScheme(.dark)
         }
         .onChange(of: phase) { p in
+            Log.d("App", "trạng thái: \(p)")
             switch p {
             case .active:
                 AppModel.shared.checkUpdate(manual: false)
