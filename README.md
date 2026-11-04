@@ -78,6 +78,18 @@ loại trên menu của trang; thể loại / nước khác thì dùng **Tìm ki
   chọn "chỉ trang phim".
 - Mật khẩu proxy lưu trong bộ nhớ riêng của app (app khác không đọc được), không mã hoá.
 
+## Riêng tư và dữ liệu duyệt web
+
+- **Xoá dữ liệu web** (menu chính, ngay trên Cài đặt — từ 1.8.1): xoá cookie, dữ liệu các trang đã lưu (localStorage,
+  IndexedDB…), bộ nhớ đệm và mật khẩu HTTP đã nhớ của trình duyệt trong app. Lịch sử xem, chỗ đang xem dở, điểm
+  server, cài đặt và proxy giữ nguyên. **Cài đặt → Dữ liệu → "Xoá ảnh & dữ liệu duyệt web"** làm việc tương tự và xoá
+  thêm ảnh bìa đã lưu.
+- Trang phim thấy app như một trình duyệt Chromium trên Android: app gửi chung một User-Agent rút gọn
+  (`Android 10; K … Chrome/<bản chính>.0.0.0`), không có tên mẫu TV hay số bản build Android; client hints ghi
+  "Chromium" thay vì "Android WebView". Khi app tự tải trang hộ trình phát thì không gửi tên gói app. Riêng các yêu cầu
+  do WebView tự gửi, WebView 138 trên TV thử vẫn kèm `X-Requested-With: vn.chimto.tv` (app đã tắt tính năng này nhưng
+  bản WebView đó chưa làm theo).
+
 ## Dựng lại
 
 ```powershell
@@ -153,6 +165,13 @@ bộ đăng nhập proxy thật (RFC 1929), gửi tên miền (DNS của proxy) 
 độ "chỉ trang phim" cho đích khác đi thẳng. Đổi cài đặt → mở cổng mới, đóng kết nối cũ (kết nối keep-alive không giữ
 cài đặt cũ). Điểm server khi video đi qua proxy chấm riêng (`<trang>·proxy`). Test:
 `.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.Socks5BridgeTest` (proxy SOCKS5 giả trong test).
+
+Riêng tư (từ 1.8.1 — `Privacy.kt`, `BrowsingData.kt`): User-Agent rút gọn lấy số bản chính Chrome từ UA của WebView
+(lưu ở `Prefs.userAgent` để `Http.kt` dùng ngay khi mở app), áp cho mọi WebView kèm `UserAgentMetadata` (brand
+"Chromium", model rỗng) và danh sách origin trống cho `X-Requested-With`; `PlayerActivity.fetchWithAgent` bỏ header đó
+khi giá trị là tên gói. `BrowsingData.clear` gom `WebStorage.deleteAllData`, xoá cache qua một WebView tạm,
+`WebViewDatabase.clearHttpAuthUsernamePassword` và `CookieManager.removeAllCookies` (`Http.kt` không có kho cookie
+riêng). Test: `.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.PrivacyTest`.
 
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server
