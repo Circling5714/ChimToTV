@@ -3,7 +3,7 @@ import SwiftSoup
 
 // Đọc dữ liệu từ trang phim (bản Android: Site.kt — giữ cùng tên hàm, cùng bộ chọn CSS để sửa song song).
 // Không viết riêng cho từng trang: nhận dạng theo mẫu giao diện ("flw-item" kiểu yanhh3d, "halim-item" của theme HaLim).
-// Trang dựng bằng Next.js (kiểu PhimMoi) thì chuyển cho NextSite.
+// Trang dựng bằng Next.js (kiểu PhimMoi) thì chuyển cho NextSite; trang ứng dụng JS có API JSON (mephim) cho ApiSite.
 
 extension Element {
     func q(_ css: String) -> [Element] { (try? select(css).array()) ?? [] }
@@ -54,6 +54,7 @@ enum Site {
     // MARK: - Trang chủ
 
     static func home(_ base: String = Prefs.baseUrl) async throws -> Home {
+        if ApiSite.isKnown(base) { return try await ApiSite.home(base) }
         let doc = try await fetch(base + "/")
         let moved = originOf(doc.location()).flatMap { hostOf($0) != hostOf(base) ? $0 : nil }
         var home: Home
@@ -62,13 +63,25 @@ enum Site {
         } else {
             home = parseHome(doc)
         }
+        // Trang trắng của ứng dụng JS (React…): thử API kiểu mephim
+        if home.sections.isEmpty && isAppShell(doc), await ApiSite.probe(base) { return try await ApiSite.home(base) }
         home.movedTo = moved
         return home
+    }
+
+    /// Trang chỉ có khung rỗng cho ứng dụng JS (vd <div id="root"></div>) — dữ liệu không nằm trong HTML.
+    static func isAppShell(_ doc: Document) -> Bool {
+        guard let root = doc.q1("#root, #app, #__nuxt") else { return false }
+        return root.children().isEmpty() && doc.q("a[href]").count < 5
     }
 
     /// Thời gian tính phần tải qua mạng, không tính lúc đọc HTML.
     static func check(_ base: String) async throws -> SiteCheck {
         let t0 = Date()
+        if ApiSite.isKnown(base) {
+            let films = try await ApiSite.list(ApiSite.newestUrl(base)).films.count
+            return SiteCheck(ms: Int(Date().timeIntervalSince(t0) * 1000), films: films)
+        }
         let r = try await Http.get(base + "/")
         let ms = Int(Date().timeIntervalSince(t0) * 1000)
         let doc = try parse(r.body, r.url)
@@ -269,6 +282,7 @@ enum Site {
     // MARK: - Danh sách / tìm kiếm
 
     static func list(_ url: String) async throws -> FilmPage {
+        if ApiSite.isKnown(url) { return try await ApiSite.list(url) }
         // hoathinh3d.pw (11/2026): Phim Lẻ / Đang Chiếu / Hoàn Thành / Đánh Giá Cao nạp phim bằng API JSON
         if url.contains(HalimApi.path) {
             return HalimApi.parse(try await Http.get(url, headers: ["Accept": "application/json"]).data, url)
@@ -324,6 +338,7 @@ enum Site {
 
     /// Trang WordPress nhận ?s=; trang Next.js tìm ở /tim-kiem (chưa biết loại trang thì thử ?s= trước).
     static func search(_ query: String, base: String = Prefs.baseUrl) async throws -> FilmPage {
+        if ApiSite.isKnown(base) { return try await ApiSite.list(ApiSite.searchUrl(base, query)) }
         if !NextSite.isKnown(base) {
             let page = try await list("\(base)/?s=" + query.trimmed.formEncoded)
             if !NextSite.isKnown(base) { return page }
@@ -363,7 +378,13 @@ enum Site {
     // MARK: - Chi tiết phim
 
     static func detail(_ url: String) async throws -> FilmDetail {
+        if ApiSite.isKnown(url) {
+            let d = try await ApiSite.detail(url)
+            cache(d, url)
+            return d
+        }
         let doc = try await fetch(url)
+        if isAppShell(doc), await ApiSite.probe(url) { return try await detail(url) }
         let d: FilmDetail
         if let data = NextSite.data(doc) {
             d = try await NextSite.detail(doc, data, url)
@@ -457,7 +478,12 @@ enum Site {
 
     // MARK: - Trang tập phim
 
-    static func source(_ epUrl: String) async throws -> EpisodeSource { parseSource(try await fetch(epUrl), epUrl) }
+    static func source(_ epUrl: String) async throws -> EpisodeSource {
+        if ApiSite.isKnown(epUrl) { return try await ApiSite.source(epUrl) }
+        let doc = try await fetch(epUrl)
+        if isAppShell(doc), await ApiSite.probe(epUrl) { return try await ApiSite.source(epUrl) }
+        return parseSource(doc, epUrl)
+    }
 
     private static let movieInfo = Rx(#"MovieInfo\s*=\s*\{\s*id:\s*(\d+)"#)
     private static let playerPhp = Rx(#"url:\s*['"]([^'"]*player\.php)['"]"#)

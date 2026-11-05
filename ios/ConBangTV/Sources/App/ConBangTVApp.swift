@@ -51,6 +51,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         UINavigationBar.appearance().tintColor = UIColor(red: 0x2B / 255, green: 0xAF / 255, blue: 0x85 / 255, alpha: 1)
 
         Prefs.migrateMovedHosts()
+        Prefs.addNewPresets()
         AppProxy.apply()
         WebSetup.prepare()
         #if DEVTOOLS

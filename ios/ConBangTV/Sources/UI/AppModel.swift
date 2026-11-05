@@ -248,8 +248,8 @@ final class AppModel: ObservableObject {
             Entry(title: followsTitle(), kind: .follows),
         ]
         items += categories.map { Entry(title: $0.title, kind: .category, url: $0.url) }
-        // Trang kiểu PhimMoi: đủ thể loại / quốc gia của bộ lọc (menu trang chỉ có vài mục)
-        if NextSite.isKnown(Prefs.baseUrl) {
+        // Trang kiểu PhimMoi / trang API (mephim): đủ thể loại / quốc gia của bộ lọc (menu trang chỉ có vài mục)
+        if NextSite.isKnown(Prefs.baseUrl) || ApiSite.isKnown(Prefs.baseUrl) {
             items.append(Entry(title: "Thể loại…", kind: .filter, url: "genre"))
             items.append(Entry(title: "Quốc gia…", kind: .filter, url: "country"))
         }
@@ -747,7 +747,7 @@ final class AppModel: ObservableObject {
         showToast("Đang tải danh sách…")
         Task {
             do {
-                let f = try await NextSite.filters(base)
+                let f = ApiSite.isKnown(base) ? ApiSite.filters(base) : try await NextSite.filters(base)
                 filters = (base, f.genres, f.countries)
                 presentFilter(e, f.genres, f.countries)
             } catch {

@@ -63,7 +63,7 @@ struct SitesView: View {
                     }
                     if !addError.isEmpty { Text(addError).foregroundColor(.red) }
                 } header: { Text("Thêm trang") } footer: {
-                    Text("Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…) và kiểu PhimMoi (phimmois). Thêm xong là chuyển sang trang đó.")
+                    Text("Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…), kiểu PhimMoi (phimmois) và mephim.ddns.net (nguồn KKPhim). Thêm xong là chuyển sang trang đó.")
                 }
             }
             .navigationTitle("Chọn trang phim")

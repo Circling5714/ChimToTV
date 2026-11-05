@@ -21,7 +21,21 @@ enum Prefs {
     static let defaultBase = "https://yanhh3d.ee"
 
     /// Các trang mẫu có sẵn trong danh sách lần đầu cài.
-    static let presetSites = [defaultBase, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun"]
+    static let presetSites = [defaultBase, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun",
+                              "https://mephim.ddns.net"]
+
+    /// Trang mẫu thêm ở bản sau: thêm một lần vào danh sách người xem đã lưu (xoá đi thì thôi, không thêm lại).
+    static let addedSites = ["https://mephim.ddns.net"]
+
+    /// Gọi lúc mở app (sau migrateMovedHosts).
+    static func addNewPresets() {
+        for url in addedSites {
+            let key = "preset_added@\(url)"
+            if store.bool(forKey: key) { continue }
+            if let list = store.stringArray(forKey: "sites"), !list.contains(url) { sites = list + [url] }
+            store.set(true, forKey: key)
+        }
+    }
 
     /// Trang đổi hẳn tên miền, đường dẫn giữ nguyên (tên cũ chuyển hướng 301 sang tên mới). Tên cũ hay bị nhà mạng chặn nên
     /// app không tự thấy trang đã chuyển → đổi tên cũ → mới trong mọi dữ liệu đã lưu (migrateMovedHosts).
