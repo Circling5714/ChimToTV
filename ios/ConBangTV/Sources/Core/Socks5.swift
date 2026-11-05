@@ -316,11 +316,11 @@ final class Socks5Bridge {
         a.sin_port = 0
         a.sin_addr.s_addr = inet_addr("127.0.0.1")
         let ok = withUnsafePointer(to: &a) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
-        } == 0 && listen(fd, 64) == 0
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        } == 0 && Darwin.listen(fd, 64) == 0
         var len = socklen_t(MemoryLayout<sockaddr_in>.size)
         guard ok, withUnsafeMutablePointer(to: &a, {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(fd, $0, &len) }
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.getsockname(fd, $0, &len) }
         }) == 0 else {
             Darwin.close(fd)
             throw SocksError(code: 1, message: "không mở được cổng nội bộ (\(errno))")
@@ -353,7 +353,7 @@ final class Socks5Bridge {
         while !isClosed {
             var p = pollfd(fd: server, events: Int16(POLLIN), revents: 0)
             guard poll(&p, 1, 500) > 0 else { continue }
-            let c = accept(server, nil, nil)
+            let c = Darwin.accept(server, nil, nil)
             if c < 0 { continue }
             let client = TcpSocket(fd: c)
             let t = Thread { [weak self] in self?.handle(client) }

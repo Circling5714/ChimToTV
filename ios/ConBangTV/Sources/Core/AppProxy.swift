@@ -97,15 +97,21 @@ enum AppProxy {
 
     /// Cho cổng gỡ lỗi.
     static func debugState() -> [String: Any] {
-        locked {
-            [
-                "active": config != nil, "direct": direct, "port": bridge?.port ?? 0, "generation": gen,
-                "proxy": config.map { "\($0.host):\($0.port)" + ($0.user.isEmpty ? "" : " (có đăng nhập)") } ?? "",
-                "remoteDns": config?.remoteDns ?? true, "sitesOnly": config?.sitesOnly ?? false,
-                "lastError": bridge?.recentError ?? "", "hosts": hosts,
-                "stats": bridge?.statsCopy.map { "\($0.key) proxy=\($0.value[0]) thẳng=\($0.value[1]) lỗi=\($0.value[2])" }.sorted() ?? [],
-            ]
-        }
+        lock.lock()
+        defer { lock.unlock() }
+        var o: [String: Any] = [:]
+        o["active"] = config != nil
+        o["direct"] = direct
+        o["port"] = bridge?.port ?? 0
+        o["generation"] = gen
+        o["proxy"] = config.map { c -> String in "\(c.host):\(c.port)" + (c.user.isEmpty ? "" : " (có đăng nhập)") } ?? ""
+        o["remoteDns"] = config?.remoteDns ?? true
+        o["sitesOnly"] = config?.sitesOnly ?? false
+        o["lastError"] = bridge?.recentError ?? ""
+        o["hosts"] = hosts
+        let stats: [String: [Int]] = bridge?.statsCopy ?? [:]
+        o["stats"] = stats.map { k, v -> String in "\(k) proxy=\(v[0]) thẳng=\(v[1]) lỗi=\(v[2])" }.sorted()
+        return o
     }
 
     /// Nút "Kiểm tra proxy": tải https://www.cloudflare.com/cdn-cgi/trace qua proxy c (mở cổng nội bộ tạm, thử được trước
