@@ -909,13 +909,14 @@ public sealed class PlayerView : UserControl
             _clickTimer.Stop();
             _clickTimer.Start();
         };
-        o.Seek.PreviewMouseLeftButtonDown += (_, _) => _dragging = true;
-        o.Seek.PreviewMouseLeftButtonUp += (_, _) =>
+        // Thanh trượt tự đánh dấu đã xử lý sự kiện chuột (nhảy tới chỗ bấm) → nghe cả sự kiện đã xử lý
+        o.Seek.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, _) => _dragging = true), true);
+        o.Seek.AddHandler(UIElement.PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler((_, _) =>
         {
             if (!_dragging) return;
             _dragging = false;
             if (_state is { D: > 0 }) SeekTo(o.Seek.Value);
-        };
+        }), true);
         o.Seek.ValueChanged += (_, _) =>
         {
             if (_dragging && _state is { D: > 0 } s) o.TimeText.Text = $"{Util.FormatTime(o.Seek.Value)} / {Util.FormatTime(s.D)}";

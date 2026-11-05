@@ -237,7 +237,7 @@ public partial class MainWindow : Window
             return;
         }
         // Trang gốc: Back về menu (như bản TV)
-        if (!_menuButtons.Contains(Keyboard.FocusedElement as Button)) FocusMenu();
+        if (Keyboard.FocusedElement is not Button fb || !_menuButtons.Contains(fb)) FocusMenu();
     }
 
     public void Busy(string? text)

@@ -121,6 +121,8 @@ public class SiteTests
         Assert.True(UpdateCheck.IsNewer("1.0.1", "1.0"));
         Assert.False(UpdateCheck.IsNewer("1.0", "1.0"));
         Assert.True(UpdateCheck.IsNewer("1.10", "1.9"));
+        Assert.False(UpdateCheck.IsNewer("1.0.0+4265f12", "1.0"));
+        Assert.True(UpdateCheck.IsNewer("1.0.1", "1.0.0+4265f12"));
         var notes = "Mở đầu\n## Có gì mới\n- **Theo dõi** phim\n- `x` y\n## Kỹ thuật\n- SHA-256 abc";
         Assert.Equal("Theo dõi phim\nx y", UpdateCheck.Summary(notes));
     }

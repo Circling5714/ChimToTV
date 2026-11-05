@@ -29,8 +29,10 @@ public static class UpdateCheck
     }
 
     /// Bản Windows mới nhất (bỏ bản nháp / thử nghiệm); null = chưa có bản nào.
-    public static async Task<Release?> Latest(string api = ReleasesApi)
+    public static async Task<Release?> Latest(string? api = null)
     {
+        // Thử cập nhật trên máy: biến môi trường CONBANG_UPDATE_API trỏ tới danh sách release giả
+        api ??= Environment.GetEnvironmentVariable("CONBANG_UPDATE_API") ?? ReleasesApi;
         var r = await Http.Get(api, new() { ["Accept"] = "application/vnd.github+json" });
         if (JsonScan.Parse(r.Data) is not List<object?> list) return null;
         var releases = J.Objects(list).Select(o =>
@@ -60,7 +62,7 @@ public static class UpdateCheck
         return false;
     }
 
-    private static int[] Parts(string v) => v.Before("-").Split('.').Select(p => int.TryParse(p.Trim(), out var n) ? n : 0).ToArray();
+    private static int[] Parts(string v) => v.Before("-").Before("+").Split('.').Select(p => int.TryParse(p.Trim(), out var n) ? n : 0).ToArray();
 
     /// Ghi chú phát hành (markdown) → vài dòng chữ thường cho hộp thoại; có mục "Có gì mới" thì chỉ lấy mục đó.
     public static string Summary(string notes)
@@ -112,7 +114,8 @@ public static class UpdateCheck
             if (hash != rel.Sha256) throw new AppError("Bản cập nhật tải về bị hỏng (sai mã kiểm tra) — thử lại sau.");
         }
         var v = FileVersionInfo.GetVersionInfo(file);
-        if (v.ProductName != "Côn Bằng TV" || !(v.ProductVersion ?? "").StartsWith(rel.Version))
+        var pv = v.ProductVersion ?? "";
+        if (v.ProductName != "Côn Bằng TV" || IsNewer(pv, rel.Version) || IsNewer(rel.Version, pv))
             throw new AppError("Tệp tải về không phải bản Côn Bằng TV " + rel.Version + ".");
         return file;
     }

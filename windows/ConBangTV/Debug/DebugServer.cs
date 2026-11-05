@@ -81,6 +81,15 @@ public static class DebugServer
                     var (last, lines) = Log.Since(int.TryParse(q["since"], out var s) ? s : 0);
                     body = Text($"#{last}\n" + string.Join("\n", lines.TakeLast(int.TryParse(q["n"], out var c) ? c : 300)));
                     break;
+                case "/type":
+                    body = Text(await _w!.Dispatcher.InvokeAsync(() =>
+                    {
+                        if (Keyboard.FocusedElement is not TextBox tb) return "không có ô chữ đang chọn";
+                        tb.Text = q["text"] ?? "";
+                        tb.CaretIndex = tb.Text.Length;
+                        return "đã gõ: " + tb.Text;
+                    }));
+                    break;
                 case "/play":
                     await _w!.Dispatcher.InvokeAsync(() => _w.Play(q["film"]!, q["ep"]!));
                     body = Text("ok");

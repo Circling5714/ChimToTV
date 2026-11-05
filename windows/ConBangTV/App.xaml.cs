@@ -38,7 +38,8 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        Prefs.Load();
+        // Thử trên máy: thư mục dữ liệu riêng (CONBANG_DATA_DIR) để không đụng dữ liệu đang dùng
+        Prefs.Load(Environment.GetEnvironmentVariable("CONBANG_DATA_DIR"));
         Log.Start();
         Log.D("app", $"Mở bản {UpdateCheck.CurrentVersion} ({string.Join(' ', e.Args)})");
         UpdateCheck.Cleanup();
