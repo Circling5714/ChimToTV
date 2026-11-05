@@ -6,6 +6,37 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 
 Bản iPad (iPadOS 15+, cài bằng TrollStore) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 
+## iPad 1.1 — 05/11/2026
+
+- **Người xem cho cả nhà** (như bản TV 2.0): mỗi người một hồ sơ (tên + màu) với lịch sử xem, Xem tiếp, chỗ đang xem, phim
+  theo dõi, trang phim, server ưu tiên, Xem riêng, cách xem riêng; lịch sử cũ thành của người đầu tiên "Cả nhà". Mở app
+  (và quay lại sau 30 phút) hỏi **"Ai đang xem?"** khi có từ 2 người; đổi người bằng tên người xem ở đầu menu; thêm / sửa /
+  xoá ở Cài đặt → Người xem. **Mã PIN** 4 số tuỳ từng người, gõ trên bàn phím số ngay trên màn hình.
+- **Hình trong hình:** nút thu nhỏ cạnh nút Menu của trình phát — phim chạy tiếp ở cửa sổ nổi của iPad, vẫn chọn phim khác
+  / dùng app khác được; nút phóng to của cửa sổ mở lại màn xem phim, nút đóng lưu chỗ đang xem. Vuốt về màn hình chính
+  lúc đang xem là tự thu nhỏ (tắt được: Cài đặt → Phát video).
+- bản 1.1 (CFBundleVersion 2) · mã gói `vn.chimto.tv` · tag `ios-v1.1` · commit `0edf596` · SHA-256 IPA
+  `c2ce6ebe992451ad80b3f53927d8ccd782fd156ba11a669fc8719fe7bb7239d1`
+
+## 2.0 — 05/11/2026
+
+- **Người xem cho cả nhà:** TV dùng chung thì mỗi người một hồ sơ (tên + màu, tối đa 8) với lịch sử xem, hàng Xem tiếp,
+  chỗ đang xem dở, phim theo dõi, trang phim đang dùng, server ưu tiên, Xem riêng, bước tua, tự chuyển tập, khung hình
+  riêng. Danh sách trang phim, proxy, DNS, dữ liệu duyệt web, điểm server, mốc nhạc mở đầu dùng chung.
+  - Lịch sử có từ trước thành của người xem đầu tiên "Cả nhà" — cài đè không mất gì.
+  - Nhà có từ 2 người: mở app (và quay lại app sau 30 phút không dùng) thì hỏi **"Ai đang xem?"** — tắt được trong Cài
+    đặt. Đổi người: mục "Người xem: …" đầu menu. Thêm / đổi tên / đổi màu / xoá: Cài đặt → Người xem.
+  - **Mã PIN** 4 số bật / tắt cho từng người: người có mã phải nhập đúng mới mở / sửa / xoá được hồ sơ.
+- **Thu nhỏ phim vào góc:** lúc xem nhấn ▼ → "Thu nhỏ vào góc" (hoặc phím Window) — phim chạy tiếp ở góc, vẫn chọn phim
+  khác được; đầu menu có "Phóng to" / "Tắt phim thu nhỏ", phím phát / dừng / chuyển tập của remote điều khiển phim nhỏ.
+  - TV / máy có hình trong hình của Android: cửa sổ nhỏ của hệ thống (nổi cả trên app khác); bấm Home lúc đang xem là tự
+    thu nhỏ (tắt được trong Cài đặt).
+  - TV không có (TV box ít RAM như TX3, TV Skyworth…): cửa sổ phim nhỏ ngay trong app — rời app thì phim dừng, thoát app
+    thì phim tắt.
+- Chọn phim khác lúc đang thu nhỏ thì phim đó mở ngay trong trình phát đang chạy (lưu chỗ xem phim cũ).
+- versionCode 18 · tag `v2.0` · commit `0edf596` · SHA-256 APK
+  `bf86165ba925f40d959f8df9cc0db359d00ea66f9657c6eb75a6ba65f6078c33`
+
 ## iPad 1.0 — 04/11/2026
 
 - **Bản đầu tiên cho iPad** (iPadOS 15 trở lên, cài bằng TrollStore — tải `ConBangTV-iPad-1.0.ipa`, mở bằng TrollStore):

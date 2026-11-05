@@ -9,7 +9,7 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad** (iPadOS 15+, cài bằng TrollStore): [release `ios-v1.0`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.0)
+**Bản iPad** (iPadOS 15+, cài bằng TrollStore): [release `ios-v1.1`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.1)
 — xem mục [Bản iPad](#bản-ipad).
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -61,6 +61,10 @@ chính của bản TV, điều khiển bằng chạm:
   đầu, tốc độ, khung hình, hẹn giờ tắt, mở trang web của tập.
 - **Bàn phím rời:** Space / K dừng–phát, ◀ ▶ (J / L) tua (giữ để tua nhanh), ▲ hiện thanh, ▼ / M menu, N / P tập
   sau / trước, số 0–9 nhảy tới 0–90%, Esc thoát / đóng menu; trong Duyệt web Esc = lùi trang.
+- **Người xem / hình trong hình** (từ 1.1, như bản TV 2.0 — xem [Người xem](#người-xem-từ-20) và
+  [Thu nhỏ phim](#thu-nhỏ-phim--hình-trong-hình-từ-20)): mở app chọn "Ai đang xem?", mã PIN gõ trên bàn phím số của màn
+  hình; nút thu nhỏ cạnh nút Menu của trình phát → phim chạy tiếp ở cửa sổ nổi của iPad (cửa sổ có nút phóng to / đóng);
+  vuốt về màn hình chính lúc đang xem là tự thu nhỏ (Cài đặt → Phát video).
 - **Khác bản TV:** chưa có proxy SOCKS5 và DNS mã hoá (iOS 15 không cho app đặt proxy riêng cho WKWebView — cần thì
   dùng VPN / hồ sơ DNS của iPad); không có con trỏ ảo (chạm thẳng vào trang web).
 
@@ -68,9 +72,11 @@ chính của bản TV, điều khiển bằng chạm:
 
 | Màn hình | Phím |
 | --- | --- |
-| Trang chủ / danh sách | Mũi tên: di chuyển • OK/Enter: mở phim (hàng **Xem tiếp**: phát tiếp luôn) • Giữ OK / Menu trên phim ở Xem tiếp, Lịch sử xem: xoá khỏi lịch sử • Back: về menu bên trái, Back lần nữa để thoát |
+| Ai đang xem? (nhà có từ 2 người xem) | ◀ ▶: chọn người • OK: vào (người có 🔒: gõ mã PIN bằng phím số / bàn phím ảo) • **Sửa người xem…**: mở Cài đặt • Back: xem tiếp bằng người đang dùng (người đó có PIN thì thoát app) |
+| Trang chủ / danh sách | Mũi tên: di chuyển • OK/Enter: mở phim (hàng **Xem tiếp**: phát tiếp luôn) • Giữ OK / Menu trên phim ở Xem tiếp, Lịch sử xem: xoá khỏi lịch sử • Mục **Người xem: …** đầu menu: đổi người • Back: về menu bên trái, Back lần nữa để thoát |
 | Chi tiết phim | OK: xem tiếp / xem tập mới nhất • ▼: vào danh sách tập (ô xanh = đã xem) • Số 0–9 hoặc nút **Đến tập…**: nhảy tới tập theo số • **＋ Theo dõi**: báo khi phim có tập mới |
-| Đang xem phim | OK/Space: dừng–phát • ◀ ▶: tua (giữ để tua nhanh) • ▲: xem thời gian • ▼/Menu: đổi server (kèm điểm từng server), đổi tập, tốc độ, khung hình (Vừa / Lấp đầy), hẹn giờ tắt, nhạc mở đầu • Số 0–9: nhảy tới 0–90% • CH+/CH−, N/P: tập sau/trước • Back: thoát |
+| Đang xem phim | OK/Space: dừng–phát • ◀ ▶: tua (giữ để tua nhanh) • ▲: xem thời gian • ▼/Menu: đổi server (kèm điểm từng server), đổi tập, **Thu nhỏ vào góc**, tốc độ, khung hình (Vừa / Lấp đầy), hẹn giờ tắt, nhạc mở đầu • Số 0–9: nhảy tới 0–90% • CH+/CH−, N/P: tập sau/trước • Phím Window (nếu remote có): thu nhỏ • Back: thoát |
+| Phim đang thu nhỏ (cửa sổ nhỏ) | Đầu menu: **▶ Phóng to: …** / **✕ Tắt phim thu nhỏ** • Phím phát / dừng / tua / tập sau / tập trước của remote (nếu có): điều khiển phim nhỏ • Chạm vào cửa sổ nhỏ: phóng to |
 | Gợi ý đổi server (hiện khi video giật nhiều) | OK: chuyển sang server được gợi ý, xem tiếp đúng chỗ • Back: bỏ qua |
 | Duyệt web | Mũi tên: di chuyển con trỏ (chạm mép thì cuộn) • OK: bấm • CH+/CH−: cuộn nhanh • Menu: tải lại • Back: lùi trang |
 
@@ -88,6 +94,38 @@ Cho TV box nối màn cảm ứng và điện thoại — chạm thay remote lú
   Thanh tự ẩn sau 5 giây (phim đang dừng thì ở lại).
 - **Các màn khác:** chạm, vuốt, giữ (xoá khỏi lịch sử) như điện thoại; có nút **‹ Quay lại** ở góc trên (trang chủ:
   **Thoát**; Duyệt web: góc dưới trái). Nút chỉ hiện khi đang dùng cảm ứng, bấm remote là ẩn.
+
+## Người xem (từ 2.0)
+
+TV / iPad dùng chung cả nhà: mỗi người một hồ sơ, chọn ở màn **Ai đang xem?**.
+
+- **Riêng từng người:** lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, ô tập đã xem, phim theo dõi, trang phim đang dùng,
+  server ưu tiên (vd bố Thuyết Minh, con Vietsub), Xem riêng, bước tua, tự chuyển tập, khung hình. **Dùng chung:** danh
+  sách trang phim, proxy, DNS mã hoá, dữ liệu duyệt web (cookie), điểm server (đo theo TV), mốc nhạc mở đầu, cập nhật.
+- Lịch sử có từ trước là của người xem đầu tiên **Cả nhà** (đổi tên được). Thêm người ở **Cài đặt → Người xem** (tối đa
+  8, mỗi người một màu); người mới bắt đầu với trang phim + cài đặt xem của người đang dùng, lịch sử trống.
+- Nhà có từ 2 người: mở app — và quay lại app sau 30 phút không dùng — thì hỏi **Ai đang xem?** (tắt được: "Hỏi «Ai đang
+  xem?» khi mở app"). Đổi người lúc nào cũng được: mục **Người xem: …** đầu menu (iPad: tên người xem ở đầu menu).
+- **Mã PIN** 4 số, bật / tắt riêng từng người (Cài đặt → chọn người → Đặt / Đổi / Tắt mã PIN): người có mã phải nhập đúng
+  mới mở hồ sơ, sửa hay xoá. App chỉ lưu mã băm. Người đang dùng có mã thì mở app luôn phải nhập mã (kể cả khi tắt hỏi
+  "Ai đang xem?"). Quên mã: chỉ xoá dữ liệu app (mất lịch sử, cài đặt) mới mở lại được — PIN để trẻ khỏi vào nhầm hồ sơ
+  người lớn, không phải mật khẩu bảo mật.
+- Đổi người lúc phim đang thu nhỏ: app lưu chỗ xem cho người cũ rồi đóng phim đó.
+
+## Thu nhỏ phim / hình trong hình (từ 2.0)
+
+Lúc xem nhấn ▼ → **Thu nhỏ vào góc** (hoặc phím Window của remote): phim chạy tiếp ở góc màn hình, vẫn chọn phim khác.
+
+- **TV / máy có hình trong hình của Android** (điện thoại, TV box đủ RAM): cửa sổ nhỏ của hệ thống, nổi được cả trên app
+  khác, có nút lùi 10 giây / phát–dừng / tập sau. Bấm Home lúc đang phát là tự thu nhỏ (Cài đặt → Phát video → "Bấm Home
+  khi đang xem").
+- **TV không có** — nhiều TV box ít RAM (TX3: Android tự tắt dù vẫn khai báo có), nhiều TV như Skyworth (hãng tắt): cửa
+  sổ phim nhỏ ngay trong app, góc dưới bên phải màn đang mở (trang chủ, trang phim, Cài đặt…), đi lại các màn như thường.
+  Không nổi lên app khác được: bấm Home thì phim dừng (mở lại app vẫn nằm ở góc), thoát app (Back 2 lần) thì phim tắt.
+- Đầu menu bên trái lúc có phim thu nhỏ: **▶ Phóng to: …** và **✕ Tắt phim thu nhỏ**; phím phát / dừng / tua / chuyển tập
+  của remote (nếu có) điều khiển phim nhỏ; chạm vào cửa sổ nhỏ (màn cảm ứng) để phóng to.
+- Chỉ có một trình phát: chọn phim khác lúc đang thu nhỏ thì phim đó mở ngay (lưu chỗ xem phim cũ). Đang thu nhỏ vẫn tự
+  sang tập, nhớ chỗ xem, hẹn giờ tắt; gợi ý đổi server thì để lúc phóng to.
 
 ## Phim theo dõi và nhạc mở đầu (từ 1.9)
 
@@ -133,7 +171,7 @@ Cho TV box nối màn cảm ứng và điện thoại — chạm thay remote lú
   IndexedDB…), bộ nhớ đệm và mật khẩu HTTP đã nhớ của trình duyệt trong app. Lịch sử xem, chỗ đang xem dở, điểm
   server, cài đặt và proxy giữ nguyên. **Cài đặt → Dữ liệu → "Xoá ảnh & dữ liệu duyệt web"** làm việc tương tự và xoá
   thêm ảnh bìa đã lưu.
-- **Cài đặt → Dữ liệu** (từ 1.8.2): **Xem riêng** — không ghi phim đã xem và chỗ đang xem (chỗ xem chỉ giữ trong bộ nhớ
+- **Cài đặt → Dữ liệu** (từ 1.8.2; từ 2.0 riêng từng người xem): **Xem riêng** — không ghi phim đã xem và chỗ đang xem (chỗ xem chỉ giữ trong bộ nhớ
   tới khi tắt app; màn hình chính ghi "· xem riêng"); **Tự xoá dữ liệu web khi rời app** — xoá như mục trên mỗi khi rời
   app (Home, Back thoát), trừ lúc trình phát còn mở giữa chừng; app bị tắt trước khi kịp xoá thì lần mở sau tự xoá.
 - **Xoá một phim khỏi lịch sử:** giữ OK (hoặc nhấn Menu) trên phim ở hàng Xem tiếp / mục Lịch sử xem — xoá cả chỗ
@@ -272,6 +310,28 @@ app không tự rời chế độ chạm khi đang dùng cảm ứng (`focusForR
 bằng `INVISIBLE` (không `GONE`) để luôn được xếp chỗ — vừa hiện là chạm trúng nút. Thử bằng `adb shell input tap /
 swipe` (chạm thật) — trên TX3 lúc đang phát mỗi lệnh `input` mất tới ~6 giây, lâu hơn thời gian thanh tự ẩn: chạy hai
 lệnh chồng nhau (`input tap … & sleep 2; input tap …`) hoặc thử lúc phim đang dừng.
+
+Người xem (từ 2.0 — `Prefs.kt` / `Prefs.swift`, giao diện TV `ProfileUi.kt`, iPad `ProfileViews.swift`): người đầu tiên
+(id rỗng, "Cả nhà") dùng đúng các khoá cũ — cài đè / hạ bản không mất dữ liệu; người thêm sau dùng khoá `<khoá>#<id>`
+(`history`, `positions`, `pos_film` (iPad: `positions_v2`), `follows`, `last_follow_check`, `private_mode`, `base_url`,
+`seek_step`, `auto_next`, `video_fill`, `server_type@<trang>`, `server_label@<trang>`). Danh sách người ở khoá `profiles`
+(JSON: id, tên, màu, mã băm SHA-256 của PIN), người đang dùng ở `profile`. Xoá người = xoá mọi khoá riêng của người đó.
+`AppUse` (TV) đếm màn hình đang hiện của cả app để biết quay lại sau ≥ 30 phút. Test:
+`.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.ProfilesTest` (SharedPreferences giả), iPad `ProfilesTests`.
+
+Thu nhỏ phim (từ 2.0): `PlayerActivity` là trình phát duy nhất (`singleTask`) chạy trong task riêng (`taskAffinity=".player"`)
+— thu nhỏ thì task chính của app hiện lại. `PlayerActivity.pipSupported` xét giống `ActivityManager.supportsMultiWindow`:
+có `FEATURE_PICTURE_IN_PICTURE`, không phải máy ít RAM, `config_supportsMultiWindow` (TX3 có cờ `ro.config.low_ram` nên
+Android báo "Device doesn't support picture-in-picture mode"). Có thì `enterPictureInPictureMode` (nút `RemoteAction` qua
+broadcast nội bộ, `onUserLeaveHint` = bấm Home; `onPause` không dừng phim khi đang PiP; đóng cửa sổ nhỏ → `onStop` →
+`finish`). Không có thì cửa sổ nhỏ trong app (`MiniPlayer.kt`): `moveTaskToBack`, WebView của trình phát chuyển sang nổi ở
+góc màn đang mở (`BaseActivity.onResume` → `MiniPlayer.attach`), trình phát vẫn đọc trạng thái mỗi giây; rời hẳn app
+(`AppUse`) thì dừng; quay lại app lúc trình phát toàn màn hình nằm ở nền thì đưa nó ra lại (`showHidden`). Agent báo thêm
+`vw` / `vh` (tỉ lệ cửa sổ PiP). Bản iPad: `webkitSetPresentationMode('picture-in-picture')` gọi thẳng trong khung có video
+bằng `evaluateJavaScript` của app (WebKit tính là "người dùng vừa bấm"; qua `postMessage` thì mất) — `window.__chimtoHere`
+trong `player-agent.js`; vào PiP lúc đang dùng app thì đóng màn trình phát nhưng giữ trình phát (`PlayerModel.detachedModel`).
+Thử trên TX3: launcher TiviKit mở app bằng intent `cmp=` không kèm action — mở lại bằng `am start -n …`, không dùng
+`-a MAIN -c LEANBACK_LAUNCHER` (thành hai màn chính).
 
 Từ 1.9.1: chỗ bắt đầu báo trước (`startHint` = chỗ xem dở, hoặc hết nhạc mở đầu khi nhạc nằm ngay đầu tập) được chèn
 vào agent (`window.__chimtoStart`) và `hls.html` (`startPosition`). JW Player của streamfree bỏ qua `starttime` và tự gọi
