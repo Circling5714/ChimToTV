@@ -17,6 +17,8 @@ enum AppProxy {
     private static var gen = 0
     /// Cổng gỡ lỗi: mở cổng nội bộ không có proxy thật (mọi kết nối đi thẳng) — để xem WebKit có đi qua cổng không.
     private static var direct = false
+    /// Vượt chặn nhà mạng (Cài đặt): cổng nội bộ chạy cả khi không bật proxy, chia nhỏ gói bắt tay HTTPS.
+    private static var split = false
 
     private static func locked<T>(_ f: () -> T) -> T {
         lock.lock()
@@ -32,7 +34,7 @@ enum AppProxy {
 
     /// Cổng nội bộ; nil = tắt. Bật mà không mở được cổng (rất hiếm) thì trỏ vào cổng 1 (đóng): kết nối báo lỗi chứ không
     /// lén đi thẳng.
-    static var localPort: Int? { locked { bridge?.port ?? (config != nil ? 1 : nil) } }
+    static var localPort: Int? { locked { bridge?.port ?? (config != nil || split ? 1 : nil) } }
 
     /// Từ điển proxy CFNetwork (URLSession.connectionProxyDictionary, WebKit); nil = đi thẳng.
     static var cfDictionary: [AnyHashable: Any]? { localPort.map { dictionary(port: $0) } }
@@ -52,14 +54,16 @@ enum AppProxy {
     static func apply() {
         let c = Prefs.proxyConfig()
         let h = (Prefs.sites + [Prefs.baseUrl]).compactMap { Site.hostOf($0)?.lowercased() }
+        let s = Prefs.unblock
         lock.lock()
         defer { lock.unlock() }
         hosts = h
-        let want = c != nil || direct
-        if c == config && want == (bridge != nil) { return }
+        let want = c != nil || direct || s
+        if c == config && s == split && want == (bridge != nil) { return }
         bridge?.close()
-        bridge = want ? try? Socks5Bridge(socks: c, siteHosts: { AppProxy.siteHosts }) : nil
+        bridge = want ? try? Socks5Bridge(socks: c, split: s, siteHosts: { AppProxy.siteHosts }) : nil
         config = c
+        split = s
         gen += 1
     }
 
@@ -102,6 +106,7 @@ enum AppProxy {
         var o: [String: Any] = [:]
         o["active"] = config != nil
         o["direct"] = direct
+        o["unblock"] = split
         o["port"] = bridge?.port ?? 0
         o["generation"] = gen
         o["proxy"] = config.map { c -> String in "\(c.host):\(c.port)" + (c.user.isEmpty ? "" : " (có đăng nhập)") } ?? ""

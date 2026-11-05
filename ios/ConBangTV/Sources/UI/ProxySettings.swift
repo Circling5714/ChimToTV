@@ -158,3 +158,26 @@ struct ProxySection: View {
         }
     }
 }
+
+/// Cài đặt → Vượt chặn nhà mạng (dùng chung cả nhà): chia nhỏ gói bắt tay HTTPS (Socks5Bridge.writeHello).
+struct UnblockSection: View {
+    @EnvironmentObject var app: AppModel
+    @State private var on = Prefs.unblock
+
+    var body: some View {
+        Section {
+            Toggle("Vượt chặn nhà mạng", isOn: $on)
+                .onChange(of: on) {
+                    Prefs.unblock = $0
+                    AppProxy.apply()
+                    app.proxyChanged = true
+                }
+            if on && !WebSetup.canProxy {
+                Text("⚠ iPadOS này không cho trình phát đi qua cổng vượt chặn: chỉ phần đọc trang được vượt chặn.")
+                    .foregroundColor(Theme.dim)
+            }
+        } header: { Text("Vượt chặn nhà mạng") } footer: {
+            Text("Một số nhà mạng chặn trang phim (vd phimmoir.fun) bằng cách đọc tên trang trong gói bắt tay HTTPS: trang mở mãi không được, dùng VPN thì vào được. Bật mục này: app chia nhỏ gói đó nên nhà mạng không đọc được tên trang — không cần VPN hay proxy. Trên iPadOS 15–16, lúc bật app không giữ cookie của trang web sau khi tắt app.")
+        }
+    }
+}

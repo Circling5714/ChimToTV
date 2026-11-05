@@ -294,10 +294,11 @@ enum Socks5 {
 /// Cổng SOCKS5 nội bộ (chỉ nghe 127.0.0.1, không mật khẩu) đứng giữa app và proxy thật — xem AppProxy.
 /// socks = proxy của cổng này (nil = đi thẳng; đổi cài đặt thì AppProxy mở cổng mới); siteHosts() = tên miền các
 /// trang phim, đọc lại mỗi kết nối (chế độ "chỉ trang phim": đích khác đi thẳng). Proxy lỗi thì trả lỗi cho bên gọi,
-/// không tự đi thẳng.
+/// không tự đi thẳng. split = vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS đầu tiên của mỗi kết nối (writeHello).
 final class Socks5Bridge {
     let port: Int
     let socks: SocksConfig?
+    let split: Bool
     private let server: Int32
     private let siteHosts: () -> [String]
     private let lock = NSLock()
@@ -310,8 +311,9 @@ final class Socks5Bridge {
     /// Số kết nối đã mở theo đích ("host:cổng" → [qua proxy, đi thẳng, lỗi]) — cho cổng gỡ lỗi.
     private(set) var stats: [String: [Int]] = [:]
 
-    init(socks: SocksConfig?, siteHosts: @escaping () -> [String]) throws {
+    init(socks: SocksConfig?, split: Bool = false, siteHosts: @escaping () -> [String]) throws {
         self.socks = socks
+        self.split = split
         self.siteHosts = siteHosts
         let fd = socket(AF_INET, SOCK_STREAM, Int32(IPPROTO_TCP))
         guard fd >= 0 else { throw SocksError(code: 1, message: "không mở được cổng nội bộ (\(errno))") }
@@ -434,7 +436,7 @@ final class Socks5Bridge {
             guard let u = up, track(u) else { return }
             try reply(client, 0)
             client.setReadTimeout(0)
-            relay(client, u)
+            relay(client, u, hello: split ? (host, viaProxy) : nil)
         } catch {
             // bên gọi đóng giữa chừng, hoặc proxy vừa bị tắt — bỏ qua
         }
@@ -478,27 +480,76 @@ final class Socks5Bridge {
 
     private func reply(_ c: TcpSocket, _ code: UInt8) throws { try c.write([5, code, 0, 1, 0, 0, 0, 0, 0, 0]) }
 
-    /// Chép hai chiều tới khi hết; một chiều lỗi thì đóng cả hai cho chiều kia khỏi treo.
-    private func relay(_ a: TcpSocket, _ b: TcpSocket) {
+    /// Vượt chặn theo tên trang (SNI): nhà mạng đọc tên trang trong gói bắt tay HTTPS đầu tiên (TLS ClientHello) để chặn
+    /// (vd phimmoir.fun — kết nối được nhưng bắt tay treo 15 giây rồi đứt). Đo trên mạng nhà: gửi nguyên hoặc cắt 2–3
+    /// mẩu lớn đều bị chặn; gửi riêng byte đầu là lọt. Ở đây: byte đầu riêng, tên trang thành từng mẩu 2 byte, rồi phần
+    /// còn lại — mỗi lần ghi là một gói (TCP_NODELAY). Qua proxy: chờ chút sau byte đầu để proxy cũng gửi nó thành gói
+    /// riêng. Không phải gói bắt tay TLS thì gửi nguyên.
+    static func writeHello(_ to: TcpSocket, _ p: UnsafeMutableRawPointer, _ n: Int, host: String, viaProxy: Bool) throws {
+        let b = p.assumingMemoryBound(to: UInt8.self)
+        guard n > 5, b[0] == 0x16, b[1] == 0x03 else { return try to.write(p, n) }
+        try to.write(p, 1)
+        if viaProxy { usleep(40_000) }
+        var i = 1
+        let name = Array(host.lowercased().utf8)
+        if name.count >= 2, n - name.count > 1, let s = find(name, in: b, from: 1, to: n) {
+            if s > i { try to.write(p + i, s - i) }
+            var k = s
+            while k < s + name.count {
+                let len = min(2, s + name.count - k)
+                try to.write(p + k, len)
+                k += len
+            }
+            i = s + name.count
+        }
+        if i < n { try to.write(p + i, n - i) }
+    }
+
+    /// Vị trí đầu tiên của name (chữ thường) trong b[from..<to], không phân biệt hoa / thường.
+    static func find(_ name: [UInt8], in b: UnsafeMutablePointer<UInt8>, from: Int, to: Int) -> Int? {
+        guard to - from >= name.count else { return nil }
+        var s = from
+        while s + name.count <= to {
+            var k = 0
+            while k < name.count {
+                let c = b[s + k]
+                if (c >= 0x41 && c <= 0x5A ? c | 0x20 : c) != name[k] { break }
+                k += 1
+            }
+            if k == name.count { return s }
+            s += 1
+        }
+        return nil
+    }
+
+    /// Chép hai chiều tới khi hết; một chiều lỗi thì đóng cả hai cho chiều kia khỏi treo. hello != nil: gói đầu tiên
+    /// từ bên gọi (a → b) là gói bắt tay HTTPS thì chia nhỏ (vượt chặn nhà mạng).
+    private func relay(_ a: TcpSocket, _ b: TcpSocket, hello: (host: String, viaProxy: Bool)?) {
         let done = DispatchSemaphore(value: 0)
         let t = Thread { [weak self] in
-            self?.pipe(b, a)
+            self?.pipe(b, a, hello: nil)
             done.signal()
         }
         t.name = "chimto-socks-pipe"
         t.start()
-        pipe(a, b)
+        pipe(a, b, hello: hello)
         done.wait()
     }
 
-    private func pipe(_ from: TcpSocket, _ to: TcpSocket) {
+    private func pipe(_ from: TcpSocket, _ to: TcpSocket, hello: (host: String, viaProxy: Bool)?) {
         let size = 16 * 1024
         let buf = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 8)
         defer { buf.deallocate() }
         do {
+            var first = hello
             while true {
                 let n = try from.read(buf, size)
                 if n == 0 { break }
+                if let h = first {
+                    first = nil
+                    try Self.writeHello(to, buf, n, host: h.host, viaProxy: h.viaProxy)
+                    continue
+                }
                 try to.write(buf, n)
             }
             // Hết dữ liệu: báo bên kia (đóng nửa ghi); chiều ngược lại chờ tối đa 60 s im lặng rồi thôi

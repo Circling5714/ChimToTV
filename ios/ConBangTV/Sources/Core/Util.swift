@@ -113,7 +113,7 @@ func friendly(_ error: Error, proxyNote: Bool = true) -> String {
     if let e = error as? AppError { return e.message }
     if let e = error as? URLError {
         // Đang bật proxy: ghép lời nhắc (kèm lỗi phía proxy nếu có, vd sai mật khẩu)
-        return urlErrorText(e) + (proxyNote ? AppProxy.note() : "")
+        return urlErrorText(e) + (proxyNote ? AppProxy.note() : "") + unblockHint(e.code)
     }
     let ns = error as NSError
     if ns.domain == (kCFErrorDomainCFNetwork as String) {
@@ -123,6 +123,12 @@ func friendly(_ error: Error, proxyNote: Bool = true) -> String {
         return base + (proxyNote ? AppProxy.note() : "")
     }
     return error.localizedDescription
+}
+
+/// Bắt tay HTTPS hỏng / treo: hay là nhà mạng chặn theo tên trang → gợi ý bật Vượt chặn nhà mạng.
+private func unblockHint(_ code: URLError.Code) -> String {
+    guard !Prefs.unblock, [.secureConnectionFailed, .timedOut, .networkConnectionLost].contains(code) else { return "" }
+    return "\nNếu nhà mạng chặn trang này: bật Cài đặt → Vượt chặn nhà mạng."
 }
 
 private func urlErrorText(_ e: URLError) -> String {

@@ -168,4 +168,26 @@ final class Socks5Tests: XCTestCase {
         XCTAssertEqual(try roundTrip(s, "đi thẳng"), "đi thẳng")
         XCTAssertEqual(bridge.statsCopy["localhost:\(echo.port)"], [0, 1, 0])
     }
+
+    /// Vượt chặn: gói bắt tay TLS bị chia nhỏ khi qua cổng nội bộ nhưng tới đích vẫn đủ và đúng thứ tự.
+    func testSplitHelloKeepsBytes() throws {
+        let echo = echoServer()
+        defer { echo.close() }
+        let bridge = try Socks5Bridge(socks: nil, split: true, siteHosts: { [] })
+        defer { bridge.close() }
+        let s = try Socks5.connect(SocksConfig(host: "127.0.0.1", port: bridge.port), host: "Phimmoir.FUN", ip: nil, port: echo.port)
+        defer { s.close() }
+        // Giả gói ClientHello: 16 03 01 … có tên trang ở giữa
+        let hello: [UInt8] = [0x16, 0x03, 0x01, 0x00, 0x40] + Array(repeating: 0x2A, count: 30) + Array("phimmoir.fun".utf8) + Array(repeating: 0x2B, count: 25)
+        try s.write(hello)
+        s.setReadTimeout(5)
+        XCTAssertEqual(try s.readFully(hello.count), hello)
+        XCTAssertEqual(try roundTrip(s, "sau đó chuyển bình thường"), "sau đó chuyển bình thường")
+    }
+
+    func testFindName() {
+        var bytes = Array("xxPhimMoir.funyy".utf8)
+        let at = bytes.withUnsafeMutableBufferPointer { Socks5Bridge.find(Array("phimmoir.fun".utf8), in: $0.baseAddress!, from: 1, to: $0.count) }
+        XCTAssertEqual(at, 2)
+    }
 }

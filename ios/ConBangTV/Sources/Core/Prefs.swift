@@ -471,6 +471,12 @@ enum Prefs {
         set { store.set(newValue, forKey: "proxy_sites_only") }
     }
 
+    /// Vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS để nhà mạng không đọc được tên trang (xem Socks5Bridge.writeHello).
+    static var unblock: Bool {
+        get { store.bool(forKey: "unblock") }
+        set { store.set(newValue, forKey: "unblock") }
+    }
+
     /// Proxy đang dùng; nil = tắt (hoặc chưa nhập máy chủ / cổng hợp lệ).
     static func proxyConfig() -> SocksConfig? {
         guard proxyOn else { return nil }
