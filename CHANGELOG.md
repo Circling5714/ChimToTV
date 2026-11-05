@@ -6,6 +6,53 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 
 Bản iPad (iPadOS 15+, cài bằng TrollStore) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 
+## iPad 1.2 — 05/11/2026
+
+- **Proxy SOCKS5** (Cài đặt → Proxy SOCKS5), như bản TV: máy chủ / cổng / tên đăng nhập / mật khẩu (dán được
+  `socks5://tên:mật-khẩu@máy:cổng`), DNS của proxy hoặc của iPad, dùng cho toàn bộ app hoặc chỉ trang phim, nút "Kiểm tra
+  proxy" (báo IP ra ngoài). Mật khẩu lưu trong Keychain; ô mật khẩu không tự viết hoa, có nút con mắt để xem lại. Proxy
+  báo "không cho phép" thì app nói rõ "thường do sai tên đăng nhập / mật khẩu".
+- **Vượt chặn nhà mạng** (Cài đặt): vào được trang phim bị nhà mạng chặn theo tên trang mà không cần VPN; trang không vào
+  được thì app gợi ý bật. Lúc bật proxy / vượt chặn, trên iPadOS 15–16 app không giữ cookie trang web sau khi tắt app.
+- **phimmoir.fun đổi tên thành phimmois.fun:** danh sách trang, lịch sử, phim theo dõi, chỗ đang xem… tự đổi sang tên mới;
+  trang tự chuyển tên miền thì app thay tên cũ trong danh sách (không thêm trùng).
+- **Cử chỉ lúc xem:** vuốt ngang để tua (hiện giờ tới), vuốt dọc nửa trái chỉnh độ sáng / nửa phải chỉnh âm lượng, giữ tay
+  xem nhanh 2×, chụm / mở hai ngón: vừa / lấp đầy màn hình. Vuốt bắt đầu sát mép trên / dưới vẫn để cho iPad.
+- **Màn hình khoá, Trung tâm điều khiển, AirPods:** tên phim, tập, ảnh phim; phát / dừng, tua, kéo thanh thời gian, tập
+  trước / sau (AirPods chạm hai lần: tập sau).
+- **Giới hạn giờ xem** cho từng người xem (Cài đặt → Người xem → "Giới hạn giờ xem…"), như bản TV 2.1.
+- **Chọn trang phim:** thêm lại trang mẫu đã xoá, gõ tên miền để thêm trang khác, vuốt trái một trang để xoá.
+- **Tìm kiếm trên mọi trang:** trước đây chỉ ra kết quả của một trang và chậm — nay kết quả hiện dần theo từng trang,
+  tối đa 3 trang cùng lúc, mỗi trang chờ tối đa 12 giây.
+- **Hình trong hình:** vuốt lên từ mép dưới lúc phim đang phát thì chắc chắn thu nhỏ phim (lần vuốt đầu dành cho app);
+  phim dừng / chưa chạy thì vuốt lên về thẳng màn hình chính. Tên người xem luôn hiện ở đầu menu.
+- bản 1.2 (CFBundleVersion 3) · mã gói `vn.chimto.tv` · tag `ios-v1.2` · commit `52a15e9` · SHA-256 IPA
+  `fd412842d36c0f51b1242d5b49d43cf204b60b999177551d3e383dab804e2cf8`
+
+## 2.1 — 05/11/2026
+
+- **Vượt chặn nhà mạng** (Cài đặt → Vượt chặn nhà mạng): một số nhà mạng chặn trang phim bằng cách đọc tên trang lúc mở
+  kết nối HTTPS (trang mở mãi không được, dùng VPN thì vào được). Bật mục này: app chia nhỏ gói mở kết nối nên nhà mạng
+  không đọc được tên trang — không cần VPN hay proxy; dùng được cùng DNS mã hoá và proxy. Trang không vào được (quá giờ /
+  lỗi SSL) thì app gợi ý bật mục này.
+- **phimmoir.fun đổi tên thành phimmois.fun:** trang mẫu đổi theo; danh sách trang, trang đang dùng của từng người xem,
+  lịch sử, Xem tiếp, phim theo dõi, chỗ đang xem, server ưu tiên, điểm server tự đổi sang tên mới khi mở app. Trang tự
+  chuyển tên miền thì app thay tên cũ trong danh sách (trước đây thêm tên mới bên cạnh).
+- **Giới hạn giờ xem** cho từng người xem (Cài đặt → Người xem → "Giới hạn giờ xem…"): đặt **mã PIN phụ huynh**, rồi chọn
+  số phút được xem mỗi ngày (30 phút – 3 giờ) và giờ đi ngủ (không xem được tới 6 giờ sáng). Chỉ đếm lúc phim thật sự chạy;
+  còn 5 phút thì nhắc; hết giờ thì phim dừng, màn "Hết giờ xem" cho người lớn nhập mã để cho xem thêm 15 / 30 / 60 phút
+  hoặc không giới hạn tới 6 giờ sáng. Đã có giới hạn thì thêm / xoá người xem cũng cần mã phụ huynh.
+- **Đổi trang phim:** thêm "＋ Thêm lại: …" (trang mẫu đã xoá) và "＋ Thêm trang khác…" (gõ tên miền); Cài đặt có nút
+  thêm lại trang mẫu.
+- **Proxy:** proxy trả "không cho phép" khi có đăng nhập thì app báo "thường do sai tên đăng nhập / mật khẩu" (nhiều proxy
+  nhận mọi mật khẩu lúc đăng nhập rồi mới từ chối).
+- **Tìm kiếm trên mọi trang:** kết quả hiện dần theo từng trang (ghi rõ trang nào đang tìm / không có phim / không trả
+  lời); hỏi cùng lúc tối đa 3 trang, mỗi trang chờ tối đa 12 giây — một trang chậm hay bị chặn không làm chậm cả lượt tìm.
+- Mục **Người xem** luôn hiện ở đầu menu, kể cả khi mới có một người xem.
+- versionCode 19 · tag `v2.1` · commit `52a15e9` · SHA-256 APK
+  `0b7c1aad0b849a4270eebbbdb6e2fa95a0f3988a98cd4b8fe5ea2bf0c53f5d2d`
+- Cập nhật tự động 2.0 → 2.1 đã thử trên TV box (Cài đặt → "Kiểm tra cập nhật" → "Cài đặt ngay").
+
 ## iPad 1.1 — 05/11/2026
 
 - **Người xem cho cả nhà** (như bản TV 2.0): mỗi người một hồ sơ (tên + màu) với lịch sử xem, Xem tiếp, chỗ đang xem, phim

@@ -2,14 +2,14 @@
 
 ![Côn Bằng TV](design/banner-1280.png)
 
-App Android TV xem phim hoạt hình 3D (và phim bộ / phim lẻ ở phimmoir.fun) từ trang web bằng remote hoặc bàn phím
+App Android TV xem phim hoạt hình 3D (và phim bộ / phim lẻ ở phimmois.fun) từ trang web bằng remote hoặc bàn phím
 (trước đây tên là ChimTo TV — vẫn cùng một app, cài đè và tự cập nhật bình thường).
 Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, nên trang đổi tên miền chỉ cần sửa link trong **Cài đặt**.
 
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad** (iPadOS 15+, cài bằng TrollStore): [release `ios-v1.1`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.1)
+**Bản iPad** (iPadOS 15+, cài bằng TrollStore): [release `ios-v1.2`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.2)
 — xem mục [Bản iPad](#bản-ipad).
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -26,15 +26,17 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | hoathinh3d.ee | HaLim, chia Việt Sub / Thuyết Minh | `player.php` → iframe |
 | hhkungfu.ee | HaLim, chia Vietsub / Thuyết Minh | `player.php` → iframe |
 | hoathinh3d.pw | HaLimMovies | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
-| phimmoir.fun | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
+| phimmois.fun (trước là phimmoir.fun) | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
 
 **Tìm kiếm** (từ 1.9.1) tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm, trang đang dùng đứng đầu.
 
 App không viết riêng cho từng trang mà nhận dạng theo mẫu giao diện, nên trang khác cùng kiểu (yanhh3d / theme HaLim /
-Next.js kiểu PhimMoi) thường cũng chạy: nhập tên miền trong **Cài đặt** → **Lưu** → **Kiểm tra kết nối**. Trang nào
-không có `player.php` thì app tự mở trang tập và phóng trình phát ra toàn màn hình.
+Next.js kiểu PhimMoi) thường cũng chạy: **Đổi trang phim** → **＋ Thêm trang khác…** rồi gõ tên miền (từ 2.1), hoặc nhập
+tên miền trong **Cài đặt** → **Lưu** → **Kiểm tra kết nối**. Trang mẫu đã xoá thì thêm lại bằng **＋ Thêm lại: …** ở cuối
+danh sách (iPad: mục "Thêm trang"; vuốt trái một trang để xoá). Trang nào không có `player.php` thì app tự mở trang tập
+và phóng trình phát ra toàn màn hình.
 
-phimmoir.fun là trang tổng hợp: ngoài hoạt hình 3D (khối "Hoạt hình Trung Quốc mới cập nhật" đầu trang chủ) còn phim
+phimmois.fun là trang tổng hợp: ngoài hoạt hình 3D (khối "Hoạt hình Trung Quốc mới cập nhật" đầu trang chủ) còn phim
 bộ / phim lẻ Hàn, Trung, Âu Mỹ, Nhật, Thái. Menu có Hoạt hình, Phim bộ mới, Phim lẻ mới, 5 mục theo nước, 10 thể
 loại trên menu của trang, và **Thể loại…** / **Quốc gia…** (từ 1.9.1) để chọn trong đủ danh sách của bộ lọc. Server: **KK Phim** (nhanh nhất), **NguonC**
 (app tự bỏ qua quảng cáo trước phim), **HD** (bản Song Ngữ, có phụ đề tiếng Việt), OPhim (đang hỏng).
@@ -61,12 +63,19 @@ chính của bản TV, điều khiển bằng chạm:
   đầu, tốc độ, khung hình, hẹn giờ tắt, mở trang web của tập.
 - **Bàn phím rời:** Space / K dừng–phát, ◀ ▶ (J / L) tua (giữ để tua nhanh), ▲ hiện thanh, ▼ / M menu, N / P tập
   sau / trước, số 0–9 nhảy tới 0–90%, Esc thoát / đóng menu; trong Duyệt web Esc = lùi trang.
+- **Cử chỉ lúc xem** (từ 1.2): vuốt ngang để tua (giữa màn hình hiện giờ tới và quãng tua; cả bề ngang = 2 phút),
+  vuốt dọc nửa trái chỉnh độ sáng / nửa phải chỉnh âm lượng, giữ tay xem nhanh 2× tới khi nhấc tay, chụm / mở hai
+  ngón: vừa / lấp đầy màn hình. Vuốt bắt đầu sát mép trên / dưới vẫn để cho iPad; rời trình phát thì độ sáng trở lại.
+- **Màn hình khoá, Trung tâm điều khiển, AirPods** (từ 1.2): tên phim, tập, ảnh phim; phát / dừng, tua, kéo thanh thời
+  gian, tập trước / sau (AirPods chạm hai lần: tập sau).
+- **Proxy SOCKS5, Vượt chặn nhà mạng, Giới hạn giờ xem** (từ 1.2): như bản TV — xem [Proxy SOCKS5](#proxy-socks5),
+  [Vượt chặn nhà mạng](#vượt-chặn-nhà-mạng-từ-21), [Giới hạn giờ xem](#giới-hạn-giờ-xem-từ-21).
 - **Người xem / hình trong hình** (từ 1.1, như bản TV 2.0 — xem [Người xem](#người-xem-từ-20) và
   [Thu nhỏ phim](#thu-nhỏ-phim--hình-trong-hình-từ-20)): mở app chọn "Ai đang xem?", mã PIN gõ trên bàn phím số của màn
   hình; nút thu nhỏ cạnh nút Menu của trình phát → phim chạy tiếp ở cửa sổ nổi của iPad (cửa sổ có nút phóng to / đóng);
   vuốt về màn hình chính lúc đang xem là tự thu nhỏ (Cài đặt → Phát video).
-- **Khác bản TV:** chưa có proxy SOCKS5 và DNS mã hoá (iOS 15 không cho app đặt proxy riêng cho WKWebView — cần thì
-  dùng VPN / hồ sơ DNS của iPad); không có con trỏ ảo (chạm thẳng vào trang web).
+- **Khác bản TV:** chưa có DNS mã hoá (cần thì dùng hồ sơ DNS của iPad); không có con trỏ ảo (chạm thẳng vào trang
+  web). Lúc bật proxy / vượt chặn, trên iPadOS 15–16 app không giữ cookie của trang web sau khi tắt app.
 
 ## Phím điều khiển
 
@@ -112,6 +121,19 @@ TV / iPad dùng chung cả nhà: mỗi người một hồ sơ, chọn ở màn 
   người lớn, không phải mật khẩu bảo mật.
 - Đổi người lúc phim đang thu nhỏ: app lưu chỗ xem cho người cũ rồi đóng phim đó.
 
+## Giới hạn giờ xem (từ 2.1)
+
+**Cài đặt → Người xem → Giới hạn giờ xem…** (iPad từ 1.2): lần đầu đặt **mã PIN phụ huynh** (4 số, nhập hai lần — khác mã
+PIN của từng người xem), rồi chọn cho từng người:
+
+- **Mỗi ngày được xem:** không giới hạn, 30 / 45 phút, 1 giờ, 1 giờ 30 phút, 2 giờ, 3 giờ — chỉ đếm lúc phim thật sự chạy
+  (không tính lúc dừng, lúc chờ tải); sang ngày mới đếm lại.
+- **Giờ đi ngủ:** 19:30 – 23:00 — từ giờ đó tới 6 giờ sáng không xem được.
+- Còn 5 phút thì trình phát nhắc; hết giờ thì phim dừng, màn **Hết giờ xem**: người lớn nhập mã phụ huynh để cho xem thêm
+  15 / 30 / 60 phút hoặc không giới hạn tới 6 giờ sáng, không thì **Thoát** (chọn sẵn để trẻ khỏi bấm nhầm).
+- Đã có giới hạn thì thêm / xoá người xem cũng phải nhập mã phụ huynh (khỏi lách bằng hồ sơ mới); xoá mã phụ huynh chỉ
+  được khi không còn ai bị giới hạn. Người lớn nên đặt mã PIN cho hồ sơ của mình để trẻ không chuyển sang được.
+
 ## Thu nhỏ phim / hình trong hình (từ 2.0)
 
 Lúc xem nhấn ▼ → **Thu nhỏ vào góc** (hoặc phím Window của remote): phim chạy tiếp ở góc màn hình, vẫn chọn phim khác.
@@ -139,7 +161,8 @@ Lúc xem nhấn ▼ → **Thu nhỏ vào góc** (hoặc phím Window của remot
 
 ## Khi trang thay đổi
 
-- **Đổi tên miền**: Cài đặt → nhập tên miền mới → Lưu (nút "Kiểm tra kết nối" cho biết đọc được bao nhiêu phim). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật.
+- **Đổi tên miền**: Cài đặt → nhập tên miền mới → Lưu (nút "Kiểm tra kết nối" cho biết đọc được bao nhiêu phim). Nếu tên miền cũ tự chuyển hướng, app tự thay tên cũ bằng tên mới trong danh sách (từ 2.1). Tên cũ bị nhà mạng chặn thì app không thấy chuyển hướng: bật **Vượt chặn nhà mạng** rồi mở lại trang cũ, hoặc gõ tên mới. Trang đã biết là đổi hẳn tên miền (phimmoir.fun → phimmois.fun, 11/2026) được app tự đổi trong mọi dữ liệu đã lưu khi mở app.
+- **Trang mở mãi không được, dùng VPN thì vào được**: nhà mạng chặn theo tên trang — bật **Cài đặt → Vượt chặn nhà mạng** (từ 2.1).
 - **Video không chạy / hay giật**: trong lúc xem nhấn ▼ → chọn server khác. App nhớ server chọn lần cuối và chấm điểm
   từng server theo những lần xem trên chính TV đó (mở mất bao lâu, giật nhiều hay ít). Server đang giật nhiều thì app
   gợi ý server khác cùng ngôn ngữ, nhấn OK để chuyển. Báo "TV rớt …% khung hình" nghĩa là TV xử lý không kịp, đổi
@@ -148,9 +171,19 @@ Lúc xem nhấn ▼ → **Thu nhỏ vào góc** (hoặc phím Window của remot
   "không đọc được phim" = vào được nhưng không có danh sách phim (có thể là trang chặn của nhà mạng).
 - **Trang đổi giao diện** (app không đọc được danh sách): dùng mục **Duyệt web** để xem bằng con trỏ.
 
+## Vượt chặn nhà mạng (từ 2.1)
+
+**Cài đặt → Vượt chặn nhà mạng** (iPad từ 1.2, mặc định tắt). Một số nhà mạng chặn trang phim bằng cách đọc **tên trang**
+trong gói đầu tiên của kết nối HTTPS (TLS ClientHello, phần SNI): kết nối tới địa chỉ thì được nhưng bắt tay HTTPS treo
+rồi đứt, đổi DNS / DNS mã hoá không đỡ, dùng VPN thì vào được (đo ở mạng nhà 11/2026: phimmoir.fun treo 15 giây rồi lỗi,
+cùng địa chỉ với tên trang khác thì vào ngay). Bật mục này: mọi kết nối của app đi qua cổng nội bộ (như proxy), gói bắt
+tay đầu tiên được chia nhỏ — gửi riêng byte đầu, tên trang thành từng mẩu 2 byte — nên máy soi của nhà mạng không đọc
+được tên trang; trang web nhận đủ, đúng thứ tự. Không cần VPN hay proxy; dùng được cùng DNS mã hoá và proxy. Trang không
+vào được (quá giờ / lỗi SSL) thì app gợi ý bật mục này.
+
 ## Proxy SOCKS5
 
-**Cài đặt → Proxy SOCKS5** (từ 1.8.0, mặc định tắt):
+**Cài đặt → Proxy SOCKS5** (từ 1.8.0, mặc định tắt; iPad từ 1.2):
 
 - Nhập máy chủ, cổng, tên đăng nhập / mật khẩu (bỏ trống nếu proxy không cần), hoặc dán nguyên
   `socks5://user:pass@máy-chủ:cổng`. **Kiểm tra proxy** thử ngay (chưa cần lưu): báo IP ra ngoài, nơi đặt máy, thời
@@ -160,8 +193,10 @@ Lúc xem nhấn ▼ → **Thu nhỏ vào góc** (hoặc phím Window của remot
 - **Dùng cho: toàn bộ app** (trang, ảnh, video, kiểm tra cập nhật) / **chỉ trang phim** (chỉ các trang trong danh sách;
   video, ảnh từ CDN, GitHub đi thẳng mạng nhà — đỡ tốn proxy).
 - Proxy lỗi (chết, sai mật khẩu) thì app báo rõ, **không tự đi thẳng**; màn hình chính ghi "· proxy" khi đang bật.
-  Máy chủ video có thể chặn IP của proxy (đã gặp với CDN của KK Phim trên phimmoir.fun): video lỗi khi bật proxy thì
-  chọn "chỉ trang phim".
+  Nhiều proxy nhận mọi mật khẩu ở bước đăng nhập rồi mới từ chối mở kết nối ("không cho phép") — app báo "thường do sai
+  tên đăng nhập / mật khẩu" (từ 2.1). Máy chủ video có thể chặn IP của proxy (đã gặp với CDN của KK Phim trên
+  phimmois.fun): video lỗi khi bật proxy thì chọn "chỉ trang phim".
+- **iPad** (từ 1.2): mật khẩu lưu trong Keychain; ô mật khẩu không tự viết hoa, nút con mắt để xem lại chữ đã gõ.
 - Mật khẩu proxy (từ 1.9.1) lưu mã hoá bằng khoá trong Android Keystore — chép được file dữ liệu của app cũng không
   đọc được; Android 5 vẫn lưu chữ thường trong bộ nhớ riêng của app.
 
@@ -264,7 +299,7 @@ một chất lượng, đoạn 10–19 s ngụy trang ảnh PNG trên CDN). JW �
 `maxMaxBufferLength = 1` (chỉ tải trước một đoạn). `player-agent.js` bọc `jwplayer(...).setup`, chạy `onHlsInit` của
 trang rồi đặt `maxBufferLength` 120 s, bỏ qua lệnh ép < 10 s; agent báo `ahead` (giây đã tải trước) để đo.
 
-Trang Next.js (từ 1.7, phimmoir.fun — `NextSite.kt`): không đọc HTML mà đọc dữ liệu trong các đoạn
+Trang Next.js (từ 1.7, phimmoir.fun, nay phimmois.fun — `NextSite.kt`): không đọc HTML mà đọc dữ liệu trong các đoạn
 `self.__next_f.push([1,"…"])` của trang (phim, đủ danh sách tập theo từng ngôn ngữ, server, link video). Server cho link
 `.m3u8` (KK Phim, server HD của trang) → `PlayerActivity` dựng `assets/hls.html` (origin = địa chỉ tập) với hls.js
 1.5.20 light đóng kèm (`assets/hls.light.min.js`, trả ở đường dẫn `/__chimto/hls.js`), agent nằm ngay trong trang,
@@ -282,6 +317,22 @@ bộ đăng nhập proxy thật (RFC 1929), gửi tên miền (DNS của proxy) 
 độ "chỉ trang phim" cho đích khác đi thẳng. Đổi cài đặt → mở cổng mới, đóng kết nối cũ (kết nối keep-alive không giữ
 cài đặt cũ). Điểm server khi video đi qua proxy chấm riêng (`<trang>·proxy`). Test:
 `.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.Socks5BridgeTest` (proxy SOCKS5 giả trong test).
+
+Vượt chặn nhà mạng (từ 2.1 — `Socks5Bridge.writeHello` trong `Socks5.kt` / `Socks5.swift`): `RouteConfig.split` →
+cổng nội bộ chạy cả khi không có proxy / DoH; gói đầu tiên bên gọi gửi lên (bắt đầu `16 03` = TLS handshake) được ghi
+thành: byte đầu, đoạn tới tên trang, tên trang từng 2 byte (tìm không phân biệt hoa / thường), phần còn lại — mỗi lần ghi
+một gói nhờ `tcpNoDelay`; qua proxy thì chờ 40 ms sau byte đầu. Đo bằng bộ chuyển tiếp thử trên máy tính (`curl
+--connect-to`): gửi nguyên / cắt 2–3 mẩu lớn → bị chặn, tách byte đầu (không cần chờ) hoặc mẩu 2 byte → lọt. Trang đổi
+tên miền hẳn: `MOVED_HOSTS` / `movedHosts` + `migrateMovedHosts()` (đổi tên cũ → mới trong mọi khoá và giá trị đã lưu,
+khoá tên mới đã có thì giữ); `home.movedTo` gọi `Prefs.replaceSite`. Test: `ProfilesTest`, iPad `Socks5Tests`,
+`MovedHostsTests`.
+
+Giới hạn giờ xem (từ 2.1 — `WatchLimit.kt` / `WatchLimit.swift`, giao diện TV `ProfileUi.limits` / `grant`, iPad
+`LimitViews.swift`): khoá riêng từng người xem `limit_min`, `bedtime`, `watch_day`, `watch_sec`, `watch_extra`,
+`unblock_until`; mã phụ huynh `parent_pin` (băm SHA-256). Trình phát gọi `WatchLimit.tick` mỗi lần đọc trạng thái (phim
+chạy, không chờ tải; bỏ khoảng hở > 3 s), ghi xuống mỗi 30 s và khi rời trình phát / đổi người. Cho xem thêm: hết phút →
+cộng `watch_extra`; giờ đi ngủ → `unblock_until`. Test: `.\gradlew.bat :app:testDebugUnitTest --tests
+vn.chimto.tv.WatchLimitTest`, iPad `WatchLimitTests`.
 
 Riêng tư (từ 1.8.1 — `Privacy.kt`, `BrowsingData.kt`): User-Agent rút gọn lấy số bản chính Chrome từ UA của WebView
 (lưu ở `Prefs.userAgent` để `Http.kt` dùng ngay khi mở app), áp cho mọi WebView kèm `UserAgentMetadata` (brand
@@ -352,6 +403,15 @@ chèn ở khung trên cùng (bỏ thẻ `/__chimto/hls.js`). WKWebView trên iPa
 JW Player trên Safari không tự tải trước video → app tự gửi lệnh phát khi trình phát đứng chờ chưa có dữ liệu; JW giữ khung
 16:9 → `WebSetup.fillCss` phóng `.jwplayer` kín iframe, nền trang nhúng đen (màn iPad ≈ 4:3). Chặn quảng cáo bằng
 `WKContentRuleList`. Test lõi: `CoreTests` (macOS, chạy trên CI).
+
+iPad từ 1.2: proxy / vượt chặn dùng cổng SOCKS5 nội bộ viết lại bằng Swift (`Core/Socks5.swift`, socket POSIX + mỗi kết
+nối một luồng, `SO_NOSIGPIPE`); URLSession đi qua cổng bằng `connectionProxyDictionary` (khoá SOCKS); WKWebView trên
+iPadOS 15–16 qua API ẩn của WebKit (`Player/WebKitSPI.m`: `_WKWebsiteDataStoreConfiguration initNonPersistentConfiguration`
++ `setProxyConfiguration:` + `-[WKWebsiteDataStore _initWithConfiguration:]` — kho dữ liệu không lưu xuống máy, app cài
+bằng TrollStore nên dùng được), iPadOS 17+ dùng `proxyConfigurations` công khai. Đo trên iPad thật: trang nhúng, đoạn
+video HLS (CDN TikTok) và video KK đều đi qua cổng. Màn hình khoá: agent đặt `navigator.mediaSession` (WebKit tự đưa lên
+màn hình khoá / AirPods) — tên phim do app gửi bằng lệnh `meta`, tập trước / sau báo ngược qua trạng thái (`rs` / `rc`).
+Cử chỉ: `TouchCatcher` trong `PlayerView.swift`; âm lượng qua thanh trượt của `MPVolumeView` gần như trong suốt.
 
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server
