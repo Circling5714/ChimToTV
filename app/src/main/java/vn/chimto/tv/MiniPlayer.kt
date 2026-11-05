@@ -82,6 +82,8 @@ object MiniPlayer {
         val radius = a.dp(10).toFloat()
         val f = FrameLayout(a).apply {
             setBackgroundColor(Color.BLACK)
+            // Trình phát (có FLAG_KEEP_SCREEN_ON) đang ẩn: khung phim nhỏ tự giữ màn hình sáng, khỏi bật bảo vệ màn hình
+            keepScreenOn = true
             isFocusable = false
             descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
             outlineProvider = object : ViewOutlineProvider() {
