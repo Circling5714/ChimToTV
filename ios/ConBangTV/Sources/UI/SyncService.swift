@@ -175,7 +175,8 @@ final class SyncService: ObservableObject {
             guard let self = self else { return }
             var b = buf
             if let d = data { b.append(d) }
-            if let req = SyncHTTP.parseRequest(b) {
+            if var req = SyncHTTP.parseRequest(b) {
+                req.remoteHost = SyncHTTP.host(of: c)
                 Task { @MainActor in
                     let resp = await self.handle(req)
                     self.queue.async { c.send(content: resp, completion: .contentProcessed { _ in c.cancel() }) }
@@ -195,7 +196,7 @@ final class SyncService: ObservableObject {
                                                  "platform": Self.platform, "version": UpdateCheck.currentVersion,
                                                  "pairing": pairCode != nil])
         case ("POST", "/pair"):
-            return pairRequest(r.body)
+            return pairRequest(r.body, back: SyncHTTP.callback(r))
         case ("POST", "/sync"):
             guard let id = r.headers["x-device"], let peer = peers.first(where: { $0.id == id }) else {
                 return SyncHTTP.response(403, json: ["error": "unpaired"])
@@ -205,10 +206,16 @@ final class SyncService: ObservableObject {
                 return SyncHTTP.response(400, json: ["error": "json"])
             }
             let changed = absorb(remote)
+            let back = SyncHTTP.callback(r)
             updatePeer(id) {
                 $0.name = remote.name
                 $0.last = nowMs()
                 $0.status = changed ? "Đã nhận dữ liệu mới" : "Đã khớp"
+                // Nhớ địa chỉ máy kia để tự gọi lại (khác lớp mạng thì Bonjour không thấy)
+                if let b = back {
+                    $0.host = b.host
+                    $0.port = b.port
+                }
             }
             if changed { AppModel.shared.syncApplied() }
             let body = (try? JSONEncoder().encode(payload())) ?? Data()
@@ -218,7 +225,7 @@ final class SyncService: ObservableObject {
         }
     }
 
-    private func pairRequest(_ body: Data) -> Data {
+    private func pairRequest(_ body: Data, back: (host: String, port: Int)?) -> Data {
         guard let code = pairCode else { return SyncHTTP.response(403, json: ["error": "closed"]) }
         guard let o = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any],
               let device = o["device"] as? String, !device.isEmpty, let given = o["code"] as? String else {
@@ -232,7 +239,7 @@ final class SyncService: ObservableObject {
         }
         let token = SyncHTTP.randomToken()
         let peer = SyncPeer(id: device, name: (o["name"] as? String) ?? "Máy khác", platform: (o["platform"] as? String) ?? "",
-                            token: token, host: nil, port: nil, last: nil, status: "Vừa ghép")
+                            token: token, host: back?.host, port: back?.port, last: nil, status: "Vừa ghép")
         peers.removeAll { $0.id == device }
         peers.append(peer)
         savePeers()
@@ -403,6 +410,18 @@ enum SyncHTTP {
 
     static func parseRequest(_ data: Data) -> Message? { parse(data, request: true) }
 
+    /// Địa chỉ máy bên kia của kết nối (IPv6 cục bộ giữ cả "%en0").
+    static func host(of c: NWConnection) -> String? {
+        if case let .hostPort(host, _)? = c.currentPath?.remoteEndpoint { return "\(host)" }
+        return nil
+    }
+
+    /// Máy gọi tới báo cổng của nó (X-Port) → địa chỉ để gọi lại.
+    static func callback(_ m: Message) -> (host: String, port: Int)? {
+        guard let h = m.remoteHost, let p = Int(m.headers["x-port"] ?? ""), p > 0 else { return nil }
+        return (h, p)
+    }
+
     static func sign(_ token: String, time: String, body: Data) -> String {
         var d = Data("\(time)\n".utf8)
         d.append(body)
@@ -440,8 +459,9 @@ enum SyncHTTP {
     /// Gửi một yêu cầu tới máy kia (thẳng trong mạng nhà, không qua proxy), chờ tối đa 8 giây.
     static func send(_ ep: NWEndpoint, method: String, path: String, body: Data, token: String? = nil,
                      queue: DispatchQueue) async throws -> Message {
+        // X-Port: cổng của máy này — máy kia nhớ địa chỉ + cổng để gọi lại
         var head = "\(method) \(path) HTTP/1.1\r\nHost: conbangtv\r\nContent-Type: application/json\r\n" +
-            "Content-Length: \(body.count)\r\nConnection: close\r\n"
+            "Content-Length: \(body.count)\r\nConnection: close\r\nX-Port: \(SyncService.port)\r\n"
         if let t = token {
             let time = String(nowMs())
             head += "X-Device: \(Prefs.deviceId)\r\nX-Time: \(time)\r\nX-Sig: \(sign(t, time: time, body: body))\r\n"
@@ -483,11 +503,7 @@ enum SyncHTTP {
             var b = buf
             if let d = data { b.append(d) }
             if var m = parse(b, request: false) {
-                if case let .hostPort(host, _)? = c.currentPath?.remoteEndpoint {
-                    var h = "\(host)"
-                    if let pct = h.firstIndex(of: "%") { h = String(h[..<pct]) } // bỏ "%en0" của IPv6
-                    m.remoteHost = h
-                }
+                m.remoteHost = host(of: c)
                 finish(.success(m))
             } else if let e = error {
                 finish(.failure(e))

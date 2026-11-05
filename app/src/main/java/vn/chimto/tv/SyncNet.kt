@@ -260,7 +260,10 @@ object SyncNet {
             try {
                 sock.soTimeout = 10_000
                 val req = Http1.read(sock.getInputStream(), request = true) ?: return
-                val resp = handle(req)
+                // Máy gọi tới báo cổng của nó (X-Port) → nhớ địa chỉ để TV tự gọi lại (khác lớp mạng thì NSD không thấy)
+                val port = req.headers["x-port"]?.toIntOrNull()?.takeIf { it > 0 }
+                val back = port?.let { p -> sock.inetAddress?.hostAddress?.let { it to p } }
+                val resp = handle(req, back)
                 sock.getOutputStream().apply {
                     write(resp)
                     flush()
@@ -271,11 +274,11 @@ object SyncNet {
         }
     }
 
-    private fun handle(r: Http1.Message): ByteArray = when {
+    private fun handle(r: Http1.Message, back: Pair<String, Int>?): ByteArray = when {
         r.method == "GET" && r.path == "/hello" -> Http1.response(200, JSONObject()
             .put("app", "conbangtv").put("device", Prefs.deviceId).put("name", deviceName).put("platform", PLATFORM)
             .put("version", BuildConfig.VERSION_NAME).put("pairing", pairCode != null).toString().toByteArray())
-        r.method == "POST" && r.path == "/pair" -> pairRequest(r.body)
+        r.method == "POST" && r.path == "/pair" -> pairRequest(r.body, back)
         r.method == "POST" && r.path == "/sync" -> {
             val peer = peers.firstOrNull { it.id == r.headers["x-device"] }
             when {
@@ -286,7 +289,8 @@ object SyncNet {
                     val changed = absorb(remote)
                     updatePeer(peer.id) {
                         it.copy(name = remote.name, last = System.currentTimeMillis(),
-                            status = if (changed) "Đã nhận dữ liệu mới" else "Đã khớp")
+                            status = if (changed) "Đã nhận dữ liệu mới" else "Đã khớp",
+                            host = back?.first ?: it.host, port = back?.second ?: it.port)
                     }
                     if (changed) mainHandler.post { onApplied?.invoke() }
                     Http1.response(200, payload().toJson().toByteArray(), peer.token)
@@ -299,7 +303,7 @@ object SyncNet {
     }
 
     @Synchronized
-    private fun pairRequest(body: ByteArray): ByteArray {
+    private fun pairRequest(body: ByteArray, back: Pair<String, Int>?): ByteArray {
         val code = pairCode ?: return Http1.json(403, "closed")
         val o = try {
             JSONObject(String(body))
@@ -318,7 +322,7 @@ object SyncNet {
         }
         val token = Http1.randomToken()
         val name = o.optString("name").ifEmpty { "Máy khác" }
-        addPeer(SyncPeer(device, name, o.optString("platform"), token, status = "Vừa ghép"))
+        addPeer(SyncPeer(device, name, o.optString("platform"), token, back?.first, back?.second ?: 0, status = "Vừa ghép"))
         pairCode = "%04d".format(SecureRandom().nextInt(10000)) // mã dùng một lần
         pairTries = 0
         changed()
@@ -530,8 +534,9 @@ object Http1 {
         Socket(Proxy.NO_PROXY).use { s ->
             s.connect(InetSocketAddress(host, port), 5000)
             s.soTimeout = 8000
+            // X-Port: cổng của TV — máy kia nhớ địa chỉ + cổng để gọi lại
             val sb = StringBuilder("$method $path HTTP/1.1\r\nHost: conbangtv\r\nContent-Type: application/json\r\n")
-                .append("Content-Length: ${body.size}\r\nConnection: close\r\n")
+                .append("Content-Length: ${body.size}\r\nConnection: close\r\nX-Port: ${SyncNet.port}\r\n")
             if (token != null) {
                 val time = System.currentTimeMillis().toString()
                 sb.append("X-Device: ${Prefs.deviceId}\r\nX-Time: $time\r\nX-Sig: ${sign(token, time, body)}\r\n")
