@@ -15,7 +15,6 @@ import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import java.util.concurrent.Executors
 import kotlin.math.max
 
 /**
@@ -497,9 +496,13 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    /** Một lần tìm mọi trang: trang nào trả lời trước hiện trước (rows = các hàng kết quả đã hiện, không kể ghi chú). */
-    private class SearchRun(val token: Int, val query: String, hosts: List<String>) {
-        val pending = hosts.toMutableList()
+    /**
+     * Một lần tìm mọi trang. queue: trang chưa hỏi (theo thứ tự danh sách, trang đang dùng trước); running: trang đang hỏi
+     * (tối đa SEARCH_AT_ONCE); rows = các hàng kết quả đã hiện (không kể dòng ghi chú).
+     */
+    private class SearchRun(val token: Int, val query: String, sites: List<String>) {
+        val queue = ArrayDeque(sites)
+        val running = ArrayList<String>()
         val empty = ArrayList<String>()
         val failed = ArrayList<String>()
         val rows = ArrayList<GridRow>()
@@ -508,13 +511,16 @@ class MainActivity : BaseActivity() {
     private var searchRun: SearchRun? = null
 
     private companion object {
-        /** Mỗi trang một luồng (luồng chung của app chỉ có 3, còn để tải ảnh bìa). */
-        val searchPool by lazy { Executors.newFixedThreadPool(5) }
+        /** Hỏi cùng lúc tối đa 3 trang (TV box yếu: mỗi trang một kết nối HTTPS + đọc HTML). */
+        const val SEARCH_AT_ONCE = 3
+
+        /** Mỗi trang chờ tối đa 12 giây kể từ lúc bắt đầu hỏi trang đó (không vào được thì thôi, nhường chỗ trang khác). */
+        const val SEARCH_TIMEOUT = 12_000L
     }
 
     /**
-     * Tìm cùng lúc trên mọi trang trong danh sách: kết quả trang nào về trước hiện trước (không chờ trang chậm / không
-     * vào được), dòng cuối ghi trang đang tìm / không có phim / không trả lời. Quá 12 giây thì thôi chờ trang đó.
+     * Tìm trên mọi trang trong danh sách, cùng lúc tối đa 3 trang: kết quả trang nào về trước hiện trước (không chờ trang
+     * chậm / không vào được), dòng cuối ghi trang đang tìm / không có phim / không trả lời.
      */
     private fun doSearch() {
         val q = search.text.toString().trim()
@@ -525,38 +531,45 @@ class MainActivity : BaseActivity() {
         nextUrl = null
         gridAdapter.clear()
         val sites = (listOf(Prefs.baseUrl) + Prefs.sites).distinct()
-        val run = SearchRun(t, q, sites.map { Site.hostOf(it) ?: it })
+        val run = SearchRun(t, q, sites)
         searchRun = run
         status.loading("Đang tìm «$q» trên ${sites.size} trang…")
-        for (base in sites) {
-            val host = Site.hostOf(base) ?: base
-            searchPool.execute {
-                val r = runCatching { Site.search(q, base) }
-                mainHandler.post { if (!isFinishing && !isDestroyed) siteSearched(run, host, r) }
-            }
-        }
-        mainHandler.postDelayed({
-            if (searchRun !== run || token != run.token || run.pending.isEmpty() || isFinishing || isDestroyed) return@postDelayed
-            run.failed += run.pending
-            run.pending.clear()
-            showSearch(run, emptyList())
-        }, 12_000)
+        startSearches(run)
     }
 
-    private fun siteSearched(run: SearchRun, host: String, r: Result<FilmPage>) {
-        if (searchRun !== run || token != run.token || host !in run.pending) return // lần tìm khác / về quá muộn
-        run.pending -= host
-        val films = r.getOrNull()?.let { p -> (p.films + p.sections.flatMap { it.films }).distinctBy { it.url } }
+    private fun searchLive(run: SearchRun) = searchRun === run && token == run.token && !isFinishing && !isDestroyed
+
+    /** Hỏi tiếp các trang đang chờ cho tới khi đủ SEARCH_AT_ONCE trang đang hỏi. */
+    private fun startSearches(run: SearchRun) {
+        while (run.running.size < SEARCH_AT_ONCE && run.queue.isNotEmpty()) {
+            val base = run.queue.removeFirst()
+            val host = Site.hostOf(base) ?: base
+            run.running += host
+            // Luồng riêng mỗi trang: trang quá giờ (kết nối còn treo tới khi Http hết thời gian chờ) không giữ chỗ trang khác
+            Thread {
+                val r = runCatching { Site.search(run.query, base) }
+                mainHandler.post { siteSearched(run, host, r) }
+            }.apply { isDaemon = true }.start()
+            mainHandler.postDelayed({ siteSearched(run, host, null) }, SEARCH_TIMEOUT)
+        }
+    }
+
+    /** Một trang trả lời (r) hoặc quá giờ (r = null). Về muộn sau khi đã quá giờ / lần tìm khác thì bỏ. */
+    private fun siteSearched(run: SearchRun, host: String, r: Result<FilmPage>?) {
+        if (!searchLive(run) || !run.running.remove(host)) return
+        val films = r?.getOrNull()?.let { p -> (p.films + p.sections.flatMap { it.films }).distinctBy { it.url } }
         when {
             films == null -> run.failed += host
             films.isEmpty() -> run.empty += host
         }
+        startSearches(run)
         showSearch(run, if (films.isNullOrEmpty()) emptyList() else listOf(HeaderRow("$host — ${films.size} phim")) + films.map { FilmRow(it) })
     }
 
     private fun showSearch(run: SearchRun, added: List<GridRow>) {
         val notes = ArrayList<String>()
-        if (run.pending.isNotEmpty()) notes += "Đang tìm: ${run.pending.joinToString(", ")}…"
+        val waiting = run.running + run.queue.map { Site.hostOf(it) ?: it }
+        if (waiting.isNotEmpty()) notes += "Đang tìm: ${waiting.joinToString(", ")}…"
         if (run.empty.isNotEmpty()) notes += "Không có phim: ${run.empty.joinToString(", ")}"
         if (run.failed.isNotEmpty()) notes += "Không trả lời: ${run.failed.joinToString(", ")}"
         val note = notes.takeIf { it.isNotEmpty() }?.let { NoteRow(it.joinToString("   ·   ")) }
@@ -565,7 +578,7 @@ class MainActivity : BaseActivity() {
         if (run.rows.isEmpty()) {
             val text = notes.joinToString("\n")
             when {
-                run.pending.isNotEmpty() -> status.loading("Đang tìm «${run.query}»…\n$text")
+                waiting.isNotEmpty() -> status.loading("Đang tìm «${run.query}»…\n$text")
                 run.empty.isEmpty() -> status.message("Không tìm được — các trang không trả lời.\n${notes.joinToString("\n")}", ::doSearch)
                 else -> status.message("Không tìm thấy phim nào tên «${run.query}».\n$text")
             }

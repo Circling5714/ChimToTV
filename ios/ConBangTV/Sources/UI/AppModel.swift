@@ -392,50 +392,72 @@ final class AppModel: ObservableObject {
 
     // MARK: - Tìm mọi trang
 
-    /// Một lần tìm mọi trang (bản Android: MainActivity.SearchRun).
+    /// Một lần tìm mọi trang (bản Android: MainActivity.SearchRun). queue: trang chưa hỏi (trang đang dùng trước);
+    /// running: trang đang hỏi (tối đa searchAtOnce).
     private struct SearchRun {
         let token: Int
         let query: String
-        var pending: [String]
+        var queue: [String]
+        var running: [String] = []
         var empty: [String] = []
         var failed: [String] = []
         var found: [GridSection] = []
     }
 
     private var searchRun: SearchRun?
+    /// Truy vấn đang chạy (tìm lượt mới thì huỷ hết — URLSession huỷ luôn kết nối).
+    private var searchTasks: [Task<Void, Never>] = []
 
-    /// Tìm cùng lúc trên mọi trang trong danh sách: kết quả trang nào về trước hiện trước (không chờ trang chậm / không vào
-    /// được), dòng cuối ghi trang đang tìm / không có phim / không trả lời. Quá 12 giây thì thôi chờ trang đó.
+    /// Hỏi cùng lúc tối đa 3 trang; mỗi trang chờ tối đa 12 giây kể từ lúc bắt đầu hỏi trang đó.
+    private static let searchAtOnce = 3
+    private static let searchTimeout = 12.0
+
+    /// Tìm trên mọi trang trong danh sách, cùng lúc tối đa 3 trang: kết quả trang nào về trước hiện trước (không chờ trang
+    /// chậm / không vào được), dòng cuối ghi trang đang tìm / không có phim / không trả lời.
     func doSearch() {
         let q = searchText.trimmed
         guard !q.isEmpty else { return }
         title = "Tìm: \(q) (mọi trang)"
         token += 1
-        let t = token
         nextUrl = nil
         sections = []
+        searchTasks.forEach { $0.cancel() }
+        searchTasks = []
         let sites = ([Prefs.baseUrl] + Prefs.sites).distinct { $0 }
-        searchRun = SearchRun(token: t, query: q, pending: sites.map { Site.hostOf($0) ?? $0 })
+        searchRun = SearchRun(token: token, query: q, queue: sites)
         status = .loading("Đang tìm «\(q)» trên \(sites.count) trang…")
         retry = { [weak self] in self?.doSearch() }
-        for base in sites {
+        startSearches()
+    }
+
+    /// Hỏi tiếp các trang đang chờ cho tới khi đủ searchAtOnce trang đang hỏi.
+    private func startSearches() {
+        guard var run = searchRun, run.token == token else { return }
+        while run.running.count < Self.searchAtOnce && !run.queue.isEmpty {
+            let base = run.queue.removeFirst()
             let host = Site.hostOf(base) ?? base
-            Task { [weak self] in
+            let q = run.query
+            let t = run.token
+            let timeout = Self.searchTimeout
+            run.running.append(host)
+            searchTasks.append(Task { [weak self] in
                 let r: Result<FilmPage, Error>
                 do {
-                    r = .success(try await withTimeout(12) { try await Site.search(q, base: base) })
+                    r = .success(try await withTimeout(timeout) { try await Site.search(q, base: base) })
                 } catch {
                     r = .failure(error)
                 }
+                if Task.isCancelled { return }
                 self?.siteSearched(t, host, r)
-            }
+            })
         }
+        searchRun = run
     }
 
     private func siteSearched(_ t: Int, _ host: String, _ r: Result<FilmPage, Error>) {
-        // Lần tìm khác / về quá muộn: bỏ
-        guard t == token, var run = searchRun, run.token == t, let i = run.pending.firstIndex(of: host) else { return }
-        run.pending.remove(at: i)
+        // Lần tìm khác: bỏ
+        guard t == token, var run = searchRun, run.token == t, let i = run.running.firstIndex(of: host) else { return }
+        run.running.remove(at: i)
         switch r {
         case .success(let page):
             let films = (page.films + page.sections.flatMap { $0.films }).distinct { $0.url }
@@ -449,14 +471,17 @@ final class AppModel: ObservableObject {
             run.failed.append(host)
         }
         searchRun = run
+        startSearches()
+        run = searchRun ?? run
         var notes: [String] = []
-        if !run.pending.isEmpty { notes.append("Đang tìm: " + run.pending.joined(separator: ", ") + "…") }
+        let waiting = run.running + run.queue.map { Site.hostOf($0) ?? $0 }
+        if !waiting.isEmpty { notes.append("Đang tìm: " + waiting.joined(separator: ", ") + "…") }
         if !run.empty.isEmpty { notes.append("Không có phim: " + run.empty.joined(separator: ", ")) }
         if !run.failed.isEmpty { notes.append("Không trả lời: " + run.failed.joined(separator: ", ")) }
         guard !run.found.isEmpty else {
             sections = []
             let text = notes.joined(separator: "\n")
-            if !run.pending.isEmpty {
+            if !waiting.isEmpty {
                 status = .loading("Đang tìm «\(run.query)»…\n\(text)")
             } else if run.empty.isEmpty {
                 status = .message("Không tìm được — các trang không trả lời.\n\(text)", retry: true)
