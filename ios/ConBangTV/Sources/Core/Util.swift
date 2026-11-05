@@ -115,6 +115,13 @@ func friendly(_ error: Error, proxyNote: Bool = true) -> String {
         // Đang bật proxy: ghép lời nhắc (kèm lỗi phía proxy nếu có, vd sai mật khẩu)
         return urlErrorText(e) + (proxyNote ? AppProxy.note() : "")
     }
+    let ns = error as NSError
+    if ns.domain == (kCFErrorDomainCFNetwork as String) {
+        // Lỗi của CFNetwork khi đi qua proxy: cổng nội bộ trả lời "không mở được" (proxy thật lỗi, trang không tới được…)
+        // — vd mã 310. Lý do cụ thể nằm trong lời nhắc proxy (lỗi gần nhất của cổng nội bộ).
+        let base = "Không kết nối được tới trang qua proxy (mã \(ns.code))."
+        return base + (proxyNote ? AppProxy.note() : "")
+    }
     return error.localizedDescription
 }
 
