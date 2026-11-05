@@ -9,7 +9,7 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.3`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.3)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.4`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.4)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -208,6 +208,13 @@ tay đầu tiên được chia nhỏ — gửi riêng byte đầu, tên trang th
 được tên trang; trang web nhận đủ, đúng thứ tự. Không cần VPN hay proxy; dùng được cùng DNS mã hoá và proxy. Trang không
 vào được (quá giờ / lỗi SSL) thì app gợi ý bật mục này.
 
+**Mức 2 — đảo thứ tự** (từ 2.3 / iPad 1.4; TV: bấm nút đổi vòng Tắt → Mức 1 → Mức 2, iPad: chọn mức): dành cho khi mức 1
+không còn lọt (máy soi của nhà mạng ghép các mẩu lại). Như mức 1, thêm: byte đầu của gói bắt tay gửi với TTL 1 — chết
+ngay ở router trong nhà, không tới nhà mạng; phần sau đi trước, trang giữ lại chờ; hệ điều hành thấy byte đầu chưa được
+xác nhận thì tự gửi lại với TTL bình thường → byte đầu tới sau. Máy soi thấy gói bắt tay thiếu đầu, sai thứ tự. Chậm thêm
+khoảng 10–40 ms mỗi kết nối. Không cần root / VPN. Qua proxy thì dùng cách mức 1 (proxy nhận đủ theo thứ tự rồi mới gửi
+tiếp). Máy soi nào ghép đủ cả luồng theo thứ tự rồi mới đọc thì vẫn có thể thấy tên trang.
+
 ## Proxy SOCKS5
 
 **Cài đặt → Proxy SOCKS5** (từ 1.8.0, mặc định tắt; iPad từ 1.2):
@@ -349,7 +356,13 @@ Vượt chặn nhà mạng (từ 2.1 — `Socks5Bridge.writeHello` trong `Socks5
 cổng nội bộ chạy cả khi không có proxy / DoH; gói đầu tiên bên gọi gửi lên (bắt đầu `16 03` = TLS handshake) được ghi
 thành: byte đầu, đoạn tới tên trang, tên trang từng 2 byte (tìm không phân biệt hoa / thường), phần còn lại — mỗi lần ghi
 một gói nhờ `tcpNoDelay`; qua proxy thì chờ 40 ms sau byte đầu. Đo bằng bộ chuyển tiếp thử trên máy tính (`curl
---connect-to`): gửi nguyên / cắt 2–3 mẩu lớn → bị chặn, tách byte đầu (không cần chờ) hoặc mẩu 2 byte → lọt. Trang đổi
+--connect-to`): gửi nguyên / cắt 2–3 mẩu lớn → bị chặn, tách byte đầu (không cần chờ) hoặc mẩu 2 byte → lọt. Mức 2 (từ
+2.3 — `RouteConfig.disorder` / `Socks5Bridge(disorder:)`, khoá `unblock_level`): đặt `IP_TTL` và `IPV6_UNICAST_HOPS` = 1,
+ghi byte đầu, trả lại (TV: -1 = mặc định Linux, `TcpTtl.kt`; iPad: giá trị cũ đọc bằng `getsockopt`). TV lấy fd bằng
+`(socket.inputStream as FileInputStream).fd` — **không** dùng `ParcelFileDescriptor.fromSocket(...)` rồi đóng: Android 9 không
+nhân bản fd, đóng là đóng luôn socket; Android 5–6 dùng `Socket.getFileDescriptor$` (reflection). Đo: tcpdump trên TV box
+(bản userdebug, `adb root`) thấy byte đầu ttl 1 → phần sau ttl 64 → máy kia báo thiếu → byte đầu gửi lại ttl 64 sau ~11 ms;
+cổng đo trên máy tính (khác lớp mạng, qua router): mức 1 đọc được 1 byte trước, mức 2 đọc cả gói một lần sau 22–36 ms. Trang đổi
 tên miền hẳn: `MOVED_HOSTS` / `movedHosts` + `migrateMovedHosts()` (đổi tên cũ → mới trong mọi khoá và giá trị đã lưu,
 khoá tên mới đã có thì giữ); `home.movedTo` gọi `Prefs.replaceSite`. Test: `ProfilesTest`, iPad `Socks5Tests`,
 `MovedHostsTests`.

@@ -6,6 +6,24 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 
+## iPad 1.4 — 05/11/2026
+
+- **Vượt chặn nhà mạng mức 2** (Cài đặt → Vượt chặn nhà mạng → Mức 1 / Mức 2), như TV 2.3: mẩu đầu của gói mở kết nối HTTPS
+  gửi với TTL 1 (chết ở router trong nhà), phần sau đi trước, hệ thống tự gửi lại mẩu đầu — nhà mạng thấy gói thiếu đầu, sai
+  thứ tự. Dành cho khi mức 1 không còn vào được trang bị chặn; qua proxy thì dùng cách mức 1.
+- bản 1.4 (CFBundleVersion 5) · mã gói `vn.chimto.tv` · tag `ios-v1.4` · commit `4e9b37b` · SHA-256 IPA
+  `47f4fe7f0a96d21a99f940b7ca56aaeba131ae20ce5baafe8608d6d88e905c74`
+
+## 2.3 — 05/11/2026
+
+- **Vượt chặn nhà mạng mức 2:** nút Cài đặt → Vượt chặn nhà mạng đổi vòng Tắt → Mức 1 (chia nhỏ) → Mức 2 (đảo thứ tự). Mức 2:
+  mẩu đầu của gói mở kết nối HTTPS gửi với TTL 1 nên chết ở router trong nhà, phần sau đi trước, hệ thống tự gửi lại mẩu đầu —
+  máy soi của nhà mạng thấy gói thiếu đầu, sai thứ tự. Chậm thêm vài chục mili giây; không cần VPN / root; qua proxy thì dùng
+  cách mức 1. Thử trên TV box: phimmoir.fun (nhà mạng chặn theo tên) tắt vượt chặn thì lỗi, mức 2 vào được.
+- versionCode 21 · tag `v2.3` · commit `4e9b37b` · SHA-256 APK
+  `564656d089739e2d3fa47350bc68c67a29014f3e15a10cc200f760c73373dacf`
+- Cập nhật tự động 2.2 → 2.3 đã thử trên TV box (Cài đặt → "Kiểm tra cập nhật" → "Cài đặt ngay").
+
 ## iPad 1.3 — 05/11/2026
 
 - **Có bản cho iPhone:** cùng một tệp `ConBangTV-iPad-1.3.ipa` cài được cả iPhone và iPad. Lưới phim, trang phim, «Ai đang
