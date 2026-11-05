@@ -43,7 +43,7 @@ object AppProxy {
      * Http.kt buộc phải kết nối lại theo cài đặt mới ngay (không dùng lại kết nối keep-alive đi theo cài đặt cũ).
      */
     fun apply() {
-        val c = RouteConfig(Prefs.proxyConfig(), Prefs.dohServer).takeIf { it.socks != null || it.doh != null }
+        val c = RouteConfig(Prefs.proxyConfig(), Prefs.dohServer, Prefs.unblock).takeIf { it.socks != null || it.doh != null || it.split }
         if (c == bridgeConfig && (c == null) == (bridge == null)) return
         bridge?.close()
         Doh.clearCache()

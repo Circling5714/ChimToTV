@@ -37,10 +37,17 @@ object Prefs {
     const val DEFAULT_BASE = "https://yanhh3d.ee"
 
     /** Các trang mẫu có sẵn trong danh sách lần đầu cài. */
-    val PRESET_SITES = listOf(DEFAULT_BASE, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmoir.fun")
+    val PRESET_SITES = listOf(DEFAULT_BASE, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun")
 
     /** Trang mẫu thêm ở bản sau: thêm một lần vào danh sách người xem đã lưu (xoá đi thì thôi, không thêm lại). */
-    private val ADDED_SITES = listOf("https://phimmoir.fun")
+    private val ADDED_SITES = listOf("https://phimmois.fun")
+
+    /**
+     * Trang đổi hẳn tên miền, đường dẫn giữ nguyên (tên cũ chuyển hướng 301 sang tên mới). Tên cũ hay bị nhà mạng chặn nên
+     * app không tự thấy trang đã chuyển → đổi tên cũ → mới trong mọi dữ liệu đã lưu (xem migrateMovedHosts).
+     * phimmoir.fun → phimmois.fun: 11/2026.
+     */
+    internal val MOVED_HOSTS = mapOf("phimmoir.fun" to "phimmois.fun")
     private const val MAX_HISTORY = 60
     private const val MAX_POSITIONS = 400
 
@@ -51,6 +58,7 @@ object Prefs {
     /** Test JVM truyền SharedPreferences giả. */
     internal fun init(prefs: SharedPreferences) {
         sp = prefs
+        migrateMovedHosts()
         privatePositions.clear()
         pid = sp.getString("profile", "") ?: ""
         if (profiles.none { it.id == pid }) pid = profiles.first().id
@@ -61,6 +69,45 @@ object Prefs {
             sp.edit().putBoolean(key, true).apply()
         }
     }
+
+    /**
+     * Đổi tên miền cũ → mới (MOVED_HOSTS) trong mọi khoá / giá trị đã lưu: danh sách trang, trang đang dùng của từng người
+     * xem, lịch sử, Xem tiếp, phim theo dõi, chỗ đang xem, server ưu tiên, điểm server… Khoá mới đã có thì giữ khoá mới.
+     */
+    private fun migrateMovedHosts() {
+        val all = sp.all
+        fun moved(s: String) = MOVED_HOSTS.keys.any { it in s }
+        if (all.none { (k, v) -> moved(k) || (v is String && moved(v)) }) return
+        fun rename(s: String) = MOVED_HOSTS.entries.fold(s) { acc, (old, new) -> acc.replace(old, new) }
+        val e = sp.edit()
+        for ((k, v) in all) {
+            if (!moved(k) && !(v is String && moved(v))) continue
+            val nk = rename(k)
+            if (nk != k) {
+                e.remove(k)
+                if (all.containsKey(nk)) continue
+            }
+            when (v) {
+                is String -> e.putString(nk, rename(v))
+                is Boolean -> e.putBoolean(nk, v)
+                is Int -> e.putInt(nk, v)
+                is Long -> e.putLong(nk, v)
+                is Float -> e.putFloat(nk, v)
+            }
+        }
+        e.apply()
+    }
+
+    /** Trang tự chuyển sang tên miền mới: thay tên cũ trong danh sách (giữ chỗ), rồi dùng tên mới. */
+    fun replaceSite(old: String, new: String) {
+        sites = sites.map { if (it == old) new else it }
+        baseUrl = new
+    }
+
+    /** Vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS để nhà mạng không đọc được tên trang (Socks5Bridge.writeHello). */
+    var unblock: Boolean
+        get() = sp.getBoolean("unblock", false)
+        set(value) = sp.edit().putBoolean("unblock", value).apply()
 
     // ---- Người xem (hồ sơ) ----
 
@@ -210,7 +257,7 @@ object Prefs {
         get() {
             val s = sp.getString("sites", null) ?: sp.getString("recent_urls", null)
             val saved = s?.let { j -> JSONArray(j).let { a -> List(a.length()) { a.getString(it) } } }.orEmpty()
-            return if (sp.contains("sites")) saved else (PRESET_SITES + saved).distinct()
+            return if (sp.contains("sites")) saved.distinct() else (PRESET_SITES + saved).distinct()
         }
         set(value) = sp.edit().putString("sites", JSONArray(value.distinct()).toString()).apply()
 

@@ -133,6 +133,17 @@ class SettingsActivity : BaseActivity() {
             AppProxy.apply()
             showDoh()
         }
+        val unblockBtn = findViewById<TextView>(R.id.btnUnblock)
+        fun showUnblock() {
+            unblockBtn.text = "Vượt chặn nhà mạng: ${if (Prefs.unblock) "Bật" else "Tắt"}" +
+                if (Prefs.unblock && !AppProxy.webViewSupported) " (WebView quá cũ: chỉ phần đọc trang)" else ""
+        }
+        showUnblock()
+        unblockBtn.setOnClickListener {
+            Prefs.unblock = !Prefs.unblock
+            AppProxy.apply()
+            showUnblock()
+        }
         val privateBtn = findViewById<TextView>(R.id.btnPrivate)
         fun showPrivate() {
             privateBtn.text = "Xem riêng${who?.let { " của $it" } ?: ""} (không lưu lịch sử): ${if (Prefs.privateMode) "Bật" else "Tắt"}"
@@ -363,7 +374,7 @@ class SettingsActivity : BaseActivity() {
             }
             recent.addView(b)
         }
-        // Trang mẫu đã xoá khỏi danh sách (vd phimmoir.fun): thêm lại một chạm
+        // Trang mẫu đã xoá khỏi danh sách (vd phimmois.fun): thêm lại một chạm
         for (u in Prefs.missingPresets) {
             val b = inflater.inflate(R.layout.item_button, recent, false) as TextView
             b.text = "＋ ${Site.hostOf(u) ?: u}"

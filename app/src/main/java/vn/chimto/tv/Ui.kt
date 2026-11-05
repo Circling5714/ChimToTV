@@ -69,12 +69,15 @@ fun Throwable.friendly(): String {
     if (AppProxy.dohActive && !AppProxy.active && this !is Http.HttpError) {
         AppProxy.recentError()?.let { return "DNS mã hoá: $it.\nThử máy chủ DNS khác hoặc tắt trong Cài đặt → DNS mã hoá." }
     }
+    // Bắt tay HTTPS hỏng / treo: hay là nhà mạng chặn theo tên trang → gợi ý bật Vượt chặn nhà mạng
+    val hint = if (!Prefs.unblock && (this is SocketTimeoutException || this is SSLException))
+        "\nNếu nhà mạng chặn trang này: bật Cài đặt → Vượt chặn nhà mạng." else ""
     return when (this) {
         is UnknownHostException -> "Không tìm thấy trang. Kiểm tra mạng hoặc đổi link trong Cài đặt."
         is SocketTimeoutException -> "Trang phản hồi quá chậm, thử lại sau."
         is SSLException -> "Lỗi kết nối bảo mật (SSL) tới trang."
         else -> message ?: javaClass.simpleName
-    } + AppProxy.note()
+    } + AppProxy.note() + hint
 }
 
 /**

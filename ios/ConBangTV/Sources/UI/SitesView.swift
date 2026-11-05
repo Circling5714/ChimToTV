@@ -47,14 +47,14 @@ struct SitesView: View {
                     Text("Vuốt một trang sang trái để xoá khỏi danh sách. Sửa tên miền khi trang đổi tên: Cài đặt.")
                 }
                 Section {
-                    // Trang mẫu đã xoá (vd phimmoir.fun): thêm lại một chạm
+                    // Trang mẫu đã xoá (vd phimmois.fun): thêm lại một chạm
                     ForEach(Prefs.missingPresets.filter { !sites.contains($0) }, id: \.self) { s in
                         Button { add(s) } label: {
                             Label("Thêm lại \(Site.hostOf(s) ?? s)", systemImage: "plus.circle").foregroundColor(Theme.brand)
                         }
                     }
                     HStack {
-                        TextField("Tên miền trang khác, vd phimmoir.fun", text: $newSite)
+                        TextField("Tên miền trang khác, vd phimmois.fun", text: $newSite)
                             .keyboardType(.URL)
                             .textInputAutocapitalization(.never)
                             .disableAutocorrection(true)
@@ -96,7 +96,7 @@ struct SitesView: View {
 
     private func addTyped() {
         guard let u = Prefs.normalizeUrl(newSite) else {
-            addError = "Tên miền không hợp lệ. Ví dụ đúng: phimmoir.fun"
+            addError = "Tên miền không hợp lệ. Ví dụ đúng: phimmois.fun"
             return
         }
         add(u)

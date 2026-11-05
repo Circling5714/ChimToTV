@@ -273,6 +273,23 @@
 
         <TextView
             style="@style/SettingsLabel"
+            android:text="Vượt chặn nhà mạng" />
+
+        <TextView
+            android:id="@+id/btnUnblock"
+            style="@style/TvButton"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Một số nhà mạng chặn trang phim bằng cách đọc tên trang trong gói bắt tay HTTPS: trang mở mãi không được, dùng VPN thì vào được. Bật mục này: app chia nhỏ gói đó nên nhà mạng không đọc được tên trang — không cần VPN hay proxy. Dùng được cùng DNS mã hoá và proxy."
+            android:textColor="@color/text_dim"
+            android:textSize="14sp" />
+
+        <TextView
+            style="@style/SettingsLabel"
             android:text="Phát video" />
 
         <LinearLayout

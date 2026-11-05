@@ -21,7 +21,43 @@ enum Prefs {
     static let defaultBase = "https://yanhh3d.ee"
 
     /// Các trang mẫu có sẵn trong danh sách lần đầu cài.
-    static let presetSites = [defaultBase, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmoir.fun"]
+    static let presetSites = [defaultBase, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun"]
+
+    /// Trang đổi hẳn tên miền, đường dẫn giữ nguyên (tên cũ chuyển hướng 301 sang tên mới). Tên cũ hay bị nhà mạng chặn nên
+    /// app không tự thấy trang đã chuyển → đổi tên cũ → mới trong mọi dữ liệu đã lưu (migrateMovedHosts).
+    /// phimmoir.fun → phimmois.fun: 11/2026.
+    static let movedHosts = ["phimmoir.fun": "phimmois.fun"]
+
+    /// Đổi tên miền cũ → mới trong mọi khoá / giá trị đã lưu: danh sách trang, trang đang dùng của từng người xem, lịch sử,
+    /// Xem tiếp, phim theo dõi, chỗ đang xem, server ưu tiên, điểm server… Khoá mới đã có thì giữ khoá mới. Gọi lúc mở app.
+    static func migrateMovedHosts() {
+        func rename(_ s: String) -> String { movedHosts.reduce(s) { $0.replacingOccurrences(of: $1.key, with: $1.value) } }
+        func moved(_ s: String) -> Bool { movedHosts.keys.contains { s.contains($0) } }
+        var changed = false
+        let all = store.dictionaryRepresentation()
+        for (k, v) in all {
+            var nv: Any?
+            if let s = v as? String, moved(s) {
+                nv = rename(s)
+            } else if let a = v as? [String], a.contains(where: moved) {
+                nv = a.map(rename)
+            } else if let d = v as? Data, let s = String(data: d, encoding: .utf8), moved(s) {
+                nv = Data(rename(s).utf8)
+            }
+            guard moved(k) || nv != nil else { continue }
+            let nk = rename(k)
+            if nk != k {
+                store.removeObject(forKey: k)
+                if all[nk] != nil { continue }
+            }
+            store.set(nv ?? v, forKey: nk)
+            changed = true
+        }
+        guard changed else { return }
+        let s = sites
+        sites = s // bỏ trang trùng (tên cũ đổi thành tên mới đã có sẵn)
+        reload()
+    }
 
     private static let maxHistory = 60
     private static let maxPositions = 400
@@ -211,6 +247,12 @@ enum Prefs {
             var seen = Set<String>()
             store.set(newValue.filter { seen.insert($0).inserted }, forKey: "sites")
         }
+    }
+
+    /// Trang tự chuyển sang tên miền mới: thay tên cũ trong danh sách (giữ chỗ), rồi dùng tên mới.
+    static func replaceSite(_ old: String, with new: String) {
+        sites = sites.map { $0 == old ? new : $0 }
+        baseUrl = new
     }
 
     /// Thêm trang vào danh sách (không đổi trang đang dùng); đã có thì thôi.

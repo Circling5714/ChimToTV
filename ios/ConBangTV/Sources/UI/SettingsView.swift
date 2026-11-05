@@ -64,7 +64,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    // Trang mẫu đã xoá khỏi danh sách (vd phimmoir.fun): thêm lại một chạm
+                    // Trang mẫu đã xoá khỏi danh sách (vd phimmois.fun): thêm lại một chạm
                     ForEach(Prefs.missingPresets.filter { !sites.contains($0) }, id: \.self) { s in
                         Button {
                             Prefs.addSite(s)

@@ -29,10 +29,26 @@ data class SocksConfig(
  * Cài đặt của cổng nội bộ: proxy SOCKS5 (null = đi thẳng) và DNS mã hoá cho các tên miền thiết bị tự phân giải
  * (null = DNS của thiết bị / nhà mạng).
  */
-data class RouteConfig(val socks: SocksConfig?, val doh: Doh.Server?)
+data class RouteConfig(val socks: SocksConfig?, val doh: Doh.Server?, val split: Boolean = false)
 
 /** Lỗi khi mở kết nối; code = mã trả lời SOCKS5 gửi lại bên gọi; viaProxy = lỗi ở phía proxy (để báo người xem). */
 class SocksError(val code: Int, message: String, val viaProxy: Boolean = true) : IOException(message)
+
+/** Vị trí đầu tiên của name (chữ thường) trong b[from until to], không phân biệt hoa / thường. */
+internal fun find(name: ByteArray, b: ByteArray, from: Int, to: Int): Int? {
+    var s = from
+    while (s + name.size <= to) {
+        var k = 0
+        while (k < name.size) {
+            val c = b[s + k].toInt() and 0xFF
+            if ((if (c in 0x41..0x5A) c or 0x20 else c) != (name[k].toInt() and 0xFF)) break
+            k++
+        }
+        if (k == name.size) return s
+        s++
+    }
+    return null
+}
 
 /** Phía khách SOCKS5 (RFC 1928, đăng nhập theo RFC 1929): đi qua proxy thật tới một đích. */
 object Socks5 {
@@ -221,7 +237,8 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
             open += up
             reply(o, 0)
             client.soTimeout = 0
-            relay(client, up)
+            val viaProxy = c.socks != null && (!c.socks.sitesOnly || isSite(host))
+            relay(client, up, if (c.split) host to viaProxy else null)
         } catch (e: Exception) {
             // bên gọi đóng giữa chừng, hoặc proxy vừa bị tắt — bỏ qua (không để lỗi lọt ra làm sập app)
         } finally {
@@ -267,21 +284,31 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
 
     private fun reply(o: OutputStream, code: Int) = o.write(byteArrayOf(5, code.toByte(), 0, 1, 0, 0, 0, 0, 0, 0))
 
-    /** Chép hai chiều tới khi hết; một chiều lỗi thì đóng cả hai cho chiều kia khỏi treo. */
-    private fun relay(a: Socket, b: Socket) {
-        val back = pool.submit { pipe(b, a) }
-        pipe(a, b)
+    /**
+     * Chép hai chiều tới khi hết; một chiều lỗi thì đóng cả hai cho chiều kia khỏi treo. hello != null (tên trang, đi qua
+     * proxy): gói đầu tiên từ bên gọi (a → b) là gói bắt tay HTTPS thì chia nhỏ (vượt chặn nhà mạng).
+     */
+    private fun relay(a: Socket, b: Socket, hello: Pair<String, Boolean>?) {
+        val back = pool.submit { pipe(b, a, null) }
+        pipe(a, b, hello)
         runCatching { back.get() }
     }
 
-    private fun pipe(from: Socket, to: Socket) {
+    private fun pipe(from: Socket, to: Socket, hello: Pair<String, Boolean>?) {
         val buf = ByteArray(16 * 1024)
         try {
             val i = from.getInputStream()
             val o = to.getOutputStream()
+            var first = hello
             while (true) {
                 val n = i.read(buf)
                 if (n < 0) break
+                val h = first
+                if (h != null) {
+                    first = null
+                    writeHello(o, buf, n, h.first, h.second)
+                    continue
+                }
                 o.write(buf, 0, n)
             }
             // Hết dữ liệu: báo bên kia (đóng nửa ghi); chiều ngược lại chờ tối đa 60 s im lặng rồi thôi
@@ -291,6 +318,33 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
             close(from)
             close(to)
         }
+    }
+
+    /**
+     * Vượt chặn theo tên trang (SNI): nhà mạng đọc tên trang trong gói bắt tay HTTPS đầu tiên (TLS ClientHello) để chặn
+     * (vd phimmoir.fun — kết nối được nhưng bắt tay treo 15 giây rồi đứt). Đo trên mạng nhà: gửi nguyên hoặc cắt 2–3 mẩu
+     * lớn đều bị chặn; gửi riêng byte đầu là lọt. Ở đây: byte đầu riêng, tên trang thành từng mẩu 2 byte, rồi phần còn
+     * lại — mỗi lần ghi là một gói (tcpNoDelay). Qua proxy: chờ chút sau byte đầu để proxy cũng gửi nó thành gói riêng.
+     * Không phải gói bắt tay TLS thì gửi nguyên.
+     */
+    private fun writeHello(o: OutputStream, buf: ByteArray, n: Int, host: String, viaProxy: Boolean) {
+        if (n <= 5 || buf[0] != 0x16.toByte() || buf[1] != 0x03.toByte()) return o.write(buf, 0, n)
+        o.write(buf, 0, 1)
+        if (viaProxy) Thread.sleep(40)
+        var i = 1
+        val name = host.lowercase().toByteArray(Charsets.US_ASCII)
+        val s = if (name.size >= 2) find(name, buf, 1, n) else null
+        if (s != null) {
+            if (s > i) o.write(buf, i, s - i)
+            var k = s
+            while (k < s + name.size) {
+                val len = minOf(2, s + name.size - k)
+                o.write(buf, k, len)
+                k += len
+            }
+            i = s + name.size
+        }
+        if (i < n) o.write(buf, i, n - i)
     }
 
     private fun close(s: Socket) {

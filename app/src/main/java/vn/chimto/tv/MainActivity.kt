@@ -214,7 +214,7 @@ class MainActivity : BaseActivity() {
      */
     private fun pickSite() {
         val sites = Prefs.sites
-        // Cuối danh sách: thêm lại trang mẫu đã xoá (vd phimmoir.fun), thêm trang khác bằng tên miền
+        // Cuối danh sách: thêm lại trang mẫu đã xoá (vd phimmois.fun), thêm trang khác bằng tên miền
         val missing = Prefs.missingPresets
         val names = sites.map { Site.hostOf(it) ?: it }
         val checks = arrayOfNulls<Result<SiteCheck>>(sites.size)
@@ -266,10 +266,10 @@ class MainActivity : BaseActivity() {
         toast("Đã thêm ${Site.hostOf(url)} vào danh sách trang phim.")
     }
 
-    /** Gõ tên miền trang mới (vd phimmoir.fun) — trang kiểu yanhh3d / HaLim / PhimMoi. */
+    /** Gõ tên miền trang mới (vd phimmois.fun) — trang kiểu yanhh3d / HaLim / PhimMoi. */
     private fun addSiteDialog() {
         val input = EditText(this).apply {
-            hint = "Tên miền, vd phimmoir.fun"
+            hint = "Tên miền, vd phimmois.fun"
             setSingleLine()
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
             imeOptions = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI
@@ -289,7 +289,7 @@ class MainActivity : BaseActivity() {
         fun submit() {
             val url = Prefs.normalizeUrl(input.text.toString())
             if (url == null) {
-                input.error = "Tên miền không hợp lệ (vd phimmoir.fun)"
+                input.error = "Tên miền không hợp lệ (vd phimmois.fun)"
                 return
             }
             hideKeyboard(input)
@@ -491,7 +491,7 @@ class MainActivity : BaseActivity() {
             if (t != token) return@background
             r.onSuccess { home ->
                 home.movedTo?.let {
-                    Prefs.baseUrl = it
+                    Prefs.replaceSite(base, it)
                     showSiteLabel()
                     toast("Trang đã chuyển sang ${Site.hostOf(it)} — đã tự cập nhật link.")
                 }

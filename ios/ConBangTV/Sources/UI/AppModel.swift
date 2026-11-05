@@ -316,7 +316,7 @@ final class AppModel: ObservableObject {
                 let home = try await Site.home(base)
                 guard t == token else { return }
                 if let moved = home.movedTo {
-                    Prefs.baseUrl = moved
+                    Prefs.replaceSite(base, with: moved)
                     showSiteLabel()
                     showToast("Trang đã chuyển sang \(Site.hostOf(moved) ?? moved) — đã tự cập nhật link.")
                 }

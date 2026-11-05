@@ -85,7 +85,7 @@ class ProfilesTest {
         Prefs.init(sp)
         Prefs.addHistory(history("tien-nghich"))
         Prefs.savePosition("https://yanhh3d.ee/tien-nghich/tap-1", 120, "https://yanhh3d.ee/tien-nghich")
-        Prefs.baseUrl = "https://phimmoir.fun"
+        Prefs.baseUrl = "https://hhkungfu.ee"
         assertTrue(sp.contains("history") && sp.contains("positions") && sp.contains("base_url"))
 
         Prefs.init(sp) // mở lại app (bản mới)
@@ -93,7 +93,7 @@ class ProfilesTest {
         assertEquals("", Prefs.profileId)
         assertEquals(1, Prefs.history.size)
         assertEquals(120, Prefs.position("https://yanhh3d.ee/tien-nghich/tap-1"))
-        assertEquals("https://phimmoir.fun", Prefs.baseUrl)
+        assertEquals("https://hhkungfu.ee", Prefs.baseUrl)
     }
 
     @Test
@@ -128,7 +128,7 @@ class ProfilesTest {
 
         // Người mới đổi gì cũng không đụng tới người cũ
         Prefs.addHistory(history("vu-than"))
-        Prefs.baseUrl = "https://phimmoir.fun"
+        Prefs.baseUrl = "https://hhkungfu.ee"
         Prefs.setServer("hoathinh3d.ee", "vs", "Vietsub")
         Prefs.seekStep = 10
         Prefs.switchProfile("")
@@ -140,7 +140,7 @@ class ProfilesTest {
         assertEquals("tm", Prefs.serverType("hoathinh3d.ee"))
         assertEquals(30, Prefs.seekStep)
         // Danh sách trang dùng chung: trang người mới thêm có trong danh sách của cả nhà
-        assertTrue("https://phimmoir.fun" in Prefs.sites)
+        assertTrue("https://hhkungfu.ee" in Prefs.sites)
 
         // Mở lại app: nhớ người xem lần trước
         Prefs.switchProfile(bo.id)
@@ -178,14 +178,14 @@ class ProfilesTest {
     fun deleteFirstProfileKeepsSharedSettings() {
         Prefs.init(sp)
         Prefs.addHistory(history("tien-nghich"))
-        Prefs.sites = listOf("https://yanhh3d.ee", "https://phimmoir.fun")
+        Prefs.sites = listOf("https://yanhh3d.ee", "https://hhkungfu.ee")
         Prefs.proxyHost = "103.1.2.3"
         Prefs.setIntro(film.url, 0, 80)
         val be = Prefs.addProfile("Bé")
         Prefs.deleteProfile("")
         assertEquals(be.id, Prefs.profileId)
         assertFalse(sp.contains("history"))
-        assertEquals(listOf("https://yanhh3d.ee", "https://phimmoir.fun"), Prefs.sites)
+        assertEquals(listOf("https://yanhh3d.ee", "https://hhkungfu.ee"), Prefs.sites)
         assertEquals("103.1.2.3", Prefs.proxyHost)
         assertEquals(0 to 80, Prefs.intro(film.url))
         assertTrue(sp.contains("intro@${film.url}"))
@@ -226,13 +226,43 @@ class ProfilesTest {
 
     @Test
     fun deletedPresetSiteCanBeAddedBack() {
-        val phimmoir = "https://phimmoir.fun"
-        Prefs.sites = Prefs.PRESET_SITES.filter { it != phimmoir }
-        assertEquals(listOf(phimmoir), Prefs.missingPresets)
-        Prefs.addSite(phimmoir)
-        Prefs.addSite(phimmoir)
+        Prefs.init(sp)
+        val phimmois = "https://phimmois.fun"
+        Prefs.sites = Prefs.PRESET_SITES.filter { it != phimmois }
+        assertEquals(listOf(phimmois), Prefs.missingPresets)
+        Prefs.addSite(phimmois)
+        Prefs.addSite(phimmois)
         assertTrue(Prefs.missingPresets.isEmpty())
-        assertEquals(1, Prefs.sites.count { it == phimmoir })
+        assertEquals(1, Prefs.sites.count { it == phimmois })
         assertEquals(Prefs.PRESET_SITES.size, Prefs.sites.size)
+    }
+
+    /** Trang đổi tên miền (phimmoir.fun → phimmois.fun): dữ liệu đã lưu tự đổi sang tên mới lúc mở app. */
+    @Test
+    fun movedHostRenamedInSavedData() {
+        sp.map["sites"] = """["https:\/\/yanhh3d.ee","https:\/\/phimmoir.fun","https:\/\/phimmois.fun"]"""
+        sp.map["base_url"] = "https://phimmoir.fun"
+        sp.map["server_type@phimmoir.fun"] = "kk"
+        sp.map["server_type@phimmois.fun#p1"] = "nguonc"
+        sp.map["server_type@phimmoir.fun#p1"] = "ophim" // khoá tên mới đã có → giữ khoá tên mới
+        sp.map["preset_added@https://phimmoir.fun"] = true
+        sp.map["history"] = """[{"filmUrl":"https:\/\/phimmoir.fun\/phim\/a","title":"A"}]"""
+        Prefs.init(sp)
+        assertEquals(listOf("https://yanhh3d.ee", "https://phimmois.fun"), Prefs.sites)
+        assertEquals("https://phimmois.fun", Prefs.baseUrl)
+        assertEquals("kk", sp.map["server_type@phimmois.fun"])
+        assertEquals("nguonc", sp.map["server_type@phimmois.fun#p1"])
+        assertFalse(sp.map.keys.any { "phimmoir" in it })
+        assertFalse(sp.map.values.any { it is String && "phimmoir" in it })
+        // Trang mẫu mới (phimmois.fun) đã có trong danh sách → không thêm lần nữa
+        assertEquals(1, Prefs.sites.count { it == "https://phimmois.fun" })
+    }
+
+    /** Vượt chặn nhà mạng: tìm tên trang trong gói bắt tay, không phân biệt hoa / thường. */
+    @Test
+    fun findHostInHello() {
+        val b = "xxPhimMoiS.funyy".toByteArray()
+        assertEquals(2, find("phimmois.fun".toByteArray(), b, 1, b.size))
+        assertNull(find("yanhh3d.ee".toByteArray(), b, 1, b.size))
     }
 }
