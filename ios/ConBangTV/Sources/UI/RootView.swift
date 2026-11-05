@@ -14,7 +14,15 @@ enum Router {
 
     static func play(filmUrl: String, epUrl: String, continueMode: Bool = false) {
         guard let top = topController, !(top is PlayerController) else { return }
-        let c = PlayerController(model: PlayerModel(filmUrl: filmUrl, epUrl: epUrl, continueMode: continueMode))
+        // Phim đang ở cửa sổ hình trong hình: mở phim khác thì đóng phim đó (lưu chỗ xem)
+        PlayerModel.detachedModel?.closeDetached()
+        present(PlayerModel(filmUrl: filmUrl, epUrl: epUrl, continueMode: continueMode), on: top)
+    }
+
+    /// Mở màn trình phát cho model (mới, hoặc phim đang hình trong hình vừa được phóng to — trình phát vẫn chạy).
+    static func present(_ model: PlayerModel, on top: UIViewController? = nil) {
+        guard let top = top ?? topController, !(top is PlayerController) else { return }
+        let c = PlayerController(model: model)
         c.onDismissed = { AppModel.shared.playerClosed() }
         top.present(c, animated: true)
     }
@@ -69,12 +77,15 @@ struct RootView: View {
             Group {
                 switch s {
                 case .sites: SitesView()
-                case .settings: SettingsView()
+                case .settings: SettingsView().id(app.profileVersion) // đổi người xem: cài đặt của người mới
                 case .filter(let title, let items): FilterView(title: title, items: items)
                 }
             }
             .environmentObject(app)
             .preferredColorScheme(.dark)
+        }
+        .fullScreenCover(isPresented: $app.askingProfile) {
+            ProfilePickerView().environmentObject(app)
         }
         .background(
             Color.clear.alert("Xoá dữ liệu duyệt web?", isPresented: $app.confirmClear) {
@@ -130,6 +141,27 @@ struct Sidebar: View {
             .padding(.horizontal, 16)
             .padding(.top, 18)
             .padding(.bottom, 12)
+            // Nhà nhiều người xem: người đang dùng — chạm để đổi
+            if app.profiles.count >= 2, let p = app.profiles.first(where: { $0.id == app.profileId }) {
+                Button {
+                    app.showPicker(gate: false)
+                    onPick()
+                } label: {
+                    HStack(spacing: 10) {
+                        ProfileAvatar(profile: p, size: 28)
+                        Text(p.name).font(.system(size: 15, weight: .semibold)).foregroundColor(Theme.text).lineLimit(1)
+                        Image(systemName: "chevron.down").font(.system(size: 12, weight: .semibold)).foregroundColor(Theme.dim)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surface2))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Người xem: \(p.name)")
+                .padding(.horizontal, 14)
+                .padding(.bottom, 8)
+            }
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
                     ForEach(app.menu) { e in

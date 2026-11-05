@@ -208,6 +208,10 @@ private struct ControlBar: View {
                     RoundButton(icon: "goforward.10", label: "Tới 10 giây") { m.seekBy(10) }
                     RoundButton(icon: "forward.end.fill", label: "Tập sau") { m.next(); m.showBar() }
                     Spacer()
+                    if PlayerModel.pipSupported {
+                        RoundButton(icon: "pip.enter", label: "Thu nhỏ") { m.startPip() }
+                            .disabled(!m.started)
+                    }
                     RoundButton(icon: "list.bullet", label: "Menu") { m.showPanel() }
                 }
             }
@@ -286,6 +290,10 @@ private struct MenuPanel: View {
                             ChipButton(text: "Tải lại", icon: "arrow.clockwise") { m.reload() }
                             ChipButton(text: "Danh sách tập", icon: "square.grid.2x2") { m.close() }
                             ChipButton(text: "Mở trang web", icon: "safari") { m.openWebPage() }
+                            if PlayerModel.pipSupported {
+                                ChipButton(text: "Thu nhỏ (hình trong hình)", icon: "pip.enter") { m.startPip() }
+                                    .disabled(!m.started)
+                            }
                         }
                         if !m.servers.isEmpty {
                             PanelLabel(m.sessionText.map { "Server — lần xem này: \($0)" } ?? "Server (điểm theo những lần xem trước trên máy này)")
@@ -410,11 +418,15 @@ final class PlayerController: UIHostingController<PlayerView> {
     override func viewDidLoad() {
         super.viewDidLoad()
         model.onClose = { [weak self] in self?.dismiss(animated: true) }
+        // Phim vào hình trong hình lúc đang dùng app: đóng màn trình phát, trình phát vẫn chạy (PlayerModel.detachedModel)
+        model.onDetach = { [weak self] in self?.dismiss(animated: true) }
         model.onOpenWeb = { [weak self] url in
             self?.present(BrowserController(url: url), animated: true)
         }
-        NotificationCenter.default.addObserver(self, selector: #selector(didEnterBackground),
-                                               name: UIApplication.didEnterBackgroundNotification, object: nil)
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(didEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        nc.addObserver(self, selector: #selector(willResignActive), name: UIApplication.willResignActiveNotification, object: nil)
+        nc.addObserver(self, selector: #selector(didBecomeActive), name: UIApplication.didBecomeActiveNotification, object: nil)
         model.begin()
     }
 
@@ -428,12 +440,16 @@ final class PlayerController: UIHostingController<PlayerView> {
         super.viewDidDisappear(animated)
         if isBeingDismissed {
             UIApplication.shared.isIdleTimerDisabled = false
-            model.teardown()
+            // Đóng vì phim vào hình trong hình: trình phát chạy tiếp tới khi phóng to / đóng cửa sổ nhỏ
+            if !model.detached { model.teardown() }
+            NotificationCenter.default.removeObserver(self)
             onDismissed()
         }
     }
 
     @objc private func didEnterBackground() { model.didEnterBackground() }
+    @objc private func willResignActive() { model.willResignActive() }
+    @objc private func didBecomeActive() { model.didBecomeActive() }
 
     override var keyCommands: [UIKeyCommand]? {
         let inputs = [" ", "k", "j", "l", "m", "n", "p", "i", "\r", UIKeyCommand.inputLeftArrow, UIKeyCommand.inputRightArrow,

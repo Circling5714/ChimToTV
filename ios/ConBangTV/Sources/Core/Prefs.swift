@@ -1,4 +1,20 @@
 import Foundation
+import CryptoKit
+
+/// Người xem (hồ sơ) — bản Android: Profile trong Prefs.kt. id "" = người xem đầu tiên: dữ liệu nằm ở các khoá cũ (như
+/// trước khi có hồ sơ); người thêm sau dùng khoá có hậu tố "#<id>". color = chỉ số trong Prefs.profileColors; pin = mã băm
+/// của mã PIN (nil = không khoá).
+struct Profile: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var color: Int
+    var pin: String?
+
+    var locked: Bool { pin != nil }
+
+    /// Chữ cái đầu tên (trên vòng tròn màu).
+    var initial: String { name.trimmed.first.map { String($0).uppercased() } ?? "?" }
+}
 
 /// Cài đặt + lịch sử xem (bản Android: Prefs.kt, cùng tên khoá). Lưu trong UserDefaults; danh sách giữ sẵn trong bộ nhớ.
 enum Prefs {
@@ -20,13 +36,170 @@ enum Prefs {
         return body()
     }
 
+    // MARK: - Người xem (hồ sơ)
+
+    static let maxProfiles = 8
+    static let pinLength = 4
+    private static let firstProfileName = "Cả nhà"
+
+    /// Màu vòng tròn của người xem (RGB, cùng thứ tự bản Android); người thêm sau lấy màu chưa ai dùng.
+    static let profileColors: [UInt32] = [0x2BAF85, 0xE5533D, 0x3B82F6, 0xF59E0B, 0x8B5CF6, 0x06B6D4, 0xEC4899, 0x84CC16]
+    static let profileColorNames = ["Xanh lá", "Đỏ cam", "Xanh dương", "Vàng", "Tím", "Xanh ngọc", "Hồng", "Xanh nõn chuối"]
+
+    /// Khoá riêng từng người xem (còn lại — danh sách trang, điểm server, mốc nhạc mở đầu, cập nhật… — dùng chung).
+    private static let profileKeys: Set<String> = [
+        "history", "positions_v2", "follows", "last_follow_check", "private_mode",
+        "base_url", "seek_step", "auto_next", "video_fill",
+    ]
+    private static let profilePrefixes = ["server_type@", "server_label@"]
+    /// Người thêm sau bắt đầu với trang phim / server ưu tiên / cách xem của người đang dùng.
+    private static let copiedKeys: Set<String> = ["base_url", "seek_step", "auto_next", "video_fill"]
+
+    private static var pidCache: String?
+
+    /// Người xem đang dùng ("" = người đầu tiên).
+    static var profileId: String {
+        locked {
+            if let p = pidCache { return p }
+            let saved = store.string(forKey: "profile") ?? ""
+            let list = profiles
+            let p = list.contains { $0.id == saved } ? saved : list[0].id
+            pidCache = p
+            return p
+        }
+    }
+
+    /// Khoá của người xem đang dùng.
+    private static func k(_ key: String) -> String {
+        let p = profileId
+        return p.isEmpty ? key : "\(key)#\(p)"
+    }
+
+    private static func isProfileKey(_ base: String) -> Bool {
+        profileKeys.contains(base) || profilePrefixes.contains { base.hasPrefix($0) }
+    }
+
+    /// Các khoá riêng đang có của một người xem: (khoá thật, khoá gốc không hậu tố).
+    private static func ownKeys(_ id: String) -> [(key: String, base: String)] {
+        store.dictionaryRepresentation().keys.compactMap { key in
+            let base: String?
+            if id.isEmpty {
+                base = key.contains("#") ? nil : key
+            } else {
+                base = key.hasSuffix("#\(id)") ? String(key.dropLast(id.count + 1)) : nil
+            }
+            guard let b = base, isProfileKey(b) else { return nil }
+            return (key, b)
+        }
+    }
+
+    static var profiles: [Profile] {
+        let list = decode([Profile].self, "profiles") ?? []
+        return list.isEmpty ? [Profile(id: "", name: firstProfileName, color: 0, pin: nil)] : list
+    }
+
+    private static func saveProfiles(_ list: [Profile]) { encode(list, "profiles") }
+
+    /// Người xem đang dùng.
+    static var profile: Profile {
+        let id = profileId
+        let list = profiles
+        return list.first { $0.id == id } ?? list[0]
+    }
+
+    static func switchProfile(_ id: String) {
+        locked {
+            guard profiles.contains(where: { $0.id == id }) else { return }
+            pidCache = id
+            store.set(id, forKey: "profile")
+            historyCache = nil
+            positionsCache = nil
+            privatePositions.removeAll()
+        }
+    }
+
+    /// Quên mọi thứ đang giữ trong bộ nhớ (đổi kho — test).
+    static func reload() {
+        locked {
+            pidCache = nil
+            historyCache = nil
+            positionsCache = nil
+            privatePositions.removeAll()
+        }
+    }
+
+    /// Thêm người xem (chưa chuyển sang): lịch sử trống, trang phim / server ưu tiên / cách xem chép từ người đang dùng.
+    @discardableResult
+    static func addProfile(_ name: String) -> Profile {
+        locked {
+            let list = profiles
+            var n = 1
+            while list.contains(where: { $0.id == "p\(n)" }) { n += 1 }
+            let id = "p\(n)"
+            let used = Set(list.map { $0.color })
+            let color = profileColors.indices.first { !used.contains($0) } ?? (list.count % profileColors.count)
+            for (key, base) in ownKeys(profileId) where copiedKeys.contains(base) || profilePrefixes.contains(where: { base.hasPrefix($0) }) {
+                store.set(store.object(forKey: key), forKey: "\(base)#\(id)")
+            }
+            store.set(baseUrl, forKey: "base_url#\(id)")
+            let p = Profile(id: id, name: name.trimmed, color: color, pin: nil)
+            saveProfiles(list + [p])
+            return p
+        }
+    }
+
+    static func renameProfile(_ id: String, _ name: String) {
+        locked { saveProfiles(profiles.map { var p = $0; if p.id == id { p.name = name.trimmed }; return p }) }
+    }
+
+    static func setProfileColor(_ id: String, _ color: Int) {
+        locked { saveProfiles(profiles.map { var p = $0; if p.id == id { p.color = color }; return p }) }
+    }
+
+    /// Đặt mã PIN (4 số); nil = tắt khoá.
+    static func setProfilePin(_ id: String, _ pin: String?) {
+        locked { saveProfiles(profiles.map { var p = $0; if p.id == id { p.pin = pin.map { pinHash(id, $0) } }; return p }) }
+    }
+
+    static func checkPin(_ p: Profile, _ pin: String) -> Bool { p.pin == nil || p.pin == pinHash(p.id, pin) }
+
+    /// Không lưu mã PIN thật, chỉ lưu mã băm (khoá cho trẻ em khỏi vào nhầm, không phải mật khẩu bảo mật).
+    private static func pinHash(_ id: String, _ pin: String) -> String {
+        SHA256.hash(data: Data("chimto-pin:\(id):\(pin)".utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Xoá người xem cùng toàn bộ dữ liệu riêng; còn một người thì không xoá được.
+    static func deleteProfile(_ id: String) {
+        locked {
+            let list = profiles
+            guard list.count > 1, list.contains(where: { $0.id == id }) else { return }
+            for (key, _) in ownKeys(id) { store.removeObject(forKey: key) }
+            let rest = list.filter { $0.id != id }
+            saveProfiles(rest)
+            if profileId == id { switchProfile(rest[0].id) }
+        }
+    }
+
+    /// Hỏi "Ai đang xem?" khi mở app (từ 2 người xem).
+    static var askProfile: Bool {
+        get { store.object(forKey: "ask_profile") as? Bool ?? true }
+        set { store.set(newValue, forKey: "ask_profile") }
+    }
+
+    /// Về màn hình chính của iPad lúc đang xem: thu nhỏ phim (hình trong hình) thay vì dừng.
+    static var pipOnHome: Bool {
+        get { store.object(forKey: "pip_on_home") as? Bool ?? true }
+        set { store.set(newValue, forKey: "pip_on_home") }
+    }
+
     // MARK: - Trang phim
 
-    /// Trang phim đang dùng (địa chỉ gốc, không có dấu / ở cuối). Đặt trang mới thì tự thêm vào danh sách.
+    /// Trang phim đang dùng (địa chỉ gốc, không có dấu / ở cuối). Đặt trang mới thì tự thêm vào danh sách. Riêng từng
+    /// người xem.
     static var baseUrl: String {
-        get { store.string(forKey: "base_url") ?? defaultBase }
+        get { store.string(forKey: k("base_url")) ?? store.string(forKey: "base_url") ?? defaultBase }
         set {
-            store.set(newValue, forKey: "base_url")
+            store.set(newValue, forKey: k("base_url"))
             if !sites.contains(newValue) { sites = sites + [newValue] }
         }
     }
@@ -41,22 +214,22 @@ enum Prefs {
     }
 
     /// Server người xem chọn lần gần nhất trên từng trang (vd "tiktik").
-    static func serverType(_ host: String?) -> String? { store.string(forKey: "server_type@\(host ?? "")") }
-    static func serverLabel(_ host: String?) -> String? { store.string(forKey: "server_label@\(host ?? "")") }
+    static func serverType(_ host: String?) -> String? { store.string(forKey: k("server_type@\(host ?? "")")) }
+    static func serverLabel(_ host: String?) -> String? { store.string(forKey: k("server_label@\(host ?? "")")) }
 
     static func setServer(_ host: String?, type: String?, label: String?) {
-        store.set(type, forKey: "server_type@\(host ?? "")")
-        store.set(label, forKey: "server_label@\(host ?? "")")
+        store.set(type, forKey: k("server_type@\(host ?? "")"))
+        store.set(label, forKey: k("server_label@\(host ?? "")"))
     }
 
     static var seekStep: Int {
-        get { store.object(forKey: "seek_step") as? Int ?? 10 }
-        set { store.set(newValue, forKey: "seek_step") }
+        get { store.object(forKey: k("seek_step")) as? Int ?? 10 }
+        set { store.set(newValue, forKey: k("seek_step")) }
     }
 
     static var autoNext: Bool {
-        get { store.object(forKey: "auto_next") as? Bool ?? true }
-        set { store.set(newValue, forKey: "auto_next") }
+        get { store.object(forKey: k("auto_next")) as? Bool ?? true }
+        set { store.set(newValue, forKey: k("auto_next")) }
     }
 
     /// Chuẩn hoá chuỗi người dùng gõ ("yanhh3d.ee", "https://yanhh3d.ee/") → "https://yanhh3d.ee"; sai thì nil.
@@ -108,7 +281,7 @@ enum Prefs {
     static var history: [HistoryItem] {
         locked {
             if let h = historyCache { return h }
-            let h = decode([HistoryItem].self, "history") ?? []
+            let h = decode([HistoryItem].self, k("history")) ?? []
             historyCache = h
             return h
         }
@@ -117,7 +290,7 @@ enum Prefs {
     private static func saveHistory(_ list: [HistoryItem]) {
         locked {
             historyCache = list
-            encode(list, "history")
+            encode(list, k("history"))
         }
     }
 
@@ -149,8 +322,8 @@ enum Prefs {
     // MARK: - Phim theo dõi
 
     static var follows: [Follow] {
-        get { decode([Follow].self, "follows") ?? [] }
-        set { encode(newValue, "follows") }
+        get { decode([Follow].self, k("follows")) ?? [] }
+        set { encode(newValue, k("follows")) }
     }
 
     static func followOf(_ filmUrl: String) -> Follow? { follows.first { $0.filmUrl == filmUrl } }
@@ -180,8 +353,8 @@ enum Prefs {
     }
 
     static var lastFollowCheck: Int64 {
-        get { Int64(store.double(forKey: "last_follow_check")) }
-        set { store.set(Double(newValue), forKey: "last_follow_check") }
+        get { Int64(store.double(forKey: k("last_follow_check"))) }
+        set { store.set(Double(newValue), forKey: k("last_follow_check")) }
     }
 
     // MARK: - Nhạc mở đầu (mốc riêng từng phim, giây)
@@ -198,16 +371,16 @@ enum Prefs {
 
     /// Lấp đầy màn hình: video rộng (21:9) phóng cho hết viền đen, cắt bớt hai bên.
     static var videoFill: Bool {
-        get { store.bool(forKey: "video_fill") }
-        set { store.set(newValue, forKey: "video_fill") }
+        get { store.bool(forKey: k("video_fill")) }
+        set { store.set(newValue, forKey: k("video_fill")) }
     }
 
     // MARK: - Riêng tư
 
     /// Xem riêng: không ghi lịch sử xem và chỗ đang xem (vẫn đọc được chỗ đã lưu từ trước).
     static var privateMode: Bool {
-        get { store.bool(forKey: "private_mode") }
-        set { store.set(newValue, forKey: "private_mode") }
+        get { store.bool(forKey: k("private_mode")) }
+        set { store.set(newValue, forKey: k("private_mode")) }
     }
 
     /// Tự xoá dữ liệu duyệt web khi rời app.
@@ -236,7 +409,7 @@ enum Prefs {
     private static func positions() -> [Position] {
         locked {
             if let p = positionsCache { return p }
-            let p = decode([Position].self, "positions_v2") ?? []
+            let p = decode([Position].self, k("positions_v2")) ?? []
             positionsCache = p
             return p
         }
@@ -245,7 +418,7 @@ enum Prefs {
     private static func savePositions(_ list: [Position]) {
         locked {
             positionsCache = list
-            encode(list, "positions_v2")
+            encode(list, k("positions_v2"))
         }
     }
 

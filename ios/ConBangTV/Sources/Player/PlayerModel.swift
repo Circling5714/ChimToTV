@@ -1,3 +1,4 @@
+import AVKit
 import UIKit
 import WebKit
 
@@ -95,8 +96,26 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     private var timers: [String: Task<Void, Never>] = [:]
     private var polling: Task<Void, Never>?
     private var logRelay: ScriptRelay?
-    /// Khung con đã gặp trong lần nạp này: địa chỉ → khung (cho cổng gỡ lỗi).
+    /// Khung con đã gặp trong lần nạp này: địa chỉ → khung (cho cổng gỡ lỗi, hình trong hình).
     private(set) var frames: [(url: String, frame: WKFrameInfo)] = []
+
+    // MARK: Hình trong hình
+
+    /// Đang ở cửa sổ hình trong hình của iPad (agent báo theo video).
+    @Published private(set) var inPip = false
+    /// Màn trình phát đã đóng lúc phim đang hình trong hình (người xem dùng màn khác của app / app khác): trình phát vẫn
+    /// chạy tới khi phóng to (mở lại màn trình phát) hoặc đóng cửa sổ nhỏ.
+    private(set) var detached = false
+    static var detachedModel: PlayerModel?
+    /// PlayerController đóng màn trình phát mà không huỷ trình phát.
+    var onDetach: () -> Void = {}
+    private var pipRequestedAt: Int64 = 0
+    /// Hình trong hình tự bật lúc rời app (vuốt về màn hình chính); app có ra nền thật không.
+    private var pipAuto = false
+    private var wentBackground = false
+    private var begun = false
+    /// Đổi người xem: đã lưu chỗ xem cho người cũ, không ghi gì nữa.
+    private var saveDisabled = false
 
     init(filmUrl: String, epUrl: String, continueMode: Bool) {
         self.filmUrl = filmUrl
@@ -119,6 +138,8 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     // MARK: - Mở phim / tập / server
 
     func begin() {
+        guard !begun else { return } // mở lại màn trình phát của phim đang hình trong hình: trình phát vẫn chạy
+        begun = true
         startPolling()
         if let cached = Site.cachedDetail(filmUrl) {
             start(cached, epUrl: startEpUrl)
@@ -417,6 +438,8 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
                           droppedFrames: Int(Self.num(o["df"])), totalFrames: Int(Self.num(o["tf"])))
         let wasPaused = state?.paused
         if state != s { state = s }
+        let pip = Self.flag(o["pip"])
+        if pip != inPip { pipChanged(pip) }
         let err = (o["err"] as? String) ?? ""
         if !err.isEmpty && !errShown {
             errShown = true
@@ -662,7 +685,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     }
 
     func savePosition() {
-        guard let s = state, started, !episodeUrl.isEmpty, !resumePending else { return }
+        guard let s = state, started, !episodeUrl.isEmpty, !resumePending, !saveDisabled else { return }
         // Xem gần hết thì coi như xong (lần sau mở lại từ đầu)
         let done = s.ended || (s.d > 0 && s.t > s.d - 90)
         Prefs.savePosition(episodeUrl, seconds: done ? 0 : Int(s.t), filmUrl: detail?.url ?? filmUrl)
@@ -747,15 +770,114 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         onClose()
     }
 
-    // MARK: - Vòng đời
+    // MARK: - Hình trong hình
 
-    func didEnterBackground() {
+    static var pipSupported: Bool { AVPictureInPictureController.isPictureInPictureSupported() }
+
+    /// Thu nhỏ phim (cửa sổ hình trong hình của iPad). Gọi thẳng trong khung có <video>: WebKit chỉ cho vào hình trong
+    /// hình khi "người dùng vừa bấm" — evaluateJavaScript của app được tính là vậy, qua postMessage của trang bọc thì mất.
+    func startPip() {
+        guard started, !inPip else { return }
+        pipRequestedAt = nowMs()
+        hidePanel()
+        hideBar()
+        pipInFrames(true)
+    }
+
+    func stopPip() { pipInFrames(false) }
+
+    private func pipInFrames(_ on: Bool) {
+        let js = "(window.__chimtoHere&&window.__chimtoHere('pip',\(on ? 1 : 0)))||false"
+        web.evaluateJavaScript(js, in: nil, in: .page) { r in Log.d("Pip", "khung chính: \(r)") }
+        for f in frames {
+            web.evaluateJavaScript(js, in: f.frame, in: .page) { r in Log.d("Pip", "\(f.url.prefix(60)): \(r)") }
+        }
+    }
+
+    private func pipChanged(_ on: Bool) {
+        inPip = on
+        Log.d("Pip", on ? "vào hình trong hình" : "ra khỏi hình trong hình (\(state?.paused == true ? "đang dừng" : "đang phát"))")
+        if on {
+            // Đang dùng app (bấm Thu nhỏ): đóng màn trình phát, phim chạy tiếp ở cửa sổ nổi — dùng các màn khác được
+            if UIApplication.shared.applicationState == .active && !detached {
+                detached = true
+                PlayerModel.detachedModel = self
+                onDetach()
+            }
+        } else if detached {
+            if state?.paused == false {
+                // Nút phóng to của cửa sổ nhỏ: mở lại màn trình phát (trình phát vẫn chạy)
+                detached = false
+                PlayerModel.detachedModel = nil
+                Router.present(self)
+            } else {
+                closeDetached() // nút ✕ của cửa sổ nhỏ (phim dừng)
+            }
+        }
+    }
+
+    /// Đóng phim đang ở cửa sổ hình trong hình (màn trình phát đã đóng): lưu chỗ xem, huỷ trình phát.
+    func closeDetached() {
+        guard detached else { return }
+        detached = false
+        if PlayerModel.detachedModel === self { PlayerModel.detachedModel = nil }
         savePosition()
         session?.save(nowMs())
+        session = nil
+        teardown()
+        AppModel.shared.playerClosed()
+    }
+
+    /// Đổi người xem: lưu chỗ xem cho người cũ rồi đóng trình phát (đang hình trong hình / đang mở).
+    static func closeForProfileSwitch() {
+        if let m = detachedModel {
+            m.closeDetached()
+            m.saveDisabled = true
+        }
+        if let c = Router.topController as? PlayerController {
+            c.model.close()
+            c.model.saveDisabled = true
+        }
+    }
+
+    // MARK: - Vòng đời
+
+    /// Sắp rời app (vuốt về màn hình chính): đang phát thì thu nhỏ phim (Cài đặt → "Về màn hình chính lúc đang xem").
+    func willResignActive() {
+        wentBackground = false
+        guard Prefs.pipOnHome, Self.pipSupported, started, state?.paused == false, !inPip, !detached else { return }
+        pipAuto = true
+        startPip()
+    }
+
+    func didEnterBackground() {
+        wentBackground = true
+        savePosition()
+        session?.save(nowMs())
+        // Hình trong hình (hoặc vừa xin vào): phim chạy tiếp; xin mà không vào được thì dừng (khỏi phát tiếng ở nền)
+        if inPip { return }
+        if nowMs() - pipRequestedAt < 3000 {
+            after("pipcheck", 2.5) { [weak self] in
+                guard let self = self, !self.inPip, UIApplication.shared.applicationState == .background else { return }
+                Log.d("Pip", "không vào được hình trong hình — dừng phim")
+                self.cmd("pause")
+            }
+            return
+        }
         cmd("pause")
     }
 
+    func didBecomeActive() {
+        defer {
+            pipAuto = false
+            wentBackground = false
+        }
+        // Kéo Trung tâm điều khiển xuống rồi thả (app không ra nền): thôi hình trong hình vừa tự bật
+        if pipAuto && !wentBackground && inPip && !detached { stopPip() }
+    }
+
     func teardown() {
+        if PlayerModel.detachedModel === self { PlayerModel.detachedModel = nil }
         token += 1
         polling?.cancel()
         polling = nil
@@ -864,6 +986,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             "groups": groups.map { $0.name }, "group": group?.name ?? NSNull(),
             "embed": embedUrl ?? NSNull(), "hls": hlsUrl ?? NSNull(), "startHint": startHint, "resumeAt": resumeAt,
             "pageLoad": pageLoad, "rate": rate, "session": sessionText ?? NSNull(),
+            "pip": inPip, "detached": detached,
         ]
         if let s = state {
             o["state"] = ["t": s.t, "d": s.d, "paused": s.paused, "ended": s.ended, "waiting": s.waiting, "ready": s.ready,

@@ -95,12 +95,99 @@ final class AppModel: ObservableObject {
 
     static let headCount = 6
 
+    // MARK: - Người xem (hồ sơ)
+
+    @Published private(set) var profiles = Prefs.profiles
+    @Published private(set) var profileId = Prefs.profileId
+    /// Màn "Ai đang xem?" đang hiện.
+    @Published var askingProfile = false
+    /// Đổi mỗi lần đổi người xem (Cài đặt dựng lại theo người mới).
+    @Published private(set) var profileVersion = 0
+    /// Màn "Ai đang xem?" đang chặn cửa (mở app / quay lại sau lâu): người đang dùng có mã PIN thì không được đóng.
+    private var pickerGate = false
+    /// Vừa xoá người đang xem mà ai còn lại cũng có mã PIN: hỏi "Ai đang xem?" khi đóng Cài đặt.
+    private var pendingGate = false
+    private var leftAt: Int64 = 0
+
+    /// Mở app phải chọn người xem: nhà có từ 2 người (và bật "hỏi khi mở app"), hoặc người đang dùng có mã PIN.
+    var mustAskProfile: Bool { (Prefs.profiles.count >= 2 && Prefs.askProfile) || Prefs.profile.locked }
+    var pickerClosable: Bool { !(pickerGate && Prefs.profile.locked) }
+
     func startIfNeeded() {
-        guard !started else { return }
+        guard !started, !askingProfile else { return }
+        if mustAskProfile {
+            showPicker(gate: true) // chọn người xem trước khi tải (mỗi người một trang phim, lịch sử riêng)
+            return
+        }
+        begin()
+    }
+
+    private func begin() {
         started = true
         showSiteLabel()
         rebuildMenu()
         select(menu[0])
+    }
+
+    func refreshProfiles() {
+        profiles = Prefs.profiles
+        profileId = Prefs.profileId
+    }
+
+    func showPicker(gate: Bool) {
+        refreshProfiles()
+        pickerGate = gate
+        askingProfile = true
+    }
+
+    /// Đóng màn "Ai đang xem?": xem tiếp bằng người đang dùng.
+    func closePicker() {
+        guard pickerClosable else { return }
+        askingProfile = false
+        if !started { begin() }
+    }
+
+    /// Chọn xong người xem (đã nhập đúng mã PIN nếu có).
+    func pickProfile(_ p: Profile) {
+        let changed = p.id != Prefs.profileId
+        if changed {
+            PlayerModel.closeForProfileSwitch()
+            Prefs.switchProfile(p.id)
+            profileVersion += 1
+        }
+        refreshProfiles()
+        askingProfile = false
+        if !started {
+            begin()
+        } else if changed {
+            reloadSite()
+            showToast("Người xem: \(p.name)")
+        }
+    }
+
+    func deleteProfile(_ p: Profile) {
+        let wasCurrent = p.id == Prefs.profileId
+        if wasCurrent { PlayerModel.closeForProfileSwitch() }
+        Prefs.deleteProfile(p.id)
+        if wasCurrent {
+            // Sang người không khoá; ai cũng có mã PIN thì hỏi "Ai đang xem?" (không tự vào hồ sơ có khoá)
+            if let open = Prefs.profiles.first(where: { !$0.locked }) { Prefs.switchProfile(open.id) } else { pendingGate = true }
+            profileVersion += 1
+        }
+        refreshProfiles()
+        showToast("Đã xoá \(p.name).")
+        if wasCurrent && started { reloadSite() }
+    }
+
+    /// App sang nền: nhớ lúc rời app (quay lại sau ≥ 30 phút thì hỏi lại người xem).
+    func appLeft() { leftAt = nowMs() }
+
+    func appReturned() {
+        defer { leftAt = 0 }
+        guard leftAt > 0, nowMs() - leftAt >= 30 * 60_000, started, !askingProfile, sheet == nil, mustAskProfile else { return }
+        // Phim đang mở / đang ở cửa sổ hình trong hình: vẫn đang xem — thôi
+        if Router.topController is PlayerController || PlayerModel.detachedModel != nil { return }
+        showPicker(gate: true)
     }
 
     // MARK: - Menu
@@ -190,6 +277,11 @@ final class AppModel: ObservableObject {
 
     /// Cài đặt / danh sách trang vừa đóng: link trang đổi thì tải lại từ đầu.
     func settingsClosed() {
+        refreshProfiles()
+        if pendingGate {
+            pendingGate = false
+            showPicker(gate: true)
+        }
         showSiteLabel()
         if loadedBase != nil && loadedBase != Prefs.baseUrl { reloadSite() } else { rebuildMenu() }
     }
@@ -528,6 +620,7 @@ final class AppModel: ObservableObject {
     /// Cho cổng gỡ lỗi.
     func debugState() -> [String: Any] {
         [
+            "profile": Prefs.profile.name, "profiles": profiles.map { $0.name }, "askingProfile": askingProfile,
             "site": Prefs.baseUrl, "title": title, "active": active?.title ?? NSNull(),
             "status": "\(status)", "detail": detailFilm?.url ?? NSNull(),
             "sections": sections.map { ["title": $0.title ?? "", "count": $0.items.count, "first": $0.items.prefix(3).map { $0.film.title }] },

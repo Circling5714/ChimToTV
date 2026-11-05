@@ -377,6 +377,8 @@ enum DebugRoutes {
         case "double": m.doubleTap(left: q["left"] == "1")
         case "escape": m.escape()
         case "accept": m.acceptSuggestion()
+        case "pip": m.startPip()
+        case "unpip": m.stopPip()
         default: return .text("do=?", status: 400)
         }
         return .json(["ok": true, "state": m.debugState()])

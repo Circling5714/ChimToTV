@@ -18,6 +18,25 @@ struct SettingsView: View {
     @State private var serverLabel = Prefs.serverLabel(Site.hostOf(Prefs.baseUrl))
     @State private var confirmHistory = false
     @State private var dataStatus = ""
+    @State private var askProfile = Prefs.askProfile
+    @State private var pipOnHome = Prefs.pipOnHome
+    @State private var profileSheet: ProfileSheet?
+    @State private var unlockFor: Profile?
+
+    /// Thêm / sửa người xem.
+    private enum ProfileSheet: Identifiable {
+        case add
+        case edit(Profile)
+        var id: String {
+            switch self {
+            case .add: return "add"
+            case .edit(let p): return "edit|\(p.id)"
+            }
+        }
+    }
+
+    /// Nhà nhiều người xem: các mục của riêng người đang dùng ghi rõ tên.
+    private var who: String { app.profiles.count >= 2 ? " của \(Prefs.profile.name)" : "" }
 
     private var version: String {
         let v = UpdateCheck.currentVersion
@@ -28,6 +47,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             Form {
+                profileSection
                 siteSection
                 Section {
                     ForEach(sites, id: \.self) { s in
@@ -64,14 +84,20 @@ struct SettingsView: View {
                         }
                         .disabled(serverLabel == nil)
                     }
-                } header: { Text("Phát video") }
+                    if PlayerModel.pipSupported {
+                        Toggle("Về màn hình chính lúc đang xem: thu nhỏ phim (hình trong hình)", isOn: $pipOnHome)
+                            .onChange(of: pipOnHome) { Prefs.pipOnHome = $0 }
+                    }
+                } header: { Text("Phát video") } footer: {
+                    Text("Hình trong hình: lúc xem chạm nút thu nhỏ (cạnh nút Menu) — phim chạy tiếp ở cửa sổ nổi, vẫn chọn phim khác / dùng app khác được. Cửa sổ nhỏ có nút phóng to và nút đóng.")
+                }
 
                 Section {
-                    Button("Xoá lịch sử xem", role: .destructive) { confirmHistory = true }
+                    Button("Xoá lịch sử xem\(who)", role: .destructive) { confirmHistory = true }
                     Button("Xoá ảnh & dữ liệu duyệt web") {
                         app.clearWebData(images: true) { dataStatus = "Đã xoá ảnh, cookie và dữ liệu duyệt web." }
                     }
-                    Toggle("Xem riêng (không lưu lịch sử)", isOn: $privateMode)
+                    Toggle("Xem riêng\(who) (không lưu lịch sử)", isOn: $privateMode)
                         .onChange(of: privateMode) {
                             Prefs.privateMode = $0
                             app.showSiteLabel()
@@ -118,16 +144,61 @@ struct SettingsView: View {
             .navigationTitle("Cài đặt")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Xong") { dismiss() } } }
-            .alert("Xoá lịch sử xem?", isPresented: $confirmHistory) {
+            .alert("Xoá lịch sử xem\(who)?", isPresented: $confirmHistory) {
                 Button("Xoá", role: .destructive) {
                     Prefs.clearHistory()
-                    dataStatus = "Đã xoá lịch sử xem."
+                    dataStatus = "Đã xoá lịch sử xem\(who)."
                     app.playerClosed()
                 }
                 Button("Huỷ", role: .cancel) {}
             } message: { Text("Xoá mọi phim đã xem và chỗ đang xem dở.") }
+            .sheet(item: $profileSheet) { s in
+                Group {
+                    switch s {
+                    case .add: ProfileEditView(editing: nil)
+                    case .edit(let p): ProfileEditView(editing: p)
+                    }
+                }
+                .environmentObject(app)
+                .preferredColorScheme(.dark)
+            }
         }
         .navigationViewStyle(.stack)
+        .overlay {
+            if let p = unlockFor {
+                PinPad(title: "Nhập mã PIN của \(p.name) để sửa", onCancel: { unlockFor = nil }) { pin in
+                    guard Prefs.checkPin(p, pin) else { return false }
+                    unlockFor = nil
+                    profileSheet = .edit(p)
+                    return true
+                }
+            }
+        }
+    }
+
+    private var profileSection: some View {
+        Section {
+            ForEach(app.profiles) { p in
+                Button {
+                    if p.locked { unlockFor = p } else { profileSheet = .edit(p) }
+                } label: {
+                    HStack(spacing: 12) {
+                        ProfileAvatar(profile: p, size: 32)
+                        Text(p.name).foregroundColor(Theme.text)
+                        if p.locked { Image(systemName: "lock.fill").font(.system(size: 13)).foregroundColor(Theme.dim) }
+                        Spacer()
+                        if p.id == app.profileId { Text("đang xem").foregroundColor(Theme.dim) }
+                    }
+                }
+            }
+            if app.profiles.count < Prefs.maxProfiles {
+                Button("Thêm người xem") { profileSheet = .add }
+            }
+            Toggle("Hỏi «Ai đang xem?» khi mở app", isOn: $askProfile)
+                .onChange(of: askProfile) { Prefs.askProfile = $0 }
+        } header: { Text("Người xem") } footer: {
+            Text("Mỗi người có riêng: lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, phim theo dõi, trang phim đang dùng, server ưu tiên, Xem riêng, bước tua, tự chuyển tập, khung hình. Dùng chung cả nhà: danh sách trang phim, dữ liệu duyệt web, điểm server, mốc nhạc mở đầu. Chạm một người để đổi tên / màu, đặt hoặc tắt mã PIN, chuyển sang, xoá.")
+        }
     }
 
     private var siteSection: some View {

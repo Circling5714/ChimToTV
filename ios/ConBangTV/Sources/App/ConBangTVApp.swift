@@ -17,9 +17,11 @@ struct ConBangTVApp: App {
             Log.d("App", "trạng thái: \(p)")
             switch p {
             case .active:
+                AppModel.shared.appReturned() // quay lại sau ≥ 30 phút: hỏi lại "Ai đang xem?"
                 AppModel.shared.checkUpdate(manual: false)
                 AppModel.shared.checkFollows()
             case .background:
+                AppModel.shared.appLeft()
                 AutoClear.leftApp()
             default:
                 break
@@ -71,7 +73,7 @@ enum AutoClear {
     static func leftApp() {
         guard Prefs.autoClearWeb, Prefs.webDirty else { return }
         let top = Router.topController
-        if top is PlayerController || top is BrowserController { return }
+        if top is PlayerController || top is BrowserController || PlayerModel.detachedModel != nil { return }
         BrowsingData.clear(images: false) { Log.d("AutoClear", "đã xoá dữ liệu web khi rời app") }
     }
 }
