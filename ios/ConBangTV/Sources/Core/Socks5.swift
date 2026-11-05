@@ -247,6 +247,11 @@ enum Socks5 {
         default: break
         }
         _ = try s.readFully(2)
+        // Mã 2 khi có đăng nhập: nhiều proxy (vd 3proxy) nhận mọi mật khẩu ở bước đăng nhập rồi mới từ chối ở đây —
+        // thường là sai tên đăng nhập / mật khẩu (đo trên proxy nhà của người dùng)
+        if rep == 2 && login {
+            throw SocksError(code: rep, message: "proxy không cho mở \(host):\(port) — thường do sai tên đăng nhập / mật khẩu (kiểm tra chữ hoa / chữ thường), hoặc proxy chặn trang này")
+        }
         if rep != 0 { throw SocksError(code: rep, message: "proxy không mở được \(host):\(port) (\(replies[rep] ?? "mã \(rep)"))") }
     }
 

@@ -13,6 +13,7 @@ struct ProxySection: View {
     @State private var status = ""
     @State private var failed = false
     @State private var testing = false
+    @State private var showPass = false
 
     var body: some View {
         Section {
@@ -25,7 +26,25 @@ struct ProxySection: View {
             TextField("Tên đăng nhập (bỏ trống nếu không có)", text: $user)
                 .textInputAutocapitalization(.never)
                 .disableAutocorrection(true)
-            SecureField("Mật khẩu (bỏ trống nếu không có)", text: $pass)
+            HStack {
+                // Ô mật khẩu: không tự viết hoa chữ đầu / tự sửa chữ (bàn phím iPad bật sẵn Shift → sai mật khẩu mà
+                // không thấy vì chữ bị che); nút con mắt để xem lại chữ đã gõ
+                Group {
+                    if showPass {
+                        TextField("Mật khẩu (bỏ trống nếu không có)", text: $pass)
+                    } else {
+                        SecureField("Mật khẩu (bỏ trống nếu không có)", text: $pass)
+                    }
+                }
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+                .textContentType(.password)
+                Button { showPass.toggle() } label: {
+                    Image(systemName: showPass ? "eye.slash" : "eye").foregroundColor(Theme.dim)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(showPass ? "Ẩn mật khẩu" : "Hiện mật khẩu")
+            }
             HStack {
                 Text("DNS")
                 Spacer()

@@ -95,6 +95,11 @@ object Socks5 {
             4 -> i.readFully(ByteArray(16))
         }
         i.readUnsignedShort()
+        // Mã 2 khi có đăng nhập: nhiều proxy (vd 3proxy) nhận mọi mật khẩu ở bước đăng nhập rồi mới từ chối ở đây —
+        // thường là sai tên đăng nhập / mật khẩu (đo trên proxy nhà của người dùng)
+        if (rep == 2 && login) {
+            throw SocksError(rep, "proxy không cho mở $host:$port — thường do sai tên đăng nhập / mật khẩu (kiểm tra chữ hoa / chữ thường), hoặc proxy chặn trang này")
+        }
         if (rep != 0) throw SocksError(rep, "proxy không mở được $host:$port (${REPLIES[rep] ?: "mã $rep"})")
     }
 
