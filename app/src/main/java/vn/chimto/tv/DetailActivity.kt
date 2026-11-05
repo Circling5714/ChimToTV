@@ -3,6 +3,7 @@ package vn.chimto.tv
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -75,8 +76,8 @@ class DetailActivity : BaseActivity() {
             ImageLoader.load(findViewById(R.id.backdrop), it, maxWidth = 200)
         }
 
-        val widthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density - 72
-        episodes.layoutManager = GridLayoutManager(this, max(4, (widthDp / 104).toInt()))
+        episodes.layoutManager = GridLayoutManager(this, 4)
+        applyLayout()
         episodes.adapter = adapter
         episodes.itemAnimator = null
 
@@ -87,6 +88,49 @@ class DetailActivity : BaseActivity() {
         btnJump.setOnClickListener { askEpisode() }
         findViewById<View>(R.id.btnWeb).setOnClickListener { startActivity(WebActivity.intent(this, url)) }
         load()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyLayout() // điện thoại xoay ngang / dọc
+    }
+
+    /**
+     * Ngang (TV, điện thoại xoay ngang): poster bên trái, chữ và hàng nút bên phải. Điện thoại cầm dọc: poster nhỏ, hàng
+     * nút xuống dưới rộng cả màn (cuộn ngang), lề nhỏ; chừa chỗ trên cùng cho nút "‹ Quay lại".
+     */
+    private fun applyLayout() {
+        val narrow = Screen.narrow(this)
+        val body = findViewById<LinearLayout>(R.id.body)
+        val head = findViewById<View>(R.id.headRow)
+        val info = findViewById<LinearLayout>(R.id.infoCol)
+        val buttons = findViewById<View>(R.id.btnScroll)
+        body.padH(dp(if (narrow) 14 else 36), top = dp(if (narrow) 58 else 24))
+        findViewById<View>(R.id.poster).layoutParams.apply {
+            width = dp(if (narrow) 96 else 124)
+            height = dp(if (narrow) 144 else 186)
+        }
+        (info.layoutParams as LinearLayout.LayoutParams).marginStart = dp(if (narrow) 14 else 24)
+        findViewById<TextView>(R.id.title).textSize = if (narrow) 21f else 27f
+        findViewById<TextView>(R.id.desc).maxLines = if (narrow) 5 else 3
+        val inInfo = buttons.parent === info
+        if (narrow && inInfo) {
+            info.removeView(buttons)
+            body.addView(buttons, body.indexOfChild(head) + 1)
+        } else if (!narrow && !inInfo) {
+            body.removeView(buttons)
+            info.addView(buttons)
+        }
+        (buttons.layoutParams as LinearLayout.LayoutParams).apply {
+            width = LinearLayout.LayoutParams.MATCH_PARENT
+            topMargin = dp(if (narrow) 10 else 14)
+        }
+        head.requestLayout()
+        // Số cột tập: TV ~ ô 104dp; điện thoại dọc ô nhỏ hơn (~84dp) cho đủ 4 cột
+        val widthDp = resources.configuration.screenWidthDp.takeIf { it > 0 }
+            ?: (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
+        (episodes.layoutManager as GridLayoutManager).spanCount =
+            if (narrow) max(4, (widthDp - 28) / 84) else max(4, (widthDp - 72) / 104)
     }
 
     override fun onResume() {

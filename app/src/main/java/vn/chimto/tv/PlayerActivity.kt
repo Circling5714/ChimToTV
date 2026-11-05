@@ -1612,6 +1612,15 @@ class PlayerActivity : BaseActivity() {
         pipListeners.toList().forEach { it() }
     }
 
+    /** Điện thoại: xem phim toàn màn hình — ẩn thanh điều hướng (vuốt từ mép để hiện lại một lúc). TV không có thanh này. */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus || Screen.isTv(this) || inPip) return
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+            View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+    }
+
     // ---- Vòng đời ----
 
     override fun onStart() {

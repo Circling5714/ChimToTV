@@ -25,7 +25,6 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -502,7 +501,7 @@ class ProfilePicker(
     private val onManage: () -> Unit,
 ) {
     private val root = FrameLayout(activity)
-    private val row = LinearLayout(activity)
+    private val row = FlowRow(activity) // điện thoại cầm dọc: các ô tự xuống dòng
 
     /** Hiện ra để chọn người khi mở app / quay lại sau lâu không dùng (Back không được bỏ qua mã PIN). */
     var gate = false
@@ -513,6 +512,7 @@ class ProfilePicker(
     init {
         root.setBackgroundColor(activity.colorOf(R.color.bg))
         root.isClickable = true // chạm không lọt xuống màn chính
+        root.isFocusable = false // Android 8+: khung nhận chạm tự thành nhận tiêu điểm, giành mất tiêu điểm của remote
         val column = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
@@ -531,26 +531,22 @@ class ProfilePicker(
         column.addView(
             TextView(activity).apply {
                 text = "Mỗi người có lịch sử xem, Xem tiếp, phim theo dõi và cài đặt riêng."
+                gravity = Gravity.CENTER
+                setPadding(activity.dp(16), 0, activity.dp(16), 0)
                 textSize = 15f
                 setTextColor(activity.colorOf(R.color.text_dim))
             },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 .apply { topMargin = activity.dp(8) },
         )
-        row.orientation = LinearLayout.HORIZONTAL
-        row.gravity = Gravity.CENTER
+        row.centered = true
+        row.rowGap = activity.dp(16)
         row.clipChildren = false
         row.clipToPadding = false
-        row.setPadding(activity.dp(24), activity.dp(18), activity.dp(24), activity.dp(18))
-        val scroll = HorizontalScrollView(activity).apply {
-            isHorizontalScrollBarEnabled = false
-            clipChildren = false
-            clipToPadding = false
-            addView(row)
-        }
+        row.setPadding(activity.dp(12), activity.dp(18), activity.dp(12), activity.dp(18))
         column.addView(
-            scroll,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            row,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 .apply { topMargin = activity.dp(18) },
         )
         val manage = LayoutInflater.from(activity).inflate(R.layout.item_button, column, false) as TextView

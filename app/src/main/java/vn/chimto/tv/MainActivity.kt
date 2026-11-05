@@ -3,13 +3,17 @@ package vn.chimto.tv
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
@@ -46,6 +50,13 @@ class MainActivity : BaseActivity() {
     private lateinit var siteLabel: TextView
     private lateinit var search: EditText
     private lateinit var status: StatusView
+    private lateinit var side: View
+    private lateinit var scrim: View
+    private lateinit var menuBtn: View
+    private lateinit var siteTag: TextView
+
+    /** Ngăn kéo menu đang mở (điện thoại cầm dọc). */
+    private var drawerOpen = false
 
     private val menuAdapter = MenuAdapter<Entry>({ it.title }, ::onMenu)
     private val gridAdapter = FilmGridAdapter(::openFilm, ::loadMore, ::confirmRemove)
@@ -79,19 +90,22 @@ class MainActivity : BaseActivity() {
         siteLabel = findViewById(R.id.siteLabel)
         search = findViewById(R.id.search)
         status = StatusView(findViewById(R.id.status))
+        side = findViewById(R.id.side)
+        scrim = findViewById(R.id.scrim)
+        menuBtn = findViewById(R.id.menuBtn)
+        siteTag = findViewById(R.id.siteTag)
+        menuBtn.setOnClickListener { openDrawer() }
+        scrim.setOnClickListener { closeDrawer() }
 
         menu.layoutManager = LinearLayoutManager(this)
         menu.adapter = menuAdapter
 
-        // Số cột theo bề ngang màn hình (TV 720p/1080p thường ~960dp → 5 cột)
-        val widthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density - 240
-        gridAdapter.spanCount = max(3, (widthDp / 135).toInt())
         grid.layoutManager = GridLayoutManager(this, gridAdapter.spanCount).apply { spanSizeLookup = gridAdapter.spanLookup }
         grid.adapter = gridAdapter
         grid.itemAnimator = null
-        // Lưới cố định khung: thêm trang mới không bắt cả màn hình đo lại; giữ sẵn nhiều ô để cuộn qua lại không phải dựng lại
+        // Lưới cố định khung: thêm trang mới không bắt cả màn hình đo lại
         grid.setHasFixedSize(true)
-        grid.setItemViewCacheSize(gridAdapter.spanCount * 3)
+        applyLayout()
 
         search.leaveWithUpDown()
         search.setOnEditorActionListener { _, actionId, event ->
@@ -110,6 +124,91 @@ class MainActivity : BaseActivity() {
         PlayerActivity.pipListeners += pipChanged
         // Nhà nhiều người xem: hỏi "Ai đang xem?" trước khi tải (mỗi người một trang phim, lịch sử riêng)
         if (ProfileUi.mustAsk()) picker.show(gate = true) else startMain()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyLayout() // điện thoại xoay ngang / dọc
+    }
+
+    /**
+     * Bố cục theo bề ngang màn hình. Ngang (TV, điện thoại xoay ngang): menu dọc bên trái, lưới bên phải. Điện thoại cầm
+     * dọc (giống bản iPhone): thanh trên cùng ☰ · tên mục · tên trang; bấm ☰ thì menu trượt ra từ bên trái, nền tối phía
+     * sau (chạm nền / chọn mục / Back là đóng); lưới 3 cột.
+     */
+    private fun applyLayout() {
+        val narrow = Screen.narrow(this)
+        val frame = findViewById<FrameLayout>(R.id.mainFrame)
+        val root = findViewById<LinearLayout>(R.id.mainRoot)
+        val body = findViewById<View>(R.id.body)
+        if (narrow && side.parent === root) {
+            root.removeView(side)
+            frame.addView(side) // trên lớp nền tối (scrim)
+        } else if (!narrow && side.parent !== root) {
+            frame.removeView(side)
+            root.addView(side, 0)
+        }
+        side.animate().cancel()
+        scrim.animate().cancel()
+        side.translationX = 0f
+        scrim.alpha = 1f
+        if (narrow) {
+            val width = minOf(dp(300), dp(resources.configuration.screenWidthDp.coerceAtLeast(320) - 56))
+            side.layoutParams = FrameLayout.LayoutParams(width, FrameLayout.LayoutParams.MATCH_PARENT, Gravity.START)
+            side.elevation = dp(12).toFloat()
+            side.visibility = if (drawerOpen) View.VISIBLE else View.GONE
+            scrim.visibility = if (drawerOpen) View.VISIBLE else View.GONE
+        } else {
+            drawerOpen = false
+            side.layoutParams = LinearLayout.LayoutParams(dp(200), LinearLayout.LayoutParams.MATCH_PARENT)
+            side.elevation = 0f
+            side.visibility = View.VISIBLE
+            scrim.visibility = View.GONE
+        }
+        menuBtn.visibility = if (narrow) View.VISIBLE else View.GONE
+        siteTag.visibility = if (narrow) View.VISIBLE else View.GONE
+        body.padH(dp(if (narrow) 8 else 20), top = dp(if (narrow) 8 else 16))
+        titleView.textSize = if (narrow) 22f else 24f
+
+        // Số cột theo bề ngang còn lại (TV 720p/1080p thường ~960dp → 5 cột; điện thoại dọc ~400dp → 3 cột)
+        val widthDp = resources.configuration.screenWidthDp.takeIf { it > 0 }
+            ?: (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
+        val span = max(3, (widthDp - if (narrow) 16 else 240) / 135)
+        if (span != gridAdapter.spanCount || (grid.layoutManager as GridLayoutManager).spanCount != span) {
+            gridAdapter.spanCount = span
+            (grid.layoutManager as GridLayoutManager).spanCount = span
+            if (mainStarted && homeToken == token) refreshHead() // hàng Xem tiếp lấy đúng số phim một hàng
+        }
+        // Giữ sẵn nhiều ô để cuộn qua lại không phải dựng lại
+        grid.setItemViewCacheSize(gridAdapter.spanCount * 3)
+    }
+
+    // Màn chính trên điện thoại cầm dọc: không hiện nút "Thoát" (đã có ☰; Back của điện thoại nhấn 2 lần là thoát)
+    override val touchBackHidden get() = Screen.narrow(this)
+
+    private fun openDrawer() {
+        if (!Screen.narrow(this) || drawerOpen) return
+        drawerOpen = true
+        scrim.animate().cancel()
+        scrim.alpha = 0f
+        scrim.visibility = View.VISIBLE
+        scrim.animate().alpha(1f).setDuration(200).start()
+        side.animate().cancel()
+        side.visibility = View.VISIBLE
+        side.translationX = -side.layoutParams.width.toFloat()
+        side.animate().translationX(0f).setDuration(200).start()
+        val i = menuAdapter.items.indexOf(menuAdapter.active).coerceAtLeast(0)
+        menu.scrollToPosition(i)
+        if (!TouchUi.active) menu.post { menu.findViewHolderForAdapterPosition(i)?.itemView?.focusForRemote() }
+    }
+
+    private fun closeDrawer() {
+        if (!drawerOpen) return
+        drawerOpen = false
+        scrim.animate().alpha(0f).setDuration(180).withEndAction { if (!drawerOpen) scrim.visibility = View.GONE }.start()
+        side.animate().translationX(-side.width.toFloat()).setDuration(180)
+            .withEndAction { if (!drawerOpen) side.visibility = View.GONE }.start()
+        if (!TouchUi.active) menuBtn.focusForRemote()
     }
 
     private fun startMain() {
@@ -206,6 +305,10 @@ class MainActivity : BaseActivity() {
     }
 
     private fun focusMenu() {
+        if (Screen.narrow(this)) {
+            if (!TouchUi.active) menuBtn.focusForRemote()
+            return
+        }
         val i = menuAdapter.items.indexOf(menuAdapter.active).coerceAtLeast(0)
         menu.scrollToPosition(i)
         menu.post { menu.findViewHolderForAdapterPosition(i)?.itemView?.focusForRemote() }
@@ -216,6 +319,7 @@ class MainActivity : BaseActivity() {
         siteLabel.text = Site.hostOf(Prefs.baseUrl) + (if (AppProxy.active) "  ·  proxy" else "") +
             (if (AppProxy.dohActive) "  ·  DoH" else "") +
             if (Prefs.privateMode) "  ·  xem riêng" else ""
+        siteTag.text = siteLabel.text
     }
 
     private fun reloadSite() {
@@ -441,6 +545,7 @@ class MainActivity : BaseActivity() {
     }
 
     private fun onMenu(entry: Entry) {
+        closeDrawer()
         when (entry.kind) {
             Kind.PIP_EXPAND -> {
                 PlayerActivity.expandPip(this)
@@ -815,7 +920,15 @@ class MainActivity : BaseActivity() {
             closePicker()
             return
         }
-        // Đang ở lưới / ô tìm kiếm → quay về menu; đang ở menu → nhấn 2 lần để thoát
+        if (drawerOpen) {
+            closeDrawer()
+            return
+        }
+        // Đang ở lưới / ô tìm kiếm → quay về menu (điện thoại cầm dọc: mở ngăn kéo menu); đang ở menu → nhấn 2 lần để thoát
+        if (Screen.narrow(this) && !TouchUi.active && (grid.hasFocus() || search.hasFocus())) {
+            openDrawer()
+            return
+        }
         if (grid.hasFocus() || search.hasFocus()) {
             val i = menuAdapter.items.indexOf(menuAdapter.active)
             menu.scrollToPosition(max(0, i))

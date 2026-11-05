@@ -17,6 +17,7 @@
         android:background="@drawable/bg_backdrop_scrim" />
 
     <LinearLayout
+        android:id="@+id/body"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipChildren="false"
@@ -27,6 +28,7 @@
         android:paddingEnd="36dp">
 
         <LinearLayout
+            android:id="@+id/headRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:clipChildren="false"
@@ -41,6 +43,7 @@
                 android:scaleType="centerCrop" />
 
             <LinearLayout
+                android:id="@+id/infoCol"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="24dp"
@@ -86,8 +89,9 @@
                     android:textColor="@color/text_dim"
                     android:textSize="14sp" />
 
-                <!-- Cuộn ngang khi nhiều nút không vừa màn hình -->
+                <!-- Cuộn ngang khi nhiều nút không vừa màn hình; điện thoại cầm dọc: chuyển xuống dưới poster, rộng cả màn -->
                 <HorizontalScrollView
+                    android:id="@+id/btnScroll"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"

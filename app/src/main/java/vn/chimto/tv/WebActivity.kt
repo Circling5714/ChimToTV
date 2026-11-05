@@ -244,6 +244,9 @@ class WebActivity : BaseActivity() {
     // nội dung dưới đó cuộn ra được
     override val touchBackGravity = Gravity.BOTTOM or Gravity.START
 
+    // Ô nhập của trang web (đăng nhập, tìm kiếm): bàn phím ảo không che (điện thoại Android 15)
+    override val padForKeyboard = true
+
     // Đang chạm thẳng vào trang: con trỏ của remote chỉ vướng mắt. Ẩn bằng invisible (không phải gone) để con trỏ vẫn
     // được xếp chỗ: phím remote đầu tiên sau khi chạm vừa hiện lại con trỏ vừa dịch nó đi ngay
     override fun onTouchUiChanged(active: Boolean) {

@@ -1,12 +1,15 @@
 package vn.chimto.tv
 
 import android.app.Activity
+import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.WindowInsets
 import android.widget.FrameLayout
 import android.widget.TextView
 
@@ -34,6 +37,9 @@ abstract class BaseActivity : Activity() {
     /** Chữ trên nút; null = không có nút (trình phát có thanh điều khiển cảm ứng riêng). */
     protected open val touchBackLabel: String? = "‹ Quay lại"
 
+    /** true = tạm không hiện nút (vd màn chính trên điện thoại cầm dọc: đã có ☰ và nút Back của điện thoại). */
+    protected open val touchBackHidden get() = false
+
     /** Chỗ đặt nút (mặc định góc trên bên phải). */
     protected open val touchBackGravity = Gravity.TOP or Gravity.END
 
@@ -44,8 +50,18 @@ abstract class BaseActivity : Activity() {
 
     private var touchBack: TextView? = null
 
+    /** Ô nhập ở cuối màn (Duyệt web): chừa chỗ cho bàn phím ảo (Android 15 vẽ tràn màn, adjustResize không tự co). */
+    protected open val padForKeyboard = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Điện thoại: xoay dọc được (trình phát tự giữ ngang); TV giữ ngang theo manifest
+        if (this !is PlayerActivity) Screen.allowRotation(this)
+    }
+
     override fun onPostCreate(savedInstanceState: Bundle?) {
         super.onPostCreate(savedInstanceState)
+        fitSystemBars()
         val label = touchBackLabel ?: return
         touchBack = TextView(this).apply {
             text = label
@@ -73,8 +89,45 @@ abstract class BaseActivity : Activity() {
         showTouchBack()
     }
 
+    /**
+     * Điện thoại Android 15 (app vẽ tràn cả màn): chừa chỗ tai thỏ / lỗ camera và thanh điều hướng — nội dung không nằm
+     * dưới chúng. Android cũ / TV: các khoảng này bằng 0 (hệ thống đã tự chừa).
+     */
+    private fun fitSystemBars() {
+        val content = findViewById<FrameLayout>(android.R.id.content)
+        content.setOnApplyWindowInsetsListener { v, ins ->
+            var l: Int
+            var t: Int
+            var r: Int
+            var b: Int
+            if (Build.VERSION.SDK_INT >= 30) {
+                var types = WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
+                if (padForKeyboard) types = types or WindowInsets.Type.ime()
+                val i = ins.getInsets(types)
+                l = i.left; t = i.top; r = i.right; b = i.bottom
+            } else {
+                @Suppress("DEPRECATION")
+                run { l = ins.systemWindowInsetLeft; t = ins.systemWindowInsetTop; r = ins.systemWindowInsetRight; b = ins.systemWindowInsetBottom }
+                if (Build.VERSION.SDK_INT >= 28) ins.displayCutout?.let {
+                    l = maxOf(l, it.safeInsetLeft); t = maxOf(t, it.safeInsetTop)
+                    r = maxOf(r, it.safeInsetRight); b = maxOf(b, it.safeInsetBottom)
+                }
+            }
+            v.setPadding(l, t, r, b)
+            ins
+        }
+        content.requestApplyInsets()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        MiniPlayer.relayout(this) // điện thoại xoay: cửa sổ phim nhỏ đổi cỡ theo hướng mới
+        showTouchBack()
+    }
+
     override fun onResume() {
         super.onResume()
+        if (BuildConfig.DEBUG && this !is PlayerActivity) Screen.allowRotation(this) // thử xoay trên TV box (xem Screen)
         showTouchBack() // màn trước có thể vừa đổi giữa chạm / remote
         if (this is PlayerActivity) return
         // Vừa quay lại app (bấm biểu tượng app) mà trình phát toàn màn hình đang ở nền: đưa ra lại (trình phát chạy task
@@ -110,7 +163,7 @@ abstract class BaseActivity : Activity() {
     }
 
     private fun showTouchBack() {
-        touchBack?.visibility = if (TouchUi.active) View.VISIBLE else View.GONE
+        touchBack?.visibility = if (TouchUi.active && !touchBackHidden) View.VISIBLE else View.GONE
         onTouchUiChanged(TouchUi.active)
     }
 

@@ -13,7 +13,6 @@ import android.view.ViewOutlineProvider
 import android.webkit.WebView
 import android.widget.FrameLayout
 import android.widget.TextView
-import kotlin.math.roundToInt
 
 /**
  * Cửa sổ nhỏ trong app — cho TV không có hình trong hình của Android (TX3: máy ít RAM; Skyworth: hãng tắt). Trình phát
@@ -59,6 +58,17 @@ object MiniPlayer {
         frame = f
     }
 
+    /** Điện thoại vừa xoay: đổi cỡ cửa sổ nhỏ theo hướng mới. */
+    fun relayout(a: Activity) {
+        val f = frame ?: return
+        if (f.parent !== a.findViewById<FrameLayout>(android.R.id.content)) return
+        val (w, h) = miniSize(a)
+        f.layoutParams = (f.layoutParams as FrameLayout.LayoutParams).apply {
+            width = w
+            height = h
+        }
+    }
+
     /** Trả WebView về cho trình phát (phóng to / đóng phim). */
     fun release(w: WebView) {
         if (web !== w) return
@@ -77,8 +87,8 @@ object MiniPlayer {
     }
 
     private fun makeFrame(a: Activity): FrameLayout {
-        // Rộng 30% màn hình, khung 16:9 (TV 720p: 384×216 điểm ảnh)
-        val width = (a.resources.displayMetrics.widthPixels * 0.3f).roundToInt()
+        // Rộng 30% màn hình, khung 16:9 (TV 720p: 384×216 điểm ảnh); điện thoại cầm dọc: 55% bề ngang
+        val (width, height) = miniSize(a)
         val radius = a.dp(10).toFloat()
         val f = FrameLayout(a).apply {
             setBackgroundColor(Color.BLACK)
@@ -90,7 +100,7 @@ object MiniPlayer {
                 override fun getOutline(v: View, o: Outline) = o.setRoundRect(0, 0, v.width, v.height, radius)
             }
             clipToOutline = true
-            layoutParams = FrameLayout.LayoutParams(width, width * 9 / 16, Gravity.BOTTOM or Gravity.END)
+            layoutParams = FrameLayout.LayoutParams(width, height, Gravity.BOTTOM or Gravity.END)
                 .apply { setMargins(0, 0, a.dp(20), a.dp(20)) }
         }
         caption = TextView(a).apply {

@@ -7,6 +7,7 @@
     android:fillViewport="true">
 
     <LinearLayout
+        android:id="@+id/settingsBody"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:clipChildren="false"
@@ -46,13 +47,10 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
-        <LinearLayout
+        <vn.chimto.tv.FlowRow
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp">
 
             <TextView
                 android:id="@+id/btnProfileAdd"
@@ -72,7 +70,7 @@
                 android:id="@+id/btnSync"
                 style="@style/TvButton"
                 android:text="Đồng bộ với iPad / iPhone…" />
-        </LinearLayout>
+        </vn.chimto.tv.FlowRow>
 
         <TextView
             android:layout_width="match_parent"
@@ -109,13 +107,10 @@
             android:textColor="@color/text_dim"
             android:textSize="14sp" />
 
-        <LinearLayout
+        <vn.chimto.tv.FlowRow
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:orientation="horizontal">
+            android:layout_marginTop="12dp">
 
             <TextView
                 android:id="@+id/btnSave"
@@ -136,7 +131,7 @@
                 android:id="@+id/btnRemove"
                 style="@style/TvButton"
                 android:text="Xoá khỏi danh sách" />
-        </LinearLayout>
+        </vn.chimto.tv.FlowRow>
 
         <TextView
             android:id="@+id/testResult"
@@ -172,13 +167,10 @@
             style="@style/SettingsLabel"
             android:text="Proxy SOCKS5" />
 
-        <LinearLayout
+        <vn.chimto.tv.FlowRow
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp">
 
             <TextView
                 android:id="@+id/btnProxy"
@@ -191,13 +183,14 @@
             <TextView
                 android:id="@+id/btnProxyScope"
                 style="@style/TvButton" />
-        </LinearLayout>
+        </vn.chimto.tv.FlowRow>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:id="@+id/proxyRow1">
 
             <EditText
                 android:id="@+id/proxyHost"
@@ -219,7 +212,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:id="@+id/proxyRow2">
 
             <EditText
                 android:id="@+id/proxyUser"
@@ -237,13 +231,10 @@
                 android:inputType="textPassword" />
         </LinearLayout>
 
-        <LinearLayout
+        <vn.chimto.tv.FlowRow
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:orientation="horizontal">
+            android:layout_marginTop="12dp">
 
             <TextView
                 android:id="@+id/btnProxySave"
@@ -254,7 +245,7 @@
                 android:id="@+id/btnProxyTest"
                 style="@style/TvButton"
                 android:text="Kiểm tra proxy" />
-        </LinearLayout>
+        </vn.chimto.tv.FlowRow>
 
         <TextView
             android:id="@+id/proxyResult"
@@ -302,13 +293,10 @@
             style="@style/SettingsLabel"
             android:text="Phát video" />
 
-        <LinearLayout
+        <vn.chimto.tv.FlowRow
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp">
 
             <TextView
                 android:id="@+id/btnSeek"
@@ -321,7 +309,7 @@
             <TextView
                 android:id="@+id/btnServer"
                 style="@style/TvButton" />
-        </LinearLayout>
+        </vn.chimto.tv.FlowRow>
 
         <!-- Hình trong hình (ẩn trên TV không có tính năng này) -->
         <TextView
@@ -344,13 +332,10 @@
             style="@style/SettingsLabel"
             android:text="Dữ liệu" />
 
-        <LinearLayout
+        <vn.chimto.tv.FlowRow
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp">
 
             <TextView
                 android:id="@+id/btnClearHistory"
@@ -361,15 +346,12 @@
                 android:id="@+id/btnClearCache"
                 style="@style/TvButton"
                 android:text="Xoá ảnh &amp; dữ liệu duyệt web" />
-        </LinearLayout>
+        </vn.chimto.tv.FlowRow>
 
-        <LinearLayout
+        <vn.chimto.tv.FlowRow
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp">
 
             <TextView
                 android:id="@+id/btnPrivate"
@@ -378,7 +360,7 @@
             <TextView
                 android:id="@+id/btnAutoClear"
                 style="@style/TvButton" />
-        </LinearLayout>
+        </vn.chimto.tv.FlowRow>
 
         <TextView
             android:layout_width="match_parent"
@@ -392,13 +374,10 @@
             style="@style/SettingsLabel"
             android:text="Cập nhật app" />
 
-        <LinearLayout
+        <vn.chimto.tv.FlowRow
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
-            android:orientation="horizontal">
+            android:layout_marginTop="8dp">
 
             <TextView
                 android:id="@+id/btnUpdateCheck"
@@ -407,7 +386,7 @@
             <TextView
                 android:id="@+id/btnAutoUpdate"
                 style="@style/TvButton" />
-        </LinearLayout>
+        </vn.chimto.tv.FlowRow>
 
         <TextView
             android:id="@+id/updateResult"

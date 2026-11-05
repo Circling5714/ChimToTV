@@ -1,8 +1,10 @@
 package vn.chimto.tv
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -34,9 +36,50 @@ class SettingsActivity : BaseActivity() {
     private lateinit var proxyResult: TextView
     private var proxyToken = 0
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyLayout() // điện thoại xoay ngang / dọc
+    }
+
+    /** Điện thoại cầm dọc: lề nhỏ, các ô proxy xếp dọc (hàng nút tự xuống dòng — FlowRow). */
+    private fun applyLayout() {
+        val narrow = Screen.narrow(this)
+        findViewById<View>(R.id.settingsBody).padH(dp(if (narrow) 16 else 48))
+        for (id in intArrayOf(R.id.proxyRow1, R.id.proxyRow2)) {
+            val row = findViewById<LinearLayout>(id)
+            row.orientation = if (narrow) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+            for (k in 0 until row.childCount) {
+                val lp = row.getChildAt(k).layoutParams as LinearLayout.LayoutParams
+                if (k > 0) {
+                    lp.marginStart = if (narrow) 0 else dp(12)
+                    lp.leftMargin = lp.marginStart // app không bật RTL: trái = đầu (marginStart đã giải ra lúc dựng)
+                    lp.topMargin = if (narrow) dp(8) else 0
+                }
+                lp.width = if (narrow) LinearLayout.LayoutParams.MATCH_PARENT else 0
+                // Ô máy chủ rộng gấp 3 ô cổng (hàng đầu); hàng tên / mật khẩu chia đôi
+                lp.weight = if (narrow) 0f else if (id == R.id.proxyRow1 && k == 0) 3f else 1f
+            }
+            row.requestLayout()
+        }
+        // Nút chữ dài (vd «Server ưu tiên (…): …»): màn hẹp cho xuống 2 dòng thay vì cắt «…»
+        fun walk(v: View) {
+            if (v is TextView && v !is EditText && v.isClickable && v.isFocusable) {
+                if (narrow) {
+                    v.setSingleLine(false)
+                    v.maxLines = 2
+                } else {
+                    v.setSingleLine(true)
+                }
+            }
+            if (v is ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
+        }
+        walk(findViewById(R.id.settingsBody))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
+        applyLayout()
         url = findViewById(R.id.url)
         result = findViewById(R.id.testResult)
         recent = findViewById(R.id.recent)

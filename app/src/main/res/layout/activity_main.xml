@@ -1,11 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Không đặt nền ở đây: nền cửa sổ (theme) đã cùng màu, vẽ thêm một lớp là phí GPU trên TV yếu -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Điện thoại cầm dọc (giống bản iPhone): menu bên trái thành ngăn kéo trượt ra khi bấm ☰ (MainActivity.applyLayout) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainFrame"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+<LinearLayout
+    android:id="@+id/mainRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="horizontal">
 
+    <!-- Menu bên trái; điện thoại cầm dọc: ngăn kéo nổi trên màn (chuyển sang mainFrame) -->
     <LinearLayout
+        android:id="@+id/side"
         android:layout_width="200dp"
         android:layout_height="match_parent"
         android:background="@color/surface"
@@ -60,6 +69,7 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/body"
         android:layout_width="0dp"
         android:layout_height="match_parent"
         android:layout_weight="1"
@@ -70,14 +80,53 @@
         android:paddingTop="16dp"
         android:paddingEnd="20dp">
 
-        <TextView
-            android:id="@+id/title"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:singleLine="true"
-            android:textColor="@color/text"
-            android:textSize="24sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- Nút mở menu (chỉ điện thoại cầm dọc) -->
+            <TextView
+                android:id="@+id/menuBtn"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_menu_item"
+                android:clickable="true"
+                android:contentDescription="Menu"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="☰"
+                android:textColor="@color/text_on_focus"
+                android:textSize="22sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <!-- Tên trang đang dùng ở góc phải (chỉ điện thoại cầm dọc; TV ghi dưới tên app ở menu) -->
+            <TextView
+                android:id="@+id/siteTag"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="8dp"
+                android:ellipsize="end"
+                android:maxWidth="150dp"
+                android:singleLine="true"
+                android:textColor="@color/text_dim"
+                android:textSize="13sp"
+                android:visibility="gone" />
+        </LinearLayout>
 
         <EditText
             android:id="@+id/search"
@@ -118,3 +167,13 @@
         </FrameLayout>
     </LinearLayout>
 </LinearLayout>
+
+<!-- Nền tối sau ngăn kéo menu: chạm để đóng -->
+<View
+    android:id="@+id/scrim"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#73000000"
+    android:clickable="true"
+    android:visibility="gone" />
+</FrameLayout>
