@@ -2,6 +2,7 @@ package vn.chimto.tv
 
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
+import android.app.AlertDialog
 import android.app.PendingIntent
 import android.app.PictureInPictureParams
 import android.app.RemoteAction
@@ -593,6 +594,11 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun openEpisode(i: Int) {
+        // Người đang xem đã hết giờ xem (WatchLimit): chưa mở tập, hỏi mã phụ huynh trước
+        WatchLimit.block()?.let { b ->
+            showLimit(b) { openEpisode(i) }
+            return
+        }
         openAt = System.currentTimeMillis()
         val d = detail ?: return
         val ep = episodes.getOrNull(i) ?: return
@@ -917,6 +923,8 @@ class PlayerActivity : BaseActivity() {
             it.update(now, s.paused, s.waiting, s.ready, s.droppedFrames, s.totalFrames)
             if (!suggested && it.struggling(now)) suggestServer(now)
         }
+        WatchLimit.tick(started && !s.paused && !s.waiting, now)
+        checkLimit()
         // Bắt đầu khi video thật sự chạy (không phải lúc mới nạp xong mà còn dừng: trình phát như NguonC còn chạy
         // quảng cáo rồi phát lại từ đầu, tua xem tiếp lúc đó sẽ mất)
         if (!started && s.ready && !s.paused) {
@@ -970,6 +978,64 @@ class PlayerActivity : BaseActivity() {
     }
 
     private val introKey get() = detail?.url ?: filmUrl
+
+    // ---- Giới hạn giờ xem (WatchLimit) ----
+
+    /** Đang hiện màn hết giờ xem (hoặc đang nhập mã phụ huynh từ màn đó). */
+    private var limitShowing = false
+
+    /** Đã nhắc "còn 5 phút" trong lần xem này. */
+    private var limitWarned = false
+
+    /** Mỗi lần đọc trạng thái: sắp hết giờ thì nhắc, hết giờ thì dừng phim và hiện màn hết giờ xem. */
+    private fun checkLimit() {
+        if (limitShowing) return
+        val b = WatchLimit.block()
+        if (b == null) {
+            val r = WatchLimit.remaining()
+            if (started && !limitWarned && r != null && r in 1..300) {
+                limitWarned = true
+                notice.show("Còn ${WatchLimit.minutesText(r)} xem hôm nay (${Prefs.profile.name}).", 8000)
+            }
+            return
+        }
+        cmd("pause")
+        // Đang thu nhỏ: chỉ dừng phim; phóng to lại thì lần đọc trạng thái sau hiện màn hết giờ
+        if (inPipNow() || mini) return
+        showLimit(b) { cmd("play") }
+    }
+
+    /** Màn hết giờ xem: người lớn nhập mã PIN phụ huynh để cho xem thêm (rồi chạy resume), hoặc thoát trình phát. */
+    private fun showLimit(b: WatchLimit.Block, resume: () -> Unit) {
+        if (isFinishing) return
+        limitShowing = true
+        hideLoading()
+        val who = Prefs.profile.name
+        val why = when (b) {
+            WatchLimit.Block.BEDTIME -> "Đã tới giờ đi ngủ của $who (từ ${WatchLimit.bedtimeLabel(Prefs.bedtime())} tới 6 giờ sáng)."
+            WatchLimit.Block.DAILY -> "$who đã xem hết ${WatchLimit.dailyLabel(Prefs.dailyLimit())} của hôm nay."
+        }
+        val d = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("Hết giờ xem")
+            .setMessage("$why\nNgười lớn nhập mã PIN phụ huynh để cho xem thêm.")
+            .setPositiveButton("Cho xem thêm…") { _, _ ->
+                ProfileUi.grant(this, cancelled = { showLimit(b, resume) }) {
+                    limitShowing = false
+                    limitWarned = false
+                    resume()
+                }
+            }
+            .setNegativeButton("Thoát") { _, _ ->
+                limitShowing = false
+                finish()
+            }
+            .setOnCancelListener {
+                limitShowing = false
+                finish()
+            }
+            .show()
+        d.getButton(AlertDialog.BUTTON_NEGATIVE)?.requestFocus()
+    }
 
     /**
      * Phim đã đánh dấu nhạc mở đầu: video vừa chạy tới mốc đầu (trễ tối đa 8 giây — mỗi tập lệch vài giây) thì tua tới
@@ -1563,6 +1629,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onPause() {
+        WatchLimit.flush()
         savePosition()
         if (!saveDisabled) session?.save(System.currentTimeMillis())
         // Thu nhỏ (hình trong hình / cửa sổ nhỏ trong app): phim chạy tiếp, vẫn đọc trạng thái để lưu chỗ xem / tự sang
@@ -1585,6 +1652,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onDestroy() {
+        WatchLimit.flush()
         mainHandler.removeCallbacks(poll)
         mainHandler.removeCallbacks(flushSeek)
         mainHandler.removeCallbacks(pipClosedCheck)

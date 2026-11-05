@@ -62,13 +62,18 @@
             <TextView
                 android:id="@+id/btnAskProfile"
                 style="@style/TvButton" />
+
+            <TextView
+                android:id="@+id/btnLimits"
+                style="@style/TvButton"
+                android:text="Giới hạn giờ xem…" />
         </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Mỗi người có riêng: lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, phim theo dõi, trang phim đang dùng, server ưu tiên, Xem riêng, bước tua, tự chuyển tập, khung hình. Dùng chung cả nhà: danh sách trang phim, proxy, DNS mã hoá, dữ liệu duyệt web, điểm server, mốc nhạc mở đầu. Người có mã PIN phải nhập mã mới mở / sửa được."
+            android:text="Mỗi người có riêng: lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, phim theo dõi, trang phim đang dùng, server ưu tiên, Xem riêng, bước tua, tự chuyển tập, khung hình. Dùng chung cả nhà: danh sách trang phim, proxy, DNS mã hoá, dữ liệu duyệt web, điểm server, mốc nhạc mở đầu. Người có mã PIN phải nhập mã mới mở / sửa được. Giới hạn giờ xem: số phút mỗi ngày và giờ đi ngủ cho từng người (vd trẻ em), cần mã PIN phụ huynh; người lớn nên đặt mã PIN cho hồ sơ của mình để trẻ không chuyển sang được."
             android:textColor="@color/text_dim"
             android:textSize="14sp" />
 
@@ -95,7 +100,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…) và kiểu PhimMoi (phimmoir). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật."
+            android:text="Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…) và kiểu PhimMoi (phimmois). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật."
             android:textColor="@color/text_dim"
             android:textSize="14sp" />
 

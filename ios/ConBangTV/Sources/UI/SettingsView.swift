@@ -232,7 +232,7 @@ struct SettingsView: View {
             }
             if !siteStatus.isEmpty { Text(siteStatus).foregroundColor(Theme.dim) }
         } header: { Text("Địa chỉ trang phim") } footer: {
-            Text("Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…) và kiểu PhimMoi (phimmoir). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật.")
+            Text("Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…) và kiểu PhimMoi (phimmois). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật.")
         }
     }
 

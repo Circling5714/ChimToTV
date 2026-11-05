@@ -204,6 +204,7 @@ class SettingsActivity : BaseActivity() {
                 reopenAtProfiles()
             }
         }
+        findViewById<View>(R.id.btnLimits).setOnClickListener { ProfileUi.limits(this) { reopenAtProfiles() } }
         val ask = findViewById<TextView>(R.id.btnAskProfile)
         fun showAsk() {
             ask.text = "Hỏi «Ai đang xem?» khi mở app: ${if (Prefs.askProfile) "Bật" else "Tắt"}"

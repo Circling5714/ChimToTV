@@ -162,7 +162,10 @@ object ProfileUi {
      * Hộp thoại có ô nhập. ok kiểm dữ liệu: sai thì báo ngay trên ô và trả null (giữ hộp thoại); đúng thì trả việc cần
      * làm tiếp — chạy sau khi đã ẩn bàn phím và đóng hộp thoại (việc tiếp có thể dựng lại cả màn hình).
      */
-    private fun ask(a: Activity, title: String, message: String?, fields: List<EditText>, okText: String, ok: () -> (() -> Unit)?): AlertDialog {
+    private fun ask(
+        a: Activity, title: String, message: String?, fields: List<EditText>, okText: String,
+        cancelled: (() -> Unit)? = null, ok: () -> (() -> Unit)?,
+    ): AlertDialog {
         val box = LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(a.dp(24), a.dp(4), a.dp(24), 0)
@@ -172,7 +175,11 @@ object ProfileUi {
             }
         }
         val b = dialog(a).setTitle(title).setView(box).setPositiveButton(okText, null)
-            .setNegativeButton("Huỷ") { _, _ -> hideKeyboard(fields.first()) }
+            .setNegativeButton("Huỷ") { _, _ ->
+                hideKeyboard(fields.first())
+                cancelled?.invoke()
+            }
+            .setOnCancelListener { cancelled?.invoke() }
         message?.let { b.setMessage(it) }
         val d = b.create()
         d.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
@@ -276,19 +283,22 @@ object ProfileUi {
             .show()
     }
 
-    /** Thêm người xem (không chuyển sang người mới). */
+    /** Thêm người xem (không chuyển sang người mới). Đã có giới hạn giờ xem thì cần mã PIN phụ huynh (khỏi lách giới hạn). */
     fun add(a: Activity, done: (Profile) -> Unit) {
         if (Prefs.profiles.size >= Prefs.MAX_PROFILES) {
             toast(a, "Tối đa ${Prefs.MAX_PROFILES} người xem.")
             return
         }
-        editName(a, "Thêm người xem", "", "Thêm") { done(Prefs.addProfile(it)) }
+        val go = { editName(a, "Thêm người xem", "", "Thêm") { done(Prefs.addProfile(it)) } }
+        if (Prefs.anyLimits) parentUnlock(a, "Mã PIN phụ huynh để thêm người xem", then = go) else go()
     }
 
     /** Đổi sang người xem khác: lưu chỗ đang xem cho người cũ, đóng phim đang thu nhỏ. */
     fun switchTo(p: Profile) {
         if (p.id == Prefs.profileId) return
         PlayerActivity.closeForProfileSwitch()
+        WatchLimit.flush() // giờ đã xem là của người cũ
+        WatchLimit.reset()
         Prefs.switchProfile(p.id)
     }
 
@@ -315,8 +325,149 @@ object ProfileUi {
             } else {
                 actions += "Đặt mã PIN" to { setPin(a, p) { toast(a, "Đã đặt mã PIN cho ${p.name}."); changed() } }
             }
-            if (Prefs.profiles.size > 1) actions += "Xoá người xem này" to { confirmDelete(a, p, changed) }
+            if (Prefs.profiles.size > 1) actions += "Xoá người xem này" to {
+                if (Prefs.anyLimits) parentUnlock(a, "Mã PIN phụ huynh để xoá người xem") { confirmDelete(a, p, changed) }
+                else confirmDelete(a, p, changed)
+            }
             dialog(a).setTitle(p.name).setItems(actions.map { it.first }.toTypedArray()) { _, i -> actions[i].second() }.show()
+        }
+    }
+
+    // ---- Giới hạn giờ xem (WatchLimit) — mã PIN phụ huynh ----
+
+    /** Hỏi mã PIN phụ huynh (gõ đủ 4 số là thử luôn), đúng thì chạy then; chưa đặt mã thì chạy luôn. */
+    fun parentUnlock(a: Activity, title: String = "Mã PIN phụ huynh", cancelled: (() -> Unit)? = null, then: () -> Unit) {
+        if (!Prefs.hasParentPin) return then()
+        val pin = field(a, "${Prefs.PIN_LENGTH} số", pin = true)
+        val d = ask(a, title, null, listOf(pin), "Mở", cancelled) {
+            if (Prefs.checkParentPin(pin.text.toString())) {
+                then
+            } else {
+                pin.text.clear()
+                pin.error = "Sai mã PIN"
+                null
+            }
+        }
+        onText(pin) { if (it.length == Prefs.PIN_LENGTH) d.getButton(AlertDialog.BUTTON_POSITIVE)?.performClick() }
+    }
+
+    /** Đặt / đổi mã PIN phụ huynh (nhập hai lần). */
+    private fun setParentPin(a: Activity, done: () -> Unit) {
+        val f1 = field(a, "Mã mới (${Prefs.PIN_LENGTH} số)", pin = true)
+        val f2 = field(a, "Nhập lại mã PIN", pin = true)
+        ask(
+            a, "Mã PIN phụ huynh",
+            "Dùng để đặt / đổi giới hạn giờ xem và cho xem thêm khi hết giờ; khi đã có giới hạn, thêm / xoá người xem " +
+                "cũng phải nhập mã này. Nên khác mã PIN của từng người xem.",
+            listOf(f1, f2), "Lưu",
+        ) {
+            val pin = f1.text.toString()
+            when {
+                pin.length != Prefs.PIN_LENGTH || pin.any { !it.isDigit() } -> {
+                    f1.error = "Cần đủ ${Prefs.PIN_LENGTH} số"
+                    null
+                }
+                pin != f2.text.toString() -> {
+                    f2.text.clear()
+                    f2.error = "Hai lần nhập không khớp"
+                    null
+                }
+                else -> {
+                    Prefs.setParentPin(pin)
+                    done
+                }
+            }
+        }
+        onText(f1) { if (it.length == Prefs.PIN_LENGTH && f1.hasFocus()) f2.requestFocus() }
+    }
+
+    /** Cài đặt → Giới hạn giờ xem…: chưa có mã PIN phụ huynh thì đặt trước, có rồi thì hỏi mã. */
+    fun limits(a: Activity, changed: () -> Unit) {
+        if (Prefs.hasParentPin) {
+            parentUnlock(a, "Mã PIN phụ huynh") { limitList(a, changed) }
+        } else {
+            setParentPin(a) {
+                toast(a, "Đã đặt mã PIN phụ huynh.")
+                limitList(a, changed)
+            }
+        }
+    }
+
+    private fun limitList(a: Activity, changed: () -> Unit) {
+        val ps = Prefs.profiles
+        val items = ps.map { "${it.name}: ${WatchLimit.summary(it.id)}" }.toMutableList()
+        items += "Đổi mã PIN phụ huynh"
+        if (!Prefs.anyLimits) items += "Xoá mã PIN phụ huynh"
+        dialog(a).setTitle("Giới hạn giờ xem")
+            .setItems(items.toTypedArray()) { _, i ->
+                when {
+                    i < ps.size -> limitFor(a, ps[i]) {
+                        changed()
+                        limitList(a, changed)
+                    }
+                    i == ps.size -> setParentPin(a) {
+                        toast(a, "Đã đổi mã PIN phụ huynh.")
+                        limitList(a, changed)
+                    }
+                    else -> {
+                        Prefs.setParentPin(null)
+                        toast(a, "Đã xoá mã PIN phụ huynh.")
+                        changed()
+                    }
+                }
+            }
+            .setNegativeButton("Xong") { _, _ -> changed() }
+            .show()
+    }
+
+    private fun limitFor(a: Activity, p: Profile, done: () -> Unit) {
+        val items = arrayOf(
+            "Mỗi ngày được xem: ${WatchLimit.dailyLabel(Prefs.dailyLimit(p.id))}",
+            "Giờ đi ngủ: ${WatchLimit.bedtimeLabel(Prefs.bedtime(p.id))}" + if (Prefs.bedtime(p.id) >= 0) " (tới 6 giờ sáng)" else "",
+        )
+        dialog(a).setTitle("Giới hạn giờ xem của ${p.name}")
+            .setItems(items) { _, i ->
+                if (i == 0) {
+                    choose(a, "Mỗi ngày ${p.name} được xem", WatchLimit.DAILY.map { WatchLimit.dailyLabel(it) },
+                        WatchLimit.DAILY.indexOf(Prefs.dailyLimit(p.id))) {
+                        Prefs.setDailyLimit(p.id, WatchLimit.DAILY[it])
+                        limitFor(a, p, done)
+                    }
+                } else {
+                    choose(a, "Giờ đi ngủ của ${p.name} (không xem được tới 6 giờ sáng)", WatchLimit.BEDTIMES.map { WatchLimit.bedtimeLabel(it) },
+                        WatchLimit.BEDTIMES.indexOf(Prefs.bedtime(p.id))) {
+                        Prefs.setBedtime(p.id, WatchLimit.BEDTIMES[it])
+                        limitFor(a, p, done)
+                    }
+                }
+            }
+            .setNegativeButton("Xong") { _, _ -> done() }
+            .show()
+    }
+
+    private fun choose(a: Activity, title: String, labels: List<String>, current: Int, picked: (Int) -> Unit) {
+        dialog(a).setTitle(title)
+            .setSingleChoiceItems(labels.toTypedArray(), current.coerceAtLeast(0)) { d, which ->
+                d.dismiss()
+                picked(which)
+            }
+            .show()
+    }
+
+    /**
+     * Hết giờ xem (trình phát): nhập mã PIN phụ huynh rồi chọn cho xem thêm bao lâu. then: đã cho xem thêm; cancelled:
+     * bấm Huỷ / Quay lại (trình phát hiện lại màn hết giờ).
+     */
+    fun grant(a: Activity, cancelled: () -> Unit, then: () -> Unit) {
+        parentUnlock(a, "Mã PIN phụ huynh để cho xem thêm", cancelled) {
+            val opts = WatchLimit.GRANTS.map { "Cho xem thêm ${WatchLimit.dailyLabel(it)}" } + "Không giới hạn tới 6 giờ sáng"
+            dialog(a).setTitle("Cho ${Prefs.profile.name} xem thêm")
+                .setItems(opts.toTypedArray()) { _, i ->
+                    if (i < WatchLimit.GRANTS.size) WatchLimit.grant(WatchLimit.GRANTS[i]) else WatchLimit.grantUntilMorning()
+                    then()
+                }
+                .setOnCancelListener { cancelled() }
+                .show()
         }
     }
 

@@ -130,6 +130,8 @@ object Prefs {
     private val PROFILE_KEYS = setOf(
         "history", "positions", "pos_film", "follows", "last_follow_check", "private_mode",
         "base_url", "seek_step", "auto_next", "video_fill",
+        // Giới hạn giờ xem (WatchLimit)
+        "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
     )
     private val PROFILE_PREFIXES = listOf("server_type@", "server_label@")
 
@@ -233,6 +235,52 @@ object Prefs {
         saveProfiles(rest)
         if (pid == id) switchProfile(rest.first().id)
     }
+
+    // ---- Giới hạn giờ xem (xem WatchLimit) ----
+
+    /** Khoá của người xem id (người đầu tiên — id "" — giữ khoá cũ không hậu tố). */
+    private fun pk(id: String, key: String) = if (id.isEmpty()) key else "$key#$id"
+
+    /** Số phút xem mỗi ngày của người xem id (0 = không giới hạn). */
+    fun dailyLimit(id: String = pid): Int = sp.getInt(pk(id, "limit_min"), 0)
+
+    fun setDailyLimit(id: String, minutes: Int) = sp.edit().putInt(pk(id, "limit_min"), minutes).apply()
+
+    /** Giờ đi ngủ của người xem id (phút trong ngày, vd 21:00 = 1260; -1 = không): từ giờ đó tới 6 giờ sáng không xem. */
+    fun bedtime(id: String = pid): Int = sp.getInt(pk(id, "bedtime"), -1)
+
+    fun setBedtime(id: String, minute: Int) = sp.edit().putInt(pk(id, "bedtime"), minute).apply()
+
+    /** Người đang xem: ngày đang đếm ("yyyy-MM-dd"), số giây đã xem, số phút được cho thêm trong ngày đó. */
+    var watchDay: String
+        get() = sp.getString(k("watch_day"), "") ?: ""
+        set(value) = sp.edit().putString(k("watch_day"), value).apply()
+
+    var watchSeconds: Int
+        get() = sp.getInt(k("watch_sec"), 0)
+        set(value) = sp.edit().putInt(k("watch_sec"), value).apply()
+
+    var watchExtra: Int
+        get() = sp.getInt(k("watch_extra"), 0)
+        set(value) = sp.edit().putInt(k("watch_extra"), value).apply()
+
+    /** Người đang xem được xem không giới hạn tới thời điểm này (ms) — phụ huynh cho thêm lúc giờ đi ngủ. */
+    var unblockUntil: Long
+        get() = sp.getLong(k("unblock_until"), 0L)
+        set(value) = sp.edit().putLong(k("unblock_until"), value).apply()
+
+    /** Có ai đang bị giới hạn giờ xem (khi đó thêm / xoá người xem cũng cần mã PIN phụ huynh). */
+    val anyLimits: Boolean get() = profiles.any { dailyLimit(it.id) > 0 || bedtime(it.id) >= 0 }
+
+    /** Mã PIN phụ huynh (cả nhà): đặt / đổi giới hạn giờ xem, cho xem thêm khi hết giờ. */
+    val hasParentPin: Boolean get() = sp.contains("parent_pin")
+
+    /** Đặt / đổi mã PIN phụ huynh; null = xoá. */
+    fun setParentPin(pin: String?) {
+        if (pin == null) sp.edit().remove("parent_pin").apply() else sp.edit().putString("parent_pin", pinHash("parent", pin)).apply()
+    }
+
+    fun checkParentPin(pin: String): Boolean = sp.getString("parent_pin", null) == pinHash("parent", pin)
 
     /** Hỏi "Ai đang xem?" khi mở app (nhà có từ 2 người xem). */
     var askProfile: Boolean
