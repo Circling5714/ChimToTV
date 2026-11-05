@@ -9,8 +9,8 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad** (iPadOS 15+, cài bằng TrollStore): [release `ios-v1.2`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.2)
-— xem mục [Bản iPad](#bản-ipad).
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.3`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.3)
+— xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
 **Liên hệ**.
@@ -25,7 +25,7 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | yanhh3d.ee | yanhh3d (`flw-item`) | `player.php` → iframe |
 | hoathinh3d.ee | HaLim, chia Việt Sub / Thuyết Minh | `player.php` → iframe |
 | hhkungfu.ee | HaLim, chia Vietsub / Thuyết Minh | `player.php` → iframe |
-| hoathinh3d.pw | HaLimMovies | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
+| hoathinh3d.pw | HaLimMovies (Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Đánh Giá Cao đọc qua API JSON của trang, từ 2.2) | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
 | phimmois.fun (trước là phimmoir.fun) | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
 
 **Tìm kiếm** (từ 1.9.1) tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm, trang đang dùng đứng đầu.
@@ -50,11 +50,16 @@ loại trên menu của trang, và **Thể loại…** / **Quốc gia…** (từ
 
 ## Bản iPad
 
-Cùng app cho iPad (iPadOS 15 trở lên, cài bằng TrollStore), viết riêng bằng Swift (thư mục `ios/`), đủ các tính năng
-chính của bản TV, điều khiển bằng chạm:
+Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStore; iPhone từ 1.3), viết riêng bằng Swift (thư mục
+`ios/`), đủ các tính năng chính của bản TV, điều khiển bằng chạm:
 
-- **Cài:** cần TrollStore trên iPad. Tải `ConBangTV-iPad-<bản>.ipa` ở release `ios-v<bản>` → mở bằng TrollStore →
-  Install. Bản sau app tự tìm trên GitHub (release `ios-v…`) và mở TrollStore để cài đè, giữ lịch sử xem.
+- **Cài:** cần TrollStore. Tải `ConBangTV-iPad-<bản>.ipa` ở release `ios-v<bản>` (một tệp cho cả iPad và iPhone) → mở
+  bằng TrollStore → Install. Bản sau app tự tìm trên GitHub (release `ios-v…`) và mở TrollStore để cài đè, giữ lịch sử xem.
+- **iPhone** (từ 1.3): màn chính dọc hoặc ngang (menu ẩn vào nút ☰), trình phát luôn xem ngang, thanh nút gọn (chạm đúp hai
+  bên để lùi / tới 10 giây).
+- **Widget «Xem tiếp»** (từ 1.3): giữ ngón tay trên màn hình chính → **＋** → Côn Bằng TV; cỡ nhỏ / vừa / lớn = 1 / 3 / 6
+  phim đang xem dở của người xem đang dùng; chạm một phim là mở app phát tiếp đúng chỗ.
+- **Cỡ chữ** (từ 1.3): Cài đặt → Cỡ chữ (Nhỏ / Vừa / Lớn / Rất lớn / Cực lớn), dùng chung cả máy.
 - **Màn chính:** menu bên trái (iPad dọc / chia đôi màn hình thì ẩn vào nút ☰), lưới phim, hàng **Có tập mới** và
   **Xem tiếp** (chạm là phát tiếp; giữ ngón tay để xoá khỏi lịch sử / bỏ theo dõi), tìm cùng lúc mọi trang, Đổi trang
   phim (đo tốc độ), Duyệt web, Cài đặt.
@@ -62,7 +67,13 @@ chính của bản TV, điều khiển bằng chạm:
   thanh thời gian kéo để tua; chạm đúp nửa trái / phải: lùi / tới 10 giây. Menu: đổi server (kèm điểm), đổi bản, nhạc mở
   đầu, tốc độ, khung hình, hẹn giờ tắt, mở trang web của tập.
 - **Bàn phím rời:** Space / K dừng–phát, ◀ ▶ (J / L) tua (giữ để tua nhanh), ▲ hiện thanh, ▼ / M menu, N / P tập
-  sau / trước, số 0–9 nhảy tới 0–90%, Esc thoát / đóng menu; trong Duyệt web Esc = lùi trang.
+  sau / trước, số 0–9 nhảy tới 0–90%, F vừa / lấp đầy, S tốc độ, W thu nhỏ, Esc / ⌘W thoát; trong Duyệt web Esc = lùi trang.
+  Từ 1.3 ở màn chính: mũi tên chọn phim, Enter / Space mở, Delete xoá khỏi lịch sử, ⌘F tìm, ⌘1 / ⌘2 / ⌘3 Trang chủ /
+  Lịch sử / Theo dõi, ⌥▲ ▼ mục menu trước / sau, ⌘R tải lại, ⌘O đổi trang phim, ⌘E đổi người xem, ⌘, Cài đặt; trang phim:
+  mũi tên chọn tập, Enter phát, [ ] đổi bản phim, ⌘D theo dõi, Esc / ⌘[ quay lại; gõ mã PIN bằng phím số. Giữ ⌘ để xem
+  bảng phím tắt.
+- **Chuột / bàn di chuột** (từ 1.3): rê chuột trên phim thì hiện thanh nút (đứng yên thì ẩn con trỏ), cuộn ngang để tua,
+  cuộn dọc chỉnh âm lượng, chụm hai ngón vừa / lấp đầy; ô phim / nút sáng lên khi rê chuột.
 - **Cử chỉ lúc xem** (từ 1.2): vuốt ngang để tua (giữa màn hình hiện giờ tới và quãng tua; cả bề ngang = 2 phút),
   vuốt dọc nửa trái chỉnh độ sáng / nửa phải chỉnh âm lượng, giữ tay xem nhanh 2× tới khi nhấc tay, chụm / mở hai
   ngón: vừa / lấp đầy màn hình. Vuốt bắt đầu sát mép trên / dưới vẫn để cho iPad; rời trình phát thì độ sáng trở lại.
@@ -120,6 +131,22 @@ TV / iPad dùng chung cả nhà: mỗi người một hồ sơ, chọn ở màn 
   "Ai đang xem?"). Quên mã: chỉ xoá dữ liệu app (mất lịch sử, cài đặt) mới mở lại được — PIN để trẻ khỏi vào nhầm hồ sơ
   người lớn, không phải mật khẩu bảo mật.
 - Đổi người lúc phim đang thu nhỏ: app lưu chỗ xem cho người cũ rồi đóng phim đó.
+
+## Đồng bộ trong nhà (từ 2.2)
+
+TV và iPad / iPhone (bản 1.3+) cùng mạng Wi‑Fi đồng bộ với nhau: xem dở trên TV thì mở iPad xem tiếp đúng chỗ, và ngược lại.
+
+- **Ghép máy:** TV: Cài đặt → **Đồng bộ với iPad / iPhone…** (hiện mã ghép 4 số); iPad / iPhone: Cài đặt → **Đồng bộ trong
+  nhà** (cũng hiện mã) → chọn máy kia trong danh sách «Ghép với máy khác» rồi nhập mã đang hiện trên máy đó. Mã chỉ dùng được
+  lúc màn đồng bộ đang mở, dùng một lần; đoán sai 5 lần thì đổi mã. Mạng chia nhiều lớp (máy không tự thấy nhau) thì gõ địa
+  chỉ IP của máy kia. Lần đầu iPad / iPhone hỏi cho phép tìm thiết bị trong mạng cục bộ: chọn Cho phép.
+- **Đồng bộ gì:** lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, tập đã xem, phim theo dõi (số tập đã thấy), danh sách trang
+  phim. Người xem đầu tiên của hai máy ghép với nhau, người khác ghép theo tên (vd «Bố» ↔ «Bố»); người chỉ có ở một máy
+  thì không đồng bộ. Cài đặt, mã PIN, giới hạn giờ xem không đồng bộ.
+- **Khi nào:** mở app, xem xong quay ra, theo dõi / bỏ theo dõi, xoá khỏi lịch sử (tắt được: «Tự đồng bộ»); nút **Đồng bộ
+  ngay**. Mỗi bên gộp theo lúc xem mới nhất; phim xoá khỏi lịch sử / bỏ theo dõi / trang bỏ khỏi danh sách ở máy này cũng
+  biến mất ở máy kia (trừ khi máy kia xem lại sau đó). iPad / iPhone chỉ trả lời khi app đang mở; TV trả lời khi app còn chạy.
+- **Bỏ ghép:** TV chọn máy trong danh sách → Bỏ ghép; iPad vuốt trái máy đó.
 
 ## Giới hạn giờ xem (từ 2.1)
 
@@ -259,7 +286,7 @@ Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ l�
    `gh release create v1.8.0 dist\ChimToTV-1.8.0.apk --title "Côn Bằng TV 1.8.0" --notes-file ghi-chu.md`
    Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập nhật trên TV.
 
-**Bản iPad** phát hành bằng tag riêng `ios-v<bản>` (vd `ios-v1.0`) và **không bao giờ đánh dấu "latest"**
+**Bản iPad / iPhone** phát hành bằng tag riêng `ios-v<bản>` (vd `ios-v1.0`) và **không bao giờ đánh dấu "latest"**
 (`gh release create ios-v1.0 ConBangTV-iPad-1.0.ipa --latest=false …`): app TV hỏi `releases/latest` rồi lấy tệp `.apk`,
 release iPad mà thành latest thì mọi TV hết thấy bản mới. Bản iPad duyệt danh sách release, lấy tag `ios-v*` có tệp
 `.ipa` (bỏ bản nháp / thử nghiệm) và mở `apple-magnifier://install?url=<link .ipa>` để TrollStore cài. Số bản ở
@@ -326,6 +353,22 @@ một gói nhờ `tcpNoDelay`; qua proxy thì chờ 40 ms sau byte đầu. Đo b
 tên miền hẳn: `MOVED_HOSTS` / `movedHosts` + `migrateMovedHosts()` (đổi tên cũ → mới trong mọi khoá và giá trị đã lưu,
 khoá tên mới đã có thì giữ); `home.movedTo` gọi `Prefs.replaceSite`. Test: `ProfilesTest`, iPad `Socks5Tests`,
 `MovedHostsTests`.
+
+Đồng bộ trong nhà (từ 2.2 / iPad 1.3 — TV `Sync.kt` (dữ liệu + gộp), `SyncNet.kt` (cổng, NSD, máy khách), `SyncUi.kt`; iPad
+`Core/SyncData.swift`, `UI/SyncService.swift`, `UI/SyncView.swift`): HTTP/1.1 trên TCP thô (không qua proxy của app), cổng
+8791 (bản debug / bản thử 8792 để cài song song), quảng bá `_conbangtv._tcp` (NSD / Bonjour, TXT `id`, `p`). `GET /hello`;
+`POST /pair` {device, name, platform, code} → khoá chung `token`; `POST /sync` thân = toàn bộ dữ liệu (SyncPayload, JSON
+giống hệt hai bên), ký `X-Device` / `X-Time` / `X-Sig` = HMAC-SHA256(token, "time\nthân") (lệch ≤ 10 phút), máy nhận gộp
+rồi trả bản đã gộp (cũng ký), máy gửi gộp nốt. Mọi yêu cầu gửi `X-Port` → máy nhận nhớ địa chỉ + cổng để gọi lại (khác lớp
+mạng mDNS không qua được); địa chỉ IPv6 cục bộ giữ `%en0`. Gộp: lịch sử theo lúc xem, chỗ xem theo lúc lưu (`pos_time` /
+`Position.t`), theo dõi lấy số tập lớn hơn; "bia mộ" `hist_del`, `follow_del` (riêng người xem), `sites_add` / `sites_del`
+(cả máy), tối đa 300. Máy đã ghép: `sync_peers`; mã máy `device_id`. Test: `.\gradlew.bat :app:testDebugUnitTest --tests
+vn.chimto.tv.SyncTest` (cùng ca với iPad `SyncMergeTests`).
+
+hoathinh3d.pw (11/2026): các trang Phim Lẻ / Đang Chiếu / Hoàn Thành / Đánh Giá Cao chỉ có khung trống, phim nạp bằng
+`/wp-json/halim/v1/{movies|ongoing|completed|top-rated}?page=N&per_page=20` (Phim Lẻ thêm `sortby`); Lịch Chiếu
+`/wp-json/movie-schedule/v1/daily?day=thu-hai…` (`early_movies` + `regular_movies`); Top 10 là thẻ `a.t10-card` trong HTML.
+`Site.HalimApi` (TV / iPad) đọc `API_URL` trong mã JS của trang. Test `HalimApiTest` / `HalimApiTests`.
 
 Giới hạn giờ xem (từ 2.1 — `WatchLimit.kt` / `WatchLimit.swift`, giao diện TV `ProfileUi.limits` / `grant`, iPad
 `LimitViews.swift`): khoá riêng từng người xem `limit_min`, `bedtime`, `watch_day`, `watch_sec`, `watch_extra`,
@@ -412,6 +455,18 @@ bằng TrollStore nên dùng được), iPadOS 17+ dùng `proxyConfigurations` c
 video HLS (CDN TikTok) và video KK đều đi qua cổng. Màn hình khoá: agent đặt `navigator.mediaSession` (WebKit tự đưa lên
 màn hình khoá / AirPods) — tên phim do app gửi bằng lệnh `meta`, tập trước / sau báo ngược qua trạng thái (`rs` / `rc`).
 Cử chỉ: `TouchCatcher` trong `PlayerView.swift`; âm lượng qua thanh trượt của `MPVolumeView` gần như trong suốt.
+
+iPad / iPhone từ 1.3: IPA chung (`TARGETED_DEVICE_FAMILY` 1,2); `PlayerController.supportedInterfaceOrientations` = ngang
+trên iPhone. Cỡ chữ: mọi chữ dùng `.appFont(cỡ, đậm)` (theo dõi `TextScale`, `Prefs.textScale`) + `.appDynamicType()` cho
+điều khiển hệ thống. Bàn phím: nút ẩn mang `.keyboardShortcut` (`MainShortcuts`, `GridShortcuts`, `DetailShortcuts` — tắt lúc
+đang gõ ô nhập), di chuyển trên lưới chia nhóm `Core/KeyNav.swift` (test `KeyNavTests`); trình phát `UIKeyCommand` có tên
+(bảng phím tắt khi giữ ⌘), `UIHoverGestureRecognizer` / `UIPointerInteraction` / pan chỉ nhận sự kiện cuộn. Widget: phần
+mở rộng `Widget/` (WidgetKit, `ConBangWidget.appex`), dữ liệu dùng chung `Shared/WidgetFeedData.swift`; app ghi
+`Widget/feed.json` + `posters/*.jpg` trong App Group `group.vn.chimto.tv` (bản thử `.debug`) — `UI/WidgetFeed.swift` — rồi
+`WidgetCenter.reloadAllTimelines`; chạm mở `conbangtv://play?p=<người xem>&film=…&ep=…` (bản thử `conbangtv-thu://`).
+`ios/scripts/package.sh` ký app + widget bằng `ldid` kèm App Group và đúng các quyền TrollStore tự thêm cho app không khai
+báo quyền (`application-identifier` / `keychain-access-groups` `TROLLTROLL.*`) — thiếu thì mất mật khẩu proxy trong Keychain
+của bản cũ. Cổng gỡ lỗi bản thử thêm `/orient`, `/textscale`, `/widget`, `/sync`.
 
 Chấm điểm server (`PlayStats.kt`): agent báo thêm số khung hình rớt; `PlaySession` đếm từ trạng thái mỗi giây (đang
 phát mà trình phát chờ tải = giật; chờ tải ngay sau lệnh tua thì không tính), lưu 8 lần xem gần nhất theo trang + server

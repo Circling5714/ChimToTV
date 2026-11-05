@@ -4,7 +4,39 @@ Côn Bằng TV — từ 1.0 đến 1.4 tên là ChimTo TV. Tải bản mới nh�
 Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b`), cài đè
 được lên nhau và giữ nguyên lịch sử xem.
 
-Bản iPad (iPadOS 15+, cài bằng TrollStore) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
+Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
+
+## iPad 1.3 — 05/11/2026
+
+- **Có bản cho iPhone:** cùng một tệp `ConBangTV-iPad-1.3.ipa` cài được cả iPhone và iPad. Lưới phim, trang phim, «Ai đang
+  xem?», bàn phím mã PIN, màn «Hết giờ xem» co theo màn hẹp (dọc / ngang); trên iPhone trình phát luôn xem ngang, thanh nút
+  gọn lại.
+- **Widget «Xem tiếp»** trên màn hình chính (nhỏ 1 phim / vừa 3 phim / lớn 6 phim): phim đang xem dở của người xem đang dùng,
+  chạm là mở app phát tiếp đúng chỗ.
+- **Đồng bộ trong nhà** với TV (Côn Bằng TV 2.2+) hoặc iPad / iPhone khác (Cài đặt → Đồng bộ trong nhà): lịch sử xem, chỗ
+  đang xem, tập đã xem, phim theo dõi, danh sách trang phim; ghép bằng mã 4 số, tự tìm máy cùng Wi‑Fi hoặc gõ IP; tự đồng
+  bộ khi mở app / xem xong.
+- **Cỡ chữ** (Cài đặt → Cỡ chữ: Nhỏ – Cực lớn).
+- **Bàn phím rời / chuột:** mũi tên chọn phim / chọn tập, Enter mở, Delete xoá khỏi lịch sử, ⌘F / ⌘1–3 / ⌘R / ⌘O / ⌘E /
+  ⌘, / Esc; trình phát thêm F / S / W; gõ mã PIN bằng bàn phím; rê chuột hiện thanh nút, cuộn để tua / chỉnh âm lượng.
+- hoathinh3d.pw: các mục Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Top 10, Đánh Giá Cao hiện phim trở lại (như TV 2.2).
+- Cài đè giữ lịch sử xem và mật khẩu proxy đã lưu (IPA ký kèm đúng nhóm Keychain như bản cũ).
+- bản 1.3 (CFBundleVersion 4) · mã gói `vn.chimto.tv` (widget `vn.chimto.tv.widget`) · tag `ios-v1.3` · commit `a4c405e` ·
+  SHA-256 IPA `bdb0da1b50b381628050d95b9e4f2a75b569e10000967b0e0c8243328380eb54`
+
+## 2.2 — 05/11/2026
+
+- **Đồng bộ với iPad / iPhone** (Cài đặt → «Đồng bộ với iPad / iPhone…»): xem dở trên TV thì mở iPad / iPhone xem tiếp đúng
+  chỗ, và ngược lại. Đồng bộ lịch sử xem, Xem tiếp, chỗ đang xem, tập đã xem, phim theo dõi, danh sách trang phim; người xem
+  đầu tiên ghép với nhau, người khác ghép theo tên. Ghép bằng mã 4 số (chỉ dùng được lúc hộp thoại mở), mỗi lần đồng bộ ký
+  bằng khoá chung; tự tìm máy cùng Wi‑Fi, không thấy thì nhập IP. Tự đồng bộ khi mở app / xem xong (tắt được), có «Đồng bộ
+  ngay»; xoá / bỏ theo dõi ở máy này thì máy kia cũng xoá.
+- **hoathinh3d.pw:** Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Top 10 HH3D, Đánh Giá Cao trống vì trang đổi sang nạp phim
+  bằng JavaScript — app đọc thẳng dữ liệu của trang (có trang sau; Lịch Chiếu chia theo ngày từ hôm nay, phim chiếu sớm ghi
+  giờ; Top 10 ghi thứ hạng).
+- versionCode 20 · tag `v2.2` · commit `a4c405e` · SHA-256 APK
+  `54b448b7b168708737bbc6944dd783923afe1dac481cec81ea11da99168097e4`
+- Cập nhật tự động 2.1 → 2.2 đã thử trên TV box (Cài đặt → "Kiểm tra cập nhật" → "Cài đặt ngay").
 
 ## iPad 1.2 — 05/11/2026
 
