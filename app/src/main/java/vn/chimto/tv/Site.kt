@@ -58,7 +58,7 @@ data class EpisodeSource(
 /**
  * Đọc dữ liệu từ trang phim. Không viết riêng cho từng trang: nhận dạng theo các mẫu giao diện phổ biến của
  * trang hoạt hình 3D (thẻ "flw-item" kiểu yanhh3d, thẻ "halim-item" của theme HaLim) và có phương án dự phòng.
- * Trang dựng bằng Next.js (kiểu PhimMoi) thì chuyển cho NextSite.
+ * Trang dựng bằng Next.js (kiểu PhimMoi) thì chuyển cho NextSite; trang ứng dụng JS có API JSON (mephim) cho ApiSite.
  * Mọi đường dẫn lấy từ chính trang → đổi tên miền / thêm trang tương tự trong Cài đặt là chạy.
  */
 object Site {
@@ -80,15 +80,26 @@ object Site {
     // ---- Trang chủ ----
 
     fun home(base: String = Prefs.baseUrl): Home {
+        if (ApiSite.isKnown(base)) return ApiSite.home(base)
         val doc = fetch("$base/")
         val movedTo = originOf(doc.location())?.takeIf { hostOf(it) != hostOf(base) }
         val home = NextSite.data(doc)?.let { NextSite.home(doc, it) } ?: parseHome(doc)
+        // Trang trắng của ứng dụng JS (React…): thử API kiểu mephim
+        if (home.sections.isEmpty() && isAppShell(doc) && ApiSite.probe(base)) return ApiSite.home(base)
         return home.copy(movedTo = movedTo)
     }
+
+    /** Trang chỉ có khung rỗng cho ứng dụng JS (vd <div id="root"></div>) — dữ liệu không nằm trong HTML. */
+    private fun isAppShell(doc: Document) =
+        doc.selectFirst("#root, #app, #__nuxt")?.let { it.childrenSize() == 0 } == true && doc.select("a[href]").size < 5
 
     /** Thời gian tính phần tải qua mạng, không tính lúc đọc HTML (TV yếu đọc chậm, không phải lỗi của trang). */
     fun check(base: String): SiteCheck {
         val t0 = System.nanoTime()
+        if (ApiSite.isKnown(base)) {
+            val films = ApiSite.list(ApiSite.newestUrl(base)).films.size
+            return SiteCheck((System.nanoTime() - t0) / 1_000_000, films)
+        }
         val r = Http.get("$base/")
         val ms = (System.nanoTime() - t0) / 1_000_000
         return SiteCheck(ms, parseHome(Jsoup.parse(r.body, r.url)).sections.sumOf { it.films.size })
@@ -239,6 +250,7 @@ object Site {
     // ---- Danh sách / tìm kiếm ----
 
     fun list(url: String): FilmPage {
+        if (ApiSite.isKnown(url)) return ApiSite.list(url)
         // hoathinh3d.pw (11/2026): Phim Lẻ / Đang Chiếu / Hoàn Thành / Đánh Giá Cao nạp phim bằng API JSON
         if (HALIM_API_PATH in url) return HalimApi.parse(Http.get(url, mapOf("Accept" to "application/json")).body, url)
         val doc = fetch(url)
@@ -290,6 +302,7 @@ object Site {
      * (chưa biết loại trang thì thử ?s= trước, ra trang Next.js thì tìm lại đúng chỗ).
      */
     fun search(query: String, base: String = Prefs.baseUrl): FilmPage {
+        if (ApiSite.isKnown(base)) return ApiSite.list(ApiSite.searchUrl(base, query))
         if (!NextSite.isKnown(base)) {
             val page = list("$base/?s=" + URLEncoder.encode(query.trim(), "UTF-8"))
             if (!NextSite.isKnown(base)) return page
@@ -300,7 +313,9 @@ object Site {
     // ---- Chi tiết phim ----
 
     fun detail(url: String): FilmDetail {
+        if (ApiSite.isKnown(url)) return ApiSite.detail(url).also { detailCache.put(url, it) }
         val doc = fetch(url)
+        if (isAppShell(doc) && ApiSite.probe(url)) return detail(url)
         val d = NextSite.data(doc)?.let { NextSite.detail(doc, it, url) } ?: parseDetail(doc, url)
         return d.also { detailCache.put(url, it) }
     }
@@ -379,7 +394,12 @@ object Site {
 
     // ---- Trang tập phim ----
 
-    fun source(epUrl: String): EpisodeSource = parseSource(fetch(epUrl), epUrl)
+    fun source(epUrl: String): EpisodeSource {
+        if (ApiSite.isKnown(epUrl)) return ApiSite.source(epUrl)
+        val doc = fetch(epUrl)
+        if (isAppShell(doc) && ApiSite.probe(epUrl)) return ApiSite.source(epUrl)
+        return parseSource(doc, epUrl)
+    }
 
     fun parseSource(doc: Document, epUrl: String): EpisodeSource {
         NextSite.data(doc)?.let { return NextSite.parseSource(doc, it, epUrl) }

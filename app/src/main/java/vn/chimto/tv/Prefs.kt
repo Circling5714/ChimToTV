@@ -39,10 +39,13 @@ object Prefs {
     const val DEFAULT_BASE = "https://yanhh3d.ee"
 
     /** Các trang mẫu có sẵn trong danh sách lần đầu cài. */
-    val PRESET_SITES = listOf(DEFAULT_BASE, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun")
+    val PRESET_SITES = listOf(
+        DEFAULT_BASE, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun",
+        "https://mephim.ddns.net",
+    )
 
     /** Trang mẫu thêm ở bản sau: thêm một lần vào danh sách người xem đã lưu (xoá đi thì thôi, không thêm lại). */
-    private val ADDED_SITES = listOf("https://phimmois.fun")
+    private val ADDED_SITES = listOf("https://phimmois.fun", "https://mephim.ddns.net")
 
     /**
      * Trang đổi hẳn tên miền, đường dẫn giữ nguyên (tên cũ chuyển hướng 301 sang tên mới). Tên cũ hay bị nhà mạng chặn nên

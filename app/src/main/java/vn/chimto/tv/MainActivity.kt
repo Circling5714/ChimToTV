@@ -437,7 +437,7 @@ class MainActivity : BaseActivity() {
         val base = Prefs.baseUrl
         val cached = filters?.takeIf { it.first == base }?.second
         if (cached == null) toast("Đang tải danh sách…")
-        background({ cached ?: NextSite.filters(base) }) { r ->
+        background({ cached ?: if (ApiSite.isKnown(base)) ApiSite.filters(base) else NextSite.filters(base) }) { r ->
             r.onSuccess { f ->
                 filters = base to f
                 val list = if (entry.url == "genre") f.first else f.second
@@ -507,8 +507,8 @@ class MainActivity : BaseActivity() {
         items += Entry("Lịch sử xem", Kind.HISTORY)
         items += Entry(followsTitle(), Kind.FOLLOWS)
         categories.forEach { items += Entry(it.title, Kind.CATEGORY, it.url) }
-        // Trang kiểu PhimMoi: đủ thể loại / quốc gia của bộ lọc (menu trang chỉ có vài mục)
-        if (NextSite.isKnown(Prefs.baseUrl)) {
+        // Trang kiểu PhimMoi / trang API (mephim): đủ thể loại / quốc gia của bộ lọc (menu trang chỉ có vài mục)
+        if (NextSite.isKnown(Prefs.baseUrl) || ApiSite.isKnown(Prefs.baseUrl)) {
             items += Entry("Thể loại…", Kind.FILTER, "genre")
             items += Entry("Quốc gia…", Kind.FILTER, "country")
         }
