@@ -8,6 +8,9 @@
   window.__chimtoAgent = 1;
   var isTop = window.top === window;
   var userActed = false, restarted = false;
+  // Màn hình khoá / Trung tâm điều khiển / tai nghe (bản iPad): tên phim do app gửi ('meta'), tập trước / sau bấm ở đó
+  // báo lên app qua trạng thái (rs tăng dần, rc = 'next' | 'prev')
+  var meta = null, remote = { seq: 0, cmd: null }, sessionSet = false;
 
   // Ẩn thanh điều khiển của jwplayer — app đã có thanh thời gian riêng điều khiển bằng remote.
   try {
@@ -133,8 +136,33 @@
       rate: v.playbackRate,
       // Khung phim (cửa sổ hình trong hình theo đúng tỉ lệ) + đang ở cửa sổ hình trong hình của Safari (bản iPad)
       vw: v.videoWidth || 0, vh: v.videoHeight || 0,
-      pip: v.webkitPresentationMode === 'picture-in-picture' || document.pictureInPictureElement === v
+      pip: v.webkitPresentationMode === 'picture-in-picture' || document.pictureInPictureElement === v,
+      rs: remote.seq, rc: remote.cmd
     };
+  }
+
+  // Media Session: WebKit (Safari / iPad) đưa tên phim, ảnh và các nút này lên màn hình khoá, Trung tâm điều khiển,
+  // AirPods (chạm hai lần: tập sau). WebView của Android TV không dùng tới — đặt cũng không sao.
+  function session() {
+    var ms = navigator.mediaSession;
+    if (!ms) return;
+    sessionSet = true;
+    if (meta && window.MediaMetadata) try { ms.metadata = new MediaMetadata(meta); } catch (e) {}
+    function remoteCmd(c) { remote.seq++; remote.cmd = c; var s = state(); if (s) up(s); }
+    var acts = {
+      play: function () { userActed = true; var x = video(); if (x) play(x); },
+      pause: function () { userActed = true; var x = video(); if (x) x.pause(); },
+      seekbackward: function (d) { var x = video(); if (x) x.currentTime = Math.max(0, x.currentTime - ((d && d.seekOffset) || 10)); },
+      seekforward: function (d) {
+        var x = video(); if (!x) return;
+        var max = isFinite(x.duration) ? x.duration - 1 : 1e9;
+        x.currentTime = Math.min(max, x.currentTime + ((d && d.seekOffset) || 10));
+      },
+      seekto: function (d) { var x = video(); if (x && d && isFinite(d.seekTime)) x.currentTime = d.seekTime; },
+      previoustrack: function () { remoteCmd('prev'); },
+      nexttrack: function () { remoteCmd('next'); }
+    };
+    for (var k in acts) try { ms.setActionHandler(k, acts[k]); } catch (e) {}
   }
   // Hình trong hình của trình duyệt (bản iPad: WebKit; Android dùng hình trong hình của cả màn hình app)
   function pip(v, on) {
@@ -170,6 +198,7 @@
       case 'rate': want.rate = m.arg; applyView(v); break;
       case 'fit': want.fit = m.arg; applyView(v); break;
       case 'pip': pip(v, !!m.arg); break;
+      case 'meta': meta = m.arg; session(); break;
     }
     var s = state(); if (s) up(s);
   }
@@ -213,6 +242,7 @@
 
   setInterval(function () {
     if (adPlaying()) skipAd(); else { unstick(video()); applyView(video()); }
+    if (!sessionSet && video()) session();
     // NguonC tự hỏi "Tiếp tục xem?" và chờ bấm (remote không bấm được trong iframe): app đã tự nhớ chỗ xem dở
     // và tua tới đó khi phim chạy → chọn "Xem lại từ đầu"
     var restart = !restarted && document.querySelector('.stream-resume #restartBtn');

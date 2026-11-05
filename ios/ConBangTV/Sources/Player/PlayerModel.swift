@@ -177,6 +177,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     func openEpisode(_ i: Int) {
         guard let d = detail, let ep = episodes[safe: i] else { return }
         index = i
+        remoteSeq = 0
         token += 1
         let t = token
         stopVideo()
@@ -445,6 +446,16 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         if state != s { state = s }
         let pip = Self.flag(o["pip"])
         if pip != inPip { pipChanged(pip) }
+        // Màn hình khoá / Trung tâm điều khiển / AirPods bấm tập trước / sau (Media Session của trang, player-agent.js)
+        let rs = Int(Self.num(o["rs"]))
+        if rs > remoteSeq {
+            remoteSeq = rs
+            switch o["rc"] as? String {
+            case "next": next(); return
+            case "prev": prev(); return
+            default: break
+            }
+        }
         let err = (o["err"] as? String) ?? ""
         if !err.isEmpty && !errShown {
             errShown = true
@@ -471,6 +482,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         // Bắt đầu khi video thật sự chạy (không phải lúc mới nạp xong mà còn dừng)
         if !started && s.ready && !s.paused {
             started = true
+            sendNowPlaying()
             Log.d("Player", "video chạy t=\(Int(s.t)), báo trước \(startHint), \(now - loadStartedAt) ms")
             hideLoading()
             if resumeAt > 30 && (s.d <= 0 || Double(resumeAt) < s.d - 30) {
@@ -722,6 +734,22 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         seekBy(left ? -10 : 10)
         showNotice(left ? "◀◀ 10 giây" : "10 giây ▶▶", 1.2)
         if !panelShown { showBar() }
+    }
+
+    // MARK: - Màn hình khoá / Trung tâm điều khiển / AirPods
+
+    /// Lần bấm tập trước / sau ở màn hình khoá đã xử lý (đếm theo trang phát; mở tập khác thì đếm lại).
+    private var remoteSeq = 0
+
+    /// Tên phim, tập, ảnh cho màn hình khoá / Trung tâm điều khiển / AirPods: gửi xuống trang phát (Media Session của
+    /// WebKit — player-agent.js); nút phát / dừng / tua do WebKit tự lo, nút tập trước / sau báo ngược lên app.
+    private func sendNowPlaying() {
+        guard let d = detail else { return }
+        var meta: [String: Any] = ["title": d.title, "artist": episodes[safe: index]?.title ?? "", "album": "Côn Bằng TV"]
+        if let p = d.poster, !p.isEmpty { meta["artwork"] = [["src": p, "sizes": "512x512"]] }
+        guard let data = try? JSONSerialization.data(withJSONObject: meta), let json = String(data: data, encoding: .utf8) else { return }
+        let js = "window.chimtoCmd&&chimtoCmd('meta'," + json.replacingOccurrences(of: "</", with: "<\\/") + ")"
+        web.evaluateJavaScript(js, completionHandler: nil)
     }
 
     // MARK: - Cử chỉ chạm (vuốt, giữ tay, chụm) — xem TouchCatcher
