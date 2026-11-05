@@ -265,6 +265,25 @@ struct DetailView: View {
         }
     }
 
+    private var jumpBox: some View {
+        HStack(spacing: 6) {
+            TextField("Đến tập…", text: $m.jumpText)
+                .keyboardType(.numberPad)
+                .focused($jumpFocused)
+                .frame(width: 96)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Theme.surface2))
+                .onSubmit { m.jump() }
+            Button("Đến") {
+                jumpFocused = false
+                m.jump()
+            }
+            .buttonStyle(.bordered)
+            .tint(Theme.brand)
+        }
+    }
+
     @ViewBuilder
     private func episodesSection(_ d: FilmDetail) -> some View {
         if d.groups.count > 1 {
@@ -287,25 +306,10 @@ struct DetailView: View {
                 }
                 .tint(Theme.dim)
             }
-            if count > 20 {
-                HStack(spacing: 6) {
-                    TextField("Đến tập…", text: $m.jumpText)
-                        .keyboardType(.numberPad)
-                        .focused($jumpFocused)
-                        .frame(width: 96)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.surface2))
-                        .onSubmit { m.jump() }
-                    Button("Đến") {
-                        jumpFocused = false
-                        m.jump()
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(Theme.brand)
-                }
-            }
+            if count > 20 && !narrow { jumpBox }
         }
+        // Màn hẹp (iPhone dọc): ô "Đến tập" xuống dòng riêng
+        if count > 20 && narrow { jumpBox }
         let epMin = TextScale.shared.layout(96)
         LazyVGrid(columns: [GridItem(.adaptive(minimum: epMin), spacing: 10)], spacing: 10) {
             ForEach(m.episodes) { ep in

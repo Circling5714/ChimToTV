@@ -325,8 +325,10 @@ struct FilmGridView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let minW = scale.layout(geo.size.width < 500 ? 105 : 150)
-            let spacing: CGFloat = geo.size.width < 500 ? 12 : 16
+            // Màn nhỏ (iPhone dọc, hoặc nằm ngang — thấp): ô phim nhỏ hơn cho thấy được nhiều phim
+            let small = geo.size.width < 500 || geo.size.height < 420
+            let minW = scale.layout(small ? 105 : 150)
+            let spacing: CGFloat = small ? 12 : 16
             let pad: CGFloat = geo.size.width < 500 ? 14 : 20
             let cols = [GridItem(.adaptive(minimum: minW, maximum: scale.layout(230)), spacing: spacing, alignment: .top)]
             ScrollViewReader { proxy in

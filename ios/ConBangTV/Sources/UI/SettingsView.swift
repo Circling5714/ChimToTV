@@ -260,6 +260,8 @@ struct SettingsView: View {
                 .keyboardType(.URL)
                 .textInputAutocapitalization(.never)
                 .disableAutocorrection(true)
+            // Màn hẹp (iPhone): cuộn ngang thay vì gãy chữ trong nút
+            ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 Button("Lưu") { save() }.buttonStyle(.borderedProminent).tint(Theme.brand)
                 Button("Kiểm tra kết nối") { check() }.buttonStyle(.bordered)
@@ -269,6 +271,8 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 Button("Xoá khỏi danh sách", role: .destructive) { removeCurrent() }.buttonStyle(.bordered)
+            }
+            .fixedSize()
             }
             if !siteStatus.isEmpty { Text(siteStatus).foregroundColor(Theme.dim) }
         } header: { Text("Địa chỉ trang phim") } footer: {

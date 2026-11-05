@@ -11,7 +11,9 @@ for cfg in Beta Release; do
   found=1
   version=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$app/Info.plist")
   build=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$app/Info.plist")
-  # Quyền App Group (app ghi dữ liệu cho widget «Xem tiếp») — ký widget trước, rồi tới app
+  # Quyền App Group (app ghi dữ liệu cho widget «Xem tiếp») — ký widget trước, rồi tới app. Kèm đúng các quyền TrollStore
+  # tự thêm cho app không khai báo quyền (bản 1.2 trở về trước): application-identifier / nhóm Keychain TROLLTROLL.* —
+  # thiếu thì mật khẩu proxy đã lưu trong Keychain ở bản cũ không đọc được nữa.
   group=$(/usr/libexec/PlistBuddy -c "Print ConBangAppGroup" "$app/Info.plist")
   ent=$(mktemp)
   cat > "$ent" <<EOF
@@ -19,6 +21,9 @@ for cfg in Beta Release; do
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>com.apple.security.application-groups</key><array><string>${group}</string></array>
+  <key>application-identifier</key><string>TROLLTROLL.*</string>
+  <key>com.apple.developer.team-identifier</key><string>TROLLTROLL</string>
+  <key>keychain-access-groups</key><array><string>TROLLTROLL.*</string><string>com.apple.token</string></array>
 </dict></plist>
 EOF
   for ext in "$app"/PlugIns/*.appex; do

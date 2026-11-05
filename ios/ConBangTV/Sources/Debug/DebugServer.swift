@@ -301,6 +301,7 @@ enum DebugRoutes {
             o["canProxy"] = WebSetup.canProxy
             o["webMode"] = WebSetup.proxyMode
             o["keychain"] = Secret.works
+            o["savedPassword"] = !Prefs.proxyPass.isEmpty // mật khẩu proxy đã lưu còn đọc được (đổi quyền Keychain)
             return .json(o)
         case "/prefs":
             if r.method == "POST", let key = q["key"] {
