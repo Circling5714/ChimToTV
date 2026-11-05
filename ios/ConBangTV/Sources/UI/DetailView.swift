@@ -156,6 +156,9 @@ struct DetailView: View {
     @StateObject private var m: DetailModel
     @FocusState private var jumpFocused: Bool
     @State private var expanded = false
+    /// Màn hẹp (iPhone dọc, iPad chia đôi): ảnh bìa nhỏ, lề hẹp.
+    @Environment(\.horizontalSizeClass) private var hClass
+    private var narrow: Bool { hClass == .compact }
 
     init(film: Film) {
         _m = StateObject(wrappedValue: DetailModel(film: film))
@@ -187,7 +190,7 @@ struct DetailView: View {
                         ProgressView().tint(Theme.text).frame(maxWidth: .infinity).padding(40)
                     }
                 }
-                .padding(24)
+                .padding(narrow ? 16 : 24)
             }
             .onChange(of: m.scrollTarget) { t in
                 guard let t = t else { return }
@@ -220,13 +223,13 @@ struct DetailView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 22) {
+        HStack(alignment: .top, spacing: narrow ? 14 : 22) {
             Color.clear
-                .frame(width: 190, height: 285)
+                .frame(width: narrow ? 116 : 190, height: narrow ? 174 : 285)
                 .overlay(PosterImage(url: poster))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             VStack(alignment: .leading, spacing: 10) {
-                Text(title).appFont(30, .bold).foregroundColor(Theme.text)
+                Text(title).appFont(narrow ? 22 : 30, .bold).foregroundColor(Theme.text)
                 if let o = m.detail?.otherTitle { Text(o).appFont(17).foregroundColor(Theme.dim) }
                 if let i = m.detail?.info { Text(i).appFont(15).foregroundColor(Theme.dim) }
                 if let desc = m.detail?.description {
@@ -245,7 +248,7 @@ struct DetailView: View {
         let eps = m.group?.episodes ?? []
         if let latest = eps.last {
             let resume = m.resumeEp
-            let cols = [GridItem(.adaptive(minimum: 200), spacing: 12, alignment: .leading)]
+            let cols = [GridItem(.adaptive(minimum: narrow ? 150 : 200), spacing: 12, alignment: .leading)]
             LazyVGrid(columns: cols, alignment: .leading, spacing: 12) {
                 ChipButton(text: resume.map { "Xem tiếp \($0.title)" } ?? (eps.count == 1 ? "Xem phim" : "Xem \(latest.title) (mới nhất)"),
                            icon: "play.fill", active: true) { m.play(resume ?? latest) }

@@ -63,7 +63,7 @@ struct RootView: View {
                         .ignoresSafeArea()
                         .onTapGesture { showMenu = false }
                     Sidebar { showMenu = false }
-                        .frame(width: 300)
+                        .frame(width: min(300, geo.size.width - 56))
                         .transition(.move(edge: .leading))
                 }
             }
@@ -245,13 +245,14 @@ struct HomeContent: View {
                     }
                     .accessibilityLabel("Menu")
                 }
-                Text(app.title).appFont(26, .bold).foregroundColor(Theme.text).lineLimit(1)
+                Text(app.title).appFont(26, .bold).foregroundColor(Theme.text).lineLimit(1).minimumScaleFactor(0.7)
                 Spacer()
                 if showMenuButton {
                     Text(app.siteLabel).appFont(14).foregroundColor(Theme.dim).lineLimit(1)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.leading, showMenuButton ? 8 : 20)
+            .padding(.trailing, 20)
             .padding(.top, 14)
             .padding(.bottom, 8)
 

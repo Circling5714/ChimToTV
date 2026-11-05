@@ -149,7 +149,7 @@ struct SettingsView: View {
                     Toggle("Tự động kiểm tra cập nhật", isOn: $autoUpdate)
                         .onChange(of: autoUpdate) { Prefs.autoUpdate = $0 }
                 } header: { Text("Cập nhật app") } footer: {
-                    Text("App tự tìm bản iPad mới trên GitHub khi mở (tối đa 2 giờ một lần) rồi mở TrollStore để cài.")
+                    Text("App tự tìm bản mới (iPad / iPhone) trên GitHub khi mở (tối đa 2 giờ một lần) rồi mở TrollStore để cài.")
                 }
 
                 Section {
@@ -169,7 +169,7 @@ struct SettingsView: View {
                 #endif
 
                 Section {
-                    Text("Côn Bằng TV \(version) — xem phim từ trang web trên iPad bằng chạm / bàn phím.")
+                    Text("Côn Bằng TV \(version) — xem phim từ trang web trên iPad / iPhone bằng chạm / bàn phím.")
                         .foregroundColor(Theme.dim)
                 }
             }

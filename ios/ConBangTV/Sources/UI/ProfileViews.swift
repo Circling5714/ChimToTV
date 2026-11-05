@@ -35,24 +35,30 @@ struct ProfilePickerView: View {
     @State private var settings = false
     @State private var parentForAdd = false
 
-    /// Cột cố định (tối đa 4 ô một hàng — vừa cả iPad dọc): lưới nằm giữa màn hình.
-    private var cols: [GridItem] {
+    /// Cột cố định (tối đa 4 ô một hàng — vừa cả iPad dọc): lưới nằm giữa màn hình. Màn hẹp (iPhone) ô nhỏ hơn.
+    private func cols(_ width: CGFloat) -> [GridItem] {
         let n = app.profiles.count + (app.profiles.count < Prefs.maxProfiles ? 1 : 0)
-        return Array(repeating: GridItem(.fixed(150), spacing: 24), count: max(1, min(4, n)))
+        let tile: CGFloat = width < 600 ? 118 : 150
+        let spacing: CGFloat = width < 600 ? 12 : 24
+        let fit = Int((width - 40 + spacing) / (tile + spacing))
+        return Array(repeating: GridItem(.fixed(tile), spacing: spacing), count: max(1, min(4, n, fit)))
     }
 
     var body: some View {
         ZStack {
             Theme.bg.ignoresSafeArea()
+            GeometryReader { geo in
+            let narrow = geo.size.width < 600
+            ScrollView {
             VStack(spacing: 12) {
-                Text("Ai đang xem?").appFont(38, .bold).foregroundColor(Theme.text)
+                Text("Ai đang xem?").appFont(narrow ? 30 : 38, .bold).foregroundColor(Theme.text)
                 Text("Mỗi người có lịch sử xem, Xem tiếp, phim theo dõi và cài đặt riêng.")
                     .appFont(16).foregroundColor(Theme.dim).multilineTextAlignment(.center)
-                LazyVGrid(columns: cols, spacing: 26) {
+                LazyVGrid(columns: cols(geo.size.width), spacing: narrow ? 14 : 26) {
                     ForEach(app.profiles) { p in
                         Button {
                             if p.locked { pinFor = p } else { app.pickProfile(p) }
-                        } label: { tile(p) }
+                        } label: { tile(p, avatar: narrow ? 84 : 108) }
                         .buttonStyle(PressScale())
                         .accessibilityLabel(p.name)
                     }
@@ -60,12 +66,12 @@ struct ProfilePickerView: View {
                         Button {
                             // Đã có giới hạn giờ xem: thêm người cần mã PIN phụ huynh
                             if Prefs.anyLimits && Prefs.hasParentPin { parentForAdd = true } else { adding = true }
-                        } label: { tile(nil) }
+                        } label: { tile(nil, avatar: narrow ? 84 : 108) }
                             .buttonStyle(PressScale())
                             .accessibilityLabel("Thêm người")
                     }
                 }
-                .padding(.vertical, 26)
+                .padding(.vertical, narrow ? 14 : 26)
                 Button { settings = true } label: {
                     Label("Sửa người xem…", systemImage: "pencil")
                         .appFont(16, .medium)
@@ -76,7 +82,10 @@ struct ProfilePickerView: View {
                 }
                 .buttonStyle(PressScale())
             }
-            .padding(30)
+            .padding(narrow ? 20 : 30)
+            .frame(maxWidth: .infinity, minHeight: geo.size.height) // giữa màn hình; màn thấp (iPhone ngang) thì cuộn
+            }
+            }
             // Mở từ menu (không phải lúc mở app), hoặc người đang dùng không khoá: được đóng, xem tiếp bằng người đang dùng
             if app.pickerClosable {
                 VStack {
@@ -113,9 +122,9 @@ struct ProfilePickerView: View {
         }
     }
 
-    private func tile(_ p: Profile?) -> some View {
+    private func tile(_ p: Profile?, avatar: CGFloat) -> some View {
         VStack(spacing: 12) {
-            ProfileAvatar(profile: p, size: 108)
+            ProfileAvatar(profile: p, size: avatar)
             HStack(spacing: 6) {
                 Text(p?.name ?? "Thêm người")
                     .appFont(19, .semibold)
@@ -138,6 +147,8 @@ struct PinPad: View {
 
     @State private var digits = ""
     @State private var wrong = 0
+    /// iPhone nằm ngang: màn thấp — chữ + chấm bên trái, bàn phím số bên phải.
+    @Environment(\.verticalSizeClass) private var vClass
 
     init(title: String, subtitle: String? = nil, onCancel: @escaping () -> Void, check: @escaping (String) -> Bool) {
         self.title = title
@@ -149,7 +160,29 @@ struct PinPad: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.6).ignoresSafeArea().onTapGesture { onCancel() }
-            VStack(spacing: 18) {
+            if vClass == .compact {
+                HStack(spacing: 28) {
+                    VStack(spacing: 14) { header }
+                        .frame(maxWidth: 260)
+                    keypad(size: 54, spacing: 8)
+                }
+                .padding(20)
+                .background(RoundedRectangle(cornerRadius: 22).fill(Theme.surface))
+            } else {
+                VStack(spacing: 18) {
+                    header
+                    keypad(size: 76, spacing: 12)
+                }
+                .padding(28)
+                .frame(maxWidth: 380)
+                .background(RoundedRectangle(cornerRadius: 22).fill(Theme.surface))
+            }
+        }
+        .background(PinKeys(press: press, delete: { if !digits.isEmpty { digits.removeLast() } }, cancel: onCancel))
+    }
+
+    @ViewBuilder
+    private var header: some View {
                 Text(title).appFont(22, .bold).foregroundColor(Theme.text).multilineTextAlignment(.center)
                 if let s = subtitle {
                     Text(s).appFont(14).foregroundColor(Theme.dim).multilineTextAlignment(.center)
@@ -165,21 +198,19 @@ struct PinPad: View {
                 .modifier(Shake(amount: CGFloat(wrong)))
                 .animation(.linear(duration: 0.35), value: wrong)
                 Text(wrong > 0 ? "Sai mã PIN" : " ").appFont(14, .medium).foregroundColor(.red)
-                VStack(spacing: 12) {
-                    ForEach([["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["Huỷ", "0", "⌫"]], id: \.self) { row in
-                        HStack(spacing: 18) {
-                            ForEach(row, id: \.self) { key in keyButton(key) }
-                        }
-                    }
+    }
+
+    private func keypad(size: CGFloat, spacing: CGFloat) -> some View {
+        VStack(spacing: spacing) {
+            ForEach([["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["Huỷ", "0", "⌫"]], id: \.self) { row in
+                HStack(spacing: spacing * 1.5) {
+                    ForEach(row, id: \.self) { key in keyButton(key, size: size) }
                 }
             }
-            .padding(28)
-            .frame(maxWidth: 380)
-            .background(RoundedRectangle(cornerRadius: 22).fill(Theme.surface))
         }
     }
 
-    private func keyButton(_ key: String) -> some View {
+    private func keyButton(_ key: String, size: CGFloat) -> some View {
         Button {
             switch key {
             case "Huỷ": onCancel()
@@ -188,9 +219,9 @@ struct PinPad: View {
             }
         } label: {
             Text(key)
-                .font(.system(size: key.count > 1 ? 17 : 28, weight: .medium))
+                .font(.system(size: key.count > 1 ? 17 : size * 0.37, weight: .medium))
                 .foregroundColor(Theme.text)
-                .frame(width: 76, height: 76)
+                .frame(width: size, height: size)
                 .background(Circle().fill(key.count > 1 && key != "⌫" ? Color.clear : Theme.surface2))
         }
         .buttonStyle(PressScale())
@@ -206,6 +237,27 @@ struct PinPad: View {
             wrong += 1
             digits = ""
         }
+    }
+}
+
+/// Gõ mã PIN bằng bàn phím rời: số 0–9, Delete xoá số, Esc huỷ.
+private struct PinKeys: View {
+    let press: (String) -> Void
+    let delete: () -> Void
+    let cancel: () -> Void
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<10, id: \.self) { d in
+                Button("\(d)") { press("\(d)") }.keyboardShortcut(KeyEquivalent(Character("\(d)")), modifiers: [])
+            }
+            Button("Xoá số", action: delete).keyboardShortcut(.delete, modifiers: [])
+            Button("Huỷ", action: cancel).keyboardShortcut(.escape, modifiers: [])
+        }
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

@@ -271,7 +271,7 @@ enum Socks5 {
         hints.ai_socktype = SOCK_STREAM
         var res: UnsafeMutablePointer<addrinfo>?
         guard getaddrinfo(host, nil, &hints, &res) == 0, let first = res else {
-            throw SocksError(code: 4, message: "iPad không phân giải được \(host)")
+            throw SocksError(code: 4, message: "Máy không phân giải được \(host)")
         }
         defer { freeaddrinfo(res) }
         var v4: [IPAddr] = [], v6: [IPAddr] = []
@@ -286,7 +286,7 @@ enum Socks5 {
             }
         }
         let all = v4 + v6
-        guard !all.isEmpty else { throw SocksError(code: 4, message: "iPad không phân giải được \(host)") }
+        guard !all.isEmpty else { throw SocksError(code: 4, message: "Máy không phân giải được \(host)") }
         return all
     }
 }

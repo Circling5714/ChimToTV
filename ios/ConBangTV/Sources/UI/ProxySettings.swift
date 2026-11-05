@@ -50,7 +50,7 @@ struct ProxySection: View {
                 Spacer()
                 Picker("DNS", selection: $remoteDns) {
                     Text("của proxy").tag(true)
-                    Text("của iPad").tag(false)
+                    Text("của máy").tag(false)
                 }
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 300)
@@ -79,7 +79,7 @@ struct ProxySection: View {
             }
             if !status.isEmpty { Text(status).foregroundColor(failed ? .red : Theme.dim) }
         } header: { Text("Proxy SOCKS5") } footer: {
-            Text("DNS của proxy: proxy tự tìm địa chỉ trang (vượt chặn tên miền của nhà mạng); DNS của iPad: iPad tự tìm rồi chỉ gửi IP cho proxy. Chỉ trang phim: video, ảnh, cập nhật app đi thẳng mạng nhà (đỡ tốn proxy). Trên iPadOS 15–16, lúc bật proxy app không giữ cookie của trang web sau khi tắt app.")
+            Text("DNS của proxy: proxy tự tìm địa chỉ trang (vượt chặn tên miền của nhà mạng); DNS của máy: máy tự tìm rồi chỉ gửi IP cho proxy. Chỉ trang phim: video, ảnh, cập nhật app đi thẳng mạng nhà (đỡ tốn proxy). Trên iOS 15–16, lúc bật proxy app không giữ cookie của trang web sau khi tắt app.")
         }
         .onAppear { show() }
     }
@@ -128,11 +128,11 @@ struct ProxySection: View {
     private func show() {
         failed = false
         guard let c = Prefs.proxyConfig() else {
-            status = "Đang tắt — app dùng mạng mặc định của iPad."
+            status = "Đang tắt — app dùng mạng mặc định của máy."
             return
         }
         status = "Đang bật: \(c.host):\(c.port)" + (c.user.isEmpty ? "" : " · có đăng nhập") +
-            (WebSetup.canProxy ? "" : "\n⚠ iPadOS này không cho trình phát đi qua proxy: video và Duyệt web vẫn đi thẳng, chỉ phần đọc trang đi qua proxy.")
+            (WebSetup.canProxy ? "" : "\n⚠ iOS bản này không cho trình phát đi qua proxy: video và Duyệt web vẫn đi thẳng, chỉ phần đọc trang đi qua proxy.")
     }
 
     /// Thử proxy đang nhập (chưa cần lưu / bật): mở HTTPS tới Cloudflare qua proxy, báo IP ra ngoài + thời gian.
@@ -173,11 +173,11 @@ struct UnblockSection: View {
                     app.proxyChanged = true
                 }
             if on && !WebSetup.canProxy {
-                Text("⚠ iPadOS này không cho trình phát đi qua cổng vượt chặn: chỉ phần đọc trang được vượt chặn.")
+                Text("⚠ iOS bản này không cho trình phát đi qua cổng vượt chặn: chỉ phần đọc trang được vượt chặn.")
                     .foregroundColor(Theme.dim)
             }
         } header: { Text("Vượt chặn nhà mạng") } footer: {
-            Text("Một số nhà mạng chặn trang phim (vd phimmoir.fun) bằng cách đọc tên trang trong gói bắt tay HTTPS: trang mở mãi không được, dùng VPN thì vào được. Bật mục này: app chia nhỏ gói đó nên nhà mạng không đọc được tên trang — không cần VPN hay proxy. Trên iPadOS 15–16, lúc bật app không giữ cookie của trang web sau khi tắt app.")
+            Text("Một số nhà mạng chặn trang phim (vd phimmoir.fun) bằng cách đọc tên trang trong gói bắt tay HTTPS: trang mở mãi không được, dùng VPN thì vào được. Bật mục này: app chia nhỏ gói đó nên nhà mạng không đọc được tên trang — không cần VPN hay proxy. Trên iOS 15–16, lúc bật app không giữ cookie của trang web sau khi tắt app.")
         }
     }
 }

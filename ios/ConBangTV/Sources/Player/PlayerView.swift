@@ -341,14 +341,20 @@ private struct LimitOverlay: View {
     @ObservedObject var m: PlayerModel
     @State private var askPin = false
     @State private var choose = false
+    /// iPhone nằm ngang: màn thấp — bỏ biểu tượng, cho cuộn.
+    @Environment(\.verticalSizeClass) private var vClass
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.82).ignoresSafeArea()
+            GeometryReader { geo in
+            ScrollView {
             VStack(spacing: 16) {
-                Image(systemName: m.limitBlock == .bedtime ? "moon.zzz.fill" : "hourglass")
-                    .appFont(46, .semibold)
-                    .foregroundColor(Theme.focus)
+                if vClass != .compact {
+                    Image(systemName: m.limitBlock == .bedtime ? "moon.zzz.fill" : "hourglass")
+                        .appFont(46, .semibold)
+                        .foregroundColor(Theme.focus)
+                }
                 Text(choose ? "Cho \(Prefs.profile.name) xem thêm" : "Hết giờ xem").appFont(30, .bold)
                 if choose {
                     VStack(spacing: 10) {
@@ -381,9 +387,13 @@ private struct LimitOverlay: View {
                 }
             }
             .foregroundColor(Theme.text)
-            .padding(34)
+            .padding(vClass == .compact ? 20 : 34)
             .frame(maxWidth: 540)
             .background(RoundedRectangle(cornerRadius: 22).fill(Theme.surface))
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: geo.size.height) // khung giữa màn hình, màn thấp thì cuộn
+            }
+            }
             if askPin {
                 ParentPinView(title: "Mã PIN phụ huynh để cho xem thêm", onCancel: { askPin = false }) {
                     askPin = false
@@ -443,7 +453,7 @@ private struct LoadingOverlay: View {
                     .appFont(14)
                     .foregroundColor(Theme.dim)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 60)
+                    .padding(.horizontal, UIDevice.current.userInterfaceIdiom == .phone ? 24 : 60)
             }
         }
     }
@@ -461,18 +471,26 @@ private struct ControlBar: View {
     private var playing: Bool { m.started && m.state?.paused == false }
 
     var body: some View {
+        GeometryReader { geo in bar(compact: geo.size.width < 700) }
+            .onAppear { syncValue() }
+            .onChange(of: m.state) { _ in syncValue() }
+            .onChange(of: m.seekTarget) { _ in syncValue() }
+    }
+
+    /// compact: màn hẹp (iPhone, iPad chia đôi màn hình) — nút nhỏ hơn, bỏ nút lùi / tới 10 giây (chạm đúp hai bên).
+    private func bar(compact: Bool) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                RoundButton(icon: "xmark", label: "Thoát") { m.close() }
+                RoundButton(icon: "xmark", label: "Thoát", compact: compact) { m.close() }
                 Text(m.title)
                     .appFont(18, .semibold)
                     .foregroundColor(Theme.text)
                     .lineLimit(1)
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 30)
+            .padding(.horizontal, compact ? 12 : 20)
+            .padding(.top, compact ? 8 : 14)
+            .padding(.bottom, compact ? 16 : 30)
             .background(LinearGradient(colors: [Color.black.opacity(0.75), .clear], startPoint: .top, endPoint: .bottom))
 
             Spacer()
@@ -493,28 +511,30 @@ private struct ControlBar: View {
                         .appFont(15, .medium, mono: true)
                         .foregroundColor(Theme.dim)
                 }
-                HStack(spacing: 12) {
-                    RoundButton(icon: "backward.end.fill", label: "Tập trước") { m.prev(); m.showBar() }
-                    RoundButton(icon: "gobackward.10", label: "Lùi 10 giây") { m.seekBy(-10) }
-                    RoundButton(icon: playing ? "pause.fill" : "play.fill", label: playing ? "Dừng" : "Phát", big: true) { m.togglePlay() }
-                    RoundButton(icon: "goforward.10", label: "Tới 10 giây") { m.seekBy(10) }
-                    RoundButton(icon: "forward.end.fill", label: "Tập sau") { m.next(); m.showBar() }
+                HStack(spacing: compact ? 10 : 12) {
+                    RoundButton(icon: "backward.end.fill", label: "Tập trước", compact: compact) { m.prev(); m.showBar() }
+                    if !compact {
+                        RoundButton(icon: "gobackward.10", label: "Lùi 10 giây") { m.seekBy(-10) }
+                    }
+                    RoundButton(icon: playing ? "pause.fill" : "play.fill", label: playing ? "Dừng" : "Phát", big: true,
+                                compact: compact) { m.togglePlay() }
+                    if !compact {
+                        RoundButton(icon: "goforward.10", label: "Tới 10 giây") { m.seekBy(10) }
+                    }
+                    RoundButton(icon: "forward.end.fill", label: "Tập sau", compact: compact) { m.next(); m.showBar() }
                     Spacer()
                     if PlayerModel.pipSupported {
-                        RoundButton(icon: "pip.enter", label: "Thu nhỏ") { m.startPip() }
+                        RoundButton(icon: "pip.enter", label: "Thu nhỏ", compact: compact) { m.startPip() }
                             .disabled(!m.started)
                     }
-                    RoundButton(icon: "list.bullet", label: "Menu") { m.showPanel() }
+                    RoundButton(icon: "list.bullet", label: "Menu", compact: compact) { m.showPanel() }
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 40)
-            .padding(.bottom, 22)
+            .padding(.horizontal, compact ? 14 : 24)
+            .padding(.top, compact ? 24 : 40)
+            .padding(.bottom, compact ? 10 : 22)
             .background(LinearGradient(colors: [.clear, Color.black.opacity(0.85)], startPoint: .top, endPoint: .bottom))
         }
-        .onAppear { syncValue() }
-        .onChange(of: m.state) { _ in syncValue() }
-        .onChange(of: m.seekTarget) { _ in syncValue() }
     }
 
     private func syncValue() {
@@ -529,14 +549,17 @@ struct RoundButton: View {
     let icon: String
     let label: String
     var big = false
+    var compact = false
     let action: () -> Void
+
+    private var side: CGFloat { compact ? (big ? 58 : 44) : (big ? 72 : 54) }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .appFont(big ? 30 : 22, .semibold)
+                .appFont(compact ? (big ? 26 : 19) : (big ? 30 : 22), .semibold)
                 .foregroundColor(Theme.text)
-                .frame(width: big ? 72 : 54, height: big ? 72 : 54)
+                .frame(width: side, height: side)
                 .background(Circle().fill(Color.white.opacity(big ? 0.22 : 0.14)))
         }
         .buttonStyle(PressScale())
@@ -704,6 +727,15 @@ final class PlayerController: UIHostingController<PlayerView> {
 
     @available(*, unavailable)
     required dynamic init?(coder: NSCoder) { fatalError("không dùng") }
+
+    /// iPhone: phim luôn xem ngang (mở trình phát là tự xoay); iPad xoay tự do.
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        UIDevice.current.userInterfaceIdiom == .phone ? .landscape : .all
+    }
+
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
+        UIDevice.current.userInterfaceIdiom == .phone ? .landscapeRight : super.preferredInterfaceOrientationForPresentation
+    }
 
     override var prefersStatusBarHidden: Bool { true }
     override var prefersHomeIndicatorAutoHidden: Bool { true }
