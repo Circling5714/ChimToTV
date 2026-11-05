@@ -125,11 +125,13 @@ của điện thoại); TV / TV box vẫn luôn nằm ngang như cũ.
   trượt ra từ bên trái (chạm ra ngoài / chọn mục / Back là đóng). Lưới phim 3 cột. Không có nút "Thoát" — bấm Back của
   điện thoại hai lần.
 - **Cầm dọc — chi tiết phim:** poster nhỏ, hàng nút (Xem tiếp, Xem từ tập 1, Theo dõi…) xuống dưới rộng cả màn, 4 cột tập.
+- Cầm dọc, nút **‹ Quay lại** (chi tiết phim, Cài đặt) nằm trên một dải riêng ở trên cùng — nội dung cuộn không bị nút che.
 - **Cài đặt:** hàng nút tự xuống dòng (cả trên TV khi hàng quá dài), nút chữ dài hiện 2 dòng; cầm dọc thì ô proxy xếp dọc.
 - **Xem phim:** trình phát luôn nằm ngang, ẩn thanh điều hướng của điện thoại (vuốt từ mép màn để hiện lại một lúc).
 - Xoay lúc đang dùng: màn tự đổi bố cục, không tải lại. Màn hẹp = bề ngang dưới 600dp (điện thoại cầm dọc); điện thoại
   cầm ngang / máy tính bảng dùng bố cục như TV.
-- Android 15: nội dung chừa chỗ tai thỏ / lỗ camera và thanh điều hướng; Duyệt web chừa chỗ bàn phím ảo.
+- Android 15: nội dung chừa chỗ tai thỏ / lỗ camera và thanh điều hướng (chỗ thanh điều hướng cùng màu nền app); Duyệt web
+  chừa chỗ bàn phím ảo. Đã thử trên vivo X200 Pro (Android 15).
 
 ## Người xem (từ 2.0)
 

@@ -6,6 +6,19 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 
+## 2.4.1 — 05/11/2026
+
+Sửa lỗi sau khi thử 2.4 trên điện thoại thật (vivo X200 Pro, Android 15):
+
+- Cầm dọc: nút «‹ Quay lại» (Cài đặt, chi tiết phim) có dải riêng ở trên cùng, nội dung cuộn không còn chui xuống dưới nút.
+- Menu ☰: mở ra vẫn thấy vài mục trước mục đang chọn (trước đây «Người xem», «Trang chủ» bị khuất phía trên).
+- Android 15: chỗ thanh điều hướng cùng màu nền app (hết dải xám nhạt hệ thống tự phủ).
+- Tìm kiếm trên điện thoại: Back tới thẳng bước «Nhấn Back lần nữa để thoát», không còn một lần bấm thừa.
+- versionCode 23 · tag `v2.4.1` · commit `69ad195` · SHA-256 APK
+  `b5f7437cc702d3ff4d03645318569b94a81e3dfb4ba28fd64ef5aa4b6ea99a0d`
+- Đã thử trên vivo X200 Pro qua cổng gỡ lỗi của bản debug: màn chính, menu ☰, chi tiết phim, Cài đặt, Tìm kiếm, Duyệt web
+  (cầm dọc), trình phát (ngang), xoay ngang. Cập nhật tự động 2.4 → 2.4.1 đã thử trên TV box.
+
 ## 2.4 — 05/11/2026
 
 - **Dùng tốt trên điện thoại Android:** xoay dọc được (trước đây luôn nằm ngang). Cầm dọc thì màn chính giống bản iPhone:
@@ -17,8 +30,8 @@ Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone 
 - Điện thoại Android 15: nội dung không bị tai thỏ và thanh điều hướng che; Duyệt web không bị bàn phím ảo che.
 - versionCode 22 · tag `v2.4` · commit `9f78cef` · SHA-256 APK
   `9501df8fb614d9d3b51dafa7790fd56b03e59141a47c9b9b39d2ee511ab8b77f`
-- Cập nhật tự động 2.3 → 2.4 đã thử trên TV box. Giao diện cầm dọc thử trên TV box giả lập màn điện thoại 360dp; chưa thử
-  trên điện thoại thật.
+- Cập nhật tự động 2.3 → 2.4 đã thử trên TV box. Giao diện cầm dọc thử trên TV box giả lập màn điện thoại 360dp (sau đó thử
+  trên điện thoại thật — xem 2.4.1).
 
 ## iPad 1.4 — 05/11/2026
 
