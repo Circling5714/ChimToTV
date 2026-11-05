@@ -557,7 +557,8 @@ enum DebugRoutes {
             let f = e.accessibilityFrame
             out.append([
                 "label": e.accessibilityLabel ?? "", "value": e.accessibilityValue ?? "",
-                "frame": [Int(f.minX), Int(f.minY), Int(f.width), Int(f.height)],
+                // Khung chưa xác định (NaN / vô cực, vd phần tử đang ẩn) → 0 — Int(NaN) làm sập app
+                "frame": [f.minX, f.minY, f.width, f.height].map { $0.isFinite ? Int($0) : 0 },
                 "button": e.accessibilityTraits.contains(.button), "type": String(describing: type(of: e)),
             ])
         }
