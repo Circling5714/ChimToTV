@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Côn Bằng TV cho Windows: WPF + WebView2 (nhân Chromium như WebView của bản Android). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>ConBangTV</RootNamespace>
+    <AssemblyName>ConBangTV</AssemblyName>
+    <Product>Côn Bằng TV</Product>
+    <Company>Côn Bằng TV</Company>
+    <Description>Côn Bằng TV</Description>
+    <Copyright>Côn Bằng TV</Copyright>
+    <!-- Số hiệu bản Windows (tag win-v<bản>) -->
+    <Version>1.0.0</Version>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <SatelliteResourceLanguages>vi</SatelliteResourceLanguages>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" Version="1.8.5" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
+  </ItemGroup>
+
+  <!-- Dùng chung tệp của bản Android (một nguồn duy nhất để sửa) -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\app\src\main\assets\player-agent.js" LogicalName="player-agent.js" />
+    <EmbeddedResource Include="..\..\app\src\main\assets\page-focus.js" LogicalName="page-focus.js" />
+    <EmbeddedResource Include="..\..\app\src\main\assets\player.html" LogicalName="player.html" />
+    <EmbeddedResource Include="..\..\app\src\main\assets\hls.html" LogicalName="hls.html" />
+    <EmbeddedResource Include="..\..\app\src\main\assets\hls.light.min.js" LogicalName="hls.light.min.js" />
+    <Resource Include="logo.png" />
+    <Resource Include="app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ConBangTV.Tests" />
+  </ItemGroup>
+
+</Project>

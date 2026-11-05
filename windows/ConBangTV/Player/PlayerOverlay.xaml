@@ -1,0 +1,90 @@
+<Window x:Class="ConBangTV.Player.PlayerOverlay"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ShowInTaskbar="False" ResizeMode="NoResize"
+        ShowActivated="True" FontFamily="Segoe UI" FontSize="15" Title="Côn Bằng TV" UseLayoutRounding="True">
+  <!-- Lớp phủ trong suốt trên trình phát: nhận chuột / phím (WebView2 không bao giờ giữ phím), vẽ thanh điều khiển.
+       Nền gần trong suốt (#01) để vẫn nhận chuột; chế độ «bấm vào trang» bỏ nền đi để chuột đi xuyên xuống trang. -->
+  <Grid x:Name="HitArea" Background="#01000000">
+    <Grid x:Name="Scaled">
+      <!-- Thanh trên: quay lại + tên phim -->
+      <Border x:Name="TopBar" VerticalAlignment="Top" Padding="22,16,22,40">
+        <Border.Background>
+          <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#CC000000" Offset="0" />
+            <GradientStop Color="#00000000" Offset="1" />
+          </LinearGradientBrush>
+        </Border.Background>
+        <DockPanel>
+          <Button x:Name="BtnBack" DockPanel.Dock="Left" Content="←  Quay lại" Focusable="False" Margin="0,0,16,0" />
+          <Button x:Name="BtnFull" DockPanel.Dock="Right" Content="⛶  Toàn màn hình" Focusable="False" Margin="12,0,0,0" />
+          <TextBlock x:Name="TitleText" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+      </Border>
+
+      <!-- Đang tải / lỗi -->
+      <Border x:Name="LoadingBox" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#C0000000" CornerRadius="14"
+              Padding="30,22" MaxWidth="720" Visibility="Collapsed">
+        <StackPanel>
+          <ProgressBar x:Name="LoadingBar" IsIndeterminate="True" Width="240" Margin="0,0,0,14" />
+          <TextBlock x:Name="LoadingText" FontSize="17" TextWrapping="Wrap" TextAlignment="Center" />
+        </StackPanel>
+      </Border>
+
+      <!-- Thông báo ngắn -->
+      <Border x:Name="NoticeBox" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,90,0,0" Background="#E6232833"
+              CornerRadius="10" Padding="20,12" MaxWidth="820" Visibility="Collapsed" IsHitTestVisible="False">
+        <TextBlock x:Name="NoticeText" FontSize="16" TextWrapping="Wrap" TextAlignment="Center" />
+      </Border>
+
+      <!-- Chữ lớn giữa màn (tua / tốc độ) -->
+      <Border x:Name="HudBox" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#B0000000" CornerRadius="14"
+              Padding="26,14" Visibility="Collapsed" IsHitTestVisible="False">
+        <TextBlock x:Name="HudText" FontSize="28" FontWeight="SemiBold" TextAlignment="Center" />
+      </Border>
+
+      <!-- Thanh dưới: thời gian, thanh tua, nút -->
+      <Border x:Name="Osd" VerticalAlignment="Bottom" Padding="26,46,26,18">
+        <Border.Background>
+          <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#00000000" Offset="0" />
+            <GradientStop Color="#D9000000" Offset="1" />
+          </LinearGradientBrush>
+        </Border.Background>
+        <StackPanel>
+          <DockPanel Margin="2,0,2,2">
+            <TextBlock x:Name="StateText" DockPanel.Dock="Right" Foreground="#B3FFFFFF" FontSize="14" Margin="12,0,0,0" />
+            <TextBlock x:Name="TimeText" FontSize="16" FontWeight="SemiBold" />
+          </DockPanel>
+          <Slider x:Name="Seek" Style="{StaticResource SeekSlider}" Minimum="0" Maximum="1" Margin="0,2,0,8" />
+          <WrapPanel HorizontalAlignment="Center">
+            <Button x:Name="BtnPrev" Content="⏮  Tập trước" Focusable="False" />
+            <Button x:Name="BtnBack10" Content="↺ 10s" Focusable="False" />
+            <Button x:Name="BtnPlay" Content="⏯  Phát / Dừng" Focusable="False" MinWidth="150" />
+            <Button x:Name="BtnFwd10" Content="10s ↻" Focusable="False" />
+            <Button x:Name="BtnNext" Content="Tập sau  ⏭" Focusable="False" />
+            <Button x:Name="BtnMenu" Content="☰  Server · Tập · Tốc độ" Focusable="False" />
+          </WrapPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Bảng tuỳ chọn bên phải (▼ / M / nút ☰) -->
+      <Border x:Name="Panel" HorizontalAlignment="Right" Width="470" Background="#F0171A21" Visibility="Collapsed"
+              BorderBrush="#2E3442" BorderThickness="1,0,0,0">
+        <DockPanel>
+          <DockPanel DockPanel.Dock="Top" Margin="22,18,16,6">
+            <Button x:Name="BtnPanelClose" DockPanel.Dock="Right" Content="✕" Padding="12,6" Margin="0" />
+            <TextBlock x:Name="PanelTitle" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+          </DockPanel>
+          <ScrollViewer x:Name="PanelScroll" VerticalScrollBarVisibility="Auto" Focusable="False">
+            <StackPanel x:Name="PanelStack" Margin="22,4,14,22" />
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+      <!-- Chế độ bấm thẳng vào trang -->
+      <Button x:Name="BtnDone" Content="✓  Xong — quay lại điều khiển bằng phím" HorizontalAlignment="Center" VerticalAlignment="Top"
+              Margin="0,14,0,0" Visibility="Collapsed" Focusable="False" />
+    </Grid>
+  </Grid>
+</Window>

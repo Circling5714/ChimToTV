@@ -10,3 +10,9 @@ TIEN-DO-*.md
 *.iml
 .idea/
 .vscode/
+
+# Bản Windows (.NET)
+windows/**/bin/
+windows/**/obj/
+windows/**/TestResults/
+*.user
