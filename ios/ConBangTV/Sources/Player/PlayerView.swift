@@ -1,3 +1,5 @@
+import AVFoundation
+import MediaPlayer
 import SwiftUI
 import UIKit
 import WebKit
@@ -11,7 +13,7 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             WebHost(web: m.web).ignoresSafeArea()
-            TouchLayer(onTapUp: { m.tapUp() }, onTapConfirmed: { m.tapConfirmed() }, onDoubleTap: { m.doubleTap(left: $0) })
+            TouchLayer(m: m)
                 .ignoresSafeArea()
             if let text = m.loading {
                 LoadingOverlay(text: text, isError: m.loadingIsError)
@@ -40,6 +42,10 @@ struct PlayerView: View {
                 }
                 Spacer()
             }
+            if let h = m.gestureHint {
+                GestureHintView(hint: h)
+                    .allowsHitTesting(false)
+            }
             if m.suggestion != nil {
                 VStack {
                     Spacer()
@@ -63,72 +69,211 @@ struct WebHost: UIViewRepresentable {
 // MARK: - Lớp chạm
 
 struct TouchLayer: UIViewRepresentable {
-    var onTapUp: @MainActor () -> Void
-    var onTapConfirmed: @MainActor () -> Void
-    var onDoubleTap: @MainActor (Bool) -> Void
+    let m: PlayerModel
 
     func makeUIView(context: Context) -> TouchCatcher {
         let v = TouchCatcher()
         v.backgroundColor = .clear
-        v.isMultipleTouchEnabled = false
+        v.isMultipleTouchEnabled = true
+        v.model = m
         return v
     }
 
-    func updateUIView(_ v: TouchCatcher, context: Context) {
-        v.onTapUp = onTapUp
-        v.onTapConfirmed = onTapConfirmed
-        v.onDoubleTap = onDoubleTap
-    }
+    func updateUIView(_ v: TouchCatcher, context: Context) { v.model = m }
 }
 
 /// Bắt chạm thay cho trang web: chạm một lần (báo ngay lúc nhấc tay, rồi báo "chắc chắn" khi hết thời gian chờ chạm
-/// đúp), chạm đúp nửa trái / phải.
+/// đúp), chạm đúp nửa trái / phải (lùi / tới 10 giây). Cử chỉ: giữ tay — xem nhanh 2× tới khi nhấc tay; vuốt ngang — tua
+/// (hiện giờ tới); vuốt dọc nửa trái — độ sáng, nửa phải — âm lượng; chụm / mở hai ngón — vừa / lấp đầy màn hình.
+/// Vuốt dọc bắt đầu sát mép trên / dưới thì để cho iPad (Trung tâm điều khiển, vuốt lên thu nhỏ phim / về màn hình chính).
 final class TouchCatcher: UIView {
-    var onTapUp: @MainActor () -> Void = {}
-    var onTapConfirmed: @MainActor () -> Void = {}
-    var onDoubleTap: @MainActor (Bool) -> Void = { _ in }
+    weak var model: PlayerModel?
 
+    private enum Mode { case none, tap, hold, scrub, brightness, volume, ignored }
+    private var mode = Mode.none
     private var downAt: CGPoint = .zero
-    private var moved = false
+    private var nearEdge = false
+    private var startLevel: CGFloat = 0
     private var lastTap: TimeInterval = 0
     private var lastPoint: CGPoint = .zero
     private var pending: Task<Void, Never>?
+    private var holdTask: Task<Void, Never>?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        addGestureRecognizer(UIPinchGestureRecognizer(target: self, action: #selector(pinched(_:))))
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("không dùng") }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil { SystemLevels.shared.attach(to: self) }
+    }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        // Hai ngón trở lên: để cho cử chỉ chụm (không tính là chạm / vuốt)
+        if (event?.allTouches?.count ?? 1) > 1 {
+            finish(apply: false)
+            mode = .ignored
+            return
+        }
         guard let t = touches.first else { return }
         downAt = t.location(in: self)
-        moved = false
+        nearEdge = downAt.y < 40 || downAt.y > bounds.height - 40
+        mode = .tap
+        holdTask?.cancel()
+        holdTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard let self = self, !Task.isCancelled, self.mode == .tap, self.model?.holdFast(true) == true else { return }
+            self.mode = .hold
+        }
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let t = touches.first else { return }
+        guard let t = touches.first, let m = model else { return }
         let p = t.location(in: self)
-        if hypot(p.x - downAt.x, p.y - downAt.y) > 24 { moved = true }
+        let dx = p.x - downAt.x, dy = p.y - downAt.y
+        switch mode {
+        case .tap:
+            guard hypot(dx, dy) > 24 else { return }
+            holdTask?.cancel()
+            if !m.gesturesAllowed {
+                mode = .ignored
+            } else if abs(dx) > abs(dy) {
+                mode = m.scrubBegan() ? .scrub : .ignored
+            } else if nearEdge {
+                mode = .ignored
+            } else if downAt.x < bounds.width / 2 {
+                mode = .brightness
+                startLevel = SystemLevels.shared.brightness
+            } else {
+                mode = .volume
+                startLevel = CGFloat(SystemLevels.shared.volume)
+            }
+            if mode != .ignored { touchesMoved(touches, with: event) }
+        case .scrub:
+            m.scrubChanged(Double(dx / max(1, bounds.width)))
+        case .brightness, .volume:
+            // Vuốt hết ~70% chiều cao màn hình = từ 0 lên 100%
+            let v = min(1, max(0, startLevel - dy / max(1, bounds.height * 0.7)))
+            if mode == .brightness { SystemLevels.shared.brightness = v } else { SystemLevels.shared.volume = Float(v) }
+            m.showLevel(brightness: mode == .brightness, Double(v))
+        case .hold, .none, .ignored:
+            break
+        }
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard let t = touches.first, !moved else { return }
+        let was = mode
+        finish(apply: true)
+        if was == .tap, let t = touches.first { tapped(t) }
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { finish(apply: false) }
+
+    /// Kết thúc cử chỉ đang làm: nhấc tay thì áp dụng (tua tới chỗ đã chọn), bị huỷ (iPad lấy chạm) thì bỏ.
+    private func finish(apply: Bool) {
+        holdTask?.cancel()
+        let was = mode
+        mode = .none
+        switch was {
+        case .hold: model?.holdFast(false)
+        case .scrub: model?.scrubEnded(apply: apply)
+        case .brightness, .volume: model?.levelEnded()
+        case .tap, .none, .ignored: break
+        }
+    }
+
+    private func tapped(_ t: UITouch) {
+        guard let m = model else { return }
         let p = t.location(in: self)
         if t.timestamp - lastTap < 0.3 && hypot(p.x - lastPoint.x, p.y - lastPoint.y) < 80 {
             pending?.cancel()
             pending = nil
             lastTap = 0
-            onDoubleTap(p.x < bounds.width / 2)
+            m.doubleTap(left: p.x < bounds.width / 2)
             return
         }
         lastTap = t.timestamp
         lastPoint = p
-        onTapUp()
+        m.tapUp()
         pending?.cancel()
         pending = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard let self = self, !Task.isCancelled else { return }
             self.pending = nil
-            self.onTapConfirmed()
+            self.model?.tapConfirmed()
         }
     }
 
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { moved = true }
+    @objc private func pinched(_ g: UIPinchGestureRecognizer) {
+        guard g.state == .ended, let m = model, m.gesturesAllowed else { return }
+        if g.scale > 1.15 { m.setFill(true) } else if g.scale < 0.87 { m.setFill(false) }
+    }
+}
+
+/// Âm lượng hệ thống (qua thanh trượt của một MPVolumeView gần như trong suốt — có nó trên màn hình thì iPad không hiện
+/// khung âm lượng che phim) và độ sáng màn hình cho cử chỉ vuốt dọc. Độ sáng trả lại như cũ khi rời trình phát.
+@MainActor
+final class SystemLevels {
+    static let shared = SystemLevels()
+
+    private let volumeView = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 2, height: 2))
+    private var savedBrightness: CGFloat?
+
+    private init() {
+        volumeView.alpha = 0.01
+        volumeView.isUserInteractionEnabled = false
+    }
+
+    func attach(to v: UIView) {
+        if volumeView.superview !== v { v.addSubview(volumeView) }
+    }
+
+    private var slider: UISlider? { volumeView.subviews.lazy.compactMap { $0 as? UISlider }.first }
+
+    var volume: Float {
+        get { slider?.value ?? AVAudioSession.sharedInstance().outputVolume }
+        set { slider?.setValue(newValue, animated: false) }
+    }
+
+    var brightness: CGFloat {
+        get { UIScreen.main.brightness }
+        set {
+            if savedBrightness == nil { savedBrightness = UIScreen.main.brightness }
+            UIScreen.main.brightness = newValue
+        }
+    }
+
+    /// Rời trình phát (đóng / ra màn hình chính): trả độ sáng như trước khi vuốt.
+    func restoreBrightness() {
+        guard let b = savedBrightness else { return }
+        savedBrightness = nil
+        UIScreen.main.brightness = b
+    }
+}
+
+/// Chữ giữa màn hình lúc vuốt / giữ tay.
+private struct GestureHintView: View {
+    let hint: PlayerModel.GestureHint
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack(spacing: 12) {
+                Image(systemName: hint.icon).font(.system(size: 26, weight: .semibold))
+                Text(hint.text).font(.system(size: 26, weight: .semibold).monospacedDigit())
+            }
+            if let d = hint.detail {
+                Text(d).font(.system(size: 16, weight: .medium).monospacedDigit()).foregroundColor(Theme.dim)
+            }
+        }
+        .foregroundColor(Theme.text)
+        .padding(.horizontal, 26)
+        .padding(.vertical, 16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.black.opacity(0.72)))
+    }
 }
 
 // MARK: - Màn chờ
@@ -147,7 +292,7 @@ private struct LoadingOverlay: View {
                     .foregroundColor(Theme.text)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
-                Text("Chạm vào màn hình để hiện nút điều khiển (dừng / phát, tua, đổi tập, menu, thoát)  •  Chạm đúp trái / phải: lùi / tới 10 giây")
+                Text("Chạm vào màn hình để hiện nút điều khiển (dừng / phát, tua, đổi tập, menu, thoát)  •  Chạm đúp trái / phải: lùi / tới 10 giây  •  Vuốt ngang: tua  •  Vuốt dọc bên trái: độ sáng, bên phải: âm lượng  •  Giữ tay: xem nhanh 2×  •  Chụm / mở hai ngón: vừa / lấp đầy màn hình")
                     .font(.system(size: 14))
                     .foregroundColor(Theme.dim)
                     .multilineTextAlignment(.center)
@@ -470,12 +615,16 @@ final class PlayerController: UIHostingController<PlayerView> {
             UIApplication.shared.isIdleTimerDisabled = false
             // Đóng vì phim vào hình trong hình: trình phát chạy tiếp tới khi phóng to / đóng cửa sổ nhỏ
             if !model.detached { model.teardown() }
+            SystemLevels.shared.restoreBrightness()
             NotificationCenter.default.removeObserver(self)
             onDismissed()
         }
     }
 
-    @objc private func didEnterBackground() { model.didEnterBackground() }
+    @objc private func didEnterBackground() {
+        SystemLevels.shared.restoreBrightness()
+        model.didEnterBackground()
+    }
 
     override var keyCommands: [UIKeyCommand]? {
         let inputs = [" ", "k", "j", "l", "m", "n", "p", "i", "\r", UIKeyCommand.inputLeftArrow, UIKeyCommand.inputRightArrow,

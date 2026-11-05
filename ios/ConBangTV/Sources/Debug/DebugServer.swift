@@ -365,6 +365,22 @@ enum DebugRoutes {
         }
         let s = Double(q["s"] ?? "0") ?? 0
         switch q["do"] ?? "" {
+        // Cử chỉ chạm (thay cho ngón tay): scrub&f=0.3 (vuốt ngang 30% bề ngang, end=0 thì giữ nguyên chưa nhấc tay)
+        //   · hold&on=1|0 · level&kind=volume|brightness&v=0.4 · pinch&fill=1|0
+        case "scrub":
+            guard m.scrubBegan() else { return .json(["ok": false, "why": "chưa tua được"]) }
+            m.scrubChanged(Double(q["f"] ?? "0") ?? 0)
+            if q["end"] != "0" { m.scrubEnded(apply: true) }
+        case "hold": return .json(["ok": m.holdFast(q["on"] != "0")])
+        case "level":
+            let v = Double(q["v"] ?? "0.5") ?? 0.5
+            if q["kind"] == "brightness" { SystemLevels.shared.brightness = CGFloat(v) } else { SystemLevels.shared.volume = Float(v) }
+            m.showLevel(brightness: q["kind"] == "brightness", v)
+            return .json(["ok": true, "volume": SystemLevels.shared.volume, "brightness": Double(SystemLevels.shared.brightness)])
+        case "levelEnd":
+            m.levelEnded()
+            SystemLevels.shared.restoreBrightness()
+        case "pinch": m.setFill(q["fill"] == "1")
         case "toggle": m.togglePlay()
         case "play": m.play()
         case "pause": m.pause()

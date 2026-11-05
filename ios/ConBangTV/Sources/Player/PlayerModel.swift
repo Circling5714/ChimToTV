@@ -724,6 +724,87 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         if !panelShown { showBar() }
     }
 
+    // MARK: - Cử chỉ chạm (vuốt, giữ tay, chụm) — xem TouchCatcher
+
+    /// Chữ giữa màn hình lúc vuốt / giữ tay (biểu tượng SF Symbols, chữ chính, dòng phụ).
+    struct GestureHint: Equatable {
+        let icon: String
+        let text: String
+        var detail: String?
+    }
+
+    @Published private(set) var gestureHint: GestureHint?
+    private var scrubFrom: Double?
+    private var holdRate: Double?
+
+    /// Đang mở menu thì không nhận cử chỉ (chạm để đóng menu như cũ).
+    var gesturesAllowed: Bool { !panelShown }
+
+    /// Bắt đầu vuốt ngang để tua; false = chưa tua được (phim chưa chạy / chưa biết độ dài).
+    func scrubBegan() -> Bool {
+        guard gesturesAllowed, started, let s = state, s.d > 0 else { return false }
+        userActivity()
+        cancel("seek")
+        scrubFrom = seekTarget ?? s.t
+        return true
+    }
+
+    /// fraction = quãng ngón tay đã vuốt / bề ngang màn hình (−1…1). Cả bề ngang = 2 phút (phim ngắn hơn: cả phim).
+    func scrubChanged(_ fraction: Double) {
+        guard let from = scrubFrom, let d = state?.d, d > 0 else { return }
+        let target = min(d - 1, max(0, from + fraction * min(d, 120)))
+        seekTarget = target
+        let delta = target - from
+        gestureHint = GestureHint(icon: delta < 0 ? "backward.fill" : "forward.fill",
+                                  text: "\(formatTime(target)) / \(formatTime(d))",
+                                  detail: (delta < 0 ? "−" : "+") + formatTime(abs(delta)))
+        showBar()
+    }
+
+    /// Nhấc tay: tua tới chỗ đã chọn; bị huỷ (iPad lấy chạm) thì về như cũ.
+    func scrubEnded(apply: Bool) {
+        guard scrubFrom != nil else { return }
+        scrubFrom = nil
+        gestureHint = nil
+        if apply { flushSeek() } else { seekTarget = nil }
+    }
+
+    /// Giữ tay: xem nhanh 2× tới khi nhấc tay (đang phát mới có tác dụng).
+    @discardableResult
+    func holdFast(_ on: Bool) -> Bool {
+        if on {
+            guard gesturesAllowed, started, state?.paused == false, holdRate == nil, rate < 2 else { return false }
+            userActivity()
+            holdRate = rate
+            cmd("rate", 2)
+            gestureHint = GestureHint(icon: "hare.fill", text: "Xem nhanh 2×", detail: "nhấc tay để xem tiếp như thường")
+            return true
+        }
+        guard let r = holdRate else { return false }
+        holdRate = nil
+        cmd("rate", r)
+        gestureHint = nil
+        return true
+    }
+
+    /// Vuốt dọc: hiện mức độ sáng / âm lượng (0…1).
+    func showLevel(brightness: Bool, _ v: Double) {
+        cancel("hint")
+        let icon = brightness ? "sun.max.fill" : (v == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
+        gestureHint = GestureHint(icon: icon, text: "\(brightness ? "Độ sáng" : "Âm lượng") \(Int((v * 100).rounded()))%")
+    }
+
+    func levelEnded() {
+        after("hint", 0.6) { [weak self] in self?.gestureHint = nil }
+    }
+
+    /// Chụm / mở hai ngón: vừa màn hình / lấp đầy.
+    func setFill(_ fill: Bool) {
+        userActivity()
+        if Prefs.videoFill != fill { toggleFit() }
+        showNotice(fitText, 1.2)
+    }
+
     // MARK: - Lớp phủ
 
     func showBar() {
@@ -1004,6 +1085,9 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             "pageLoad": pageLoad, "rate": rate, "session": sessionText ?? NSNull(),
             "pip": inPip, "detached": detached,
         ]
+        if let h = gestureHint { o["gestureHint"] = [h.icon, h.text, h.detail ?? ""] }
+        o["seekTarget"] = seekTarget ?? NSNull()
+        o["fill"] = Prefs.videoFill
         if let s = state {
             o["state"] = ["t": s.t, "d": s.d, "paused": s.paused, "ended": s.ended, "waiting": s.waiting, "ready": s.ready,
                           "df": s.droppedFrames, "tf": s.totalFrames]
