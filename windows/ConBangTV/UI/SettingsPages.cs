@@ -176,18 +176,7 @@ public sealed class SettingsPage : Page
     private static void SetUnblock(int level)
     {
         Prefs.UnblockLevel = level;
-        // Trình phát đã chạy với cài đặt cũ: phải mở lại app (trang và ảnh đổi theo ngay)
-        if (App.WebEnvUnblock >= 0 && App.WebEnvUnblock != level)
-        {
-            _ = AskRestart();
-        }
-    }
-
-    private static async Task AskRestart()
-    {
-        var r = await Main.Ask("Mở lại app?", "Trình phát phim dùng cài đặt mới sau khi mở lại app (trang phim và ảnh đã đổi theo ngay).",
-            new[] { "Mở lại ngay", "Để sau" });
-        if (r == 0) App.Restart();
+        Net.SettingsChanged();
     }
 
     private void Build()
@@ -225,6 +214,8 @@ public sealed class SettingsPage : Page
             ("Mức 2", Prefs.UnblockLevel == 2, () => SetUnblock(2)),
         }, "Trang không vào được / quá thời gian chờ (nhà mạng chặn theo tên trang, vd phimmois.fun): bật Mức 1. " +
            "Vẫn bị chặn thì thử Mức 2. Không đổi DNS, không cần VPN.");
+        Body.Children.Add(Ui.Row(Ui.Pill(Prefs.ProxyConfig() is { } pc ? $"Proxy SOCKS5: {pc.Host}:{pc.Port}" : "Proxy SOCKS5: tắt",
+            () => Main.Push(new ProxyPage()))));
         Option("Tự kiểm tra bản mới", new[]
         {
             ("Bật", Prefs.AutoUpdate, (Action)(() => Prefs.AutoUpdate = true)),

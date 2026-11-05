@@ -13,15 +13,12 @@ public partial class App : Application
 
     public static Task<CoreWebView2Environment> WebEnv() => _env ??= CreateEnv();
 
-    /// Trình duyệt đã chạy với cài đặt «Vượt chặn nhà mạng» lúc đó (đổi cài đặt thì phải mở lại app).
-    public static int WebEnvUnblock { get; private set; } = -1;
-
     private static Task<CoreWebView2Environment> CreateEnv()
     {
-        // Trình phát tự phát không cần bấm (app điều khiển bằng phím / remote)
-        var args = "--autoplay-policy=no-user-gesture-required --disable-features=msSmartScreenProtection";
-        WebEnvUnblock = Unblock.Level;
-        if (WebEnvUnblock > 0) args += $" --proxy-server=http://127.0.0.1:{Unblock.StartProxy()}";
+        // Trình phát tự phát không cần bấm (app điều khiển bằng phím / remote). Mọi kết nối của trình phát đi qua cổng SOCKS5
+        // nội bộ (Net): proxy / vượt chặn nhà mạng đổi lúc nào cũng có hiệu lực ngay.
+        var args = "--autoplay-policy=no-user-gesture-required --disable-features=msSmartScreenProtection" +
+                   $" --proxy-server=socks5://127.0.0.1:{Net.StartBridge()}";
         return CoreWebView2Environment.CreateAsync(null, Path.Combine(Prefs.DataDir, "WebView2"),
             new CoreWebView2EnvironmentOptions { AdditionalBrowserArguments = args, Language = "vi-VN" });
     }

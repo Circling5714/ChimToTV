@@ -84,6 +84,14 @@ public static class DebugServer
                 case "/type":
                     body = Text(await _w!.Dispatcher.InvokeAsync(() =>
                     {
+                        // field=N: chọn ô nhập thứ N trong cửa sổ trước khi gõ
+                        if (int.TryParse(q["field"], out var fi))
+                            KeyNav.Targets(_w).Where(x => x is TextBox or PasswordBox).ElementAtOrDefault(fi)?.Focus();
+                        if (Keyboard.FocusedElement is PasswordBox pb)
+                        {
+                            pb.Password = q["text"] ?? "";
+                            return "đã gõ mật khẩu";
+                        }
                         if (Keyboard.FocusedElement is not TextBox tb) return "không có ô chữ đang chọn";
                         tb.Text = q["text"] ?? "";
                         tb.CaretIndex = tb.Text.Length;

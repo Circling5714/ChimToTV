@@ -41,7 +41,7 @@ public static class KeyNav
     }
 
     private static bool IsTarget(FrameworkElement e) =>
-        e is ButtonBase or TextBox && e.Focusable && e.IsEnabled && e.IsVisible && e.ActualWidth > 0;
+        e is ButtonBase or TextBox or PasswordBox && e.Focusable && e.IsEnabled && e.IsVisible && e.ActualWidth > 0;
 
     public static Rect Bounds(FrameworkElement e, Visual root)
     {

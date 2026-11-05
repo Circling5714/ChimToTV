@@ -121,8 +121,11 @@ public static class Util
         switch (e)
         {
             case AppError a: return a.Message;
+            case SocksError sk: return "Lỗi proxy: " + sk.Message + ".";
             case Http.HttpError h: return h.Message;
             case TaskCanceledException or TimeoutException: return "Trang không trả lời (quá thời gian chờ)." + UnblockHint();
+            case HttpRequestException { InnerException: SocksError se2 }:
+                return "Lỗi proxy: " + se2.Message + ".";
             case HttpRequestException hr:
                 var inner = hr.InnerException;
                 while (inner?.InnerException != null && inner is not SocketException) inner = inner.InnerException;
@@ -141,7 +144,7 @@ public static class Util
                 if (hr.InnerException is System.Security.Authentication.AuthenticationException ||
                     hr.InnerException is IOException)
                     return "Lỗi kết nối bảo mật / mất kết nối." + UnblockHint();
-                return "Lỗi mạng: " + hr.Message;
+                return "Lỗi mạng: " + hr.Message + Net.Note();
             default: return e.Message;
         }
     }

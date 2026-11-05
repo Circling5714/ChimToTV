@@ -239,6 +239,60 @@ public static class Prefs
         }
     }
 
+    // ---- Proxy SOCKS5 (xem Net) — cùng khoá bản TV / iPad ----
+
+    public static bool ProxyOn
+    {
+        get => Get<bool>("proxy_on");
+        set => Set("proxy_on", value);
+    }
+
+    public static string ProxyHost
+    {
+        get => Get<string>("proxy_host") ?? "";
+        set => Set("proxy_host", value.Trim());
+    }
+
+    public static int ProxyPort
+    {
+        get => Has("proxy_port") ? Get<int>("proxy_port") : 1080;
+        set => Set("proxy_port", value);
+    }
+
+    public static string ProxyUser
+    {
+        get => Get<string>("proxy_user") ?? "";
+        set => Set("proxy_user", value);
+    }
+
+    /// Mật khẩu lưu đã mã hoá (DPAPI, chỉ tài khoản Windows này giải được) — khoá riêng của bản Windows.
+    public static string ProxyPass
+    {
+        get => Secret.Unprotect(Get<string>("proxy_pass_dpapi"));
+        set => Set("proxy_pass_dpapi", Secret.Protect(value));
+    }
+
+    /// DNS của proxy (gửi tên miền cho proxy) — mặc định; tắt = máy tự phân giải.
+    public static bool ProxyRemoteDns
+    {
+        get => !Has("proxy_remote_dns") || Get<bool>("proxy_remote_dns");
+        set => Set("proxy_remote_dns", value);
+    }
+
+    /// Chỉ trang phim đi qua proxy (video / ảnh CDN đi thẳng).
+    public static bool ProxySitesOnly
+    {
+        get => Get<bool>("proxy_sites_only");
+        set => Set("proxy_sites_only", value);
+    }
+
+    /// Proxy đang bật và đủ thông tin (null = đi thẳng).
+    public static SocksConfig? ProxyConfig()
+    {
+        if (!ProxyOn || ProxyHost.Length == 0 || ProxyPort is <= 0 or > 65535) return null;
+        return new SocksConfig(ProxyHost, ProxyPort, ProxyUser, ProxyUser.Length > 0 ? ProxyPass : "", ProxyRemoteDns, ProxySitesOnly);
+    }
+
     // ---- Cập nhật ----
 
     public static bool AutoUpdate

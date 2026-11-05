@@ -23,7 +23,7 @@ public static class ImageLoader
         AutomaticDecompression = DecompressionMethods.All,
         ConnectTimeout = TimeSpan.FromSeconds(10),
         MaxConnectionsPerServer = 6,
-        ConnectCallback = Unblock.Connect,
+        ConnectCallback = Net.HttpConnect,
     })
     {
         Timeout = TimeSpan.FromSeconds(20),

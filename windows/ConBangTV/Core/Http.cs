@@ -46,7 +46,7 @@ public static class Http
         ConnectTimeout = TimeSpan.FromSeconds(15),
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
         MaxConnectionsPerServer = 6,
-        ConnectCallback = Unblock.Connect,
+        ConnectCallback = Net.HttpConnect,
     })
     {
         Timeout = TimeSpan.FromSeconds(25),

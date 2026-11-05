@@ -300,7 +300,7 @@ public partial class MainWindow : Window
             return;
         }
         var focused = Keyboard.FocusedElement as FrameworkElement;
-        var inText = focused is TextBox;
+        var inText = focused is TextBox or PasswordBox;
         if (key is Key.Escape or Key.BrowserBack || (key == Key.Back && !inText))
         {
             e.Handled = true;
@@ -320,7 +320,8 @@ public partial class MainWindow : Window
             return;
         }
         if (KeyNav.DirOf(key) is not { } dir) return;
-        if (inText && dir is KeyNav.Dir.Left or KeyNav.Dir.Right)
+        if (focused is PasswordBox && dir is KeyNav.Dir.Left or KeyNav.Dir.Right) return;
+        if (focused is TextBox && dir is KeyNav.Dir.Left or KeyNav.Dir.Right)
         {
             var tb = (TextBox)focused!;
             var atEdge = dir == KeyNav.Dir.Left ? tb.CaretIndex == 0 && tb.SelectionLength == 0 : tb.CaretIndex >= tb.Text.Length;
