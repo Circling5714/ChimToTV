@@ -58,6 +58,7 @@ class DebugBoot : ContentProvider() {
  *   /key?k=BACK|ENTER|DPAD_DOWN…  phím
  *   /orient?o=portrait|landscape|auto   ép hướng màn (auto = theo cảm biến như bản thật)
  *   /open?s=main|settings         mở màn
+ *   /js?c=<mã JS>                 chạy JS ở khung trên cùng của WebView đang hiện (trình phát, Duyệt web)
  */
 object DebugServer {
     private const val PORT = 8790
@@ -131,6 +132,18 @@ object DebugServer {
                     onMain { top?.let { if (it !is PlayerActivity) Screen.allowRotation(it) } }
                     text(out, 200, "ok")
                 }
+                "/js" -> {
+                    // Chạy JS ở khung trên cùng của WebView trên màn đang mở (vd JSON.stringify(window.__chimtoState))
+                    val code = q["c"].orEmpty()
+                    val done = CountDownLatch(1)
+                    var res: String? = null
+                    main.post {
+                        val w = top?.window?.decorView?.let(::findWeb)
+                        if (w == null) done.countDown() else w.evaluateJavascript(code) { res = it; done.countDown() }
+                    }
+                    done.await(10, TimeUnit.SECONDS)
+                    text(out, if (res == null) 404 else 200, res ?: "không có WebView / không trả lời")
+                }
                 "/open" -> {
                     val cls = when (q["s"]) {
                         "settings" -> SettingsActivity::class.java
@@ -139,11 +152,17 @@ object DebugServer {
                     onMain { (top ?: app).startActivity(Intent(top ?: app, cls).addFlags(if (top == null) Intent.FLAG_ACTIVITY_NEW_TASK else 0)) }
                     text(out, 200, "ok")
                 }
-                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open")
+                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /js")
             }
         } catch (e: Throwable) {
             runCatching { text(out, 500, e.toString()) }
         }
+    }
+
+    private fun findWeb(v: View): android.webkit.WebView? {
+        if (v is android.webkit.WebView && v.isShown) return v
+        if (v is ViewGroup) for (i in 0 until v.childCount) findWeb(v.getChildAt(i))?.let { return it }
+        return null
     }
 
     private fun Map<String, String>.f(k: String) = this[k]?.toFloatOrNull() ?: throw IllegalArgumentException("thiếu $k")

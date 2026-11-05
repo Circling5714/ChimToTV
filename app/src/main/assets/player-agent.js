@@ -15,7 +15,11 @@
   // Ẩn thanh điều khiển của jwplayer — app đã có thanh thời gian riêng điều khiển bằng remote.
   try {
     var st = document.createElement('style');
-    st.textContent = '.jw-controlbar,.jw-title{display:none!important}';
+    st.textContent = '.jw-controlbar,.jw-title{display:none!important}' +
+      // Video tràn ra ngoài khung (xem fitScreen): ghim vừa đúng khung, giữ tỉ lệ
+      '.chimto-pin{position:fixed!important;left:0!important;top:0!important;right:auto!important;bottom:auto!important;' +
+      'width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;' +
+      'margin:0!important;transform:none!important;z-index:2147483646!important;background:#000!important}';
     (document.head || document.documentElement).appendChild(st);
   } catch (e) {}
 
@@ -137,7 +141,11 @@
       // Khung phim (cửa sổ hình trong hình theo đúng tỉ lệ) + đang ở cửa sổ hình trong hình của Safari (bản iPad)
       vw: v.videoWidth || 0, vh: v.videoHeight || 0,
       pip: v.webkitPresentationMode === 'picture-in-picture' || document.pictureInPictureElement === v,
-      rs: remote.seq, rc: remote.cmd
+      rs: remote.seq, rc: remote.cmd,
+      // Khung video trong khung trang (gỡ lỗi): ngang × cao của trang, vị trí / cỡ video, kiểu co giãn, đã ghim chưa
+      box: [window.innerWidth, window.innerHeight].concat((function (r) {
+        return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)];
+      })(v.getBoundingClientRect()), getComputedStyle(v).objectFit, v.classList.contains('chimto-pin'))
     };
   }
 
@@ -219,10 +227,22 @@
   // Tốc độ / khung hình người xem chọn trong app (null = để trình phát tự lo). Đặt lại mỗi giây: trình phát như JW
   // đặt lại tốc độ / kiểu co giãn khi đổi nguồn hoặc tua.
   var want = { rate: null, fit: null };
+  // Màn dài hơn 16:9 (điện thoại 20:9): nhiều trang phát đặt khung video theo bề ngang (cao = ngang × 9/16) → khung cao
+  // hơn màn, phần dưới phim bị cắt. Khung video tràn ra ngoài khung trang thì ghim vừa đúng khung (.chimto-pin), hình giữ
+  // tỉ lệ (viền đen hai bên). TV 16:9 không tràn nên không đổi gì.
+  function fitScreen(v) {
+    if (v.classList.contains('chimto-pin')) return;
+    var r = v.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight;
+    if (!W || !H || r.width < 50 || r.height < 50) return;
+    if (r.bottom > H + 2 || r.right > W + 2 || r.top < -2 || r.left < -2) v.classList.add('chimto-pin');
+  }
   function applyView(v) {
     if (!v) return;
     if (want.rate && Math.abs(v.playbackRate - want.rate) > 0.01) v.playbackRate = want.rate;
-    if (want.fit === null) return;
+    fitScreen(v);
+    // Đã ghim mà người xem chưa chọn khung hình: luôn giữ tỉ lệ (trang có thể đặt cover / fill cho khung cũ của nó)
+    var pinned = v.classList.contains('chimto-pin');
+    if (want.fit === null && !pinned) return;
     // Lấp đầy: video rộng (21:9) phóng cho hết viền đen trên / dưới, cắt bớt hai bên
     var fit = want.fit ? 'cover' : 'contain';
     if (v.style.getPropertyValue('object-fit') !== fit) v.style.setProperty('object-fit', fit, 'important');
