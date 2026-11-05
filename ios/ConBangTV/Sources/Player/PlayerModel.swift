@@ -110,9 +110,8 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     /// PlayerController đóng màn trình phát mà không huỷ trình phát.
     var onDetach: () -> Void = {}
     private var pipRequestedAt: Int64 = 0
-    /// Hình trong hình tự bật lúc rời app (vuốt về màn hình chính); app có ra nền thật không.
-    private var pipAuto = false
-    private var wentBackground = false
+    /// Phóng to từ cửa sổ nhỏ lúc app chưa hiện lên hẳn (đang ở màn hình chính iPad): đợi app hiện rồi mở màn trình phát.
+    private var waitingToReattach = false
     private var begun = false
     /// Đổi người xem: đã lưu chỗ xem cho người cũ, không ghi gì nữa.
     private var saveDisabled = false
@@ -806,14 +805,38 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             }
         } else if detached {
             if state?.paused == false {
-                // Nút phóng to của cửa sổ nhỏ: mở lại màn trình phát (trình phát vẫn chạy)
-                detached = false
-                PlayerModel.detachedModel = nil
-                Router.present(self)
+                reattach() // nút phóng to của cửa sổ nhỏ: mở lại màn trình phát (trình phát vẫn chạy)
             } else {
                 closeDetached() // nút ✕ của cửa sổ nhỏ (phim dừng)
             }
         }
+    }
+
+    /// Mở lại màn trình phát cho phim vừa ra khỏi cửa sổ nhỏ. App chưa hiện lên hẳn (bấm phóng to lúc đang ở màn hình
+    /// chính iPad — iOS mở app rồi mới hiện) thì đợi tới appBecameActive, không thì màn trình phát không mở được mà phim
+    /// vẫn chạy ngầm.
+    private func reattach() {
+        guard UIApplication.shared.applicationState == .active else {
+            waitingToReattach = true
+            return
+        }
+        waitingToReattach = false
+        detached = false
+        PlayerModel.detachedModel = nil
+        Router.present(self)
+    }
+
+    /// App vừa hiện lên (ConBangTVApp): đang đợi mở lại màn trình phát thì mở.
+    func appBecameActive() {
+        if waitingToReattach { reattach() }
+    }
+
+    /// Vuốt lên từ mép dưới màn hình lúc đang xem (PlayerController để lại lần vuốt đầu cho app): thu nhỏ phim — app vẫn
+    /// đang mở hẳn nên iPad cho vào hình trong hình; vuốt tiếp mới về màn hình chính, phim vẫn nổi.
+    func swipeUpFromEdge() {
+        guard Prefs.pipOnHome, Self.pipSupported, started, state?.paused == false, !inPip, !detached else { return }
+        Log.d("Pip", "vuốt lên từ mép dưới — thu nhỏ phim")
+        startPip()
     }
 
     /// Đóng phim đang ở cửa sổ hình trong hình (màn trình phát đã đóng): lưu chỗ xem, huỷ trình phát.
@@ -842,19 +865,14 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
 
     // MARK: - Vòng đời
 
-    /// Sắp rời app (vuốt về màn hình chính): đang phát thì thu nhỏ phim (Cài đặt → "Về màn hình chính lúc đang xem").
-    func willResignActive() {
-        wentBackground = false
-        guard Prefs.pipOnHome, Self.pipSupported, started, state?.paused == false, !inPip, !detached else { return }
-        pipAuto = true
-        startPip()
-    }
+    // Không tự thu nhỏ lúc app sắp ra nền (willResignActive): đo trên iPad 15.4 — lệnh tới đúng khung video nhưng iPad
+    // không mở cửa sổ nổi khi app đã thôi "đang mở hẳn" (5/11/2026). Vì vậy dùng lần vuốt đầu từ mép dưới (swipeUpFromEdge).
 
     func didEnterBackground() {
-        wentBackground = true
         savePosition()
         session?.save(nowMs())
-        // Hình trong hình (hoặc vừa xin vào): phim chạy tiếp; xin mà không vào được thì dừng (khỏi phát tiếng ở nền)
+        // Hình trong hình (hoặc vừa bấm thu nhỏ, cửa sổ đang mở ra): phim chạy tiếp; không vào được thì dừng (khỏi phát
+        // tiếng ở nền)
         if inPip { return }
         if nowMs() - pipRequestedAt < 3000 {
             after("pipcheck", 2.5) { [weak self] in
@@ -865,15 +883,6 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             return
         }
         cmd("pause")
-    }
-
-    func didBecomeActive() {
-        defer {
-            pipAuto = false
-            wentBackground = false
-        }
-        // Kéo Trung tâm điều khiển xuống rồi thả (app không ra nền): thôi hình trong hình vừa tự bật
-        if pipAuto && !wentBackground && inPip && !detached { stopPip() }
     }
 
     func teardown() {

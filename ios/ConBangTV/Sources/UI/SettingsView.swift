@@ -85,11 +85,11 @@ struct SettingsView: View {
                         .disabled(serverLabel == nil)
                     }
                     if PlayerModel.pipSupported {
-                        Toggle("Về màn hình chính lúc đang xem: thu nhỏ phim (hình trong hình)", isOn: $pipOnHome)
+                        Toggle("Vuốt lên từ mép dưới lúc đang xem: thu nhỏ phim (hình trong hình)", isOn: $pipOnHome)
                             .onChange(of: pipOnHome) { Prefs.pipOnHome = $0 }
                     }
                 } header: { Text("Phát video") } footer: {
-                    Text("Hình trong hình: lúc xem chạm nút thu nhỏ (cạnh nút Menu) — phim chạy tiếp ở cửa sổ nổi, vẫn chọn phim khác / dùng app khác được. Cửa sổ nhỏ có nút phóng to và nút đóng.")
+                    Text("Hình trong hình: lúc xem chạm nút thu nhỏ (cạnh nút Menu), hoặc vuốt lên từ mép dưới — phim chạy tiếp ở cửa sổ nổi, vẫn chọn phim khác / dùng app khác được; vuốt lên lần nữa để về màn hình chính. Cửa sổ nhỏ có nút phóng to và nút đóng. Tắt mục này thì vuốt lên về thẳng màn hình chính (phim dừng).")
                 }
 
                 Section {

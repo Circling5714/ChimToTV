@@ -17,6 +17,7 @@ struct ConBangTVApp: App {
             Log.d("App", "trạng thái: \(p)")
             switch p {
             case .active:
+                PlayerModel.detachedModel?.appBecameActive() // phóng to từ cửa sổ nhỏ lúc đang ở màn hình chính iPad
                 AppModel.shared.appReturned() // quay lại sau ≥ 30 phút: hỏi lại "Ai đang xem?"
                 AppModel.shared.checkUpdate(manual: false)
                 AppModel.shared.checkFollows()

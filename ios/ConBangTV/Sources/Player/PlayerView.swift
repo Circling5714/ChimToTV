@@ -423,17 +423,43 @@ final class PlayerController: UIHostingController<PlayerView> {
         model.onOpenWeb = { [weak self] url in
             self?.present(BrowserController(url: url), animated: true)
         }
-        let nc = NotificationCenter.default
-        nc.addObserver(self, selector: #selector(didEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
-        nc.addObserver(self, selector: #selector(willResignActive), name: UIApplication.willResignActiveNotification, object: nil)
-        nc.addObserver(self, selector: #selector(didBecomeActive), name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(didEnterBackground),
+                                               name: UIApplication.didEnterBackgroundNotification, object: nil)
+        // Vuốt lên từ mép dưới: lần đầu iPad để lại cho app (preferredScreenEdgesDeferringSystemGestures) → thu nhỏ phim
+        let edge = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(bottomEdge(_:)))
+        edge.edges = .bottom
+        view.addGestureRecognizer(edge)
         model.begin()
+    }
+
+    /// Đang bật "vuốt lên thì thu nhỏ phim": lần vuốt đầu từ mép dưới thuộc về app (thu nhỏ phim lúc app còn mở hẳn — iPad
+    /// chỉ cho vào hình trong hình lúc đó), vuốt tiếp mới về màn hình chính.
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
+        Prefs.pipOnHome && PlayerModel.pipSupported ? .bottom : []
+    }
+
+    private var edgeFired = false
+
+    @objc private func bottomEdge(_ g: UIScreenEdgePanGestureRecognizer) {
+        switch g.state {
+        case .began:
+            edgeFired = false
+        case .changed:
+            // Vuốt lên hẳn (khỏi bắt nhầm lúc ngón tay chạm sát mép dưới)
+            if !edgeFired && g.translation(in: view).y < -50 {
+                edgeFired = true
+                model.swipeUpFromEdge()
+            }
+        default:
+            break
+        }
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         becomeFirstResponder()
         UIApplication.shared.isIdleTimerDisabled = true
+        setNeedsUpdateOfScreenEdgesDeferringSystemGestures() // theo Cài đặt mới nhất (vuốt lên thì thu nhỏ phim)
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -448,8 +474,6 @@ final class PlayerController: UIHostingController<PlayerView> {
     }
 
     @objc private func didEnterBackground() { model.didEnterBackground() }
-    @objc private func willResignActive() { model.willResignActive() }
-    @objc private func didBecomeActive() { model.didBecomeActive() }
 
     override var keyCommands: [UIKeyCommand]? {
         let inputs = [" ", "k", "j", "l", "m", "n", "p", "i", "\r", UIKeyCommand.inputLeftArrow, UIKeyCommand.inputRightArrow,
