@@ -57,6 +57,12 @@ abstract class BaseActivity : Activity() {
         super.onCreate(savedInstanceState)
         // Điện thoại: xoay dọc được (trình phát tự giữ ngang); TV giữ ngang theo manifest
         if (this !is PlayerActivity) Screen.allowRotation(this)
+        // Điện thoại: thanh điều hướng cùng màu nền app — Android 15 tự phủ lớp tương phản xám nhạt lên chỗ thanh điều hướng
+        if (!Screen.isTv(this)) {
+            if (Build.VERSION.SDK_INT >= 29) window.isNavigationBarContrastEnforced = false
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = if (this is PlayerActivity) android.graphics.Color.BLACK else colorOf(R.color.bg)
+        }
     }
 
     override fun onPostCreate(savedInstanceState: Bundle?) {
