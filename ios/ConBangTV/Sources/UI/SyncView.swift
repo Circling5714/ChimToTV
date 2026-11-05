@@ -81,9 +81,13 @@ struct SyncView: View {
                         .disableAutocorrection(true)
                         .textInputAutocapitalization(.never)
                     Button("Chọn") {
-                        let h = manualHost.trimmingCharacters(in: .whitespaces)
-                        guard !h.isEmpty, let port = NWEndpoint.Port(rawValue: SyncService.port) else { return }
-                        pick(Target(name: h, endpoint: .hostPort(host: NWEndpoint.Host(h), port: port)))
+                        // "192.168.1.20" hoặc "192.168.1.20:8792" (cổng khác — bản thử)
+                        let s = manualHost.trimmingCharacters(in: .whitespaces)
+                        let parts = s.split(separator: ":")
+                        let host = parts.first.map(String.init) ?? ""
+                        let num = parts.count == 2 ? UInt16(parts[1]) ?? 8791 : 8791
+                        guard !host.isEmpty, let port = NWEndpoint.Port(rawValue: num) else { return }
+                        pick(Target(name: s, endpoint: .hostPort(host: NWEndpoint.Host(host), port: port)))
                     }
                     .disabled(manualHost.trimmingCharacters(in: .whitespaces).isEmpty)
                 }

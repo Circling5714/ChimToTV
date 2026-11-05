@@ -67,6 +67,11 @@
                 android:id="@+id/btnLimits"
                 style="@style/TvButton"
                 android:text="Giới hạn giờ xem…" />
+
+            <TextView
+                android:id="@+id/btnSync"
+                style="@style/TvButton"
+                android:text="Đồng bộ với iPad / iPhone…" />
         </LinearLayout>
 
         <TextView

@@ -91,6 +91,7 @@ class DetailActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        SyncNet.syncSoon() // xem xong quay ra: đồng bộ chỗ xem với iPad / iPhone (đã ghép)
         // Quay lại từ trình phát: cập nhật "Xem tiếp" và đánh dấu tập đã xem
         if (detail != null) {
             updateButtons()
@@ -152,6 +153,7 @@ class DetailActivity : BaseActivity() {
                 Prefs.follow(d)
                 Toast.makeText(this, "Đã theo dõi — trang chủ sẽ báo khi phim có tập mới.", Toast.LENGTH_LONG).show()
             }
+            SyncNet.syncSoon()
             showFollow(d)
         }
     }

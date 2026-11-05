@@ -16,6 +16,8 @@ data class HistoryItem(
 data class Follow(
     val filmUrl: String, val title: String, val poster: String?,
     val count: Int, val latest: String, val seen: Int,
+    /** Lúc bấm theo dõi (ms; 0 = bản cũ) — đồng bộ trong nhà. */
+    val t: Long = 0,
 ) {
     val newCount get() = (count - seen).coerceAtLeast(0)
 }
@@ -129,6 +131,8 @@ object Prefs {
      */
     private val PROFILE_KEYS = setOf(
         "history", "positions", "pos_film", "follows", "last_follow_check", "private_mode",
+        // Đồng bộ trong nhà: lúc lưu chỗ xem, lúc xoá phim khỏi lịch sử / bỏ theo dõi
+        "pos_time", "hist_del", "follow_del",
         "base_url", "seek_step", "auto_next", "video_fill",
         // Giới hạn giờ xem (WatchLimit)
         "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
@@ -307,7 +311,18 @@ object Prefs {
             val saved = s?.let { j -> JSONArray(j).let { a -> List(a.length()) { a.getString(it) } } }.orEmpty()
             return if (sp.contains("sites")) saved.distinct() else (PRESET_SITES + saved).distinct()
         }
-        set(value) = sp.edit().putString("sites", JSONArray(value.distinct()).toString()).apply()
+        set(value) {
+            // Đồng bộ trong nhà: ghi lúc thêm / bỏ từng trang
+            val old = sites.toSet()
+            val list = value.distinct()
+            val now = System.currentTimeMillis()
+            val add = stamps("sites_add")
+            val del = stamps("sites_del")
+            list.filter { it !in old }.forEach { add[it] = now }
+            old.filter { it !in list }.forEach { del[it] = now }
+            sp.edit().putString("sites", JSONArray(list).toString())
+                .putString("sites_add", stampsJson(add)).putString("sites_del", stampsJson(del)).apply()
+        }
 
     /** Thêm trang vào danh sách (không đổi trang đang dùng); đã có thì thôi. */
     fun addSite(url: String) {
@@ -486,8 +501,14 @@ object Prefs {
 
     /** Xoá lịch sử xem + chỗ đang xem của người xem đang dùng. */
     fun clearHistory() {
+        val del = stamps(k("hist_del"))
+        val now = System.currentTimeMillis()
+        val films = posFilms()
+        (history.map { it.filmUrl } + films.keys().asSequence().map { films.optString(it) }).filter { it.isNotEmpty() }
+            .forEach { del[it] = now }
         privatePositions.clear()
-        sp.edit().remove(k("history")).remove(k("positions")).remove(k("pos_film")).apply()
+        sp.edit().remove(k("history")).remove(k("positions")).remove(k("pos_film")).remove(k("pos_time"))
+            .putString(k("hist_del"), stampsJson(del)).apply()
     }
 
     /** Xoá một phim khỏi lịch sử, kèm chỗ đang xem / đánh dấu đã xem của các tập phim đó. */
@@ -497,14 +518,20 @@ object Prefs {
         val films = posFilms()
         // Vị trí lưu trước 1.8.2 không ghi phim → chỉ biết tập cuối trong lịch sử
         val eps = films.keys().asSequence().filter { films.optString(it) == filmUrl }.toList() + listOfNotNull(item?.epUrl)
+        val times = posTimes()
         eps.forEach {
             o.remove(it)
             films.remove(it)
+            times.remove(it)
             privatePositions.remove(it)
         }
+        val del = stamps(k("hist_del"))
+        del[filmUrl] = System.currentTimeMillis()
         sp.edit().putString(k("history"), historyJson(history.filter { it.filmUrl != filmUrl }))
             .putString(k("positions"), o.toString())
-            .putString(k("pos_film"), films.toString()).apply()
+            .putString(k("pos_film"), films.toString())
+            .putString(k("pos_time"), times.toString())
+            .putString(k("hist_del"), stampsJson(del)).apply()
     }
 
     // ---- Phim theo dõi ----
@@ -516,7 +543,7 @@ object Prefs {
                 val o = a.getJSONObject(i)
                 Follow(
                     o.getString("film"), o.getString("title"), o.optString("poster").ifEmpty { null },
-                    o.optInt("count"), o.optString("latest"), o.optInt("seen"),
+                    o.optInt("count"), o.optString("latest"), o.optInt("seen"), o.optLong("t"),
                 )
             }
         }
@@ -526,7 +553,7 @@ object Prefs {
         list.forEach {
             a.put(
                 JSONObject().put("film", it.filmUrl).put("title", it.title).put("poster", it.poster ?: "")
-                    .put("count", it.count).put("latest", it.latest).put("seen", it.seen)
+                    .put("count", it.count).put("latest", it.latest).put("seen", it.seen).put("t", it.t)
             )
         }
         sp.edit().putString(k("follows"), a.toString()).apply()
@@ -536,11 +563,16 @@ object Prefs {
 
     fun follow(d: FilmDetail) {
         val n = d.episodeCount
-        saveFollows(listOf(Follow(d.url, d.title, d.poster, n, d.latestEpisode?.title.orEmpty(), n)) +
+        saveFollows(listOf(Follow(d.url, d.title, d.poster, n, d.latestEpisode?.title.orEmpty(), n, System.currentTimeMillis())) +
             follows.filter { it.filmUrl != d.url })
     }
 
-    fun unfollow(filmUrl: String) = saveFollows(follows.filter { it.filmUrl != filmUrl })
+    fun unfollow(filmUrl: String) {
+        val del = stamps(k("follow_del"))
+        del[filmUrl] = System.currentTimeMillis()
+        sp.edit().putString(k("follow_del"), stampsJson(del)).apply()
+        saveFollows(follows.filter { it.filmUrl != filmUrl })
+    }
 
     /** Cập nhật số tập mới nhất; seen = true: người xem vừa mở phim (hết "tập mới"). */
     fun updateFollow(filmUrl: String, count: Int, latest: String, seen: Boolean) {
@@ -611,6 +643,9 @@ object Prefs {
     /** Tập → phim (để xoá một phim khỏi lịch sử thì xoá được cả chỗ đang xem các tập của nó). */
     private fun posFilms(): JSONObject = JSONObject(sp.getString(k("pos_film"), "{}") ?: "{}")
 
+    /** Tập → lúc lưu chỗ xem (ms) — đồng bộ trong nhà lấy lần lưu mới hơn. Chỗ xem lưu từ bản cũ không có. */
+    private fun posTimes(): JSONObject = JSONObject(sp.getString(k("pos_time"), "{}") ?: "{}")
+
     fun savePosition(epUrl: String, seconds: Int, filmUrl: String) {
         if (privateMode) {
             privatePositions[epUrl] = seconds
@@ -619,16 +654,119 @@ object Prefs {
         privatePositions.remove(epUrl)
         val o = positions()
         val films = posFilms()
+        val times = posTimes()
         o.remove(epUrl)
         o.put(epUrl, seconds) // JSONObject giữ thứ tự chèn → khoá đầu là cũ nhất
         films.put(epUrl, filmUrl)
+        times.put(epUrl, System.currentTimeMillis())
         val keys = o.keys().asSequence().toList()
         if (keys.size > MAX_POSITIONS) {
             keys.take(keys.size - MAX_POSITIONS).forEach {
                 o.remove(it)
                 films.remove(it)
+                times.remove(it)
             }
         }
-        sp.edit().putString(k("positions"), o.toString()).putString(k("pos_film"), films.toString()).apply()
+        sp.edit().putString(k("positions"), o.toString()).putString(k("pos_film"), films.toString())
+            .putString(k("pos_time"), times.toString()).apply()
+    }
+
+    // ---- Đồng bộ trong nhà (Sync.kt) ----
+
+    /** Máy đã ghép (JSON, xem SyncNet.peers). */
+    internal var syncPeersJson: String
+        get() = sp.getString("sync_peers", "[]") ?: "[]"
+        set(value) = sp.edit().putString("sync_peers", value).apply()
+
+    /** Tự đồng bộ khi mở app / xem xong (mặc định bật). */
+    var syncAuto: Boolean
+        get() = sp.getBoolean("sync_auto", true)
+        set(value) = sp.edit().putBoolean("sync_auto", value).apply()
+
+    /** Mốc thời gian theo khoá (lúc xoá / lúc thêm), lưu JSON {"khoá": ms}. */
+    internal fun stamps(key: String): MutableMap<String, Long> {
+        val o = JSONObject(sp.getString(key, "{}") ?: "{}")
+        return o.keys().asSequence().associateWithTo(LinkedHashMap()) { o.optLong(it) }
+    }
+
+    internal fun stampsJson(m: Map<String, Long>): String = JSONObject(SyncMerge.tombstones(m, emptyMap()) as Map<*, *>).toString()
+
+    /** Mã máy (ngẫu nhiên, tạo lần đầu) — máy kia nhận ra TV này qua mã này. */
+    val deviceId: String
+        @Synchronized get() = sp.getString("device_id", null) ?: java.util.UUID.randomUUID().toString().lowercase().also {
+            sp.edit().putString("device_id", it).apply()
+        }
+
+    /** Dữ liệu đồng bộ của người xem p. */
+    fun syncProfile(p: Profile): SyncProfile {
+        fun key(base: String) = pk(p.id, base)
+        val hist = JSONArray(sp.getString(key("history"), "[]"))
+        val pos = JSONObject(sp.getString(key("positions"), "{}") ?: "{}")
+        val films = JSONObject(sp.getString(key("pos_film"), "{}") ?: "{}")
+        val times = JSONObject(sp.getString(key("pos_time"), "{}") ?: "{}")
+        val fol = JSONArray(sp.getString(key("follows"), "[]"))
+        return SyncProfile(
+            id = p.id, name = p.name,
+            history = List(hist.length()) { i ->
+                val o = hist.getJSONObject(i)
+                SyncHistory(o.getString("film"), o.optString("title"), o.optString("poster"), o.optString("ep"),
+                    o.optString("epUrl"), o.optLong("time"))
+            },
+            histDel = stamps(key("hist_del")),
+            pos = pos.keys().asSequence().map { SyncPos(it, pos.optInt(it), films.optString(it), times.optLong(it)) }.toList(),
+            follows = List(fol.length()) { i ->
+                val o = fol.getJSONObject(i)
+                SyncFollow(o.getString("film"), o.optString("title"), o.optString("poster"), o.optInt("count"),
+                    o.optString("latest"), o.optInt("seen"), o.optLong("t"))
+            },
+            followDel = stamps(key("follow_del")),
+        )
+    }
+
+    /** Ghi dữ liệu đã gộp cho người xem s.id. true = có thay đổi. */
+    @Synchronized
+    fun applySync(s: SyncProfile): Boolean {
+        val p = profiles.firstOrNull { it.id == s.id } ?: return false
+        // Thứ tự chỗ xem không tính (JSONObject của một số bản org.json không giữ thứ tự khoá)
+        fun same(a: SyncProfile, b: SyncProfile) = a.copy(pos = a.pos.sortedBy { it.ep }) == b.copy(pos = b.pos.sortedBy { it.ep })
+        if (same(syncProfile(p), s)) return false
+        fun key(base: String) = pk(s.id, base)
+        val hist = JSONArray()
+        s.history.forEach {
+            hist.put(JSONObject().put("film", it.film).put("title", it.title).put("poster", it.poster)
+                .put("ep", it.ep).put("epUrl", it.epUrl).put("time", it.time))
+        }
+        val pos = JSONObject()
+        val films = JSONObject()
+        val times = JSONObject()
+        s.pos.forEach {
+            pos.put(it.ep, it.sec)
+            films.put(it.ep, it.film)
+            if (it.t > 0) times.put(it.ep, it.t)
+        }
+        val fol = JSONArray()
+        s.follows.forEach {
+            fol.put(JSONObject().put("film", it.film).put("title", it.title).put("poster", it.poster)
+                .put("count", it.count).put("latest", it.latest).put("seen", it.seen).put("t", it.t))
+        }
+        sp.edit().putString(key("history"), hist.toString())
+            .putString(key("positions"), pos.toString()).putString(key("pos_film"), films.toString())
+            .putString(key("pos_time"), times.toString())
+            .putString(key("follows"), fol.toString())
+            .putString(key("hist_del"), stampsJson(s.histDel))
+            .putString(key("follow_del"), stampsJson(s.followDel))
+            .commit()
+        return true
+    }
+
+    val syncSites: SyncSites get() = SyncSites(sites, stamps("sites_add"), stamps("sites_del"))
+
+    /** Ghi danh sách trang đã gộp (không ghi lại mốc thêm / bỏ như khi người xem tự sửa). true = có thay đổi. */
+    @Synchronized
+    fun applySites(s: SyncSites): Boolean {
+        if (s == syncSites || s.list.isEmpty()) return false
+        sp.edit().putString("sites", JSONArray(s.list).toString())
+            .putString("sites_add", stampsJson(s.add)).putString("sites_del", stampsJson(s.del)).commit()
+        return true
     }
 }

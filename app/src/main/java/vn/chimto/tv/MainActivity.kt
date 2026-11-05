@@ -128,9 +128,27 @@ class MainActivity : BaseActivity() {
         super.onDestroy()
     }
 
+    override fun onPause() {
+        SyncNet.onApplied = null
+        super.onPause()
+    }
+
+    /** Đồng bộ trong nhà vừa nhận dữ liệu mới từ iPad / iPhone: vẽ lại hàng Xem tiếp / lịch sử / theo dõi. */
+    private fun syncApplied() {
+        if (!mainStarted || picker.shown) return
+        when {
+            menuAdapter.active?.kind == Kind.HISTORY -> showHistory(focusFirst = false)
+            menuAdapter.active?.kind == Kind.FOLLOWS -> showFollows(focusFirst = false)
+            homeToken == token -> refreshHead()
+        }
+        refreshMenu()
+    }
+
     override fun onResume() {
         super.onResume()
         Updater.autoCheck(this)
+        SyncNet.onApplied = ::syncApplied
+        SyncNet.syncSoon(1500) // đồng bộ trong nhà (đã ghép máy): mở app, xem xong quay ra
         // Quay lại app sau ≥ 30 phút không dùng: hỏi lại người xem (TV dùng chung cả nhà)
         if (ProfileUi.mustPick || (AppUse.idleReturn(this) && ProfileUi.mustAsk())) {
             ProfileUi.mustPick = false
@@ -737,6 +755,7 @@ class MainActivity : BaseActivity() {
             .setPositiveButton("Bỏ theo dõi") { _, _ ->
                 val pos = gridAdapter.positionOf(row)
                 Prefs.unfollow(row.film.url)
+                SyncNet.syncSoon()
                 rebuildMenu()
                 if (menuAdapter.active?.kind == Kind.FOLLOWS) {
                     showFollows(focusFirst = false)
@@ -758,6 +777,7 @@ class MainActivity : BaseActivity() {
             .setPositiveButton("Xoá") { _, _ ->
                 val pos = gridAdapter.positionOf(row)
                 Prefs.removeHistory(row.film.url)
+                SyncNet.syncSoon()
                 if (menuAdapter.active?.kind == Kind.HISTORY) {
                     showHistory(focusFirst = false)
                     val i = minOf(pos, Prefs.history.size - 1)

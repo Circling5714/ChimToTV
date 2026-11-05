@@ -12,6 +12,7 @@ class App : Application() {
         ImageLoader.init(this)
         AutoClear.init(this)
         AppUse.init(this)
+        SyncNet.init(this) // đồng bộ trong nhà (đã ghép máy thì mở cổng)
         if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
     }
 }

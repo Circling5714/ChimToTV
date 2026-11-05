@@ -35,7 +35,12 @@ struct SyncFound: Identifiable, Equatable {
 @MainActor
 final class SyncService: ObservableObject {
     static let shared = SyncService()
+    /// Bản thử dùng cổng khác (cài song song bản chính trên cùng máy).
+    #if DEVTOOLS
+    static let port: UInt16 = 8792
+    #else
     static let port: UInt16 = 8791
+    #endif
     static let serviceType = "_conbangtv._tcp"
 
     @Published private(set) var peers: [SyncPeer] = []
