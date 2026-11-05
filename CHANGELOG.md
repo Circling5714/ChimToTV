@@ -6,6 +6,17 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 
+## 2.4.3 — 05/11/2026
+
+- **Cử chỉ chạm khi xem phim** (điện thoại, màn cảm ứng), như bản iPhone: **giữ tay** xem nhanh 2× tới khi nhấc tay;
+  **vuốt ngang** để tua (giữa màn hiện giờ sẽ tới, hết bề ngang = 2 phút); **vuốt dọc nửa trái** chỉnh độ sáng (chỉ trong
+  lúc xem), **nửa phải** chỉnh âm lượng; **chụm / mở hai ngón** vừa màn / lấp đầy. Vuốt từ sát mép trên / dưới để dành cho
+  điện thoại. Remote trên TV không đổi.
+- versionCode 25 · tag `v2.4.3` · commit `ae34126` · SHA-256 APK
+  `8ae31e339430e2c08efe429a5663f4456ff2a33ba79d3dba398ec2de3e8d0e61`
+- Thử trên TV box qua cổng gỡ lỗi (giữ tay → tốc độ 2 rồi về 1, vuốt ngang tua ~1 phút, độ sáng); anh thử trên vivo X200 Pro
+  (bản debug5). Cập nhật tự động 2.4.2 → 2.4.3 đã thử trên TV box.
+
 ## 2.4.2 — 05/11/2026
 
 - **Điện thoại màn dài (vd 20:9): xem phim không còn bị lẹm mất phần dưới hình.** Một số trang phát đặt khung video theo

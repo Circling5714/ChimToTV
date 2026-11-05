@@ -113,6 +113,9 @@ Cho TV box nối màn cảm ứng và điện thoại — chạm thay remote lú
 - **Xem phim:** chạm vào phim để hiện / ẩn thanh nút: Tập trước • ◀◀ 10 giây • Dừng / Phát • 10 giây ▶▶ • Tập sau •
   Menu (như ▼ trên remote) • Thoát; kéo thanh thời gian để tua. Chạm đúp nửa trái / phải màn hình: lùi / tới 10 giây.
   Thanh tự ẩn sau 5 giây (phim đang dừng thì ở lại).
+- **Cử chỉ khi xem** (từ 2.4.3, như bản iPhone): giữ tay — xem nhanh 2× tới khi nhấc tay; vuốt ngang — tua (hiện giờ tới;
+  hết bề ngang = 2 phút); vuốt dọc nửa trái — độ sáng (chỉ trong trình phát), nửa phải — âm lượng; chụm / mở hai ngón —
+  vừa màn / lấp đầy. Vuốt dọc bắt đầu sát mép trên / dưới (40dp) để dành cho điện thoại.
 - **Các màn khác:** chạm, vuốt, giữ (xoá khỏi lịch sử) như điện thoại; có nút **‹ Quay lại** ở góc trên (trang chủ:
   **Thoát**; Duyệt web: góc dưới trái). Nút chỉ hiện khi đang dùng cảm ứng, bấm remote là ẩn.
 
