@@ -34,7 +34,11 @@ struct ProfilePickerView: View {
     @State private var adding = false
     @State private var settings = false
 
-    private let cols = [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 24)]
+    /// Cột cố định (tối đa 4 ô một hàng — vừa cả iPad dọc): lưới nằm giữa màn hình.
+    private var cols: [GridItem] {
+        let n = app.profiles.count + (app.profiles.count < Prefs.maxProfiles ? 1 : 0)
+        return Array(repeating: GridItem(.fixed(150), spacing: 24), count: max(1, min(4, n)))
+    }
 
     var body: some View {
         ZStack {
@@ -57,7 +61,6 @@ struct ProfilePickerView: View {
                             .accessibilityLabel("Thêm người")
                     }
                 }
-                .frame(maxWidth: 860)
                 .padding(.vertical, 26)
                 Button { settings = true } label: {
                     Label("Sửa người xem…", systemImage: "pencil")
