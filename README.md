@@ -13,6 +13,9 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.5`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.5)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.0`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.0)
+— xem mục [Bản Windows](#bản-windows).
+
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
 **Liên hệ**.
 
@@ -27,7 +30,7 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | hoathinh3d.ee | HaLim, chia Việt Sub / Thuyết Minh | `player.php` → iframe |
 | hhkungfu.ee | HaLim, chia Vietsub / Thuyết Minh | `player.php` → iframe |
 | hoathinh3d.pw | HaLimMovies (Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Đánh Giá Cao đọc qua API JSON của trang, từ 2.2) | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
-| phimmois.fun (trước là phimmoir.fun) | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
+| phimmois.fun (trước là phimmoir.fun; từ 06/11/2026 tự chuyển sang phimmoiw.fun — app tự đổi theo) | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
 | mephim.ddns.net (từ 2.5 / iPad 1.5) | ứng dụng React — đọc API JSON `/api/movies/…` của trang (nguồn KKPhim), chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
 
 **Tìm kiếm** (từ 1.9.1) tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm, trang đang dùng đứng đầu.
@@ -93,6 +96,29 @@ Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStor
   vuốt về màn hình chính lúc đang xem là tự thu nhỏ (Cài đặt → Phát video).
 - **Khác bản TV:** chưa có DNS mã hoá (cần thì dùng hồ sơ DNS của iPad); không có con trỏ ảo (chạm thẳng vào trang
   web). Lúc bật proxy / vượt chặn, trên iPadOS 15–16 app không giữ cookie của trang web sau khi tắt app.
+
+## Bản Windows
+
+App cho máy tính và mini PC cắm tivi chạy Windows 10 / 11 (thư mục `windows/`, C# .NET 8 + WPF + WebView2), dùng được
+cả chuột lẫn bàn phím / remote:
+
+- **Cài:** tải `ConBangTV-Windows-<bản>.exe` ở release `win-v<bản>`, để vào thư mục nào cũng được rồi mở — không cần cài
+  .NET. Lần đầu Windows báo «Windows protected your PC» (app chưa có chữ ký số): **More info → Run anyway**. Cần Microsoft
+  Edge WebView2 Runtime (Windows 10 / 11 cập nhật thường có sẵn; máy chưa có thì app báo và mở trang tải). Dữ liệu ở
+  `%LOCALAPPDATA%\ConBangTV`. Bản sau tự cập nhật (Cài đặt → **Kiểm tra cập nhật**; tự hỏi tối đa 2 giờ một lần).
+- **Màn chính:** menu bên trái (Trang chủ, Tìm kiếm, Xem tiếp / Lịch sử, Theo dõi, các mục của trang, Thể loại… /
+  Quốc gia…, Đổi trang phim, Cài đặt), lưới phim; chi tiết phim có Xem tiếp, Xem từ đầu, Mới nhất, Theo dõi, các bản
+  (Vietsub / Thuyết Minh) và danh sách tập (tập đã xem màu xanh).
+- **Phím:** mũi tên đi theo vị trí trên màn (như remote TV), Enter chọn, Esc / Backspace / phím Back của remote quay lại,
+  F11 (Alt+Enter) toàn màn hình, Ctrl+F tìm kiếm. Xem phim: Space / Enter / K phát – dừng, ◀ ▶ (J / L) tua (giữ phím tua
+  nhanh dần), ▲ thời gian, ▼ / M / phím Menu mở bảng (server, bản, tập, tốc độ, khung hình, nhạc mở đầu, tải lại, bấm
+  thẳng vào trang, mở trang tập trên trình duyệt), N / P (PageDown / PageUp, phím tập sau / trước) đổi tập, 0–9 nhảy
+  0–90%, F toàn màn hình, Esc thoát phim.
+- **Chuột:** rê để hiện thanh điều khiển, bấm vào phim phát / dừng, bấm đúp toàn màn hình, bấm thanh tua nhảy tới chỗ đó,
+  Delete hoặc chuột phải trên thẻ phim (Lịch sử / Theo dõi) để xoá; nút lùi của chuột = quay lại.
+- **Cài đặt:** bước tua, tự chuyển tập, **cỡ giao diện** 100–175% (ngồi xa tivi), mở app ở toàn màn hình, **vượt chặn nhà
+  mạng** mức 1 / 2, tự kiểm tra bản mới, xoá lịch sử / dữ liệu duyệt web.
+- **Chưa có** (bản sau): người xem có mã PIN, giới hạn giờ xem, cửa sổ phim nhỏ, đồng bộ trong nhà, proxy SOCKS5.
 
 ## Phím điều khiển
 
@@ -305,6 +331,15 @@ bản phát hành không có) để thử trên điện thoại khi không có a
 vd `JSON.stringify(__chimtoState.box)`: cỡ khung trang + khung video, kiểu co giãn, đã ghim chưa). Thử giao diện điện thoại trên TV box: tạo tệp
 `files/force_phone` (+ `force_portrait` / `force_landscape`) bằng `adb shell run-as vn.chimto.tv.debug touch …`.
 
+**Bản Windows:** `.\windows\build.ps1` → chạy test (`windows/ConBangTV.Tests`, cùng ca với test của TV / iPad) rồi đóng
+gói một tệp tự chạy `dist\ConBangTV-Windows-<bản>.exe` (~70 MB, kèm .NET, nén). Cần .NET 8 SDK (đã cài riêng cho người
+dùng ở `%LOCALAPPDATA%\Microsoft\dotnet` — script tự đặt `DOTNET_ROOT`). Số bản: `<Version>` trong
+`windows/ConBangTV/ConBangTV.csproj`. Bản Debug (`dotnet build windows\ConBangTV\ConBangTV.csproj`) có **cổng gỡ lỗi**
+`http://localhost:8790` (chỉ máy này): `/info`, `/shot` (ảnh PNG cửa sổ), `/key?k=Down,Enter`, `/click?text=…` (bấm nút
+theo chữ), `/type?text=…`, `/js?code=…` (chạy JS trong trình phát), `/log`, `/play?film=&ep=`, `/open?url=`. Biến môi
+trường để thử: `CONBANG_MUTE=1` (tắt tiếng trình phát, chỉ bản Debug), `CONBANG_DATA_DIR` (thư mục dữ liệu riêng),
+`CONBANG_UPDATE_API` (danh sách release giả để thử tự cập nhật).
+
 **Bản iPad** dựng trên máy macOS của GitHub Actions (`.github/workflows/ios.yml`, repo công khai nên miễn phí) — không
 cần Mac:
 
@@ -334,6 +369,12 @@ Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ l�
 release iPad mà thành latest thì mọi TV hết thấy bản mới. Bản iPad duyệt danh sách release, lấy tag `ios-v*` có tệp
 `.ipa` (bỏ bản nháp / thử nghiệm) và mở `apple-magnifier://install?url=<link .ipa>` để TrollStore cài. Số bản ở
 `MARKETING_VERSION` trong `ios/project.yml`; ghi chú phát hành cũng cần mục `## Có gì mới`.
+
+**Bản Windows** cũng vậy: tag `win-v<bản>`, tệp `.exe`, **luôn `--latest=false`**
+(`gh release create win-v1.0 dist\ConBangTV-Windows-1.0.exe --title "Côn Bằng TV cho Windows 1.0" --notes-file … --latest=false`).
+App duyệt danh sách release, lấy tag `win-v*` có tệp `.exe`; tải về, kiểm đúng cỡ, đúng SHA-256 GitHub báo (`digest`),
+đúng tên sản phẩm + số bản trong tệp, rồi đổi tên tệp đang chạy thành `.old`, đặt tệp mới vào chỗ cũ và mở lại app
+(`--updated`; lần mở sau xoá `.old`). Thư mục chứa app không ghi được thì mở trang Releases để tải tay.
 
 Thử OTA không cần phát hành thật: bản debug hỏi `http://127.0.0.1:8765/latest.json` (cùng định dạng GitHub API).
 Dựng bản giả số hiệu cao hơn bằng `gradlew assembleDebug "-Pvc=5" "-Pvn=1.4"`, phục vụ JSON + APK từ máy tính
@@ -500,6 +541,18 @@ lệnh `rate` / `fit` cho agent, agent đặt lại mỗi giây. DoH: `Doh.kt` (
 TTL ≤ 5 phút, chỉ IPv4); cổng nội bộ chạy cả khi không có proxy (`RouteConfig(socks, doh)`); bản debug ghi tên miền đã
 hỏi vào logcat `ChimToDoh` (cũng là cách đo trang gọi tới những đâu). Mật khẩu proxy: `Secret.kt` (AES-GCM, khoá trong
 AndroidKeyStore).
+
+Bản Windows (`windows/ConBangTV`): `Core/` chuyển từ bản iPad (Site, NextSite, ApiSite, Prefs — cùng tên hàm, cùng bộ
+chọn CSS, cùng tên khoá lưu, JSON kiểu camelCase); đọc HTML bằng AngleSharp, `JsonScan` như iPad. Trình phát là WebView2
+(Chromium, như WebView Android) dùng nguyên các tệp JS / HTML của bản Android (nhúng vào exe): trang bọc (`player.html` /
+`hls.html`) được **trả lời tại chính địa chỉ trang tập** qua `WebResourceRequested` (giống `loadDataWithBaseURL` — trình
+phát nhúng thấy Referer của trang phim); agent chèn vào mọi khung bằng `AddScriptToExecuteOnDocumentCreated` (kèm
+`__chimtoStart` / `__chimtoLoad`); `/__chimto/hls.js` trả từ tài nguyên; chặn quảng cáo bằng bộ lọc yêu cầu theo tên
+miền, chặn cửa sổ mới và điều hướng cả trang do trang tự gây ra. Thanh điều khiển nằm ở một cửa sổ phủ trong suốt
+(`Player/PlayerOverlay`) vì WPF không vẽ đè lên cửa sổ của WebView2; WebView2 không bao giờ giữ phím. Ảnh bìa WebP giải mã
+bằng SkiaSharp. Vượt chặn nhà mạng: kết nối của HttpClient (`ConnectCallback`) tách gói bắt tay (`Core/Unblock.cs`, cùng
+cách tách với `writeHello` của TV, mức 2 đặt `Socket.Ttl = 1` cho byte đầu); trình phát đi qua proxy nội bộ 127.0.0.1
+(`--proxy-server`, chọn lúc tạo WebView2 → đổi mức thì mở lại app).
 
 Bản iPad (`ios/ConBangTV/Sources`): `Core/` chuyển gần như từng dòng từ Kotlin (Site, NextSite, Prefs, PlayStats,
 Follows, AdBlock — giữ cùng tên hàm / bộ chọn CSS, sửa bộ đọc trang thì sửa cả hai bên); dữ liệu Next.js đọc bằng

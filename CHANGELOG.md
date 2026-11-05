@@ -5,6 +5,25 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 được lên nhau và giữ nguyên lịch sử xem.
 
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
+Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
+
+## Windows 1.0 — 06/11/2026
+
+- **Bản đầu tiên cho máy Windows 10 / 11** (máy tính hoặc mini PC cắm tivi), dùng chuột hoặc bàn phím / remote: đủ 6 trang
+  phim như bản TV (yanhh3d, hoathinh3d.pw / .ee, hhkungfu, phimmois → phimmoiw, mephim), trang chủ, menu mục của trang,
+  Thể loại… / Quốc gia…, tìm trên mọi trang, chi tiết phim (bản Vietsub / Thuyết Minh, tập đã xem), Xem tiếp / Lịch sử,
+  Theo dõi (báo tập mới), Đổi trang phim (đo nhanh, thêm / xoá trang), trình phát (server nhớ theo trang, xem tiếp đúng
+  chỗ, tự chuyển tập, tốc độ, khung hình, nhạc mở đầu tự bỏ qua, HLS bỏ quảng cáo, chặn quảng cáo), toàn màn hình,
+  cỡ giao diện 100–175%, **vượt chặn nhà mạng mức 1 / 2**, tự cập nhật từ GitHub.
+- Chưa có: người xem / mã PIN, giới hạn giờ xem, cửa sổ phim nhỏ, đồng bộ trong nhà, proxy SOCKS5.
+- bản 1.0.0 · tag `win-v1.0` (không phải "latest") · commit `9624e00` · tệp `ConBangTV-Windows-1.0.exe` 72 736 562 byte ·
+  SHA-256 `bd2600678c1825ac4c788c6ac00f12519aa1daf46635db05886ccf4d34bd2938`
+- Cài: tải tệp .exe, mở; Windows báo «Windows protected your PC» thì **More info → Run anyway** (app chưa có chữ ký số).
+- Đã thử trên máy Windows 10 thật: 28 test lõi; phát phim ở yanhh3d (iframe), hoathinh3d.pw (mở thẳng trang tập), mephim
+  (HLS), phimmoiw (HLS qua vượt chặn mức 1 và mức 2 — phimmois.fun bị nhà mạng chặn, tắt vượt chặn thì hết giờ chờ); phím
+  mũi tên / Enter / Esc, chuột thật (bấm phát / dừng, bấm đúp toàn màn hình, bấm thanh tua); tự cập nhật trọn vẹn
+  1.0 → 1.0.1 qua release giả; tệp tải từ link công khai khớp SHA-256, tự kiểm tra bản mới với GitHub thật. Chưa thử với
+  remote thật, máy chưa có WebView2.
 
 ## iPad 1.5 — 05/11/2026
 
