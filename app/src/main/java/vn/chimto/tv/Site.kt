@@ -63,7 +63,7 @@ data class EpisodeSource(
  */
 object Site {
     /** Thẻ phim ở lưới / trượt / bảng xếp hạng. */
-    private const val CARD = ".flw-item, li.item-top, .halim-item, a.halim-trending-link"
+    private const val CARD = ".flw-item, li.item-top, .halim-item, a.halim-trending-link, a.t10-card"
 
     /** Tiêu đề khối trên trang chủ. */
     private const val HEADING = ".cat-heading, .section-title"
@@ -145,10 +145,11 @@ object Site {
         if (url.isEmpty()) return null
         val img = el.selectFirst("img")
         val title = listOf(
-            el.selectFirst(".film-name a, .entry-title, .halim-trending-title-text, h4")?.text(),
+            el.selectFirst(".film-name a, .entry-title, .halim-trending-title-text, h4, .t10-movie-title")?.text(),
             a.attr("title"), img?.attr("alt"),
         ).firstOrNull { !it.isNullOrBlank() }?.trim() ?: return null
         val badge = el.selectFirst(".tick-rate, .fdi-item, .episode")?.text()?.trim()?.takeIf { it.isNotEmpty() }
+            ?: el.selectFirst(".t10-rank-num")?.text()?.trim()?.takeIf { it.isNotEmpty() }?.let { "Top $it" }
         return Film(url, title, img?.let { imageUrl(it) }, badge)
     }
 
@@ -160,10 +161,89 @@ object Site {
             .map { img.absUrl(it) }
             .firstOrNull { it.startsWith("http") }
 
+    private const val HALIM_API_PATH = "/wp-json/halim/v1/"
+
+    /**
+     * Trang danh sách kiểu mới của hoathinh3d.pw (11/2026): HTML chỉ có khung trống, phim nạp bằng API JSON —
+     * `/wp-json/halim/v1/{movies|ongoing|completed|top-rated}?page=N&per_page=20` (Phim Lẻ thêm sortby) và lịch chiếu
+     * `/wp-json/movie-schedule/v1/daily?day=thu-hai…`. Đọc địa chỉ API ngay trong mã JS của trang (API_URL).
+     */
+    object HalimApi {
+        private val API = Regex("""API_URL\s*=\s*["']([^"']*wp-json\\?/halim\\?/v1\\?/[a-z0-9-]+)["']""")
+        private val SORT = Regex("""SORTBY\s*=\s*["']([a-z0-9_-]+)["']""")
+        private val SCHEDULE = Regex("""API_URL\s*=\s*["']([^"']*wp-json\\?/movie-schedule\\?/v1\\?/daily)["']""")
+        const val PER_PAGE = 20
+
+        /** Trang 1 của API trong HTML (null = không phải trang kiểu này). */
+        fun firstPage(html: String): String? {
+            val api = API.find(html)?.groupValues?.get(1)?.replace("\\/", "/") ?: return null
+            val sort = SORT.find(html)?.groupValues?.get(1)
+            return "$api?" + (sort?.let { "sortby=$it&" } ?: "") + "page=1&per_page=$PER_PAGE"
+        }
+
+        fun scheduleApi(html: String): String? = SCHEDULE.find(html)?.groupValues?.get(1)?.replace("\\/", "/")
+
+        /** {success, has_more, items:[{title, permalink, poster_url, latest_episode?, rank?, average_rating?}]} */
+        fun parse(json: String, url: String): FilmPage {
+            val o = JSONObject(json)
+            val items = o.optJSONArray("items") ?: return FilmPage(emptyList(), null)
+            val films = List(items.length()) { i -> film(items.getJSONObject(i)) }.filterNotNull().distinctBy { it.url }
+            val page = Regex("""[?&]page=(\d+)""").find(url)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+            val next = if (o.optBoolean("has_more") && films.isNotEmpty()) url.replace(Regex("""([?&]page=)\d+"""), "$1${page + 1}") else null
+            return FilmPage(films, next)
+        }
+
+        private fun film(it: JSONObject): Film? {
+            val url = it.optString("permalink").ifEmpty { return null }
+            val title = it.optString("title").ifEmpty { return null }
+            val poster = it.optString("poster_url").ifEmpty { it.optString("thumbnail") }.ifEmpty { null }
+            val rank = it.optInt("rank")
+            val badge = it.optString("latest_episode").trim().let { ep ->
+                when {
+                    ep.isEmpty() -> null
+                    Regex("""^\d+$""").matches(ep) -> "Tập $ep"
+                    else -> ep
+                }
+            } ?: rank.takeIf { r -> r > 0 }?.let { r -> "Top $r" }
+            val early = it.optString("early_screening_time").takeIf { t -> t.isNotEmpty() && it.optBoolean("is_early_screening") }
+            return Film(url, title, poster, listOfNotNull(early, badge).joinToString(" · ").ifEmpty { null })
+        }
+
+        private val DAYS = listOf("chu-nhat" to "Chủ nhật", "thu-hai" to "Thứ 2", "thu-ba" to "Thứ 3", "thu-tu" to "Thứ 4",
+            "thu-nam" to "Thứ 5", "thu-sau" to "Thứ 6", "thu-bay" to "Thứ 7")
+
+        /** Một ngày của lịch chiếu: phim chiếu sớm (kèm giờ) trước, rồi phim thường. */
+        fun parseDay(json: String): List<Film> {
+            val o = JSONObject(json)
+            val out = ArrayList<Film>()
+            for (key in listOf("early_movies", "regular_movies")) {
+                val a = o.optJSONArray(key) ?: continue
+                for (i in 0 until a.length()) film(a.getJSONObject(i))?.let { out += it }
+            }
+            return out.distinctBy { it.url }
+        }
+
+        /** Cả tuần, bắt đầu từ hôm nay (giờ Việt Nam). */
+        fun schedule(api: String): List<Section> {
+            val today = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Ho_Chi_Minh"))
+                .get(java.util.Calendar.DAY_OF_WEEK) - 1 // Chủ nhật = 0
+            return (0 until 7).mapNotNull { i ->
+                val (slug, name) = DAYS[(today + i) % 7]
+                runCatching {
+                    Section(name + if (i == 0) " (hôm nay)" else "", parseDay(Http.get("$api?day=$slug").body))
+                }.getOrNull()?.takeIf { it.films.isNotEmpty() }
+            }
+        }
+    }
+
     // ---- Danh sách / tìm kiếm ----
 
     fun list(url: String): FilmPage {
+        // hoathinh3d.pw (11/2026): Phim Lẻ / Đang Chiếu / Hoàn Thành / Đánh Giá Cao nạp phim bằng API JSON
+        if (HALIM_API_PATH in url) return HalimApi.parse(Http.get(url, mapOf("Accept" to "application/json")).body, url)
         val doc = fetch(url)
+        HalimApi.firstPage(doc.html())?.let { return list(it) }
+        HalimApi.scheduleApi(doc.html())?.let { api -> return FilmPage(emptyList(), null, HalimApi.schedule(api)) }
         val page = parseList(doc, url)
         if (page.films.isEmpty()) {
             val days = doc.select(".day-tabs .day-tab[data-id]")

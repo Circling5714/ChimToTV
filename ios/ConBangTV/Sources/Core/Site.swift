@@ -16,7 +16,7 @@ extension Element {
 
 enum Site {
     /// Thẻ phim ở lưới / trượt / bảng xếp hạng.
-    static let card = ".flw-item, li.item-top, .halim-item, a.halim-trending-link"
+    static let card = ".flw-item, li.item-top, .halim-item, a.halim-trending-link, a.t10-card"
 
     /// Tiêu đề khối trên trang chủ.
     static let heading = ".cat-heading, .section-title"
@@ -171,9 +171,11 @@ enum Site {
         let url = a.abs("href")
         if url.isEmpty { return nil }
         let img = el.q1("img")
-        let candidates = [el.q1(".film-name a, .entry-title, .halim-trending-title-text, h4")?.txt, a.at("title"), img?.at("alt")]
+        let candidates = [el.q1(".film-name a, .entry-title, .halim-trending-title-text, h4, .t10-movie-title")?.txt, a.at("title"),
+                          img?.at("alt")]
         guard let title = candidates.compactMap({ $0?.nonEmpty }).first else { return nil }
         let badge = el.q1(".tick-rate, .fdi-item, .episode")?.txt.nonEmpty
+            ?? el.q1(".t10-rank-num")?.txt.nonEmpty.map { "Top \($0)" }
         return Film(url: url, title: title, poster: img.flatMap { imageUrl($0) }, badge: badge)
     }
 
@@ -187,10 +189,94 @@ enum Site {
         ["data-src", "data-lazy-src", "data-original", "src"].map { img.abs($0) }.first { $0.hasPrefix("http") }
     }
 
+    /// Trang danh sách kiểu mới của hoathinh3d.pw (11/2026): HTML chỉ có khung trống, phim nạp bằng API JSON —
+    /// `/wp-json/halim/v1/{movies|ongoing|completed|top-rated}?page=N&per_page=20` (Phim Lẻ thêm sortby) và lịch chiếu
+    /// `/wp-json/movie-schedule/v1/daily?day=thu-hai…`. Đọc địa chỉ API ngay trong mã JS của trang (API_URL). Bản Android:
+    /// Site.HalimApi.
+    enum HalimApi {
+        static let path = "/wp-json/halim/v1/"
+        static let perPage = 20
+        private static let api = Rx(#"API_URL\s*=\s*["']([^"']*wp-json\\?/halim\\?/v1\\?/[a-z0-9-]+)["']"#)
+        private static let sort = Rx(#"SORTBY\s*=\s*["']([a-z0-9_-]+)["']"#)
+        private static let scheduleRx = Rx(#"API_URL\s*=\s*["']([^"']*wp-json\\?/movie-schedule\\?/v1\\?/daily)["']"#)
+        private static let pageRx = Rx(#"[?&]page=(\d+)"#)
+
+        /// Trang 1 của API trong HTML (nil = không phải trang kiểu này).
+        static func firstPage(_ html: String) -> String? {
+            guard let a = api.group(1, in: html)?.replacingOccurrences(of: "\\/", with: "/") else { return nil }
+            let s = sort.group(1, in: html).map { "sortby=\($0)&" } ?? ""
+            return "\(a)?\(s)page=1&per_page=\(perPage)"
+        }
+
+        static func scheduleApi(_ html: String) -> String? {
+            scheduleRx.group(1, in: html)?.replacingOccurrences(of: "\\/", with: "/")
+        }
+
+        /// {success, has_more, items:[{title, permalink, poster_url, latest_episode?, rank?}]}
+        static func parse(_ data: Data, _ url: String) -> FilmPage {
+            guard let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let items = o["items"] as? [[String: Any]] else { return FilmPage(films: [], nextUrl: nil) }
+            let films = items.compactMap { film($0) }.distinct { $0.url }
+            let page = pageRx.group(1, in: url).flatMap { Int($0) } ?? 1
+            var next: String?
+            if (o["has_more"] as? Bool) == true, !films.isEmpty, let r = url.range(of: #"([?&]page=)\d+"#, options: .regularExpression) {
+                let prefix = url[r].hasPrefix("&") ? "&page=" : "?page="
+                next = url.replacingCharacters(in: r, with: "\(prefix)\(page + 1)")
+            }
+            return FilmPage(films: films, nextUrl: next)
+        }
+
+        private static func film(_ o: [String: Any]) -> Film? {
+            guard let url = (o["permalink"] as? String)?.nonEmpty, let title = (o["title"] as? String)?.nonEmpty else { return nil }
+            let poster = (o["poster_url"] as? String)?.nonEmpty ?? (o["thumbnail"] as? String)?.nonEmpty
+            var badge: String?
+            if let ep = (o["latest_episode"] as? String)?.nonEmpty {
+                badge = ep.allSatisfy(\.isNumber) ? "Tập \(ep)" : ep
+            } else if let rank = o["rank"] as? Int, rank > 0 {
+                badge = "Top \(rank)"
+            }
+            let early = (o["is_early_screening"] as? Bool) == true ? (o["early_screening_time"] as? String)?.nonEmpty : nil
+            let b = [early, badge].compactMap { $0 }.joined(separator: " · ")
+            return Film(url: url, title: title, poster: poster, badge: b.isEmpty ? nil : b)
+        }
+
+        private static let days = [("chu-nhat", "Chủ nhật"), ("thu-hai", "Thứ 2"), ("thu-ba", "Thứ 3"), ("thu-tu", "Thứ 4"),
+                                   ("thu-nam", "Thứ 5"), ("thu-sau", "Thứ 6"), ("thu-bay", "Thứ 7")]
+
+        /// Một ngày của lịch chiếu: phim chiếu sớm (kèm giờ) trước, rồi phim thường.
+        static func parseDay(_ data: Data) -> [Film] {
+            guard let o = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return [] }
+            let all = ["early_movies", "regular_movies"].flatMap { (o[$0] as? [[String: Any]]) ?? [] }
+            return all.compactMap { film($0) }.distinct { $0.url }
+        }
+
+        /// Cả tuần, bắt đầu từ hôm nay (giờ Việt Nam).
+        static func schedule(_ api: String) async -> [FilmSection] {
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh") ?? .current
+            let today = cal.component(.weekday, from: Date()) - 1 // Chủ nhật = 0
+            var out: [FilmSection] = []
+            for i in 0..<7 {
+                let (slug, name) = days[(today + i) % 7]
+                guard let r = try? await Http.get("\(api)?day=\(slug)") else { continue }
+                let films = parseDay(r.data)
+                if !films.isEmpty { out.append(FilmSection(title: name + (i == 0 ? " (hôm nay)" : ""), films: films)) }
+            }
+            return out
+        }
+    }
+
     // MARK: - Danh sách / tìm kiếm
 
     static func list(_ url: String) async throws -> FilmPage {
+        // hoathinh3d.pw (11/2026): Phim Lẻ / Đang Chiếu / Hoàn Thành / Đánh Giá Cao nạp phim bằng API JSON
+        if url.contains(HalimApi.path) {
+            return HalimApi.parse(try await Http.get(url, headers: ["Accept": "application/json"]).data, url)
+        }
         let doc = try await fetch(url)
+        let html = (try? doc.html()) ?? ""
+        if let first = HalimApi.firstPage(html) { return try await list(first) }
+        if let api = HalimApi.scheduleApi(html) { return FilmPage(films: [], nextUrl: nil, sections: await HalimApi.schedule(api)) }
         let page = parseList(doc, url)
         if page.films.isEmpty {
             let days = doc.q(".day-tabs .day-tab[data-id]")
