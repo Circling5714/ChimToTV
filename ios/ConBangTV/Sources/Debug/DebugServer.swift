@@ -18,6 +18,8 @@ import WebKit
 ///            |rate|fit|sleep|introStart|introEnd|introClear|tap|confirm|double&left=1|escape|accept|bar
 ///   POST /eval?target=player|browser   (thân = mã JS) chạy JS ở khung trên cùng
 ///   GET  /probe?fn=home|list|detail|source|video|search|searchAll|filters&url=…&q=…&server=…   chạy bộ đọc trang
+///   POST /orient?to=portrait|landscape|landscapeLeft   ép xoay màn hình  ·  POST /textscale?v=1.3   cỡ chữ
+///   GET  /widget                   ghi lại + đọc dữ liệu widget «Xem tiếp»  ·  GET /sync[?do=open|close|all]  đồng bộ trong nhà
 ///   GET  /prefs  ·  POST /prefs?key=…&value=…&type=int|bool|string|double|del
 ///   GET  /proxy  ·  POST /proxy?direct=1|0 | pass=… | apply=1 | check=1   cổng proxy nội bộ: trạng thái, thử, đi thẳng
 ///   POST /upload  (thân = .ipa)    đẩy bản mới lên iPad  ·  GET /ipa  tải lại tệp đó
@@ -230,6 +232,44 @@ enum DebugRoutes {
             let text = q["text"] ?? r.text
             let ok = UIApplication.shared.sendAction(#selector(UIKeyInput.insertText(_:)), to: nil, from: text, for: nil)
             return .json(["ok": ok])
+        case "/orient":
+            // Ép xoay màn hình (thử iPhone dọc / ngang khi không cầm máy): to=portrait|landscape|landscapeLeft
+            let to = q["to"] ?? "portrait"
+            let o: UIInterfaceOrientation = to == "landscape" ? .landscapeRight : to == "landscapeLeft" ? .landscapeLeft : .portrait
+            if #available(iOS 16.0, *) {
+                let mask: UIInterfaceOrientationMask = o == .portrait ? .portrait : o == .landscapeLeft ? .landscapeLeft : .landscapeRight
+                for s in UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }) {
+                    s.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { e in Log.d("Debug", "xoay: \(e)") }
+                }
+                Router.topController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+            } else {
+                UIDevice.current.setValue(o.rawValue, forKey: "orientation")
+                UIViewController.attemptRotationToDeviceOrientation()
+            }
+            return .json(["ok": true, "to": to])
+        case "/textscale":
+            TextScale.shared.set(Double(q["v"] ?? "1") ?? 1)
+            return .json(["ok": true, "value": TextScale.shared.value])
+        case "/widget":
+            // Ghi lại dữ liệu widget «Xem tiếp» rồi trả nội dung + thư mục App Group
+            WidgetFeed.update()
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            let feed = WidgetFeedData.feedFile.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? "(chưa có)"
+            return .json(["group": WidgetFeedData.groupId, "folder": WidgetFeedData.folder?.path ?? "(không mở được App Group)",
+                          "feed": feed])
+        case "/sync":
+            // Đồng bộ trong nhà: trạng thái; do=open|close|all
+            let s = SyncService.shared
+            switch q["do"] {
+            case "open": s.openPairing()
+            case "close": s.closePairing()
+            case "all": await s.syncAll(manual: true)
+            default: break
+            }
+            return .json(["code": s.pairCode ?? "", "server": s.serverState, "busy": s.busy,
+                          "peers": s.peers.map { ["id": $0.id, "name": $0.name, "host": $0.host ?? "", "status": $0.status ?? "",
+                                                  "last": $0.last ?? 0] },
+                          "found": s.found.map { ["id": $0.id, "name": $0.name, "platform": $0.platform, "endpoint": "\($0.endpoint)"] }])
         case "/go":
             return go(q)
         case "/player":

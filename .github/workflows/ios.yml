@@ -14,6 +14,14 @@ on:
         description: 'Dựng cả bản chính (Release)'
         type: boolean
         default: false
+      shots:
+        description: 'Chụp màn hình trên máy ảo iPhone (dọc / ngang)'
+        type: boolean
+        default: false
+      device:
+        description: 'Tên máy ảo'
+        type: string
+        default: 'iPhone SE (3rd generation)'
 
 concurrency:
   group: ios-${{ github.ref }}
@@ -75,3 +83,31 @@ jobs:
           name: ipa
           path: ios/dist/*.ipa
           retention-days: 14
+
+  shots:
+    name: Chụp màn hình máy ảo iPhone
+    if: ${{ inputs.shots }}
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Công cụ
+        run: brew install xcodegen xcbeautify
+      - name: Dựng project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Dựng bản thử cho máy ảo
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Beta -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify --renderer github-actions
+      - name: Chụp
+        run: bash ios/scripts/sim-shots.sh "${{ inputs.device }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots
+          path: ios/shots/
+          retention-days: 7
