@@ -397,6 +397,67 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - Bàn phím rời
+
+    /// Ô phim đang chọn bằng phím mũi tên (id của GridFilm); nil = chưa dùng bàn phím.
+    @Published var keySel: String?
+    /// Số cột lưới phim hiện tại (lưới tự báo theo bề rộng).
+    var gridCols = 4
+
+    /// Màn chính đang ở trên cùng (không có bảng / trình phát / trang phim che): phím tắt của lưới mới có tác dụng.
+    var keysOnGrid: Bool { sheet == nil && !askingProfile && detailFilm == nil && Router.topController?.presentingViewController == nil }
+    /// Không có bảng / trình phát che (phím tắt ⌘ dùng được cả trong trang phim).
+    var keysOnMain: Bool { sheet == nil && !askingProfile && Router.topController?.presentingViewController == nil }
+
+    func keyMove(_ d: KeyNav.Dir) {
+        guard keysOnGrid else { return }
+        keySel = KeyNav.move(sections.map { $0.items.map { $0.id } }, cols: gridCols, from: keySel, d)
+    }
+
+    private var keyItem: GridFilm? {
+        guard let id = keySel else { return nil }
+        return sections.lazy.flatMap { $0.items }.first { $0.id == id }
+    }
+
+    /// Enter / Space: mở phim đang chọn (hàng Xem tiếp: phát tiếp luôn).
+    func keyOpen() {
+        guard keysOnGrid else { return }
+        guard let item = keyItem else {
+            keyMove(.right) // chưa chọn ô nào: chọn ô đầu
+            return
+        }
+        open(item)
+    }
+
+    /// Delete: xoá phim đang chọn khỏi lịch sử / bỏ theo dõi (có hỏi lại).
+    func keyRemove() {
+        guard keysOnGrid, let item = keyItem, item.removable else { return }
+        removeTarget = item
+    }
+
+    /// ⌥▲ / ⌥▼: mục menu trước / sau (bỏ qua các mục mở bảng: Đổi trang phim, Duyệt web, Cài đặt…).
+    func keyMenu(_ delta: Int) {
+        guard keysOnMain else { return }
+        let lists: Set<Kind> = [.home, .search, .history, .follows, .category]
+        let items = menu.filter { lists.contains($0.kind) }
+        guard !items.isEmpty else { return }
+        let i = items.firstIndex { $0.id == active?.id } ?? 0
+        select(items[(i + delta + items.count) % items.count])
+    }
+
+    /// Phím tắt ⌘: chọn mục menu theo loại (Trang chủ / Tìm kiếm / Lịch sử / Theo dõi / Đổi trang / Cài đặt…).
+    func keySelect(_ kind: Kind) {
+        guard keysOnMain, let e = menu.first(where: { $0.kind == kind }) else { return }
+        select(e)
+    }
+
+    /// ⌘R: tải lại danh sách đang xem.
+    func keyReload() {
+        guard keysOnMain else { return }
+        detailFilm = nil
+        if let a = active { select(a) }
+    }
+
     // MARK: - Tìm mọi trang
 
     /// Một lần tìm mọi trang (bản Android: MainActivity.SearchRun). queue: trang chưa hỏi (trang đang dùng trước);

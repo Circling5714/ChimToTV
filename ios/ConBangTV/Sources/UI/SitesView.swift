@@ -28,11 +28,11 @@ struct SitesView: View {
                                 Image(systemName: s == Prefs.baseUrl ? "checkmark.circle.fill" : "circle")
                                     .foregroundColor(s == Prefs.baseUrl ? Theme.brand : Theme.dim)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(Site.hostOf(s) ?? s).font(.system(size: 17, weight: .semibold)).foregroundColor(Theme.text)
-                                    Text(label(s)).font(.system(size: 14)).foregroundColor(Theme.dim)
+                                    Text(Site.hostOf(s) ?? s).appFont(17, .semibold).foregroundColor(Theme.text)
+                                    Text(label(s)).appFont(14).foregroundColor(Theme.dim)
                                 }
                                 Spacer()
-                                if s == fastest { Text("★ nhanh nhất").font(.system(size: 14, weight: .semibold)).foregroundColor(Theme.focus) }
+                                if s == fastest { Text("★ nhanh nhất").appFont(14, .semibold).foregroundColor(Theme.focus) }
                             }
                             .padding(.vertical, 4)
                         }

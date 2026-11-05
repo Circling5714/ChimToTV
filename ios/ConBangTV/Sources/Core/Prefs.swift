@@ -280,6 +280,15 @@ enum Prefs {
         set { store.set(newValue, forKey: "pip_on_home") }
     }
 
+    /// Cỡ chữ của app (1 = vừa; 0,9 – 1,5). Dùng chung cả máy.
+    static var textScale: Double {
+        get {
+            let v = store.double(forKey: "text_scale")
+            return v == 0 ? 1 : min(1.5, max(0.9, v))
+        }
+        set { store.set(newValue, forKey: "text_scale") }
+    }
+
     // MARK: - Trang phim
 
     /// Trang phim đang dùng (địa chỉ gốc, không có dấu / ở cuối). Đặt trang mới thì tự thêm vào danh sách. Riêng từng

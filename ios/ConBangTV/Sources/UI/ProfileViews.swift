@@ -45,9 +45,9 @@ struct ProfilePickerView: View {
         ZStack {
             Theme.bg.ignoresSafeArea()
             VStack(spacing: 12) {
-                Text("Ai đang xem?").font(.system(size: 38, weight: .bold)).foregroundColor(Theme.text)
+                Text("Ai đang xem?").appFont(38, .bold).foregroundColor(Theme.text)
                 Text("Mỗi người có lịch sử xem, Xem tiếp, phim theo dõi và cài đặt riêng.")
-                    .font(.system(size: 16)).foregroundColor(Theme.dim).multilineTextAlignment(.center)
+                    .appFont(16).foregroundColor(Theme.dim).multilineTextAlignment(.center)
                 LazyVGrid(columns: cols, spacing: 26) {
                     ForEach(app.profiles) { p in
                         Button {
@@ -68,7 +68,7 @@ struct ProfilePickerView: View {
                 .padding(.vertical, 26)
                 Button { settings = true } label: {
                     Label("Sửa người xem…", systemImage: "pencil")
-                        .font(.system(size: 16, weight: .medium))
+                        .appFont(16, .medium)
                         .foregroundColor(Theme.text)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 11)
@@ -83,7 +83,7 @@ struct ProfilePickerView: View {
                     HStack {
                         Spacer()
                         Button { app.closePicker() } label: {
-                            Image(systemName: "xmark.circle.fill").font(.system(size: 32)).foregroundColor(Theme.dim)
+                            Image(systemName: "xmark.circle.fill").appFont(32).foregroundColor(Theme.dim)
                         }
                         .accessibilityLabel("Đóng")
                         .padding(24)
@@ -118,10 +118,10 @@ struct ProfilePickerView: View {
             ProfileAvatar(profile: p, size: 108)
             HStack(spacing: 6) {
                 Text(p?.name ?? "Thêm người")
-                    .font(.system(size: 19, weight: .semibold))
+                    .appFont(19, .semibold)
                     .foregroundColor(p == nil ? Theme.dim : Theme.text)
                     .lineLimit(1)
-                if p?.locked == true { Image(systemName: "lock.fill").font(.system(size: 14)).foregroundColor(Theme.dim) }
+                if p?.locked == true { Image(systemName: "lock.fill").appFont(14).foregroundColor(Theme.dim) }
             }
         }
         .padding(14)
@@ -150,9 +150,9 @@ struct PinPad: View {
         ZStack {
             Color.black.opacity(0.6).ignoresSafeArea().onTapGesture { onCancel() }
             VStack(spacing: 18) {
-                Text(title).font(.system(size: 22, weight: .bold)).foregroundColor(Theme.text).multilineTextAlignment(.center)
+                Text(title).appFont(22, .bold).foregroundColor(Theme.text).multilineTextAlignment(.center)
                 if let s = subtitle {
-                    Text(s).font(.system(size: 14)).foregroundColor(Theme.dim).multilineTextAlignment(.center)
+                    Text(s).appFont(14).foregroundColor(Theme.dim).multilineTextAlignment(.center)
                 }
                 HStack(spacing: 18) {
                     ForEach(0..<Prefs.pinLength, id: \.self) { i in
@@ -164,7 +164,7 @@ struct PinPad: View {
                 }
                 .modifier(Shake(amount: CGFloat(wrong)))
                 .animation(.linear(duration: 0.35), value: wrong)
-                Text(wrong > 0 ? "Sai mã PIN" : " ").font(.system(size: 14, weight: .medium)).foregroundColor(.red)
+                Text(wrong > 0 ? "Sai mã PIN" : " ").appFont(14, .medium).foregroundColor(.red)
                 VStack(spacing: 12) {
                     ForEach([["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["Huỷ", "0", "⌫"]], id: \.self) { row in
                         HStack(spacing: 18) {

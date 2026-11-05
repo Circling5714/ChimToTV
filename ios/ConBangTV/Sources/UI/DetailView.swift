@@ -15,6 +15,9 @@ final class DetailModel: ObservableObject {
     @Published var scrollTarget: String?
     @Published var flash: String?
     @Published var toast: String?
+    /// Tập đang chọn bằng phím mũi tên.
+    @Published var keyEp: String?
+    var epCols = 6
 
     init(film: Film) {
         self.film = film
@@ -80,6 +83,49 @@ final class DetailModel: ObservableObject {
         }
         refresh()
         AppModel.shared.rebuildMenu()
+    }
+
+    // MARK: Bàn phím rời
+
+    /// Phím có tác dụng: trang phim đang hiện, không có bảng / trình phát che.
+    var keysActive: Bool { AppModel.shared.keysOnMain && AppModel.shared.detailFilm?.url == film.url }
+
+    func keyMove(_ d: KeyNav.Dir) {
+        guard keysActive else { return }
+        let ids = episodes.map { $0.url }
+        // Chưa chọn tập nào: bắt đầu từ tập đang xem dở (nếu có trong bản này)
+        let from = keyEp ?? resumeEp.flatMap { r in ids.contains(r.url) ? r.url : nil }
+        let next = (keyEp == nil && from != nil) ? from : KeyNav.move([ids], cols: epCols, from: from, d)
+        keyEp = next
+        if let n = next { scrollTarget = n }
+    }
+
+    /// Enter / Space: phát tập đang chọn; chưa chọn thì nút chính (Xem tiếp / tập mới nhất).
+    func keyPlay() {
+        guard keysActive else { return }
+        if let id = keyEp, let ep = episodes.first(where: { $0.url == id }) {
+            play(ep)
+        } else if let ep = resumeEp ?? group?.episodes.last {
+            play(ep)
+        }
+    }
+
+    func keyBack() {
+        guard keysActive else { return }
+        AppModel.shared.detailFilm = nil
+    }
+
+    func keyFollow() {
+        guard keysActive else { return }
+        toggleFollow()
+    }
+
+    /// Bản phim (Vietsub / Thuyết Minh…) trước / sau.
+    func keyGroup(_ delta: Int) {
+        guard keysActive, let d = detail, d.groups.count > 1 else { return }
+        let i = d.groups.firstIndex { $0 == group } ?? 0
+        group = d.groups[(i + delta + d.groups.count) % d.groups.count]
+        keyEp = nil
     }
 
     private static let number = Rx(#"\d+"#)
@@ -165,6 +211,7 @@ struct DetailView: View {
         .overlay(alignment: .bottom) {
             if let t = m.toast { ToastView(text: t).allowsHitTesting(false) }
         }
+        .background { if !jumpFocused { DetailShortcuts(m: m) } }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarHidden(false)
@@ -179,12 +226,12 @@ struct DetailView: View {
                 .overlay(PosterImage(url: poster))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             VStack(alignment: .leading, spacing: 10) {
-                Text(title).font(.system(size: 30, weight: .bold)).foregroundColor(Theme.text)
-                if let o = m.detail?.otherTitle { Text(o).font(.system(size: 17)).foregroundColor(Theme.dim) }
-                if let i = m.detail?.info { Text(i).font(.system(size: 15)).foregroundColor(Theme.dim) }
+                Text(title).appFont(30, .bold).foregroundColor(Theme.text)
+                if let o = m.detail?.otherTitle { Text(o).appFont(17).foregroundColor(Theme.dim) }
+                if let i = m.detail?.info { Text(i).appFont(15).foregroundColor(Theme.dim) }
                 if let desc = m.detail?.description {
                     Text(desc)
-                        .font(.system(size: 16))
+                        .appFont(16)
                         .foregroundColor(Theme.text.opacity(0.9))
                         .lineLimit(expanded ? nil : 5)
                         .onTapGesture { expanded.toggle() }
@@ -228,7 +275,7 @@ struct DetailView: View {
         }
         let count = m.group?.episodes.count ?? 0
         HStack(spacing: 12) {
-            Text("Danh sách tập (\(count))").font(.system(size: 20, weight: .semibold)).foregroundColor(Theme.text)
+            Text("Danh sách tập (\(count))").appFont(20, .semibold).foregroundColor(Theme.text)
             Spacer()
             if count > 1 {
                 Button { m.ascending.toggle() } label: {
@@ -255,13 +302,14 @@ struct DetailView: View {
                 }
             }
         }
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 10)], spacing: 10) {
+        let epMin = TextScale.shared.layout(96)
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: epMin), spacing: 10)], spacing: 10) {
             ForEach(m.episodes) { ep in
                 let seen = m.watched.contains(ep.url)
                 let isResume = m.resumeEp?.url == ep.url
                 Button { m.play(ep) } label: {
                     Text(ep.title)
-                        .font(.system(size: 15, weight: isResume ? .bold : .medium))
+                        .appFont(15, isResume ? .bold : .medium)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .foregroundColor(Theme.text)
@@ -270,11 +318,56 @@ struct DetailView: View {
                         .padding(.horizontal, 6)
                         .background(RoundedRectangle(cornerRadius: 8).fill(seen ? Theme.watched : Theme.surface2))
                         .overlay(RoundedRectangle(cornerRadius: 8)
-                            .stroke(m.flash == ep.url ? Theme.focus : (isResume ? Theme.brand : Color.clear), lineWidth: 2))
+                            .stroke(m.flash == ep.url || m.keyEp == ep.url ? Theme.focus : (isResume ? Theme.brand : Color.clear),
+                                    lineWidth: m.keyEp == ep.url ? 3 : 2))
                 }
                 .buttonStyle(PressScale())
+                .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 8))
+                .hoverEffect(.highlight)
                 .id(ep.url)
             }
         }
+        .background(GeometryReader { g in
+            Color.clear
+                .onAppear { m.epCols = KeyNav.columns(width: Double(g.size.width), minimum: Double(epMin), spacing: 10) }
+                .onChange(of: g.size.width) { w in m.epCols = KeyNav.columns(width: Double(w), minimum: Double(epMin), spacing: 10) }
+        })
+    }
+}
+
+/// Phím của trang phim: mũi tên chọn tập, Enter / Space phát, Esc / ⌘[ quay lại, ⌘D theo dõi, [ ] đổi bản phim.
+private struct DetailShortcuts: View {
+    @ObservedObject var m: DetailModel
+
+    var body: some View {
+        ZStack {
+            DetailKey(title: "Tập trước", key: .leftArrow) { m.keyMove(.left) }
+            DetailKey(title: "Tập sau", key: .rightArrow) { m.keyMove(.right) }
+            DetailKey(title: "Lên", key: .upArrow) { m.keyMove(.up) }
+            DetailKey(title: "Xuống", key: .downArrow) { m.keyMove(.down) }
+            DetailKey(title: "Xem", key: .return) { m.keyPlay() }
+            DetailKey(title: "Xem", key: .space) { m.keyPlay() }
+            DetailKey(title: "Quay lại", key: .escape) { m.keyBack() }
+            DetailKey(title: "Quay lại", key: "[", mods: .command) { m.keyBack() }
+            DetailKey(title: "Theo dõi / bỏ theo dõi", key: "d", mods: .command) { m.keyFollow() }
+            DetailKey(title: "Bản phim trước", key: "[") { m.keyGroup(-1) }
+            DetailKey(title: "Bản phim sau", key: "]") { m.keyGroup(1) }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+private struct DetailKey: View {
+    let title: String
+    let key: KeyEquivalent
+    var mods: EventModifiers = []
+    let action: () -> Void
+
+    var body: some View {
+        Button(title, action: action)
+            .keyboardShortcut(key, modifiers: mods)
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .accessibilityHidden(true)
     }
 }

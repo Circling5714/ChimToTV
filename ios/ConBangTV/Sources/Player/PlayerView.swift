@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import MediaPlayer
 import SwiftUI
 import UIKit
@@ -30,7 +31,7 @@ struct PlayerView: View {
             VStack {
                 if let n = m.notice {
                     Text(n)
-                        .font(.system(size: 17, weight: .medium))
+                        .appFont(17, .medium)
                         .multilineTextAlignment(.center)
                         .foregroundColor(Theme.text)
                         .padding(.horizontal, 18)
@@ -60,6 +61,7 @@ struct PlayerView: View {
         .animation(.easeOut(duration: 0.18), value: m.barShown)
         .animation(.easeOut(duration: 0.2), value: m.panelShown)
         .preferredColorScheme(.dark)
+        .appDynamicType()
     }
 }
 
@@ -89,8 +91,21 @@ struct TouchLayer: UIViewRepresentable {
 /// đúp), chạm đúp nửa trái / phải (lùi / tới 10 giây). Cử chỉ: giữ tay — xem nhanh 2× tới khi nhấc tay; vuốt ngang — tua
 /// (hiện giờ tới); vuốt dọc nửa trái — độ sáng, nửa phải — âm lượng; chụm / mở hai ngón — vừa / lấp đầy màn hình.
 /// Vuốt dọc bắt đầu sát mép trên / dưới thì để cho iPad (Trung tâm điều khiển, vuốt lên thu nhỏ phim / về màn hình chính).
-final class TouchCatcher: UIView {
-    weak var model: PlayerModel?
+final class TouchCatcher: UIView, UIPointerInteractionDelegate {
+    weak var model: PlayerModel? {
+        didSet {
+            guard model !== oldValue, let m = model else { return }
+            // Thanh nút ẩn / hiện: con trỏ chuột ẩn / hiện theo
+            barSub = m.$barShown.combineLatest(m.$panelShown).sink { [weak self] _ in
+                DispatchQueue.main.async { self?.pointer?.invalidate() }
+            }
+        }
+    }
+    private var barSub: AnyCancellable?
+    private var pointer: UIPointerInteraction?
+    private var lastHover: CGPoint?
+    private enum ScrollMode { case none, seek, volume }
+    private var scrollMode = ScrollMode.none
 
     private enum Mode { case none, tap, hold, scrub, brightness, volume, ignored }
     private var mode = Mode.none
@@ -105,6 +120,68 @@ final class TouchCatcher: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         addGestureRecognizer(UIPinchGestureRecognizer(target: self, action: #selector(pinched(_:))))
+        // Chuột / bàn di chuột: rê chuột thì hiện thanh nút, đứng yên (thanh ẩn) thì ẩn con trỏ; cuộn ngang = tua,
+        // cuộn dọc = âm lượng
+        addGestureRecognizer(UIHoverGestureRecognizer(target: self, action: #selector(hovered(_:))))
+        let scroll = UIPanGestureRecognizer(target: self, action: #selector(scrolled(_:)))
+        scroll.allowedScrollTypesMask = .all
+        scroll.allowedTouchTypes = [] // chỉ sự kiện cuộn, không nhận chạm
+        addGestureRecognizer(scroll)
+        let p = UIPointerInteraction(delegate: self)
+        addInteraction(p)
+        pointer = p
+    }
+
+    func pointerInteraction(_ interaction: UIPointerInteraction, styleFor region: UIPointerRegion) -> UIPointerStyle? {
+        guard let m = model, !m.barShown, !m.panelShown, m.started else { return nil }
+        return .hidden()
+    }
+
+    @objc private func hovered(_ g: UIHoverGestureRecognizer) {
+        guard let m = model else { return }
+        let p = g.location(in: self)
+        switch g.state {
+        case .began:
+            lastHover = p
+        case .changed:
+            // Rung tay nhẹ không tính
+            if let l = lastHover, hypot(p.x - l.x, p.y - l.y) < 6 { return }
+            lastHover = p
+            if !m.panelShown && m.limitBlock == nil { m.showBar() }
+        default:
+            lastHover = nil
+        }
+    }
+
+    @objc private func scrolled(_ g: UIPanGestureRecognizer) {
+        guard let m = model else { return }
+        let t = g.translation(in: self)
+        switch g.state {
+        case .changed:
+            if scrollMode == .none {
+                guard hypot(t.x, t.y) > 8, m.gesturesAllowed else { return }
+                if abs(t.x) > abs(t.y) {
+                    scrollMode = m.scrubBegan() ? .seek : .none
+                } else {
+                    scrollMode = .volume
+                    startLevel = CGFloat(SystemLevels.shared.volume)
+                }
+            }
+            switch scrollMode {
+            case .seek: m.scrubChanged(Double(-t.x / max(1, bounds.width)))
+            case .volume:
+                let v = min(1, max(0, startLevel + t.y / max(1, bounds.height * 0.7)))
+                SystemLevels.shared.volume = Float(v)
+                m.showLevel(brightness: false, Double(v))
+            case .none: break
+            }
+        case .ended, .cancelled, .failed:
+            if scrollMode == .seek { m.scrubEnded(apply: g.state == .ended) }
+            if scrollMode == .volume { m.levelEnded() }
+            scrollMode = .none
+        default:
+            break
+        }
     }
 
     @available(*, unavailable)
@@ -270,9 +347,9 @@ private struct LimitOverlay: View {
             Color.black.opacity(0.82).ignoresSafeArea()
             VStack(spacing: 16) {
                 Image(systemName: m.limitBlock == .bedtime ? "moon.zzz.fill" : "hourglass")
-                    .font(.system(size: 46, weight: .semibold))
+                    .appFont(46, .semibold)
                     .foregroundColor(Theme.focus)
-                Text(choose ? "Cho \(Prefs.profile.name) xem thêm" : "Hết giờ xem").font(.system(size: 30, weight: .bold))
+                Text(choose ? "Cho \(Prefs.profile.name) xem thêm" : "Hết giờ xem").appFont(30, .bold)
                 if choose {
                     VStack(spacing: 10) {
                         ForEach(WatchLimit.grants, id: \.self) { g in
@@ -283,10 +360,10 @@ private struct LimitOverlay: View {
                             .buttonStyle(.bordered)
                             .padding(.top, 4)
                     }
-                    .font(.system(size: 18, weight: .semibold))
+                    .appFont(18, .semibold)
                 } else {
                     Text(m.limitText + "\nNgười lớn nhập mã PIN phụ huynh để cho xem thêm.")
-                        .font(.system(size: 17))
+                        .appFont(17)
                         .foregroundColor(Theme.dim)
                         .multilineTextAlignment(.center)
                     HStack(spacing: 14) {
@@ -299,7 +376,7 @@ private struct LimitOverlay: View {
                         .buttonStyle(.borderedProminent)
                         .tint(Theme.brand)
                     }
-                    .font(.system(size: 18, weight: .semibold))
+                    .appFont(18, .semibold)
                     .padding(.top, 6)
                 }
             }
@@ -332,11 +409,11 @@ private struct GestureHintView: View {
     var body: some View {
         VStack(spacing: 6) {
             HStack(spacing: 12) {
-                Image(systemName: hint.icon).font(.system(size: 26, weight: .semibold))
-                Text(hint.text).font(.system(size: 26, weight: .semibold).monospacedDigit())
+                Image(systemName: hint.icon).appFont(26, .semibold)
+                Text(hint.text).appFont(26, .semibold, mono: true)
             }
             if let d = hint.detail {
-                Text(d).font(.system(size: 16, weight: .medium).monospacedDigit()).foregroundColor(Theme.dim)
+                Text(d).appFont(16, .medium, mono: true).foregroundColor(Theme.dim)
             }
         }
         .foregroundColor(Theme.text)
@@ -358,12 +435,12 @@ private struct LoadingOverlay: View {
             VStack(spacing: 18) {
                 if !isError { ProgressView().scaleEffect(1.5).tint(Theme.text) }
                 Text(text)
-                    .font(.system(size: 20, weight: .medium))
+                    .appFont(20, .medium)
                     .foregroundColor(Theme.text)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
                 Text("Chạm vào màn hình để hiện nút điều khiển (dừng / phát, tua, đổi tập, menu, thoát)  •  Chạm đúp trái / phải: lùi / tới 10 giây  •  Vuốt ngang: tua  •  Vuốt dọc bên trái: độ sáng, bên phải: âm lượng  •  Giữ tay: xem nhanh 2×  •  Chụm / mở hai ngón: vừa / lấp đầy màn hình")
-                    .font(.system(size: 14))
+                    .appFont(14)
                     .foregroundColor(Theme.dim)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 60)
@@ -388,7 +465,7 @@ private struct ControlBar: View {
             HStack(spacing: 14) {
                 RoundButton(icon: "xmark", label: "Thoát") { m.close() }
                 Text(m.title)
-                    .font(.system(size: 18, weight: .semibold))
+                    .appFont(18, .semibold)
                     .foregroundColor(Theme.text)
                     .lineLimit(1)
                 Spacer()
@@ -403,7 +480,7 @@ private struct ControlBar: View {
             VStack(spacing: 14) {
                 HStack(spacing: 14) {
                     Text(formatTime(shownTime))
-                        .font(.system(size: 15, weight: .medium).monospacedDigit())
+                        .appFont(15, .medium, mono: true)
                         .foregroundColor(Theme.text)
                     Slider(value: $value, in: 0...1, onEditingChanged: { isEditing in
                         editing = isEditing
@@ -413,7 +490,7 @@ private struct ControlBar: View {
                     .disabled(!(m.started && duration > 0))
                     .tint(Theme.brand)
                     Text(duration > 0 ? formatTime(duration) : "--:--")
-                        .font(.system(size: 15, weight: .medium).monospacedDigit())
+                        .appFont(15, .medium, mono: true)
                         .foregroundColor(Theme.dim)
                 }
                 HStack(spacing: 12) {
@@ -457,7 +534,7 @@ struct RoundButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: big ? 30 : 22, weight: .semibold))
+                .appFont(big ? 30 : 22, .semibold)
                 .foregroundColor(Theme.text)
                 .frame(width: big ? 72 : 54, height: big ? 72 : 54)
                 .background(Circle().fill(Color.white.opacity(big ? 0.22 : 0.14)))
@@ -491,11 +568,11 @@ private struct MenuPanel: View {
                     VStack(alignment: .leading, spacing: 18) {
                         HStack(alignment: .top) {
                             Text(m.title)
-                                .font(.system(size: 19, weight: .semibold))
+                                .appFont(19, .semibold)
                                 .foregroundColor(Theme.text)
                             Spacer()
                             Button { m.hidePanel() } label: {
-                                Image(systemName: "xmark.circle.fill").font(.system(size: 28)).foregroundColor(Theme.dim)
+                                Image(systemName: "xmark.circle.fill").appFont(28).foregroundColor(Theme.dim)
                             }
                             .accessibilityLabel("Đóng menu")
                         }
@@ -557,7 +634,7 @@ private struct PanelLabel: View {
     let text: String
     init(_ text: String) { self.text = text }
     var body: some View {
-        Text(text).font(.system(size: 14, weight: .medium)).foregroundColor(Theme.dim)
+        Text(text).appFont(14, .medium).foregroundColor(Theme.dim)
     }
 }
 
@@ -573,8 +650,8 @@ struct ChipButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                if let icon = icon { Image(systemName: icon).font(.system(size: 15, weight: .semibold)) }
-                Text(text).font(.system(size: 15, weight: .medium)).lineLimit(2).multilineTextAlignment(.leading)
+                if let icon = icon { Image(systemName: icon).appFont(15, .semibold) }
+                Text(text).appFont(15, .medium).lineLimit(2).multilineTextAlignment(.leading)
             }
             .foregroundColor(active ? Theme.onBrand : Theme.text)
             .padding(.horizontal, 14)
@@ -584,6 +661,8 @@ struct ChipButton: View {
             .opacity(enabled ? 1 : 0.45)
         }
         .buttonStyle(PressScale())
+        .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 10))
+        .hoverEffect(.highlight)
     }
 }
 
@@ -593,7 +672,7 @@ private struct SuggestionCard: View {
     var body: some View {
         VStack(spacing: 14) {
             Text(m.suggestionText)
-                .font(.system(size: 17, weight: .medium))
+                .appFont(17, .medium)
                 .foregroundColor(Theme.text)
                 .multilineTextAlignment(.center)
             HStack(spacing: 12) {
@@ -696,16 +775,37 @@ final class PlayerController: UIHostingController<PlayerView> {
         model.didEnterBackground()
     }
 
+    /// Phím tắt; có tên thì hiện trong bảng phím tắt của iPad (giữ phím ⌘).
+    private static let keys: [(input: String, title: String?)] = [
+        (" ", "Dừng / phát"), ("k", nil), ("\r", nil),
+        (UIKeyCommand.inputLeftArrow, "Lùi (giữ để lùi nhanh)"), ("j", nil),
+        (UIKeyCommand.inputRightArrow, "Tới (giữ để tới nhanh)"), ("l", nil),
+        (UIKeyCommand.inputUpArrow, "Hiện thanh thời gian"), ("i", nil),
+        (UIKeyCommand.inputDownArrow, "Menu: server, tập, tốc độ…"), ("m", nil),
+        ("n", "Tập sau"), (UIKeyCommand.inputPageDown, nil),
+        ("p", "Tập trước"), (UIKeyCommand.inputPageUp, nil),
+        ("f", "Vừa / lấp đầy màn hình"), ("s", "Đổi tốc độ phát"), ("w", "Thu nhỏ phim (hình trong hình)"),
+        (UIKeyCommand.inputEscape, "Thoát"),
+    ] + (0...9).map { (String($0), $0 == 0 ? "Số 0–9: tới 0–90% phim" : nil) }
+
     override var keyCommands: [UIKeyCommand]? {
-        let inputs = [" ", "k", "j", "l", "m", "n", "p", "i", "\r", UIKeyCommand.inputLeftArrow, UIKeyCommand.inputRightArrow,
-                      UIKeyCommand.inputUpArrow, UIKeyCommand.inputDownArrow, UIKeyCommand.inputEscape,
-                      UIKeyCommand.inputPageUp, UIKeyCommand.inputPageDown] + (0...9).map { String($0) }
-        return inputs.map { input in
-            let c = UIKeyCommand(input: input, modifierFlags: [], action: #selector(key(_:)))
+        var list = Self.keys.map { k -> UIKeyCommand in
+            let c = UIKeyCommand(input: k.input, modifierFlags: [], action: #selector(key(_:)))
+            if let t = k.title {
+                c.title = t
+                c.discoverabilityTitle = t
+            }
             c.wantsPriorityOverSystemBehavior = true
             return c
         }
+        let close = UIKeyCommand(input: "w", modifierFlags: .command, action: #selector(closeKey))
+        close.title = "Thoát trình phát"
+        close.discoverabilityTitle = "Thoát trình phát"
+        list.append(close)
+        return list
     }
+
+    @objc private func closeKey() { model.close() }
 
     @objc private func key(_ c: UIKeyCommand) {
         guard let input = c.input else { return }
@@ -729,6 +829,11 @@ final class PlayerController: UIHostingController<PlayerView> {
         case UIKeyCommand.inputRightArrow, "l": model.seekBy(model.step(repeatCount: repeats(input)))
         case UIKeyCommand.inputUpArrow, "i": model.showBar()
         case UIKeyCommand.inputDownArrow, "m": model.showPanel()
+        case "f": model.setFill(!Prefs.videoFill)
+        case "s":
+            model.cycleRate()
+            model.showNotice("Tốc độ \(model.rateText)", 1.2)
+        case "w": if PlayerModel.pipSupported { model.startPip() }
         case "n", UIKeyCommand.inputPageDown: model.next()
         case "p", UIKeyCommand.inputPageUp: model.prev()
         case UIKeyCommand.inputEscape: model.escape()

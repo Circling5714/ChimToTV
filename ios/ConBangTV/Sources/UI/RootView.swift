@@ -70,6 +70,8 @@ struct RootView: View {
             .animation(.easeOut(duration: 0.2), value: showMenu)
         }
         .background(Theme.bg.ignoresSafeArea())
+        .background(MainShortcuts())
+        .appDynamicType()
         .overlay(alignment: .bottom) {
             if let t = app.toast { ToastView(text: t).allowsHitTesting(false) }
         }
@@ -83,9 +85,10 @@ struct RootView: View {
             }
             .environmentObject(app)
             .preferredColorScheme(.dark)
+            .appDynamicType()
         }
         .fullScreenCover(isPresented: $app.askingProfile) {
-            ProfilePickerView().environmentObject(app)
+            ProfilePickerView().environmentObject(app).appDynamicType()
         }
         .background(
             Color.clear.alert("Xoá dữ liệu duyệt web?", isPresented: $app.confirmClear) {
@@ -134,8 +137,8 @@ struct Sidebar: View {
                     .frame(width: 46, height: 46)
                     .clipShape(RoundedRectangle(cornerRadius: 11))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Côn Bằng TV").font(.system(size: 21, weight: .bold)).foregroundColor(Theme.text)
-                    Text(app.siteLabel).font(.system(size: 13)).foregroundColor(Theme.dim).lineLimit(1)
+                    Text("Côn Bằng TV").appFont(21, .bold).foregroundColor(Theme.text)
+                    Text(app.siteLabel).appFont(13).foregroundColor(Theme.dim).lineLimit(1)
                 }
             }
             .padding(.horizontal, 16)
@@ -149,8 +152,8 @@ struct Sidebar: View {
                 } label: {
                     HStack(spacing: 10) {
                         ProfileAvatar(profile: p, size: 28)
-                        Text(p.name).font(.system(size: 15, weight: .semibold)).foregroundColor(Theme.text).lineLimit(1)
-                        Image(systemName: "chevron.down").font(.system(size: 12, weight: .semibold)).foregroundColor(Theme.dim)
+                        Text(p.name).appFont(15, .semibold).foregroundColor(Theme.text).lineLimit(1)
+                        Image(systemName: "chevron.down").appFont(12, .semibold).foregroundColor(Theme.dim)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 12)
@@ -171,8 +174,8 @@ struct Sidebar: View {
                             onPick()
                         } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: e.icon).font(.system(size: 16, weight: .medium)).frame(width: 22)
-                                Text(e.title).font(.system(size: 16, weight: on ? .semibold : .regular)).lineLimit(1)
+                                Image(systemName: e.icon).appFont(16, .medium).frame(width: 22)
+                                Text(e.title).appFont(16, on ? .semibold : .regular).lineLimit(1)
                                 Spacer(minLength: 0)
                             }
                             .foregroundColor(on ? Theme.onBrand : Theme.text)
@@ -182,6 +185,7 @@ struct Sidebar: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
                     }
                 }
                 .padding(.horizontal, 10)
@@ -189,7 +193,7 @@ struct Sidebar: View {
             }
             #if DEVTOOLS
             Text("Bản thử · gỡ lỗi: \(DebugServer.shared.addressText)")
-                .font(.system(size: 11))
+                .appFont(11)
                 .foregroundColor(Theme.dim)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -236,15 +240,15 @@ struct HomeContent: View {
             HStack(spacing: 14) {
                 if showMenuButton {
                     Button(action: openMenu) {
-                        Image(systemName: "line.3.horizontal").font(.system(size: 22, weight: .semibold)).foregroundColor(Theme.text)
+                        Image(systemName: "line.3.horizontal").appFont(22, .semibold).foregroundColor(Theme.text)
                             .frame(width: 44, height: 44)
                     }
                     .accessibilityLabel("Menu")
                 }
-                Text(app.title).font(.system(size: 26, weight: .bold)).foregroundColor(Theme.text).lineLimit(1)
+                Text(app.title).appFont(26, .bold).foregroundColor(Theme.text).lineLimit(1)
                 Spacer()
                 if showMenuButton {
-                    Text(app.siteLabel).font(.system(size: 14)).foregroundColor(Theme.dim).lineLimit(1)
+                    Text(app.siteLabel).appFont(14).foregroundColor(Theme.dim).lineLimit(1)
                 }
             }
             .padding(.horizontal, 20)
@@ -283,6 +287,7 @@ struct HomeContent: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Theme.bg.ignoresSafeArea())
+        .background { if !searchFocused { GridShortcuts() } }
     }
 }
 
@@ -300,7 +305,7 @@ struct StatusView: View {
             }
         case .message(let text, let retry):
             VStack(spacing: 16) {
-                Text(text).font(.system(size: 17)).foregroundColor(Theme.text).multilineTextAlignment(.center)
+                Text(text).appFont(17).foregroundColor(Theme.text).multilineTextAlignment(.center)
                 if retry {
                     Button("Thử lại") { app.retryNow() }
                         .buttonStyle(.borderedProminent)
@@ -314,24 +319,47 @@ struct StatusView: View {
 
 struct FilmGridView: View {
     @EnvironmentObject var app: AppModel
-    private let cols = [GridItem(.adaptive(minimum: 150, maximum: 230), spacing: 16, alignment: .top)]
+    @ObservedObject private var scale = TextScale.shared
 
     var body: some View {
+        GeometryReader { geo in
+            let minW = scale.layout(geo.size.width < 500 ? 105 : 150)
+            let spacing: CGFloat = geo.size.width < 500 ? 12 : 16
+            let pad: CGFloat = geo.size.width < 500 ? 14 : 20
+            let cols = [GridItem(.adaptive(minimum: minW, maximum: scale.layout(230)), spacing: spacing, alignment: .top)]
+            ScrollViewReader { proxy in
+                grid(cols, pad: pad)
+                    .onAppear { app.gridCols = KeyNav.columns(width: Double(geo.size.width - pad * 2), minimum: Double(minW), spacing: Double(spacing)) }
+                    .onChange(of: geo.size.width) { w in
+                        app.gridCols = KeyNav.columns(width: Double(w - pad * 2), minimum: Double(minW), spacing: Double(spacing))
+                    }
+                    .onChange(of: scale.value) { _ in
+                        app.gridCols = KeyNav.columns(width: Double(geo.size.width - pad * 2), minimum: Double(minW), spacing: Double(spacing))
+                    }
+                    .onChange(of: app.keySel) { id in
+                        guard let id = id else { return }
+                        withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(id) }
+                    }
+            }
+        }
+    }
+
+    private func grid(_ cols: [GridItem], pad: CGFloat) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(app.sections) { s in
                     if let t = s.title {
-                        Text(t).font(.system(size: 21, weight: .semibold)).foregroundColor(Theme.text)
-                            .padding(.horizontal, 20)
+                        Text(t).appFont(21, .semibold).foregroundColor(Theme.text)
+                            .padding(.horizontal, pad)
                             .padding(.top, 8)
                     }
                     LazyVGrid(columns: cols, alignment: .leading, spacing: 20) {
-                        ForEach(s.items) { item in FilmCard(item: item) }
+                        ForEach(s.items) { item in FilmCard(item: item).id(item.id) }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, pad)
                     if let n = s.note {
-                        Text(n).font(.system(size: 15)).foregroundColor(Theme.dim)
-                            .padding(.horizontal, 20)
+                        Text(n).appFont(15).foregroundColor(Theme.dim)
+                            .padding(.horizontal, pad)
                             .padding(.top, 6)
                     }
                 }
@@ -359,10 +387,16 @@ struct FilmCard: View {
                     .aspectRatio(2.0 / 3.0, contentMode: .fit)
                     .overlay(PosterImage(url: item.film.poster))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay {
+                        // Ô đang chọn bằng bàn phím
+                        if app.keySel == item.id {
+                            RoundedRectangle(cornerRadius: 10).stroke(Theme.focus, lineWidth: 4)
+                        }
+                    }
                     .overlay(alignment: .topLeading) {
                         if let b = item.film.badge {
                             Text(b)
-                                .font(.system(size: 12, weight: .bold))
+                                .appFont(12, .bold)
                                 .lineLimit(1)
                                 .foregroundColor(Theme.onBrand)
                                 .padding(.horizontal, 7)
@@ -374,14 +408,14 @@ struct FilmCard: View {
                     .overlay(alignment: .bottomTrailing) {
                         if item.resume {
                             Image(systemName: "play.circle.fill")
-                                .font(.system(size: 34))
+                                .appFont(34)
                                 .foregroundColor(.white)
                                 .shadow(radius: 4)
                                 .padding(8)
                         }
                     }
                 Text(item.film.title)
-                    .font(.system(size: 15, weight: .medium))
+                    .appFont(15, .medium)
                     .foregroundColor(Theme.text)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -389,6 +423,8 @@ struct FilmCard: View {
             }
         }
         .buttonStyle(PressScale())
+        .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 10))
+        .hoverEffect(.lift)
         .accessibilityLabel(item.film.title)
         .contextMenu {
             if item.removable {
@@ -400,5 +436,66 @@ struct FilmCard: View {
                 Button { app.detailFilm = item.film } label: { Label("Trang phim", systemImage: "info.circle") }
             }
         }
+    }
+}
+
+// MARK: - Bàn phím rời / chuột
+
+/// Nút ẩn mang phím tắt (SwiftUI chỉ nhận phím tắt gắn với nút đang có trên màn hình). Giữ phím ⌘ thì iPad liệt kê
+/// các phím tắt có ⌘ / ⌥.
+private struct KeyButton: View {
+    let title: String
+    let key: KeyEquivalent
+    var mods: EventModifiers = []
+    let action: () -> Void
+
+    var body: some View {
+        Button(title, action: action)
+            .keyboardShortcut(key, modifiers: mods)
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Phím tắt ⌘ dùng ở màn chính và trang phim.
+struct MainShortcuts: View {
+    @EnvironmentObject var app: AppModel
+
+    var body: some View {
+        ZStack {
+            KeyButton(title: "Tìm kiếm", key: "f", mods: .command) { app.keySelect(.search) }
+            KeyButton(title: "Trang chủ", key: "1", mods: .command) { app.keySelect(.home) }
+            KeyButton(title: "Lịch sử xem", key: "2", mods: .command) { app.keySelect(.history) }
+            KeyButton(title: "Phim theo dõi", key: "3", mods: .command) { app.keySelect(.follows) }
+            KeyButton(title: "Tải lại", key: "r", mods: .command) { app.keyReload() }
+            KeyButton(title: "Đổi trang phim", key: "o", mods: .command) { app.keySelect(.site) }
+            KeyButton(title: "Đổi người xem", key: "e", mods: .command) {
+                if app.keysOnMain { app.showPicker(gate: false) }
+            }
+            KeyButton(title: "Cài đặt", key: ",", mods: .command) { app.keySelect(.settings) }
+            KeyButton(title: "Mục menu trước", key: .upArrow, mods: .option) { app.keyMenu(-1) }
+            KeyButton(title: "Mục menu sau", key: .downArrow, mods: .option) { app.keyMenu(1) }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+/// Phím không có ⌘ của lưới phim: mũi tên chọn phim, Enter / Space mở, Delete xoá khỏi lịch sử. Tắt lúc đang gõ ô tìm
+/// kiếm (mũi tên / dấu cách để cho ô nhập).
+struct GridShortcuts: View {
+    @EnvironmentObject var app: AppModel
+
+    var body: some View {
+        ZStack {
+            KeyButton(title: "Sang trái", key: .leftArrow) { app.keyMove(.left) }
+            KeyButton(title: "Sang phải", key: .rightArrow) { app.keyMove(.right) }
+            KeyButton(title: "Lên", key: .upArrow) { app.keyMove(.up) }
+            KeyButton(title: "Xuống", key: .downArrow) { app.keyMove(.down) }
+            KeyButton(title: "Mở phim", key: .return) { app.keyOpen() }
+            KeyButton(title: "Mở phim", key: .space) { app.keyOpen() }
+            KeyButton(title: "Xoá khỏi lịch sử", key: .delete) { app.keyRemove() }
+        }
+        .allowsHitTesting(false)
     }
 }

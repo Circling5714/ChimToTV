@@ -16,6 +16,72 @@ enum Theme {
     static let uiBg = UIColor(red: 0x0E / 255, green: 0x10 / 255, blue: 0x14 / 255, alpha: 1)
 }
 
+/// Cỡ chữ của app (Cài đặt → Cỡ chữ): nhân mọi cỡ chữ cố định với `value`; điều khiển hệ thống (ô nhập, công tắc,
+/// danh sách Cài đặt) theo `dynamicType`. Mọi chữ dùng `.appFont` theo dõi đối tượng này nên đổi là cập nhật ngay.
+@MainActor
+final class TextScale: ObservableObject {
+    static let shared = TextScale()
+
+    struct Choice: Hashable {
+        let value: Double
+        let name: String
+    }
+
+    static let choices = [
+        Choice(value: 0.9, name: "Nhỏ"), Choice(value: 1.0, name: "Vừa"), Choice(value: 1.15, name: "Lớn"),
+        Choice(value: 1.3, name: "Rất lớn"), Choice(value: 1.5, name: "Cực lớn"),
+    ]
+
+    @Published private(set) var value = Prefs.textScale
+
+    func set(_ v: Double) {
+        Prefs.textScale = v
+        value = Prefs.textScale
+    }
+
+    static func name(_ v: Double) -> String { choices.first { abs($0.value - v) < 0.01 }?.name ?? "Vừa" }
+
+    var dynamicType: DynamicTypeSize {
+        switch value {
+        case ..<0.95: return .medium
+        case ..<1.1: return .large
+        case ..<1.25: return .xLarge
+        case ..<1.4: return .xxLarge
+        default: return .xxxLarge
+        }
+    }
+
+    /// Kích thước bố cục (bề rộng ô phim, menu…) theo cỡ chữ — tăng chậm hơn chữ.
+    func layout(_ base: CGFloat) -> CGFloat { (base * (1 + (value - 1) * 0.7)).rounded() }
+}
+
+private struct AppFont: ViewModifier {
+    @ObservedObject private var scale = TextScale.shared
+    let size: CGFloat
+    let weight: Font.Weight
+    let mono: Bool
+
+    func body(content: Content) -> some View {
+        let f = Font.system(size: (size * scale.value).rounded(), weight: weight)
+        return content.font(mono ? f.monospacedDigit() : f)
+    }
+}
+
+/// Theo cỡ chữ của app cho các điều khiển hệ thống (gắn ở gốc mỗi màn / bảng).
+private struct AppDynamicType: ViewModifier {
+    @ObservedObject private var scale = TextScale.shared
+    func body(content: Content) -> some View { content.dynamicTypeSize(scale.dynamicType) }
+}
+
+extension View {
+    /// Chữ cỡ `size` điểm (ở cỡ "Vừa"), phóng theo Cài đặt → Cỡ chữ.
+    func appFont(_ size: CGFloat, _ weight: Font.Weight = .regular, mono: Bool = false) -> some View {
+        modifier(AppFont(size: size, weight: weight, mono: mono))
+    }
+
+    func appDynamicType() -> some View { modifier(AppDynamicType()) }
+}
+
 extension Color {
     init(hex: UInt32, alpha: Double = 1) {
         self.init(.sRGB, red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255,
@@ -112,7 +178,7 @@ struct PosterImage: View {
             if let img = image {
                 Image(uiImage: img).resizable().scaledToFill()
             } else {
-                Image(systemName: "film").font(.system(size: 28)).foregroundColor(Theme.dim.opacity(0.5))
+                Image(systemName: "film").appFont(28).foregroundColor(Theme.dim.opacity(0.5))
             }
         }
         .task(id: url) {
@@ -127,7 +193,7 @@ struct ToastView: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 16, weight: .medium))
+            .appFont(16, .medium)
             .foregroundColor(Theme.text)
             .multilineTextAlignment(.center)
             .padding(.horizontal, 18)

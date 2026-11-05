@@ -25,6 +25,7 @@ struct SettingsView: View {
     @State private var limitsShown = false
     /// Đã có giới hạn giờ xem: thêm người xem cần mã PIN phụ huynh (khỏi lách giới hạn bằng hồ sơ mới).
     @State private var parentForAdd = false
+    @ObservedObject private var textScale = TextScale.shared
 
     /// Thêm / sửa người xem.
     private enum ProfileSheet: Identifiable {
@@ -47,10 +48,25 @@ struct SettingsView: View {
         return "\(v) (\(b))"
     }
 
+    private var displaySection: some View {
+        Section {
+            Picker("Cỡ chữ", selection: Binding(get: { textScale.value }, set: { textScale.set($0) })) {
+                ForEach(TextScale.choices, id: \.value) { c in Text(c.name).tag(c.value) }
+            }
+            .pickerStyle(.segmented)
+            Text("Xem trước: Đấu Phá Thương Khung — Tập 120")
+                .appFont(16)
+                .foregroundColor(Theme.text)
+        } header: { Text("Cỡ chữ") } footer: {
+            Text("Áp dụng cho cả app (dùng chung mọi người xem): lưới phim, trang phim, trình phát, Cài đặt.")
+        }
+    }
+
     var body: some View {
         NavigationView {
             Form {
                 profileSection
+                displaySection
                 siteSection
                 Section {
                     ForEach(sites, id: \.self) { s in
@@ -207,7 +223,7 @@ struct SettingsView: View {
                     HStack(spacing: 12) {
                         ProfileAvatar(profile: p, size: 32)
                         Text(p.name).foregroundColor(Theme.text)
-                        if p.locked { Image(systemName: "lock.fill").font(.system(size: 13)).foregroundColor(Theme.dim) }
+                        if p.locked { Image(systemName: "lock.fill").appFont(13).foregroundColor(Theme.dim) }
                         Spacer()
                         if p.id == app.profileId { Text("đang xem").foregroundColor(Theme.dim) }
                     }
