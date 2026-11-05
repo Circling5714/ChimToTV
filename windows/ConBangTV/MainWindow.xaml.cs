@@ -53,9 +53,19 @@ public partial class MainWindow : Window
         {
             SaveBounds();
             _player?.Close(false);
+            SyncService.Stop();
             Prefs.Flush();
         };
-        Activated += (_, _) => _player?.Reactivate();
+        Activated += (_, _) =>
+        {
+            _player?.Reactivate();
+            // Quay lại app (vd vừa xem trên tivi): đồng bộ, tối đa 1 phút một lần
+            if (Util.NowMs() - _lastActiveSync > 60_000)
+            {
+                _lastActiveSync = Util.NowMs();
+                SyncService.SyncSoon(1);
+            }
+        };
         StateChanged += (_, _) => _player?.Follow();
         LocationChanged += (_, _) => _player?.Follow();
         SizeChanged += (_, _) => _player?.Follow();
@@ -71,6 +81,23 @@ public partial class MainWindow : Window
         DebugServer.Start(this);
 #endif
         _ = CheckUpdate(false);
+        SyncService.DataChanged += () => Dispatcher.BeginInvoke(SyncApplied);
+        SyncService.Message += m => Dispatcher.BeginInvoke(() => Toast(m));
+        SyncService.AppStarted();
+    }
+
+    private long _lastActiveSync;
+
+    /// Đồng bộ trong nhà vừa đổi dữ liệu máy này: vẽ lại menu và trang đang mở (không đụng trang đang có ô nhập).
+    private void SyncApplied()
+    {
+        RebuildMenu();
+        if (Player == null && Current is { } p and not SyncPage and not SearchPage and not ProxyPage and not SitesPage)
+        {
+            var focus = Keyboard.FocusedElement as FrameworkElement;
+            p.Returned();
+            if (focus is { IsVisible: true }) focus.Focus();
+        }
     }
 
     // ---- Cỡ giao diện / cửa sổ ----
@@ -147,6 +174,7 @@ public partial class MainWindow : Window
             yield return new("countries", "Quốc gia…", () => ShowRoot(new FilterPage(false)));
         }
         yield return new("sites", "🌐  Đổi trang phim", () => ShowRoot(new SitesPage()));
+        yield return new("sync", "⇄  Đồng bộ trong nhà", () => ShowRoot(new SyncPage()));
         yield return new("settings", "⚙  Cài đặt", () => ShowRoot(new SettingsPage()));
     }
 
@@ -265,6 +293,7 @@ public partial class MainWindow : Window
     /// Trình phát đã đóng (người xem thoát): về trang trước, cập nhật tập đã xem / xem tiếp.
     public void PlayerClosed()
     {
+        SyncService.SyncSoon(1);
         PlayerHost.Visibility = Visibility.Collapsed;
         Shell.Visibility = Visibility.Visible;
         Activate();

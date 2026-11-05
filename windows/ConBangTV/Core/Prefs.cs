@@ -134,7 +134,23 @@ public static class Prefs
     public static List<string> Sites
     {
         get => Get<List<string>>("sites") ?? PresetSites.ToList();
-        set => Set("sites", value.Distinct().ToList());
+        set
+        {
+            lock (Lock)
+            {
+                // Đồng bộ trong nhà: ghi lúc thêm / bỏ từng trang
+                var old = Sites.ToHashSet();
+                var list = value.Distinct().ToList();
+                var now = Util.NowMs();
+                var add = Stamps("sites_add");
+                var del = Stamps("sites_del");
+                foreach (var s in list.Where(s => !old.Contains(s))) add[s] = now;
+                foreach (var s in old.Where(s => !list.Contains(s))) del[s] = now;
+                SetStamps("sites_add", add);
+                SetStamps("sites_del", del);
+                Set("sites", list);
+            }
+        }
     }
 
     /// Trang tự chuyển sang tên miền mới: thay tên cũ trong danh sách (giữ chỗ), rồi dùng tên mới.
@@ -345,6 +361,10 @@ public static class Prefs
     {
         lock (Lock)
         {
+            var del = Stamps(K("hist_del"));
+            var now = Util.NowMs();
+            foreach (var f in History.Select(h => h.FilmUrl).Concat(Positions().Select(p => p.Film)).Where(f => f.Length > 0)) del[f] = now;
+            SetStamps(K("hist_del"), del);
             SaveHistory(new());
             SavePositions(new());
         }
@@ -356,6 +376,9 @@ public static class Prefs
         lock (Lock)
         {
             var item = HistoryFor(filmUrl);
+            var del = Stamps(K("hist_del"));
+            del[filmUrl] = Util.NowMs();
+            SetStamps(K("hist_del"), del);
             var eps = Positions().Where(p => p.Film == filmUrl).Select(p => p.Ep).ToHashSet();
             if (item != null) eps.Add(item.EpUrl);
             SavePositions(Positions().Where(p => !eps.Contains(p.Ep)).ToList());
@@ -388,7 +411,13 @@ public static class Prefs
 
     public static void Unfollow(string filmUrl)
     {
-        lock (Lock) Follows = Follows.Where(f => f.FilmUrl != filmUrl).ToList();
+        lock (Lock)
+        {
+            var del = Stamps(K("follow_del"));
+            del[filmUrl] = Util.NowMs();
+            SetStamps(K("follow_del"), del);
+            Follows = Follows.Where(f => f.FilmUrl != filmUrl).ToList();
+        }
     }
 
     /// Cập nhật số tập mới nhất; seen = true: người xem vừa mở phim (hết "tập mới").
@@ -477,5 +506,98 @@ public static class Prefs
             if (list.Count > MaxPositions) list.RemoveRange(0, list.Count - MaxPositions);
             SavePositions(list);
         }
+    }
+
+    // ---- Đồng bộ trong nhà (SyncData.cs) — cùng khoá bản TV / iPad ----
+
+    /// Mốc thời gian theo khoá (lúc xoá / lúc thêm): {"khoá": ms}.
+    public static Dictionary<string, long> Stamps(string key) => Get<Dictionary<string, long>>(key) ?? new();
+
+    public static void SetStamps(string key, Dictionary<string, long> m) => Set(key, SyncMerge.Tombstones(m, new()));
+
+    /// Mã máy (ngẫu nhiên, tạo lần đầu) — máy kia nhận ra máy này qua mã này.
+    public static string DeviceId
+    {
+        get
+        {
+            lock (Lock)
+            {
+                if (Get<string>("device_id") is { Length: > 0 } id) return id;
+                var n = Guid.NewGuid().ToString().ToLowerInvariant();
+                Set("device_id", n);
+                return n;
+            }
+        }
+    }
+
+    /// Tên người xem đầu tiên (bản Windows chưa có nhiều người xem).
+    public const string ProfileName = "Cả nhà";
+
+    /// Dữ liệu đồng bộ của người xem đầu tiên.
+    public static SyncProfile SyncProfileData()
+    {
+        lock (Lock)
+        {
+            return new SyncProfile
+            {
+                Id = "", Name = ProfileName,
+                History = History.Select(h => new SyncHistory(h.FilmUrl, h.Title, h.Poster ?? "", h.EpTitle, h.EpUrl, h.Time)).ToList(),
+                HistDel = Stamps(K("hist_del")),
+                Pos = Positions().Select(p => new SyncPos(p.Ep, p.Sec, p.Film, p.T ?? 0)).ToList(),
+                Follows = Follows.Select(f => new SyncFollow(f.FilmUrl, f.Title, f.Poster ?? "", f.Count, f.Latest, f.Seen, f.T ?? 0)).ToList(),
+                FollowDel = Stamps(K("follow_del")),
+            };
+        }
+    }
+
+    /// Ghi dữ liệu đã gộp. true = có thay đổi.
+    public static bool ApplySync(SyncProfile s)
+    {
+        lock (Lock)
+        {
+            if (s.Id.Length != 0 || SyncProfileData().SameAs(s)) return false;
+            SaveHistory(s.History.Select(h => new HistoryItem
+            {
+                FilmUrl = h.Film, Title = h.Title, Poster = h.Poster.NonEmpty(), EpTitle = h.Ep, EpUrl = h.EpUrl, Time = h.Time,
+            }).ToList());
+            SavePositions(s.Pos.Select(p => new Position { Ep = p.Ep, Sec = p.Sec, Film = p.Film, T = p.T == 0 ? null : p.T }).ToList());
+            Follows = s.Follows.Select(f => new Follow
+            {
+                FilmUrl = f.Film, Title = f.Title, Poster = f.Poster.NonEmpty(), Count = f.Count, Latest = f.Latest, Seen = f.Seen,
+                T = f.T == 0 ? null : f.T,
+            }).ToList();
+            SetStamps(K("hist_del"), s.HistDel);
+            SetStamps(K("follow_del"), s.FollowDel);
+            return true;
+        }
+    }
+
+    public static SyncSites SyncSitesData => new() { List = Sites, Add = Stamps("sites_add"), Del = Stamps("sites_del") };
+
+    /// Ghi danh sách trang đã gộp (không ghi lại mốc thêm / bỏ như khi người xem tự sửa). true = có thay đổi.
+    public static bool ApplySites(SyncSites s)
+    {
+        lock (Lock)
+        {
+            if (s.List.Count == 0 || s.SameAs(SyncSitesData)) return false;
+            SetStamps("sites_add", s.Add);
+            SetStamps("sites_del", s.Del);
+            Set("sites", s.List);
+            return true;
+        }
+    }
+
+    /// Máy đã ghép (JSON riêng của bản Windows).
+    public static List<SyncPeer> SyncPeers
+    {
+        get => Get<List<SyncPeer>>("sync_peers") ?? new();
+        set => Set("sync_peers", value);
+    }
+
+    /// Tự đồng bộ (mở app, thoát phim, theo dõi…).
+    public static bool SyncAuto
+    {
+        get => !Has("sync_auto") || Get<bool>("sync_auto");
+        set => Set("sync_auto", value);
     }
 }

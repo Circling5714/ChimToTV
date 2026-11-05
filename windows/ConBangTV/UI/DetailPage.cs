@@ -96,6 +96,7 @@ public sealed class DetailPage : Page
                 Main.Toast("Đã theo dõi — có tập mới sẽ hiện ở Trang chủ và mục Theo dõi.");
             }
             Main.RebuildMenu();
+            SyncService.SyncSoon();
             Build(false);
         }));
         buttons.Children.Add(Ui.Pill("↗  Mở trên trình duyệt", () => Ui.OpenBrowser(d.Url)));

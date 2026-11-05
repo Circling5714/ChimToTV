@@ -275,6 +275,7 @@ public sealed class HistoryPage : Page
         {
             if (!await Main.Confirm("Xoá cả lịch sử xem?", "Xoá danh sách Xem tiếp và chỗ đang xem của mọi tập.", "Xoá hết")) return;
             Prefs.ClearHistory();
+            SyncService.SyncSoon();
             Build();
         })));
         Body.Children.Add(Ui.Dim("Enter / bấm: xem tiếp ngay.  Delete hoặc chuột phải: xoá phim khỏi lịch sử.", 14, new Thickness(0, 0, 0, 16)));
@@ -287,6 +288,7 @@ public sealed class HistoryPage : Page
                 {
                     if (!await Main.Confirm($"Xoá «{h.Title}» khỏi lịch sử?", "Xoá cả chỗ đang xem của các tập phim này.", "Xoá")) return;
                     Prefs.RemoveHistory(h.FilmUrl);
+                    SyncService.SyncSoon();
                     Build();
                     FocusFirst();
                 }));
@@ -334,6 +336,7 @@ public sealed class FollowsPage : Page
                 {
                     if (!await Main.Confirm($"Bỏ theo dõi «{f.Title}»?", "", "Bỏ theo dõi")) return;
                     Prefs.Unfollow(f.FilmUrl);
+                    SyncService.SyncSoon();
                     Build();
                     Main.RebuildMenu();
                 });
