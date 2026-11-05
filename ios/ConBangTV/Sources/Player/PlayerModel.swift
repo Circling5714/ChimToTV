@@ -109,6 +109,11 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     static var detachedModel: PlayerModel?
     /// PlayerController đóng màn trình phát mà không huỷ trình phát.
     var onDetach: () -> Void = {}
+    /// Phim bắt đầu / thôi đang phát (PlayerController: chỉ để lại lần vuốt đầu từ mép dưới khi đang phát).
+    var onPlayingChanged: () -> Void = {}
+
+    /// Đang phát thật (vuốt lên từ mép dưới thì thu nhỏ phim).
+    var playing: Bool { started && state?.paused == false && !inPip }
     private var pipRequestedAt: Int64 = 0
     /// Phóng to từ cửa sổ nhỏ lúc app chưa hiện lên hẳn (đang ở màn hình chính iPad): đợi app hiện rồi mở màn trình phát.
     private var waitingToReattach = false
@@ -436,6 +441,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
                           waiting: Self.flag(o["waiting"]), ready: Self.flag(o["ready"]),
                           droppedFrames: Int(Self.num(o["df"])), totalFrames: Int(Self.num(o["tf"])))
         let wasPaused = state?.paused
+        let wasPlaying = playing
         if state != s { state = s }
         let pip = Self.flag(o["pip"])
         if pip != inPip { pipChanged(pip) }
@@ -490,6 +496,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             exitForSleep()
             return
         }
+        if playing != wasPlaying { onPlayingChanged() }
         if resumePending && (s.t >= Double(resumeAt - 5) || now - resumeIssuedAt > 30_000) { resumePending = false }
         if started && !introDone && !s.paused { skipIntro(s) }
         if let w = wasPaused, w != s.paused { showBar() }

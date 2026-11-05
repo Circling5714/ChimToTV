@@ -420,6 +420,7 @@ final class PlayerController: UIHostingController<PlayerView> {
         model.onClose = { [weak self] in self?.dismiss(animated: true) }
         // Phim vào hình trong hình lúc đang dùng app: đóng màn trình phát, trình phát vẫn chạy (PlayerModel.detachedModel)
         model.onDetach = { [weak self] in self?.dismiss(animated: true) }
+        model.onPlayingChanged = { [weak self] in self?.setNeedsUpdateOfScreenEdgesDeferringSystemGestures() }
         model.onOpenWeb = { [weak self] url in
             self?.present(BrowserController(url: url), animated: true)
         }
@@ -432,10 +433,11 @@ final class PlayerController: UIHostingController<PlayerView> {
         model.begin()
     }
 
-    /// Đang bật "vuốt lên thì thu nhỏ phim": lần vuốt đầu từ mép dưới thuộc về app (thu nhỏ phim lúc app còn mở hẳn — iPad
-    /// chỉ cho vào hình trong hình lúc đó), vuốt tiếp mới về màn hình chính.
+    /// Đang bật "vuốt lên thì thu nhỏ phim" và phim đang phát: lần vuốt đầu từ mép dưới thuộc về app (thu nhỏ phim lúc app
+    /// còn mở hẳn — iPad chỉ cho vào hình trong hình lúc đó), vuốt tiếp mới về màn hình chính. Phim dừng / chưa chạy thì
+    /// vuốt lên về thẳng màn hình chính như thường.
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
-        Prefs.pipOnHome && PlayerModel.pipSupported ? .bottom : []
+        Prefs.pipOnHome && PlayerModel.pipSupported && model.playing ? .bottom : []
     }
 
     private var edgeFired = false
