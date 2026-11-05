@@ -258,7 +258,8 @@ final class SystemLevels {
     }
 }
 
-/// Màn «Hết giờ xem» (WatchLimit): người lớn nhập mã PIN phụ huynh rồi chọn cho xem thêm, hoặc thoát trình phát.
+/// Màn «Hết giờ xem» (WatchLimit): người lớn nhập mã PIN phụ huynh rồi chọn cho xem thêm bao lâu (nút ngay trong
+/// khung — hộp chọn xổ lên của iPad không hiện được trong lớp phủ trình phát), hoặc thoát trình phát.
 private struct LimitOverlay: View {
     @ObservedObject var m: PlayerModel
     @State private var askPin = false
@@ -271,23 +272,36 @@ private struct LimitOverlay: View {
                 Image(systemName: m.limitBlock == .bedtime ? "moon.zzz.fill" : "hourglass")
                     .font(.system(size: 46, weight: .semibold))
                     .foregroundColor(Theme.focus)
-                Text("Hết giờ xem").font(.system(size: 30, weight: .bold))
-                Text(m.limitText + "\nNgười lớn nhập mã PIN phụ huynh để cho xem thêm.")
-                    .font(.system(size: 17))
-                    .foregroundColor(Theme.dim)
-                    .multilineTextAlignment(.center)
-                HStack(spacing: 14) {
-                    Button("Thoát") { m.close() }
-                        .buttonStyle(.bordered)
-                    Button("Cho xem thêm…") {
-                        // Không có mã phụ huynh (không thể có giới hạn mà thiếu mã — phòng hờ): cho chọn luôn
-                        if Prefs.hasParentPin { askPin = true } else { choose = true }
+                Text(choose ? "Cho \(Prefs.profile.name) xem thêm" : "Hết giờ xem").font(.system(size: 30, weight: .bold))
+                if choose {
+                    VStack(spacing: 10) {
+                        ForEach(WatchLimit.grants, id: \.self) { g in
+                            grantButton("Cho xem thêm \(WatchLimit.dailyLabel(g))") { m.grantLimit(g) }
+                        }
+                        grantButton("Không giới hạn tới 6 giờ sáng") { m.grantLimit(nil) }
+                        Button("Huỷ") { choose = false }
+                            .buttonStyle(.bordered)
+                            .padding(.top, 4)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.brand)
+                    .font(.system(size: 18, weight: .semibold))
+                } else {
+                    Text(m.limitText + "\nNgười lớn nhập mã PIN phụ huynh để cho xem thêm.")
+                        .font(.system(size: 17))
+                        .foregroundColor(Theme.dim)
+                        .multilineTextAlignment(.center)
+                    HStack(spacing: 14) {
+                        Button("Thoát") { m.close() }
+                            .buttonStyle(.bordered)
+                        Button("Cho xem thêm…") {
+                            // Không có mã phụ huynh (không thể có giới hạn mà thiếu mã — phòng hờ): cho chọn luôn
+                            if Prefs.hasParentPin { askPin = true } else { choose = true }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.brand)
+                    }
+                    .font(.system(size: 18, weight: .semibold))
+                    .padding(.top, 6)
                 }
-                .font(.system(size: 18, weight: .semibold))
-                .padding(.top, 6)
             }
             .foregroundColor(Theme.text)
             .padding(34)
@@ -300,13 +314,14 @@ private struct LimitOverlay: View {
                 }
             }
         }
-        .confirmationDialog("Cho \(Prefs.profile.name) xem thêm", isPresented: $choose, titleVisibility: .visible) {
-            ForEach(WatchLimit.grants, id: \.self) { g in
-                Button("Cho xem thêm \(WatchLimit.dailyLabel(g))") { m.grantLimit(g) }
-            }
-            Button("Không giới hạn tới 6 giờ sáng") { m.grantLimit(nil) }
-            Button("Huỷ", role: .cancel) {}
+    }
+
+    private func grantButton(_ title: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).frame(maxWidth: 360).padding(.vertical, 4)
         }
+        .buttonStyle(.borderedProminent)
+        .tint(Theme.surface2)
     }
 }
 
