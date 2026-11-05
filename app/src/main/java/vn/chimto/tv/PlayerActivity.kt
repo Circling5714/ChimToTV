@@ -21,6 +21,11 @@ import android.os.Message
 import android.util.Log
 import android.util.Rational
 import android.view.GestureDetector
+import kotlin.math.hypot
+import android.view.ScaleGestureDetector
+import android.text.style.RelativeSizeSpan
+import android.text.SpannableString
+import android.media.AudioManager
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -242,6 +247,7 @@ class PlayerActivity : BaseActivity() {
     private lateinit var btnIntroClear: TextView
     private lateinit var btnSpeed: TextView
     private lateinit var touchLayer: View
+    private lateinit var gestureHud: TextView
     private lateinit var touchBar: View
     private lateinit var touchTitle: TextView
     private lateinit var touchTime: TextView
@@ -373,6 +379,7 @@ class PlayerActivity : BaseActivity() {
         btnIntroClear = findViewById(R.id.btnIntroClear)
         btnSpeed = findViewById(R.id.btnSpeed)
         touchLayer = findViewById(R.id.touchLayer)
+        gestureHud = findViewById(R.id.gestureHud)
         touchBar = findViewById(R.id.touchBar)
         touchTitle = findViewById(R.id.touchTitle)
         touchTime = findViewById(R.id.touchTime)
@@ -1321,7 +1328,27 @@ class PlayerActivity : BaseActivity() {
                 return true
             }
         })
+        val swipes = TouchGestures()
+        val pinch = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            private var total = 1f
+            override fun onScaleBegin(d: ScaleGestureDetector): Boolean {
+                total = 1f
+                return gesturesAllowed
+            }
+
+            override fun onScale(d: ScaleGestureDetector): Boolean {
+                total *= d.scaleFactor
+                return true
+            }
+
+            // Chụm / mở hai ngón: vừa màn hình / lấp đầy (như bản iPad)
+            override fun onScaleEnd(d: ScaleGestureDetector) {
+                if (total > 1.15f) setFill(true) else if (total < 0.87f) setFill(false)
+            }
+        })
         touchLayer.setOnTouchListener { _, ev ->
+            pinch.onTouchEvent(ev)
+            swipes.onTouchEvent(ev)
             gestures.onTouchEvent(ev)
             true
         }
@@ -1362,6 +1389,195 @@ class PlayerActivity : BaseActivity() {
             }
         })
     }
+
+    // ---- Cử chỉ chạm như bản iPad / iPhone: giữ tay xem nhanh 2×, vuốt ngang tua, vuốt dọc nửa trái độ sáng / nửa phải
+    // âm lượng, chụm hai ngón vừa / lấp đầy. Chạm / chạm đúp vẫn do GestureDetector (setupTouch) lo.
+
+    /** Đang mở menu / phim thu nhỏ thì không nhận cử chỉ (chạm để đóng menu như cũ). */
+    private val gesturesAllowed get() = !small && panel.visibility != View.VISIBLE
+
+    private var scrubFrom: Double? = null
+    private var holdRate: Double? = null
+    private val hideHud = Runnable { gestureHud.visibility = View.GONE }
+
+    private fun showHud(text: String, detail: String? = null, ms: Long = 0) {
+        gestureHud.removeCallbacks(hideHud)
+        gestureHud.text = if (detail == null) text else SpannableString("$text\n$detail").apply {
+            setSpan(RelativeSizeSpan(0.65f), text.length + 1, length, 0)
+        }
+        gestureHud.visibility = View.VISIBLE
+        if (ms > 0) gestureHud.postDelayed(hideHud, ms)
+    }
+
+    private fun hudOff(delay: Long = 0) {
+        gestureHud.removeCallbacks(hideHud)
+        if (delay > 0) gestureHud.postDelayed(hideHud, delay) else gestureHud.visibility = View.GONE
+    }
+
+    /** Bắt đầu vuốt ngang để tua; false = chưa tua được (phim chưa chạy / chưa biết độ dài). */
+    private fun scrubBegan(): Boolean {
+        val s = state ?: return false
+        if (!gesturesAllowed || !started || s.d <= 0) return false
+        mainHandler.removeCallbacks(flushSeek)
+        scrubFrom = seekTarget ?: s.t
+        return true
+    }
+
+    /** fraction = quãng ngón tay đã vuốt / bề ngang (−1…1). Cả bề ngang = 2 phút (phim ngắn hơn: cả phim). */
+    private fun scrubChanged(fraction: Double) {
+        val from = scrubFrom ?: return
+        val d = state?.d ?: return
+        if (d <= 0) return
+        val target = (from + fraction * min(d, 120.0)).coerceIn(0.0, d - 1)
+        seekTarget = target
+        val delta = target - from
+        showHud(
+            (if (delta < 0) "◀◀  " else "▶▶  ") + "${formatTime(target)} / ${formatTime(d)}",
+            (if (delta < 0) "−" else "+") + formatTime(abs(delta)),
+        )
+        showTouch()
+    }
+
+    /** Nhấc tay: tua tới chỗ đã chọn; bị huỷ thì về như cũ. */
+    private fun scrubEnded(apply: Boolean) {
+        if (scrubFrom == null) return
+        scrubFrom = null
+        hudOff()
+        if (apply) flushSeek.run() else seekTarget = null
+        showTouch()
+    }
+
+    /** Giữ tay: xem nhanh 2× tới khi nhấc tay (đang phát mới có tác dụng). */
+    private fun holdFast(on: Boolean): Boolean {
+        if (on) {
+            if (!gesturesAllowed || !started || state?.paused != false || holdRate != null || rate >= 2.0) return false
+            holdRate = rate
+            cmd("rate", 2.0)
+            showHud("▶▶  Xem nhanh 2×", "nhấc tay để xem tiếp như thường")
+            return true
+        }
+        val r = holdRate ?: return false
+        holdRate = null
+        cmd("rate", r)
+        hudOff()
+        return true
+    }
+
+    /** Độ sáng của riêng màn trình phát (0…1) — rời trình phát là màn hình về độ sáng cũ. */
+    private var brightness: Float
+        get() {
+            val w = window.attributes.screenBrightness
+            if (w >= 0) return w
+            return runCatching {
+                android.provider.Settings.System.getInt(contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS) / 255f
+            }.getOrDefault(0.5f).coerceIn(0f, 1f)
+        }
+        set(v) {
+            window.attributes = window.attributes.apply { screenBrightness = v.coerceIn(0.01f, 1f) }
+        }
+
+    private val audio by lazy { getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+
+    /** Âm lượng nhạc / phim của máy (0…1), không hiện thanh âm lượng của hệ thống (che phim). */
+    private var volume: Float
+        get() = audio.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() /
+            audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        set(v) {
+            val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            runCatching { audio.setStreamVolume(AudioManager.STREAM_MUSIC, (v * max).roundToInt().coerceIn(0, max), 0) }
+        }
+
+    private fun showLevel(isBrightness: Boolean, v: Float) {
+        val pct = (v * 100).roundToInt()
+        showHud(if (isBrightness) "☀  Độ sáng $pct%" else (if (pct == 0) "🔇  Âm lượng 0%" else "🔊  Âm lượng $pct%"))
+    }
+
+    /** Chụm / mở hai ngón: vừa màn hình / lấp đầy. */
+    private fun setFill(fill: Boolean) {
+        if (!gesturesAllowed) return
+        if (Prefs.videoFill != fill) {
+            Prefs.videoFill = fill
+            cmd("fit", if (fill) 1 else 0)
+            showViewButtons()
+        }
+        showHud(if (fill) "Khung hình: Lấp đầy" else "Khung hình: Vừa màn hình", ms = 1200)
+    }
+
+    /**
+     * Vuốt / giữ tay trên lớp chạm (một ngón). Ngón đi quá ~24dp mới tính là vuốt: ngang → tua, dọc → độ sáng (nửa trái)
+     * / âm lượng (nửa phải); vuốt dọc bắt đầu sát mép trên / dưới thì để cho điện thoại (kéo thanh thông báo, về màn hình
+     * chính). Giữ yên 0,5 giây → xem nhanh 2×. Hai ngón: để cho chụm.
+     */
+    private inner class TouchGestures {
+        private var mode = Mode.NONE
+        private var downX = 0f
+        private var downY = 0f
+        private var nearEdge = false
+        private var startLevel = 0f
+        private val slop = dp(24).toFloat()
+        private val hold = Runnable { if (mode == Mode.TAP && holdFast(true)) mode = Mode.HOLD }
+
+        fun onTouchEvent(ev: MotionEvent) {
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = ev.x
+                    downY = ev.y
+                    nearEdge = ev.y < dp(40) || ev.y > touchLayer.height - dp(40)
+                    mode = Mode.TAP
+                    touchLayer.removeCallbacks(hold)
+                    touchLayer.postDelayed(hold, 500)
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    finish(apply = false)
+                    mode = Mode.IGNORED
+                }
+                MotionEvent.ACTION_MOVE -> move(ev.x - downX, ev.y - downY)
+                MotionEvent.ACTION_UP -> finish(apply = true)
+                MotionEvent.ACTION_CANCEL -> finish(apply = false)
+            }
+        }
+
+        private fun move(dx: Float, dy: Float) {
+            val w = touchLayer.width.coerceAtLeast(1)
+            val h = touchLayer.height.coerceAtLeast(1)
+            when (mode) {
+                Mode.TAP -> {
+                    if (hypot(dx, dy) < slop) return
+                    touchLayer.removeCallbacks(hold)
+                    mode = when {
+                        !gesturesAllowed -> Mode.IGNORED
+                        abs(dx) > abs(dy) -> if (scrubBegan()) Mode.SCRUB else Mode.IGNORED
+                        nearEdge -> Mode.IGNORED
+                        downX < w / 2f -> Mode.BRIGHTNESS.also { startLevel = brightness }
+                        else -> Mode.VOLUME.also { startLevel = volume }
+                    }
+                    if (mode != Mode.IGNORED) move(dx, dy)
+                }
+                Mode.SCRUB -> scrubChanged((dx / w).toDouble())
+                Mode.BRIGHTNESS, Mode.VOLUME -> {
+                    // Vuốt hết ~70% chiều cao màn = từ 0 lên 100%
+                    val v = (startLevel - dy / (h * 0.7f)).coerceIn(0f, 1f)
+                    if (mode == Mode.BRIGHTNESS) brightness = v else volume = v
+                    showLevel(mode == Mode.BRIGHTNESS, v)
+                }
+                Mode.HOLD, Mode.NONE, Mode.IGNORED -> Unit
+            }
+        }
+
+        private fun finish(apply: Boolean) {
+            touchLayer.removeCallbacks(hold)
+            val was = mode
+            mode = Mode.NONE
+            when (was) {
+                Mode.HOLD -> holdFast(false)
+                Mode.SCRUB -> scrubEnded(apply)
+                Mode.BRIGHTNESS, Mode.VOLUME -> hudOff(600)
+                Mode.TAP, Mode.NONE, Mode.IGNORED -> Unit
+            }
+        }
+    }
+
+    private enum class Mode { NONE, TAP, HOLD, SCRUB, BRIGHTNESS, VOLUME, IGNORED }
 
     private fun showTouch() {
         if (small) return
