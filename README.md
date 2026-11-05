@@ -10,7 +10,7 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.4`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.4)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.5`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.5)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -28,8 +28,13 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | hhkungfu.ee | HaLim, chia Vietsub / Thuyết Minh | `player.php` → iframe |
 | hoathinh3d.pw | HaLimMovies (Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Đánh Giá Cao đọc qua API JSON của trang, từ 2.2) | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
 | phimmois.fun (trước là phimmoir.fun) | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
+| mephim.ddns.net (từ 2.5 / iPad 1.5) | ứng dụng React — đọc API JSON `/api/movies/…` của trang (nguồn KKPhim), chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
 
 **Tìm kiếm** (từ 1.9.1) tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm, trang đang dùng đứng đầu.
+
+mephim.ddns.net (từ 2.5): trang tổng hợp nguồn KKPhim — hoạt hình Trung Quốc, phim bộ / lẻ, TV Shows, thuyết minh / lồng
+tiếng; menu cố định + **Thể loại…** / **Quốc gia…**. Máy chủ của trang hay báo lỗi 500 khi nguồn chậm → app gọi thẳng
+`phimapi.com` (cùng định dạng, như chính trang web làm); riêng khối Thịnh hành / Song ngữ không có nguồn thay thế.
 
 App không viết riêng cho từng trang mà nhận dạng theo mẫu giao diện, nên trang khác cùng kiểu (yanhh3d / theme HaLim /
 Next.js kiểu PhimMoi) thường cũng chạy: **Đổi trang phim** → **＋ Thêm trang khác…** rồi gõ tên miền (từ 2.1), hoặc nhập
@@ -439,6 +444,12 @@ từng phim; `Prefs.follows` lưu `count` (số tập lần kiểm gần nhất,
 lần cuối). Mốc nhạc mở đầu: `intro@<phim>` = "đầu,hết" (giây). Trình phát gắn số lần nạp trang (`window.__chimtoLoad`,
 `pageLoad`) vào trang phát và bỏ trạng thái của trang cũ; `resumePending` giữ chỗ xem dở cho tới khi trình phát tua
 xong (TV chậm có khi mất hàng chục giây) — lưu vị trí / đổi server / đổi bản trong lúc đó dùng chỗ cũ.
+
+Trang API (từ 2.5 — `ApiSite.kt` / `ApiSite.swift`): trang trắng của ứng dụng JS (`#root` rỗng) → dò
+`/api/movies/newest` một lần mỗi trang (mephim.ddns.net có sẵn). Địa chỉ trong app theo đường dẫn của trang: phim
+`/phim/<slug>`, tập `/phim/<slug>/<tập>?sv=<thứ tự bản>` (Vietsub / Thuyết Minh trùng tên tập); danh sách = địa chỉ API.
+Tập: `EpisodeSource(next = true)` với `links` sẵn (`m3u8`, `embed`) → `NextSite.video` trả luôn, không tải thêm.
+Dự phòng: `ApiSite.fallback` đổi `/api/movies/newest|category|the-loai|quoc-gia|search|detail` sang `phimapi.com/v1/api/…`.
 
 Điện thoại (từ 2.4 — `Phone.kt`): `Screen.isTv` (chế độ TV hoặc leanback) giữ `sensorLandscape` của manifest, máy khác
 `BaseActivity.onCreate` đặt `SCREEN_ORIENTATION_FULL_USER` (trừ trình phát). Các màn khai báo `configChanges` nên xoay

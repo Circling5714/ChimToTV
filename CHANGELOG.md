@@ -6,6 +6,27 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 
+## iPad 1.5 — 05/11/2026
+
+- **Thêm trang mephim.ddns.net** như TV 2.5 (`ApiSite.swift`): có sẵn trong Đổi trang phim, trang chủ / menu / Thể loại… /
+  Quốc gia…, tìm kiếm, bản Vietsub / Thuyết Minh, server HLS (bỏ quảng cáo) + trình phát KKPhim, dự phòng phimapi.com.
+- bản 1.5 (CFBundleVersion 6) · mã gói `vn.chimto.tv` · tag `ios-v1.5` · commit `e1294b0` · SHA-256 IPA
+  `4e5d3f7fb9975d7a6dd52b167cea3290e3672a0f6a139433ffe42e3a9c063045`
+- Test lõi trên macOS qua (thêm `ApiSiteTests`). **Chưa cài thử trên iPad / iPhone thật** (iPhone không nối SSH được lúc
+  phát hành; anh tự thử sau).
+
+## 2.5 — 05/11/2026
+
+- **Thêm trang mephim.ddns.net** (ứng dụng React, API JSON `/api/movies/…`, nguồn KKPhim): có sẵn trong ☰ → Đổi trang phim
+  (người đã cài được thêm một lần). Trang chủ: Hoạt hình Trung Quốc mới cập nhật, Phim mới cập nhật, Thịnh hành, Song ngữ /
+  Thuyết minh; menu Hoạt hình Trung Quốc, Hoạt hình, Phim bộ, Phim lẻ, TV Shows, Thuyết minh, Lồng tiếng, 5 nước;
+  «Thể loại…» / «Quốc gia…»; tìm kiếm mọi trang. Bản Vietsub / Thuyết Minh riêng; mỗi tập 2 server: **HLS (bỏ quảng cáo)**
+  và **Trình phát KKPhim** (dự phòng, có quảng cáo chèn). Máy chủ của trang lỗi (hay báo 500) thì app gọi thẳng phimapi.com.
+- versionCode 26 · tag `v2.5` · commit `e1294b0` · SHA-256 APK
+  `26e879b19b76ad053011ddb0f2eebba373da2c96dbc685f034a627344ddec98c`
+- Thử trên TV box (bản gỡ lỗi + bản chính): trang chủ, phân trang, Thể loại, tìm kiếm, Thuyết Minh, Xem tiếp, cả hai server;
+  anh thử trên vivo X200 Pro. Cập nhật tự động 2.4.3 → 2.5 đã thử trên TV box.
+
 ## 2.4.3 — 05/11/2026
 
 - **Cử chỉ chạm khi xem phim** (điện thoại, màn cảm ứng), như bản iPhone: **giữ tay** xem nhanh 2× tới khi nhấc tay;
