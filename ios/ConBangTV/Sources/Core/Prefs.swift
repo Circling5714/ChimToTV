@@ -86,6 +86,8 @@ enum Prefs {
     private static let profileKeys: Set<String> = [
         "history", "positions_v2", "follows", "last_follow_check", "private_mode",
         "base_url", "seek_step", "auto_next", "video_fill",
+        // Giới hạn giờ xem (WatchLimit)
+        "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
     ]
     private static let profilePrefixes = ["server_type@", "server_label@"]
     /// Người thêm sau bắt đầu với trang phim / server ưu tiên / cách xem của người đang dùng.
@@ -215,6 +217,56 @@ enum Prefs {
             if profileId == id { switchProfile(rest[0].id) }
         }
     }
+
+    // MARK: - Giới hạn giờ xem (xem WatchLimit) — cùng tên khoá bản Android
+
+    /// Khoá của người xem id (người đầu tiên — id "" — giữ khoá cũ không hậu tố).
+    private static func pk(_ id: String, _ key: String) -> String { id.isEmpty ? key : "\(key)#\(id)" }
+
+    /// Số phút xem mỗi ngày của người xem id (mặc định người đang dùng; 0 = không giới hạn).
+    static func dailyLimit(_ id: String? = nil) -> Int { store.integer(forKey: pk(id ?? profileId, "limit_min")) }
+
+    static func setDailyLimit(_ id: String, _ minutes: Int) { store.set(minutes, forKey: pk(id, "limit_min")) }
+
+    /// Giờ đi ngủ (phút trong ngày, vd 21:00 = 1260; -1 = không): từ giờ đó tới 6 giờ sáng không xem được.
+    static func bedtime(_ id: String? = nil) -> Int { store.object(forKey: pk(id ?? profileId, "bedtime")) as? Int ?? -1 }
+
+    static func setBedtime(_ id: String, _ minute: Int) { store.set(minute, forKey: pk(id, "bedtime")) }
+
+    /// Người đang xem: ngày đang đếm ("yyyy-MM-dd"), số giây đã xem, số phút được cho thêm trong ngày đó.
+    static var watchDay: String {
+        get { store.string(forKey: k("watch_day")) ?? "" }
+        set { store.set(newValue, forKey: k("watch_day")) }
+    }
+
+    static var watchSeconds: Int {
+        get { store.integer(forKey: k("watch_sec")) }
+        set { store.set(newValue, forKey: k("watch_sec")) }
+    }
+
+    static var watchExtra: Int {
+        get { store.integer(forKey: k("watch_extra")) }
+        set { store.set(newValue, forKey: k("watch_extra")) }
+    }
+
+    /// Người đang xem được xem không giới hạn tới thời điểm này (ms) — phụ huynh cho thêm lúc giờ đi ngủ.
+    static var unblockUntil: Int64 {
+        get { (store.object(forKey: k("unblock_until")) as? NSNumber)?.int64Value ?? 0 }
+        set { store.set(NSNumber(value: newValue), forKey: k("unblock_until")) }
+    }
+
+    /// Có ai đang bị giới hạn giờ xem (khi đó thêm / xoá người xem cũng cần mã PIN phụ huynh).
+    static var anyLimits: Bool { profiles.contains { dailyLimit($0.id) > 0 || bedtime($0.id) >= 0 } }
+
+    /// Mã PIN phụ huynh (cả nhà): đặt / đổi giới hạn giờ xem, cho xem thêm khi hết giờ.
+    static var hasParentPin: Bool { store.string(forKey: "parent_pin") != nil }
+
+    /// Đặt / đổi mã PIN phụ huynh; nil = xoá.
+    static func setParentPin(_ pin: String?) {
+        if let p = pin { store.set(pinHash("parent", p), forKey: "parent_pin") } else { store.removeObject(forKey: "parent_pin") }
+    }
+
+    static func checkParentPin(_ pin: String) -> Bool { store.string(forKey: "parent_pin") == pinHash("parent", pin) }
 
     /// Hỏi "Ai đang xem?" khi mở app (từ 2 người xem).
     static var askProfile: Bool {

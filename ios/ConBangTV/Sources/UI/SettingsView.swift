@@ -22,6 +22,9 @@ struct SettingsView: View {
     @State private var pipOnHome = Prefs.pipOnHome
     @State private var profileSheet: ProfileSheet?
     @State private var unlockFor: Profile?
+    @State private var limitsShown = false
+    /// Đã có giới hạn giờ xem: thêm người xem cần mã PIN phụ huynh (khỏi lách giới hạn bằng hồ sơ mới).
+    @State private var parentForAdd = false
 
     /// Thêm / sửa người xem.
     private enum ProfileSheet: Identifiable {
@@ -178,6 +181,12 @@ struct SettingsView: View {
         }
         .navigationViewStyle(.stack)
         .overlay {
+            if parentForAdd {
+                ParentPinView(title: "Mã PIN phụ huynh để thêm người xem", onCancel: { parentForAdd = false }) {
+                    parentForAdd = false
+                    profileSheet = .add
+                }
+            }
             if let p = unlockFor {
                 PinPad(title: "Nhập mã PIN của \(p.name) để sửa", onCancel: { unlockFor = nil }) { pin in
                     guard Prefs.checkPin(p, pin) else { return false }
@@ -205,12 +214,18 @@ struct SettingsView: View {
                 }
             }
             if app.profiles.count < Prefs.maxProfiles {
-                Button("Thêm người xem") { profileSheet = .add }
+                Button("Thêm người xem") {
+                    if Prefs.anyLimits && Prefs.hasParentPin { parentForAdd = true } else { profileSheet = .add }
+                }
             }
+            Button("Giới hạn giờ xem…") { limitsShown = true }
+                .sheet(isPresented: $limitsShown, onDismiss: { app.refreshProfiles() }) {
+                    LimitsView().environmentObject(app).preferredColorScheme(.dark)
+                }
             Toggle("Hỏi «Ai đang xem?» khi mở app", isOn: $askProfile)
                 .onChange(of: askProfile) { Prefs.askProfile = $0 }
         } header: { Text("Người xem") } footer: {
-            Text("Mỗi người có riêng: lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, phim theo dõi, trang phim đang dùng, server ưu tiên, Xem riêng, bước tua, tự chuyển tập, khung hình. Dùng chung cả nhà: danh sách trang phim, proxy, dữ liệu duyệt web, điểm server, mốc nhạc mở đầu. Chạm một người để đổi tên / màu, đặt hoặc tắt mã PIN, chuyển sang, xoá.")
+            Text("Mỗi người có riêng: lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, phim theo dõi, trang phim đang dùng, server ưu tiên, Xem riêng, bước tua, tự chuyển tập, khung hình. Dùng chung cả nhà: danh sách trang phim, proxy, dữ liệu duyệt web, điểm server, mốc nhạc mở đầu. Chạm một người để đổi tên / màu, đặt hoặc tắt mã PIN, chuyển sang, xoá. Giới hạn giờ xem: số phút mỗi ngày và giờ đi ngủ cho từng người (vd trẻ em), cần mã PIN phụ huynh.")
         }
     }
 

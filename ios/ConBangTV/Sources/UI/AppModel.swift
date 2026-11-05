@@ -156,6 +156,8 @@ final class AppModel: ObservableObject {
         let changed = p.id != Prefs.profileId
         if changed {
             PlayerModel.closeForProfileSwitch()
+            WatchLimit.flush() // giờ đã xem là của người cũ
+            WatchLimit.reset()
             Prefs.switchProfile(p.id)
             profileVersion += 1
         }

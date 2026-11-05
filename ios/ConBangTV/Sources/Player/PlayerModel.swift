@@ -176,6 +176,13 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
 
     func openEpisode(_ i: Int) {
         guard let d = detail, let ep = episodes[safe: i] else { return }
+        // Người đang xem đã hết giờ xem (WatchLimit): chưa mở tập, hỏi mã phụ huynh trước
+        if let b = WatchLimit.block() {
+            limitBlock = b
+            limitResume = { [weak self] in self?.openEpisode(i) }
+            hideLoading()
+            return
+        }
         index = i
         remoteSeq = 0
         token += 1
@@ -446,6 +453,8 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         if state != s { state = s }
         let pip = Self.flag(o["pip"])
         if pip != inPip { pipChanged(pip) }
+        WatchLimit.tick(playing: started && !s.paused && !s.waiting, now: now)
+        checkLimit()
         // Màn hình khoá / Trung tâm điều khiển / AirPods bấm tập trước / sau (Media Session của trang, player-agent.js)
         let rs = Int(Self.num(o["rs"]))
         if rs > remoteSeq {
@@ -736,6 +745,52 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         if !panelShown { showBar() }
     }
 
+    // MARK: - Giới hạn giờ xem (WatchLimit)
+
+    /// Người đang xem đã hết giờ xem: màn «Hết giờ xem» (PlayerView) đang hiện, phim dừng.
+    @Published private(set) var limitBlock: WatchLimit.Block?
+    /// Cho xem thêm xong thì làm gì (phát tiếp, hoặc mở tập đang chờ).
+    private var limitResume: (() -> Void)?
+    /// Đã nhắc "còn 5 phút" trong lần xem này.
+    private var limitWarned = false
+
+    /// Mỗi lần đọc trạng thái: sắp hết giờ thì nhắc, hết giờ thì dừng phim và hiện màn hết giờ xem.
+    private func checkLimit() {
+        guard limitBlock == nil else { return }
+        if let b = WatchLimit.block() {
+            cmd("pause")
+            hideBar()
+            hidePanel()
+            limitBlock = b
+            limitResume = { [weak self] in self?.cmd("play") }
+            return
+        }
+        if started, !limitWarned, let r = WatchLimit.remaining(), r > 0, r <= 300 {
+            limitWarned = true
+            showNotice("Còn \(WatchLimit.minutesText(r)) xem hôm nay (\(Prefs.profile.name)).", 8)
+        }
+    }
+
+    /// Người lớn đã nhập mã PIN phụ huynh và chọn cho xem thêm (phút; nil = không giới hạn tới 6 giờ sáng).
+    func grantLimit(_ minutes: Int?) {
+        if let m = minutes { WatchLimit.grant(m) } else { WatchLimit.grantUntilMorning() }
+        limitBlock = nil
+        limitWarned = false
+        let resume = limitResume
+        limitResume = nil
+        resume?()
+    }
+
+    /// Lời giải thích trên màn hết giờ xem.
+    var limitText: String {
+        let who = Prefs.profile.name
+        switch limitBlock {
+        case .bedtime: return "Đã tới giờ đi ngủ của \(who) (từ \(WatchLimit.bedtimeLabel(Prefs.bedtime())) tới 6 giờ sáng)."
+        case .daily: return "\(who) đã xem hết \(WatchLimit.dailyLabel(Prefs.dailyLimit())) của hôm nay."
+        case nil: return ""
+        }
+    }
+
     // MARK: - Màn hình khoá / Trung tâm điều khiển / AirPods
 
     /// Lần bấm tập trước / sau ở màn hình khoá đã xử lý (đếm theo trang phát; mở tập khác thì đếm lại).
@@ -766,7 +821,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     private var holdRate: Double?
 
     /// Đang mở menu thì không nhận cử chỉ (chạm để đóng menu như cũ).
-    var gesturesAllowed: Bool { !panelShown }
+    var gesturesAllowed: Bool { !panelShown && limitBlock == nil }
 
     /// Bắt đầu vuốt ngang để tua; false = chưa tua được (phim chưa chạy / chưa biết độ dài).
     func scrubBegan() -> Bool {
@@ -879,6 +934,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     }
 
     func close() {
+        WatchLimit.flush()
         savePosition()
         session?.save(nowMs())
         session = nil
@@ -985,6 +1041,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     // không mở cửa sổ nổi khi app đã thôi "đang mở hẳn" (5/11/2026). Vì vậy dùng lần vuốt đầu từ mép dưới (swipeUpFromEdge).
 
     func didEnterBackground() {
+        WatchLimit.flush()
         savePosition()
         session?.save(nowMs())
         // Hình trong hình (hoặc vừa bấm thu nhỏ, cửa sổ đang mở ra): phim chạy tiếp; không vào được thì dừng (khỏi phát
@@ -1002,6 +1059,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     }
 
     func teardown() {
+        WatchLimit.flush()
         if PlayerModel.detachedModel === self { PlayerModel.detachedModel = nil }
         token += 1
         polling?.cancel()

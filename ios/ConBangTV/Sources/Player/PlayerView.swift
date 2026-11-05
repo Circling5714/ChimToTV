@@ -54,6 +54,9 @@ struct PlayerView: View {
                 }
             }
         }
+        .overlay {
+            if m.limitBlock != nil { LimitOverlay(m: m) }
+        }
         .animation(.easeOut(duration: 0.18), value: m.barShown)
         .animation(.easeOut(duration: 0.2), value: m.panelShown)
         .preferredColorScheme(.dark)
@@ -252,6 +255,58 @@ final class SystemLevels {
         guard let b = savedBrightness else { return }
         savedBrightness = nil
         UIScreen.main.brightness = b
+    }
+}
+
+/// Màn «Hết giờ xem» (WatchLimit): người lớn nhập mã PIN phụ huynh rồi chọn cho xem thêm, hoặc thoát trình phát.
+private struct LimitOverlay: View {
+    @ObservedObject var m: PlayerModel
+    @State private var askPin = false
+    @State private var choose = false
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.82).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: m.limitBlock == .bedtime ? "moon.zzz.fill" : "hourglass")
+                    .font(.system(size: 46, weight: .semibold))
+                    .foregroundColor(Theme.focus)
+                Text("Hết giờ xem").font(.system(size: 30, weight: .bold))
+                Text(m.limitText + "\nNgười lớn nhập mã PIN phụ huynh để cho xem thêm.")
+                    .font(.system(size: 17))
+                    .foregroundColor(Theme.dim)
+                    .multilineTextAlignment(.center)
+                HStack(spacing: 14) {
+                    Button("Thoát") { m.close() }
+                        .buttonStyle(.bordered)
+                    Button("Cho xem thêm…") {
+                        // Không có mã phụ huynh (không thể có giới hạn mà thiếu mã — phòng hờ): cho chọn luôn
+                        if Prefs.hasParentPin { askPin = true } else { choose = true }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.brand)
+                }
+                .font(.system(size: 18, weight: .semibold))
+                .padding(.top, 6)
+            }
+            .foregroundColor(Theme.text)
+            .padding(34)
+            .frame(maxWidth: 540)
+            .background(RoundedRectangle(cornerRadius: 22).fill(Theme.surface))
+            if askPin {
+                ParentPinView(title: "Mã PIN phụ huynh để cho xem thêm", onCancel: { askPin = false }) {
+                    askPin = false
+                    choose = true
+                }
+            }
+        }
+        .confirmationDialog("Cho \(Prefs.profile.name) xem thêm", isPresented: $choose, titleVisibility: .visible) {
+            ForEach(WatchLimit.grants, id: \.self) { g in
+                Button("Cho xem thêm \(WatchLimit.dailyLabel(g))") { m.grantLimit(g) }
+            }
+            Button("Không giới hạn tới 6 giờ sáng") { m.grantLimit(nil) }
+            Button("Huỷ", role: .cancel) {}
+        }
     }
 }
 
@@ -639,6 +694,11 @@ final class PlayerController: UIHostingController<PlayerView> {
 
     @objc private func key(_ c: UIKeyCommand) {
         guard let input = c.input else { return }
+        // Đang hiện màn hết giờ xem: phím không điều khiển phim (Esc = thoát)
+        if model.limitBlock != nil {
+            if input == UIKeyCommand.inputEscape { model.close() }
+            return
+        }
         model.userActivity()
         if model.panelShown {
             if input == UIKeyCommand.inputEscape || input == "m" || input == UIKeyCommand.inputDownArrow { model.hidePanel() }

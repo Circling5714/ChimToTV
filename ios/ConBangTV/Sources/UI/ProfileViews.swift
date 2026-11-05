@@ -33,6 +33,7 @@ struct ProfilePickerView: View {
     @State private var pinFor: Profile?
     @State private var adding = false
     @State private var settings = false
+    @State private var parentForAdd = false
 
     /// Cột cố định (tối đa 4 ô một hàng — vừa cả iPad dọc): lưới nằm giữa màn hình.
     private var cols: [GridItem] {
@@ -56,7 +57,10 @@ struct ProfilePickerView: View {
                         .accessibilityLabel(p.name)
                     }
                     if app.profiles.count < Prefs.maxProfiles {
-                        Button { adding = true } label: { tile(nil) }
+                        Button {
+                            // Đã có giới hạn giờ xem: thêm người cần mã PIN phụ huynh
+                            if Prefs.anyLimits && Prefs.hasParentPin { parentForAdd = true } else { adding = true }
+                        } label: { tile(nil) }
                             .buttonStyle(PressScale())
                             .accessibilityLabel("Thêm người")
                     }
@@ -85,6 +89,12 @@ struct ProfilePickerView: View {
                         .padding(24)
                     }
                     Spacer()
+                }
+            }
+            if parentForAdd {
+                ParentPinView(title: "Mã PIN phụ huynh để thêm người xem", onCancel: { parentForAdd = false }) {
+                    parentForAdd = false
+                    adding = true
                 }
             }
             if let p = pinFor {
@@ -226,6 +236,7 @@ struct ProfileEditView: View {
     @State private var firstPin = ""
     @State private var mismatch = false
     @State private var confirmDelete = false
+    @State private var parentForDelete = false
     @State private var locked: Bool
 
     init(editing: Profile?) {
@@ -283,7 +294,9 @@ struct ProfileEditView: View {
                             }
                         }
                         if app.profiles.count > 1 {
-                            Button("Xoá người xem này", role: .destructive) { confirmDelete = true }
+                            Button("Xoá người xem này", role: .destructive) {
+                                if Prefs.anyLimits && Prefs.hasParentPin { parentForDelete = true } else { confirmDelete = true }
+                            }
                         }
                     }
                 }
@@ -306,6 +319,12 @@ struct ProfileEditView: View {
         }
         .navigationViewStyle(.stack)
         .overlay {
+            if parentForDelete {
+                ParentPinView(title: "Mã PIN phụ huynh để xoá người xem", onCancel: { parentForDelete = false }) {
+                    parentForDelete = false
+                    confirmDelete = true
+                }
+            }
             if pinStep > 0, let p = editing {
                 PinPad(title: pinStep == 1 ? "Mã PIN mới cho \(p.name)" : "Nhập lại mã PIN",
                        subtitle: pinStep == 1 ? (mismatch ? "Hai lần nhập không khớp — nhập lại" : "\(Prefs.pinLength) số") : nil,
