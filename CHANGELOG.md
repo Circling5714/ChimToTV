@@ -6,6 +6,20 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 
+## 2.4 — 05/11/2026
+
+- **Dùng tốt trên điện thoại Android:** xoay dọc được (trước đây luôn nằm ngang). Cầm dọc thì màn chính giống bản iPhone:
+  thanh trên cùng ☰ · tên mục · tên trang, bấm ☰ để mở menu trượt ra từ bên trái; lưới 3 cột. Chi tiết phim: poster nhỏ,
+  hàng nút xuống dưới rộng cả màn. Trình phát luôn ngang, ẩn thanh điều hướng. Xoay lúc đang dùng thì tự đổi bố cục.
+- Cài đặt: hàng nút tự xuống dòng khi không đủ chỗ (cả trên TV — trước đây nút cuối của hàng dài bị tràn ra ngoài),
+  nút chữ dài không bị cắt; cầm dọc thì các ô proxy xếp dọc.
+- «Ai đang xem?»: các ô tự xuống dòng, căn giữa; sửa lỗi có lúc phím ◀ ▶ của remote không chọn được người xem.
+- Điện thoại Android 15: nội dung không bị tai thỏ và thanh điều hướng che; Duyệt web không bị bàn phím ảo che.
+- versionCode 22 · tag `v2.4` · commit `9f78cef` · SHA-256 APK
+  `9501df8fb614d9d3b51dafa7790fd56b03e59141a47c9b9b39d2ee511ab8b77f`
+- Cập nhật tự động 2.3 → 2.4 đã thử trên TV box. Giao diện cầm dọc thử trên TV box giả lập màn điện thoại 360dp; chưa thử
+  trên điện thoại thật.
+
 ## iPad 1.4 — 05/11/2026
 
 - **Vượt chặn nhà mạng mức 2** (Cài đặt → Vượt chặn nhà mạng → Mức 1 / Mức 2), như TV 2.3: mẩu đầu của gói mở kết nối HTTPS

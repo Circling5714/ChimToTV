@@ -3,7 +3,8 @@
 ![Côn Bằng TV](design/banner-1280.png)
 
 App Android TV xem phim hoạt hình 3D (và phim bộ / phim lẻ ở phimmois.fun) từ trang web bằng remote hoặc bàn phím
-(trước đây tên là ChimTo TV — vẫn cùng một app, cài đè và tự cập nhật bình thường).
+(trước đây tên là ChimTo TV — vẫn cùng một app, cài đè và tự cập nhật bình thường). Từ 2.4 dùng tốt cả trên điện thoại
+Android, cầm dọc hay ngang — xem [Điện thoại Android](#điện-thoại-android-từ-24).
 Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, nên trang đổi tên miền chỉ cần sửa link trong **Cài đặt**.
 
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
@@ -114,6 +115,21 @@ Cho TV box nối màn cảm ứng và điện thoại — chạm thay remote lú
   Thanh tự ẩn sau 5 giây (phim đang dừng thì ở lại).
 - **Các màn khác:** chạm, vuốt, giữ (xoá khỏi lịch sử) như điện thoại; có nút **‹ Quay lại** ở góc trên (trang chủ:
   **Thoát**; Duyệt web: góc dưới trái). Nút chỉ hiện khi đang dùng cảm ứng, bấm remote là ẩn.
+
+## Điện thoại Android (từ 2.4)
+
+Cùng một tệp APK với bản TV. Máy không phải TV (không có chế độ TV / leanback) thì app xoay theo máy (theo cả khoá xoay
+của điện thoại); TV / TV box vẫn luôn nằm ngang như cũ.
+
+- **Cầm dọc — màn chính** (giống bản iPhone): thanh trên cùng ☰ · tên mục · tên trang đang dùng; bấm **☰** để mở menu
+  trượt ra từ bên trái (chạm ra ngoài / chọn mục / Back là đóng). Lưới phim 3 cột. Không có nút "Thoát" — bấm Back của
+  điện thoại hai lần.
+- **Cầm dọc — chi tiết phim:** poster nhỏ, hàng nút (Xem tiếp, Xem từ tập 1, Theo dõi…) xuống dưới rộng cả màn, 4 cột tập.
+- **Cài đặt:** hàng nút tự xuống dòng (cả trên TV khi hàng quá dài), nút chữ dài hiện 2 dòng; cầm dọc thì ô proxy xếp dọc.
+- **Xem phim:** trình phát luôn nằm ngang, ẩn thanh điều hướng của điện thoại (vuốt từ mép màn để hiện lại một lúc).
+- Xoay lúc đang dùng: màn tự đổi bố cục, không tải lại. Màn hẹp = bề ngang dưới 600dp (điện thoại cầm dọc); điện thoại
+  cầm ngang / máy tính bảng dùng bố cục như TV.
+- Android 15: nội dung chừa chỗ tai thỏ / lỗ camera và thanh điều hướng; Duyệt web chừa chỗ bàn phím ảo.
 
 ## Người xem (từ 2.0)
 
@@ -269,6 +285,13 @@ tiếp). Máy soi nào ghép đủ cả luồng theo thứ tự rồi mới đ�
 Cần JDK 17 (`%USERPROFILE%\.jdks\jdk-17.0.20.1+1`) và Android SDK (`%LOCALAPPDATA%\Android\Sdk`).
 Thư mục `keys\` chứa khoá ký app — **giữ lại**, mất khoá thì bản mới không cài đè lên bản cũ được.
 
+**Bản gỡ lỗi Android** (`gradlew assembleDebug` → `app-debug.apk`): mã gói `vn.chimto.tv.debug`, tên "Côn Bằng Debug",
+cài song song bản thật (ký bằng khoá debug của máy dựng). Có **cổng gỡ lỗi 8790** trong mạng LAN (`app/src/debug/` —
+bản phát hành không có) để thử trên điện thoại khi không có adb: `GET /info` (màn, hướng, cỡ dp, khoảng chừa tai thỏ),
+`/shot?scale=0.5` (ảnh PNG, PixelCopy), `/views` (chữ + toạ độ), `/tap?x=&y=`, `/tapText?t=…`, `/swipe?x1=&y1=&x2=&y2=`,
+`/key?k=BACK`, `/orient?o=portrait|landscape|auto`, `/open?s=settings`. Thử giao diện điện thoại trên TV box: tạo tệp
+`files/force_phone` (+ `force_portrait` / `force_landscape`) bằng `adb shell run-as vn.chimto.tv.debug touch …`.
+
 **Bản iPad** dựng trên máy macOS của GitHub Actions (`.github/workflows/ios.yml`, repo công khai nên miễn phí) — không
 cần Mac:
 
@@ -408,6 +431,15 @@ từng phim; `Prefs.follows` lưu `count` (số tập lần kiểm gần nhất,
 lần cuối). Mốc nhạc mở đầu: `intro@<phim>` = "đầu,hết" (giây). Trình phát gắn số lần nạp trang (`window.__chimtoLoad`,
 `pageLoad`) vào trang phát và bỏ trạng thái của trang cũ; `resumePending` giữ chỗ xem dở cho tới khi trình phát tua
 xong (TV chậm có khi mất hàng chục giây) — lưu vị trí / đổi server / đổi bản trong lúc đó dùng chỗ cũ.
+
+Điện thoại (từ 2.4 — `Phone.kt`): `Screen.isTv` (chế độ TV hoặc leanback) giữ `sensorLandscape` của manifest, máy khác
+`BaseActivity.onCreate` đặt `SCREEN_ORIENTATION_FULL_USER` (trừ trình phát). Các màn khai báo `configChanges` nên xoay
+không dựng lại màn: `onConfigurationChanged` gọi `applyLayout()` (Main: chuyển `side` giữa hàng ngang và ngăn kéo nổi trên
+`mainFrame`, số cột lưới; Detail: chuyển hàng nút `btnScroll` giữa cột chữ và dưới poster; Settings: ô proxy dọc / ngang,
+nút 2 dòng). `FlowRow` = hàng tự xuống dòng (hàng nút Cài đặt, ô người xem). `BaseActivity.fitSystemBars` đệm
+`android:id/content` theo khoảng thanh hệ thống + tai thỏ (Android 15 bắt app vẽ tràn màn; máy cũ / TV thì bằng 0).
+Khung «Ai đang xem?» nhận chạm (`isClickable`) nhưng phải `isFocusable = false` — Android 8+ tự cho khung nhận chạm nhận
+tiêu điểm, giành mất tiêu điểm của remote.
 
 Cảm ứng (từ 1.9.3 — `TouchUi.kt`): mọi màn hình kế thừa `BaseActivity` (ESC = Back, nút "‹ Quay lại" khi
 `TouchUi.active` — lần cuối là chạm / chuột). Bấm phím thì thôi chế độ cảm ứng; riêng phím điều hướng đầu tiên sau khi
