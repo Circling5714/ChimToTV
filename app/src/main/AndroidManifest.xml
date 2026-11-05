@@ -47,10 +47,16 @@
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:screenOrientation="sensorLandscape" />
 
+        <!-- Hình trong hình / cửa sổ nhỏ trong app: một trình phát duy nhất (singleTask) chạy trong task riêng — thu nhỏ
+             thì màn trước đó của app hiện lại và đi lại bình thường; chọn phim khác lúc đang thu nhỏ thì phát ngay trong
+             trình phát này (onNewIntent) thay vì mở thêm trình phát thứ hai -->
         <activity
             android:name=".PlayerActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"
+            android:supportsPictureInPicture="true"
+            android:taskAffinity=".player"
             android:theme="@style/Theme.ChimTo.Player" />
 
         <activity

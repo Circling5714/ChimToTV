@@ -27,6 +27,53 @@
 
         <TextView
             style="@style/SettingsLabel"
+            android:text="Người xem (chọn một người để chuyển sang, đổi tên / màu, mã PIN, xoá)" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/profileRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnProfileAdd"
+                style="@style/TvButton"
+                android:text="＋ Thêm người xem" />
+
+            <TextView
+                android:id="@+id/btnAskProfile"
+                style="@style/TvButton" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Mỗi người có riêng: lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, phim theo dõi, trang phim đang dùng, server ưu tiên, Xem riêng, bước tua, tự chuyển tập, khung hình. Dùng chung cả nhà: danh sách trang phim, proxy, DNS mã hoá, dữ liệu duyệt web, điểm server, mốc nhạc mở đầu. Người có mã PIN phải nhập mã mới mở / sửa được."
+            android:textColor="@color/text_dim"
+            android:textSize="14sp" />
+
+        <TextView
+            style="@style/SettingsLabel"
             android:text="Địa chỉ trang phim" />
 
         <EditText
@@ -248,6 +295,23 @@
                 android:id="@+id/btnServer"
                 style="@style/TvButton" />
         </LinearLayout>
+
+        <!-- Hình trong hình (ẩn trên TV không có tính năng này) -->
+        <TextView
+            android:id="@+id/btnPipHome"
+            style="@style/TvButton"
+            android:layout_marginTop="8dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/pipHelp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Hình trong hình: lúc xem nhấn ▼ → «Thu nhỏ vào góc» (hoặc bấm Home nếu bật ở trên) — phim chạy tiếp ở góc màn hình, vẫn chọn phim khác / dùng app khác được. Đầu menu bên trái có «Phóng to» và «Tắt phim thu nhỏ»."
+            android:textColor="@color/text_dim"
+            android:textSize="14sp"
+            android:visibility="gone" />
 
         <TextView
             style="@style/SettingsLabel"

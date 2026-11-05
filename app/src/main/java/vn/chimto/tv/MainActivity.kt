@@ -31,9 +31,12 @@ class MainActivity : BaseActivity() {
     // Trang chủ: nút cảm ứng thoát app luôn (remote thì Back hai lần)
     override val touchBackLabel = "Thoát"
 
-    override fun onTouchBack() = finish()
+    override fun onTouchBack() {
+        PlayerActivity.closeMini()
+        finish()
+    }
 
-    private enum class Kind { HOME, SEARCH, HISTORY, FOLLOWS, CATEGORY, FILTER, SITE, WEB, CLEAR, SETTINGS }
+    private enum class Kind { PIP_EXPAND, PIP_CLOSE, PROFILE, HOME, SEARCH, HISTORY, FOLLOWS, CATEGORY, FILTER, SITE, WEB, CLEAR, SETTINGS }
 
     private data class Entry(val title: String, val kind: Kind, val url: String? = null)
 
@@ -58,6 +61,14 @@ class MainActivity : BaseActivity() {
     /** Hàng "Xem tiếp" đang nằm đầu trang chủ (để cập nhật khi xem xong quay lại); homeToken: trang chủ đang hiện. */
     private var head: List<GridRow> = emptyList()
     private var homeToken = -1
+
+    /** Màn "Ai đang xem?"; mainStarted: đã chọn xong người xem và tải màn chính lần đầu. */
+    private lateinit var picker: ProfilePicker
+    private var mainStarted = false
+    private var loadedProfile: String? = null
+
+    /** Phim vào / ra khỏi cửa sổ nhỏ (hình trong hình): thêm / bỏ mục "Phóng to", "Tắt phim thu nhỏ" ở đầu menu. */
+    private val pipChanged: () -> Unit = { if (!isFinishing && !isDestroyed) refreshMenu() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,16 +104,51 @@ class MainActivity : BaseActivity() {
             }
         }
 
+        picker = ProfilePicker(this, ::onProfilePicked) {
+            startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_SECTION, "profiles"))
+        }
+        PlayerActivity.pipListeners += pipChanged
+        // Nhà nhiều người xem: hỏi "Ai đang xem?" trước khi tải (mỗi người một trang phim, lịch sử riêng)
+        if (ProfileUi.mustAsk()) picker.show(gate = true) else startMain()
+    }
+
+    private fun startMain() {
+        mainStarted = true
+        loadedProfile = Prefs.profileId
+        showSiteLabel()
         rebuildMenu()
-        onMenu(menuAdapter.items.first())
+        onMenu(homeEntry())
+    }
+
+    private fun homeEntry() = menuAdapter.items.first { it.kind == Kind.HOME }
+
+    override fun onDestroy() {
+        PlayerActivity.pipListeners -= pipChanged
+        super.onDestroy()
     }
 
     override fun onResume() {
         super.onResume()
+        Updater.autoCheck(this)
+        // Quay lại app sau ≥ 30 phút không dùng: hỏi lại người xem (TV dùng chung cả nhà)
+        if (ProfileUi.mustPick || (AppUse.idleReturn(this) && ProfileUi.mustAsk())) {
+            ProfileUi.mustPick = false
+            picker.show(gate = true)
+        }
+        if (picker.shown) {
+            picker.refresh() // vừa thêm / sửa người xem trong Cài đặt
+            return
+        }
+        if (!mainStarted) {
+            startMain()
+            return
+        }
         showSiteLabel()
         val active = menuAdapter.active
-        if (loadedBase != null && (loadedBase != Prefs.baseUrl || loadedProxy != Prefs.proxyConfig())) {
-            // Link trang hoặc proxy vừa đổi trong Cài đặt → tải lại từ đầu
+        if (loadedProfile != Prefs.profileId ||
+            (loadedBase != null && (loadedBase != Prefs.baseUrl || loadedProxy != Prefs.proxyConfig()))
+        ) {
+            // Đổi người xem, link trang hoặc proxy trong Cài đặt → tải lại từ đầu
             reloadSite()
         } else if (active?.kind == Kind.HISTORY) {
             showHistory(focusFirst = false)
@@ -111,10 +157,39 @@ class MainActivity : BaseActivity() {
         } else if (homeToken == token) {
             refreshHead()
         }
-        // Mở phim có tập mới rồi quay ra: số "mới" trên menu đổi theo
-        if (menuAdapter.items.firstOrNull { it.kind == Kind.FOLLOWS }?.title != followsTitle()) rebuildMenu()
+        // Mở phim có tập mới rồi quay ra: số "mới" trên menu đổi theo; tên người xem / phim thu nhỏ cũng vậy
+        refreshMenu()
         if (homeToken == token || active?.kind == Kind.FOLLOWS) Follows.check(this, done = ::onFollowsChecked)
-        Updater.autoCheck(this)
+    }
+
+    /** Chọn xong người xem ở màn "Ai đang xem?" (đã nhập đúng mã PIN nếu có). */
+    private fun onProfilePicked(p: Profile) {
+        val changed = p.id != Prefs.profileId
+        ProfileUi.switchTo(p)
+        picker.hide()
+        when {
+            !mainStarted -> startMain()
+            changed -> reloadSite()
+            else -> focusMenu()
+        }
+        if (changed) toast("Người xem: ${p.name}")
+    }
+
+    /** Back ở màn "Ai đang xem?": xem tiếp bằng người đang dùng — trừ khi người đó có mã PIN và màn này đang chặn cửa. */
+    private fun closePicker() {
+        if (picker.gate && Prefs.profile.locked) {
+            PlayerActivity.closeMini()
+            finish()
+            return
+        }
+        picker.hide()
+        if (!mainStarted) startMain() else focusMenu()
+    }
+
+    private fun focusMenu() {
+        val i = menuAdapter.items.indexOf(menuAdapter.active).coerceAtLeast(0)
+        menu.scrollToPosition(i)
+        menu.post { menu.findViewHolderForAdapterPosition(i)?.itemView?.focusForRemote() }
     }
 
     /** Tên trang đang dùng, kèm "proxy" khi đang bật proxy SOCKS5 (để nhớ là app đang đi qua proxy). */
@@ -125,10 +200,11 @@ class MainActivity : BaseActivity() {
     }
 
     private fun reloadSite() {
+        loadedProfile = Prefs.profileId
         showSiteLabel()
         categories = emptyList()
         rebuildMenu()
-        onMenu(menuAdapter.items.first())
+        onMenu(homeEntry())
     }
 
     /**
@@ -222,13 +298,23 @@ class MainActivity : BaseActivity() {
         return "$host  —  " + parts.joinToString(" · ") + if (fastest) "  ★ nhanh nhất" else ""
     }
 
-    private fun rebuildMenu() {
-        val items = mutableListOf(
-            Entry("Trang chủ", Kind.HOME),
-            Entry("Tìm kiếm", Kind.SEARCH),
-            Entry("Lịch sử xem", Kind.HISTORY),
-            Entry(followsTitle(), Kind.FOLLOWS),
-        )
+    /** Dựng lại menu nếu có mục đổi tên (số phim có tập mới, người xem, phim đang thu nhỏ). */
+    private fun refreshMenu() {
+        if (menuAdapter.items.map { it.title } != menuEntries().map { it.title }) rebuildMenu()
+    }
+
+    private fun menuEntries(): List<Entry> {
+        val items = mutableListOf<Entry>()
+        // Phim đang thu nhỏ ở góc màn hình (hình trong hình): phóng to / tắt bằng remote
+        PlayerActivity.pipTitle?.let {
+            items += Entry("▶ Phóng to: $it", Kind.PIP_EXPAND)
+            items += Entry("✕ Tắt phim thu nhỏ", Kind.PIP_CLOSE)
+        }
+        if (Prefs.profiles.size >= 2) items += Entry("Người xem: ${Prefs.profile.name}", Kind.PROFILE)
+        items += Entry("Trang chủ", Kind.HOME)
+        items += Entry("Tìm kiếm", Kind.SEARCH)
+        items += Entry("Lịch sử xem", Kind.HISTORY)
+        items += Entry(followsTitle(), Kind.FOLLOWS)
         categories.forEach { items += Entry(it.title, Kind.CATEGORY, it.url) }
         // Trang kiểu PhimMoi: đủ thể loại / quốc gia của bộ lọc (menu trang chỉ có vài mục)
         if (NextSite.isKnown(Prefs.baseUrl)) {
@@ -239,6 +325,11 @@ class MainActivity : BaseActivity() {
         items += Entry("Duyệt web", Kind.WEB)
         items += Entry("Xoá dữ liệu web", Kind.CLEAR)
         items += Entry("Cài đặt", Kind.SETTINGS)
+        return items
+    }
+
+    private fun rebuildMenu() {
+        val items = menuEntries()
         // Giữ mục đang chọn (tên mục "Phim theo dõi" có thể đổi theo số tập mới)
         val active = menuAdapter.active
         menuAdapter.submit(items)
@@ -265,6 +356,18 @@ class MainActivity : BaseActivity() {
 
     private fun onMenu(entry: Entry) {
         when (entry.kind) {
+            Kind.PIP_EXPAND -> {
+                PlayerActivity.expandPip(this)
+                return
+            }
+            Kind.PIP_CLOSE -> {
+                PlayerActivity.closePip()
+                return
+            }
+            Kind.PROFILE -> {
+                picker.show(gate = false)
+                return
+            }
             Kind.WEB -> {
                 startActivity(Intent(this, WebActivity::class.java))
                 return
@@ -535,6 +638,10 @@ class MainActivity : BaseActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (picker.shown) {
+            closePicker()
+            return
+        }
         // Đang ở lưới / ô tìm kiếm → quay về menu; đang ở menu → nhấn 2 lần để thoát
         if (grid.hasFocus() || search.hasFocus()) {
             val i = menuAdapter.items.indexOf(menuAdapter.active)
@@ -544,6 +651,7 @@ class MainActivity : BaseActivity() {
         }
         val now = System.currentTimeMillis()
         if (now - lastBack < 2000) {
+            PlayerActivity.closeMini() // phim ở cửa sổ nhỏ trong app: thoát app là tắt luôn
             super.onBackPressed()
         } else {
             lastBack = now

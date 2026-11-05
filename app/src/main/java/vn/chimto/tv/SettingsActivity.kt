@@ -12,11 +12,15 @@ import android.widget.Toast
 class SettingsActivity : BaseActivity() {
     companion object {
         const val CONTACT_URL = "https://t.me/tivikit"
+
+        /** "profiles": mở Cài đặt ở mục Người xem (nút "Sửa người xem…" của màn "Ai đang xem?"). */
+        const val EXTRA_SECTION = "section"
     }
 
     private lateinit var url: EditText
     private lateinit var result: TextView
     private lateinit var recent: LinearLayout
+    private lateinit var profileRow: LinearLayout
     private lateinit var serverBtn: TextView
     private var testToken = 0
 
@@ -36,6 +40,8 @@ class SettingsActivity : BaseActivity() {
         url = findViewById(R.id.url)
         result = findViewById(R.id.testResult)
         recent = findViewById(R.id.recent)
+        profileRow = findViewById(R.id.profileRow)
+        setupProfiles()
 
         url.setText(Prefs.baseUrl)
         url.leaveWithUpDown()
@@ -82,9 +88,35 @@ class SettingsActivity : BaseActivity() {
             toast("Đã đặt lại. App sẽ nhớ server được chọn lần tới trong lúc xem.")
         }
 
-        findViewById<View>(R.id.btnClearHistory).setOnClickListener {
-            Prefs.clearHistory()
-            toast("Đã xoá lịch sử xem.")
+        // Thu nhỏ phim: hình trong hình của Android (TV có tính năng này) hoặc cửa sổ nhỏ trong app
+        val pipHelp = findViewById<TextView>(R.id.pipHelp)
+        pipHelp.visibility = View.VISIBLE
+        if (PlayerActivity.pipSupported(this)) {
+            // Bấm Home khi đang xem: thu nhỏ phim vào góc (chỉ TV / máy có hình trong hình)
+            val pipBtn = findViewById<TextView>(R.id.btnPipHome)
+            fun showPip() {
+                pipBtn.text = "Bấm Home khi đang xem: ${if (Prefs.pipOnHome) "thu nhỏ phim vào góc" else "dừng phim"}"
+            }
+            showPip()
+            pipBtn.visibility = View.VISIBLE
+            pipBtn.setOnClickListener {
+                Prefs.pipOnHome = !Prefs.pipOnHome
+                showPip()
+            }
+        } else {
+            pipHelp.text = "Thu nhỏ phim: lúc xem nhấn ▼ → «Thu nhỏ vào góc» — phim chạy tiếp ở góc màn hình trong lúc chọn " +
+                "phim khác trong app. TV này không có hình trong hình của Android nên phim không nổi lên app khác được; rời " +
+                "app thì phim dừng. Đầu menu bên trái có «Phóng to» và «Tắt phim thu nhỏ»."
+        }
+
+        // Nhà nhiều người xem: các nút của riêng người đang dùng ghi rõ tên
+        val who = if (Prefs.profiles.size >= 2) Prefs.profile.name else null
+        findViewById<TextView>(R.id.btnClearHistory).apply {
+            text = if (who != null) "Xoá lịch sử xem của $who" else "Xoá lịch sử xem"
+            setOnClickListener {
+                Prefs.clearHistory()
+                toast(if (who != null) "Đã xoá lịch sử xem của $who." else "Đã xoá lịch sử xem.")
+            }
         }
         findViewById<View>(R.id.btnClearCache).setOnClickListener {
             ImageLoader.clearDisk()
@@ -103,7 +135,7 @@ class SettingsActivity : BaseActivity() {
         }
         val privateBtn = findViewById<TextView>(R.id.btnPrivate)
         fun showPrivate() {
-            privateBtn.text = "Xem riêng (không lưu lịch sử): ${if (Prefs.privateMode) "Bật" else "Tắt"}"
+            privateBtn.text = "Xem riêng${who?.let { " của $it" } ?: ""} (không lưu lịch sử): ${if (Prefs.privateMode) "Bật" else "Tắt"}"
         }
         showPrivate()
         privateBtn.setOnClickListener {
@@ -143,7 +175,51 @@ class SettingsActivity : BaseActivity() {
             "${getString(R.string.app_name)} $version — xem phim từ trang web trên tivi bằng remote / bàn phím."
         showSites()
         setupProxy()
-        url.requestFocus()
+        if (intent.getStringExtra(EXTRA_SECTION) == "profiles") {
+            val i = Prefs.profiles.indexOfFirst { it.id == Prefs.profileId }.coerceAtLeast(0)
+            profileRow.getChildAt(i)?.requestFocus()
+        } else {
+            url.requestFocus()
+        }
+    }
+
+    // ---- Người xem (xem Prefs.Profile, ProfileUi) ----
+
+    private fun setupProfiles() {
+        showProfiles()
+        findViewById<View>(R.id.btnProfileAdd).setOnClickListener {
+            ProfileUi.add(this) { p ->
+                toast("Đã thêm ${p.name}. Đổi người xem: mục «Người xem» đầu menu, hoặc chọn lúc mở app.")
+                reopenAtProfiles()
+            }
+        }
+        val ask = findViewById<TextView>(R.id.btnAskProfile)
+        fun showAsk() {
+            ask.text = "Hỏi «Ai đang xem?» khi mở app: ${if (Prefs.askProfile) "Bật" else "Tắt"}"
+        }
+        showAsk()
+        ask.setOnClickListener {
+            Prefs.askProfile = !Prefs.askProfile
+            showAsk()
+        }
+    }
+
+    private fun showProfiles() {
+        profileRow.removeAllViews()
+        val inflater = LayoutInflater.from(this)
+        for (p in Prefs.profiles) {
+            val b = inflater.inflate(R.layout.item_button, profileRow, false) as TextView
+            ProfileUi.showOn(b, p)
+            b.isActivated = p.id == Prefs.profileId
+            b.setOnClickListener { ProfileUi.manage(this, p) { reopenAtProfiles() } }
+            profileRow.addView(b)
+        }
+    }
+
+    /** Đổi người xem / sửa người xem: dựng lại cả màn (trang phim, server ưu tiên, Xem riêng… là của người đang dùng). */
+    private fun reopenAtProfiles() {
+        intent.putExtra(EXTRA_SECTION, "profiles")
+        recreate()
     }
 
     // ---- Proxy SOCKS5 (xem AppProxy) ----

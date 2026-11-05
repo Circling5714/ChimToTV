@@ -332,6 +332,13 @@
                     style="@style/TvButton"
                     android:text="Tập sau  ▶" />
 
+                <!-- Hình trong hình (ẩn trên TV không có tính năng này) -->
+                <TextView
+                    android:id="@+id/btnPip"
+                    style="@style/TvButton"
+                    android:text="Thu nhỏ vào góc"
+                    android:visibility="gone" />
+
                 <TextView
                     android:id="@+id/btnReload"
                     style="@style/TvButton"

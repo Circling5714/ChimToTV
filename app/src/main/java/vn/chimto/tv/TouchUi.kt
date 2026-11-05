@@ -76,6 +76,13 @@ abstract class BaseActivity : Activity() {
     override fun onResume() {
         super.onResume()
         showTouchBack() // màn trước có thể vừa đổi giữa chạm / remote
+        if (this is PlayerActivity) return
+        // Vừa quay lại app (bấm biểu tượng app) mà trình phát toàn màn hình đang ở nền: đưa ra lại (trình phát chạy task
+        // riêng nên Android mở màn chính). Quay lại sau lâu mà phải hỏi "Ai đang xem?" thì thôi.
+        if (AppUse.returnedTo(this) && this !is WebActivity && !(AppUse.wasIdle && ProfileUi.mustAsk())) {
+            PlayerActivity.showHidden(this)
+        }
+        MiniPlayer.attach(this) // phim đang ở cửa sổ nhỏ trong app: nổi ở góc màn này
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
@@ -90,6 +97,8 @@ abstract class BaseActivity : Activity() {
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
         keyUsed(e)
+        // Phim đang thu nhỏ (hình trong hình): phím phát / dừng / chuyển tập của remote điều khiển phim đó
+        if (PlayerActivity.mediaKey(e)) return true
         return escapeAsBack(e) || super.dispatchKeyEvent(e)
     }
 

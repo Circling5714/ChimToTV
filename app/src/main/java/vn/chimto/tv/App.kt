@@ -11,6 +11,7 @@ class App : Application() {
         AppProxy.apply()
         ImageLoader.init(this)
         AutoClear.init(this)
+        AppUse.init(this)
         if (BuildConfig.DEBUG) WebView.setWebContentsDebuggingEnabled(true)
     }
 }

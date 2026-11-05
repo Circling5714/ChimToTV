@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URL
+import java.security.MessageDigest
 
 data class HistoryItem(
     val filmUrl: String, val title: String, val poster: String?,
@@ -17,6 +18,18 @@ data class Follow(
     val count: Int, val latest: String, val seen: Int,
 ) {
     val newCount get() = (count - seen).coerceAtLeast(0)
+}
+
+/**
+ * Người xem (hồ sơ). id "" = người xem đầu tiên: dữ liệu nằm ở các khoá cũ (như trước khi có hồ sơ — cài đè / hạ bản
+ * không mất gì); người thêm sau dùng khoá có hậu tố "#<id>". color = chỉ số trong Prefs.PROFILE_COLORS; pin = mã băm của
+ * mã PIN (null = không khoá).
+ */
+data class Profile(val id: String, val name: String, val color: Int, val pin: String? = null) {
+    val locked get() = pin != null
+
+    /** Chữ cái đầu tên (trên vòng tròn màu). */
+    val initial get() = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
 }
 
 /** Cài đặt + lịch sử xem, lưu trong SharedPreferences. */
@@ -33,8 +46,14 @@ object Prefs {
 
     private lateinit var sp: SharedPreferences
 
-    fun init(context: Context) {
-        sp = context.getSharedPreferences("chimto", Context.MODE_PRIVATE)
+    fun init(context: Context) = init(context.getSharedPreferences("chimto", Context.MODE_PRIVATE))
+
+    /** Test JVM truyền SharedPreferences giả. */
+    internal fun init(prefs: SharedPreferences) {
+        sp = prefs
+        privatePositions.clear()
+        pid = sp.getString("profile", "") ?: ""
+        if (profiles.none { it.id == pid }) pid = profiles.first().id
         for (url in ADDED_SITES) {
             val key = "preset_added@$url"
             if (sp.getBoolean(key, false)) continue
@@ -43,11 +62,146 @@ object Prefs {
         }
     }
 
+    // ---- Người xem (hồ sơ) ----
+
+    const val MAX_PROFILES = 8
+    const val PIN_LENGTH = 4
+    private const val FIRST_PROFILE_NAME = "Cả nhà"
+
+    /** Màu vòng tròn của người xem (người thêm sau lấy màu chưa ai dùng). */
+    val PROFILE_COLORS = intArrayOf(
+        0xFF2BAF85.toInt(), 0xFFE5533D.toInt(), 0xFF3B82F6.toInt(), 0xFFF59E0B.toInt(),
+        0xFF8B5CF6.toInt(), 0xFF06B6D4.toInt(), 0xFFEC4899.toInt(), 0xFF84CC16.toInt(),
+    )
+    val PROFILE_COLOR_NAMES = listOf("Xanh lá", "Đỏ cam", "Xanh dương", "Vàng", "Tím", "Xanh ngọc", "Hồng", "Xanh nõn chuối")
+
+    /**
+     * Khoá riêng từng người xem: lịch sử, chỗ đang xem, phim theo dõi, Xem riêng, trang phim đang dùng, cách xem (bước
+     * tua, tự chuyển tập, khung hình) + server ưu tiên theo trang ("server_type@<trang>"). Còn lại (danh sách trang,
+     * proxy, DNS, điểm server, mốc nhạc mở đầu, cập nhật…) dùng chung cả nhà.
+     */
+    private val PROFILE_KEYS = setOf(
+        "history", "positions", "pos_film", "follows", "last_follow_check", "private_mode",
+        "base_url", "seek_step", "auto_next", "video_fill",
+    )
+    private val PROFILE_PREFIXES = listOf("server_type@", "server_label@")
+
+    /** Người thêm sau bắt đầu với cài đặt của người đang dùng (lịch sử, theo dõi, Xem riêng thì trống). */
+    private val COPIED_KEYS = setOf("base_url", "seek_step", "auto_next", "video_fill")
+
+    @Volatile private var pid = ""
+
+    /** Khoá của người xem đang dùng. */
+    private fun k(key: String) = if (pid.isEmpty()) key else "$key#$pid"
+
+    private fun isProfileKey(base: String) = base in PROFILE_KEYS || PROFILE_PREFIXES.any { base.startsWith(it) }
+
+    /** Các khoá riêng đang có của một người xem: (khoá thật, khoá gốc không hậu tố). */
+    private fun ownKeys(id: String): List<Pair<String, String>> = sp.all.keys.mapNotNull { key ->
+        val base = if (id.isEmpty()) key.takeIf { '#' !in it } else key.takeIf { it.endsWith("#$id") }?.removeSuffix("#$id")
+        base?.takeIf { isProfileKey(it) }?.let { key to it }
+    }
+
+    val profiles: List<Profile>
+        get() {
+            val list = try {
+                val a = JSONArray(sp.getString("profiles", null) ?: "[]")
+                List(a.length()) { i ->
+                    val o = a.getJSONObject(i)
+                    Profile(o.getString("id"), o.getString("name"), o.optInt("color"), o.optString("pin").ifEmpty { null })
+                }
+            } catch (e: Exception) {
+                emptyList()
+            }
+            return list.ifEmpty { listOf(Profile("", FIRST_PROFILE_NAME, 0)) }
+        }
+
+    private fun saveProfiles(list: List<Profile>) {
+        val a = JSONArray()
+        list.forEach {
+            a.put(JSONObject().put("id", it.id).put("name", it.name).put("color", it.color).put("pin", it.pin ?: ""))
+        }
+        sp.edit().putString("profiles", a.toString()).apply()
+    }
+
+    /** Người xem đang dùng. */
+    val profile: Profile get() = profiles.let { list -> list.firstOrNull { it.id == pid } ?: list.first() }
+
+    val profileId: String get() = pid
+
+    fun switchProfile(id: String) {
+        if (profiles.none { it.id == id }) return
+        pid = id
+        privatePositions.clear()
+        sp.edit().putString("profile", id).apply()
+    }
+
+    /** Thêm người xem (chưa chuyển sang): lịch sử trống, trang phim / server ưu tiên / cách xem chép từ người đang dùng. */
+    fun addProfile(name: String): Profile {
+        val list = profiles
+        var n = 1
+        while (list.any { it.id == "p$n" }) n++
+        val id = "p$n"
+        val used = list.map { it.color }.toSet()
+        val color = PROFILE_COLORS.indices.firstOrNull { it !in used } ?: (list.size % PROFILE_COLORS.size)
+        val all = sp.all
+        val e = sp.edit()
+        for ((key, base) in ownKeys(pid)) {
+            if (base !in COPIED_KEYS && PROFILE_PREFIXES.none { base.startsWith(it) }) continue
+            when (val v = all[key]) {
+                is String -> e.putString("$base#$id", v)
+                is Int -> e.putInt("$base#$id", v)
+                is Boolean -> e.putBoolean("$base#$id", v)
+                is Long -> e.putLong("$base#$id", v)
+            }
+        }
+        e.putString("base_url#$id", baseUrl).apply()
+        val p = Profile(id, name.trim(), color)
+        saveProfiles(list + p)
+        return p
+    }
+
+    fun renameProfile(id: String, name: String) = saveProfiles(profiles.map { if (it.id == id) it.copy(name = name.trim()) else it })
+
+    fun setProfileColor(id: String, color: Int) = saveProfiles(profiles.map { if (it.id == id) it.copy(color = color) else it })
+
+    /** Đặt mã PIN (4 số); null = tắt khoá. */
+    fun setProfilePin(id: String, pin: String?) =
+        saveProfiles(profiles.map { if (it.id == id) it.copy(pin = pin?.let { p -> pinHash(id, p) }) else it })
+
+    fun checkPin(p: Profile, pin: String): Boolean = p.pin == null || p.pin == pinHash(p.id, pin)
+
+    /** Không lưu mã PIN thật, chỉ lưu mã băm (khoá cho trẻ em khỏi vào nhầm, không phải mật khẩu bảo mật). */
+    private fun pinHash(id: String, pin: String): String =
+        MessageDigest.getInstance("SHA-256").digest("chimto-pin:$id:$pin".toByteArray()).joinToString("") { "%02x".format(it) }
+
+    /** Xoá người xem cùng toàn bộ dữ liệu riêng (lịch sử, theo dõi…); còn một người thì không xoá được. */
+    fun deleteProfile(id: String) {
+        val list = profiles
+        if (list.size < 2 || list.none { it.id == id }) return
+        val e = sp.edit()
+        ownKeys(id).forEach { e.remove(it.first) }
+        e.apply()
+        val rest = list.filter { it.id != id }
+        saveProfiles(rest)
+        if (pid == id) switchProfile(rest.first().id)
+    }
+
+    /** Hỏi "Ai đang xem?" khi mở app (nhà có từ 2 người xem). */
+    var askProfile: Boolean
+        get() = sp.getBoolean("ask_profile", true)
+        set(value) = sp.edit().putBoolean("ask_profile", value).apply()
+
+    /** Bấm Home khi đang xem: thu nhỏ phim vào góc màn hình (hình trong hình) thay vì dừng. */
+    var pipOnHome: Boolean
+        get() = sp.getBoolean("pip_on_home", true)
+        set(value) = sp.edit().putBoolean("pip_on_home", value).apply()
+
     /** Trang phim đang dùng (địa chỉ gốc, không có dấu / ở cuối). Đặt trang mới thì tự thêm vào danh sách. */
     var baseUrl: String
-        get() = sp.getString("base_url", null) ?: DEFAULT_BASE
+        get() = sp.getString(k("base_url"), null) ?: sp.getString("base_url", null) ?: DEFAULT_BASE
         set(value) {
-            sp.edit().putString("base_url", value).apply()
+            sp.edit().putString(k("base_url"), value).apply()
             if (value !in sites) sites = sites + value
         }
 
@@ -60,25 +214,26 @@ object Prefs {
         }
         set(value) = sp.edit().putString("sites", JSONArray(value.distinct()).toString()).apply()
 
-    /** data-type của server người xem chọn lần gần nhất trên từng trang (vd "tiktik"). */
+    /** data-type của server người xem chọn lần gần nhất trên từng trang (vd "tiktik"). Bản rất cũ lưu chung một khoá. */
     fun serverType(host: String?): String? =
-        sp.getString("server_type@$host", null) ?: sp.getString("server_type", null)
+        sp.getString(k("server_type@$host"), null) ?: sp.getString("server_type", null)?.takeIf { pid.isEmpty() }
 
     fun serverLabel(host: String?): String? =
-        sp.getString("server_label@$host", null) ?: sp.getString("server_label", null)
+        sp.getString(k("server_label@$host"), null) ?: sp.getString("server_label", null)?.takeIf { pid.isEmpty() }
 
     fun setServer(host: String?, type: String?, label: String?) {
-        sp.edit().putString("server_type@$host", type).putString("server_label@$host", label)
-            .remove("server_type").remove("server_label").apply()
+        val e = sp.edit().putString(k("server_type@$host"), type).putString(k("server_label@$host"), label)
+        if (pid.isEmpty()) e.remove("server_type").remove("server_label")
+        e.apply()
     }
 
     var seekStep: Int
-        get() = sp.getInt("seek_step", 10)
-        set(value) = sp.edit().putInt("seek_step", value).apply()
+        get() = sp.getInt(k("seek_step"), 10)
+        set(value) = sp.edit().putInt(k("seek_step"), value).apply()
 
     var autoNext: Boolean
-        get() = sp.getBoolean("auto_next", true)
-        set(value) = sp.edit().putBoolean("auto_next", value).apply()
+        get() = sp.getBoolean(k("auto_next"), true)
+        set(value) = sp.edit().putBoolean(k("auto_next"), value).apply()
 
     /** Điểm các lần xem theo trang + server (xem PlayStats). */
     var playStats: JSONObject
@@ -198,7 +353,7 @@ object Prefs {
 
     val history: List<HistoryItem>
         get() {
-            val a = JSONArray(sp.getString("history", "[]"))
+            val a = JSONArray(sp.getString(k("history"), "[]"))
             return List(a.length()) { i ->
                 val o = a.getJSONObject(i)
                 HistoryItem(
@@ -212,7 +367,7 @@ object Prefs {
 
     fun addHistory(item: HistoryItem) {
         val list = listOf(item) + history.filter { it.filmUrl != item.filmUrl }
-        sp.edit().putString("history", historyJson(list.take(MAX_HISTORY))).apply()
+        sp.edit().putString(k("history"), historyJson(list.take(MAX_HISTORY))).apply()
     }
 
     private fun historyJson(list: List<HistoryItem>): String {
@@ -226,9 +381,10 @@ object Prefs {
         return a.toString()
     }
 
+    /** Xoá lịch sử xem + chỗ đang xem của người xem đang dùng. */
     fun clearHistory() {
         privatePositions.clear()
-        sp.edit().remove("history").remove("positions").remove("pos_film").apply()
+        sp.edit().remove(k("history")).remove(k("positions")).remove(k("pos_film")).apply()
     }
 
     /** Xoá một phim khỏi lịch sử, kèm chỗ đang xem / đánh dấu đã xem của các tập phim đó. */
@@ -243,16 +399,16 @@ object Prefs {
             films.remove(it)
             privatePositions.remove(it)
         }
-        sp.edit().putString("history", historyJson(history.filter { it.filmUrl != filmUrl }))
-            .putString("positions", o.toString())
-            .putString("pos_film", films.toString()).apply()
+        sp.edit().putString(k("history"), historyJson(history.filter { it.filmUrl != filmUrl }))
+            .putString(k("positions"), o.toString())
+            .putString(k("pos_film"), films.toString()).apply()
     }
 
     // ---- Phim theo dõi ----
 
     val follows: List<Follow>
         get() {
-            val a = JSONArray(sp.getString("follows", "[]"))
+            val a = JSONArray(sp.getString(k("follows"), "[]"))
             return List(a.length()) { i ->
                 val o = a.getJSONObject(i)
                 Follow(
@@ -270,7 +426,7 @@ object Prefs {
                     .put("count", it.count).put("latest", it.latest).put("seen", it.seen)
             )
         }
-        sp.edit().putString("follows", a.toString()).apply()
+        sp.edit().putString(k("follows"), a.toString()).apply()
     }
 
     fun followOf(filmUrl: String): Follow? = follows.firstOrNull { it.filmUrl == filmUrl }
@@ -297,8 +453,8 @@ object Prefs {
     }
 
     var lastFollowCheck: Long
-        get() = sp.getLong("last_follow_check", 0)
-        set(value) = sp.edit().putLong("last_follow_check", value).apply()
+        get() = sp.getLong(k("last_follow_check"), 0)
+        set(value) = sp.edit().putLong(k("last_follow_check"), value).apply()
 
     // ---- Nhạc mở đầu (mốc riêng từng phim, giây) ----
 
@@ -314,15 +470,15 @@ object Prefs {
 
     /** Lấp đầy màn hình: video rộng (21:9) phóng cho hết viền đen, cắt bớt hai bên. */
     var videoFill: Boolean
-        get() = sp.getBoolean("video_fill", false)
-        set(value) = sp.edit().putBoolean("video_fill", value).apply()
+        get() = sp.getBoolean(k("video_fill"), false)
+        set(value) = sp.edit().putBoolean(k("video_fill"), value).apply()
 
     // ---- Riêng tư ----
 
-    /** Xem riêng: không ghi lịch sử xem và chỗ đang xem (vẫn đọc được chỗ đã lưu từ trước). */
+    /** Xem riêng: không ghi lịch sử xem và chỗ đang xem (vẫn đọc được chỗ đã lưu từ trước). Riêng từng người xem. */
     var privateMode: Boolean
-        get() = sp.getBoolean("private_mode", false)
-        set(value) = sp.edit().putBoolean("private_mode", value).apply()
+        get() = sp.getBoolean(k("private_mode"), false)
+        set(value) = sp.edit().putBoolean(k("private_mode"), value).apply()
 
     /** Tự xoá dữ liệu duyệt web khi rời app (xem AutoClear). */
     var autoClearWeb: Boolean
@@ -336,7 +492,7 @@ object Prefs {
 
     // ---- Vị trí đang xem từng tập (giây) ----
 
-    private fun positions(): JSONObject = JSONObject(sp.getString("positions", "{}") ?: "{}")
+    private fun positions(): JSONObject = JSONObject(sp.getString(k("positions"), "{}") ?: "{}")
 
     /** Xem riêng: chỗ đang xem chỉ giữ trong bộ nhớ tới khi tắt app (đổi bản / lỡ thoát vẫn xem tiếp được). */
     private val privatePositions = HashMap<String, Int>()
@@ -350,7 +506,7 @@ object Prefs {
     fun watchedEpisodes(): Set<String> = positions().keys().asSequence().toHashSet()
 
     /** Tập → phim (để xoá một phim khỏi lịch sử thì xoá được cả chỗ đang xem các tập của nó). */
-    private fun posFilms(): JSONObject = JSONObject(sp.getString("pos_film", "{}") ?: "{}")
+    private fun posFilms(): JSONObject = JSONObject(sp.getString(k("pos_film"), "{}") ?: "{}")
 
     fun savePosition(epUrl: String, seconds: Int, filmUrl: String) {
         if (privateMode) {
@@ -370,6 +526,6 @@ object Prefs {
                 films.remove(it)
             }
         }
-        sp.edit().putString("positions", o.toString()).putString("pos_film", films.toString()).apply()
+        sp.edit().putString(k("positions"), o.toString()).putString(k("pos_film"), films.toString()).apply()
     }
 }

@@ -116,7 +116,16 @@ fun formatTime(seconds: Double): String {
 /** Thông báo nhỏ tự ẩn (Toast hệ thống trên một số TV box bị ẩn sau WebView toàn màn hình). */
 class Notice(private val view: TextView) {
     private val hide = Runnable { view.visibility = View.GONE }
+
+    /** Không hiện gì (phim đang thu nhỏ — hình trong hình: cửa sổ quá nhỏ cho chữ). */
+    var muted = false
+        set(value) {
+            field = value
+            if (value) hide()
+        }
+
     fun show(text: String, ms: Long = 3000) {
+        if (muted) return
         view.text = text
         view.visibility = View.VISIBLE
         view.removeCallbacks(hide)

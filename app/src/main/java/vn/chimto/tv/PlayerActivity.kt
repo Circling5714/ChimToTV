@@ -2,15 +2,23 @@ package vn.chimto.tv
 
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
+import android.app.PendingIntent
+import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.util.Log
+import android.util.Rational
 import android.view.GestureDetector
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -34,8 +42,10 @@ import android.widget.TextView
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
+import java.lang.ref.WeakReference
 import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * Phát một tập phim.
@@ -46,6 +56,10 @@ import kotlin.math.min
  * (phát / dừng / tua) qua postMessage và báo trạng thái lên trang bọc; app đọc trạng thái mỗi giây.
  * Server cho link HLS trực tiếp (.m3u8, trang Next.js kiểu PhimMoi): app phát bằng trang riêng assets/hls.html
  * (hls.js đóng kèm, bỏ quảng cáo chèn giữa phim), agent nằm ngay trong trang đó.
+ *
+ * Hình trong hình (Android 7+ có tính năng này): nút trong menu ▼, hoặc bấm Home lúc đang phát (Cài đặt) → phim thu
+ * nhỏ vào góc, màn trước đó của app (hoặc màn hình chính TV) hiện bên dưới. Chỉ có một trình phát (singleTask): chọn
+ * phim khác lúc đang thu nhỏ thì phim đó mở ngay trong trình phát này (onNewIntent), phóng to lại toàn màn hình.
  */
 class PlayerActivity : BaseActivity() {
     // Có thanh điều khiển cảm ứng riêng (có nút Thoát), khỏi nút "‹ Quay lại" chung
@@ -54,6 +68,93 @@ class PlayerActivity : BaseActivity() {
     companion object {
         fun intent(context: Context, film: FilmDetail, ep: Episode): Intent =
             Intent(context, PlayerActivity::class.java).putExtra("film", film.url).putExtra("ep", ep.url)
+
+        private const val ACTION_PIP = "vn.chimto.tv.PIP"
+
+        private var currentRef: WeakReference<PlayerActivity>? = null
+        private val current: PlayerActivity? get() = currentRef?.get()?.takeIf { !it.isFinishing && !it.isDestroyed }
+
+        /** Màn khác (màn chính) cập nhật khi phim vào / ra khỏi cửa sổ nhỏ. */
+        val pipListeners = ArrayList<() -> Unit>()
+
+        private var pipSupport: Boolean? = null
+
+        /**
+         * TV / máy dùng được hình trong hình. Nhiều TV bị hãng tắt hẳn (Skyworth); máy ít RAM (TX3: ro.config.low_ram)
+         * hoặc không cho chia màn hình thì vẫn khai báo có, nhưng Android báo "Device doesn't support picture-in-picture
+         * mode" khi dùng — xét giống Android (ActivityManager.supportsMultiWindow).
+         */
+        @SuppressLint("DiscouragedApi") // config_supportsMultiWindow chỉ đọc được bằng tên
+        fun pipSupported(context: Context): Boolean = pipSupport ?: run {
+            val sys = android.content.res.Resources.getSystem()
+            val multiWindow = sys.getIdentifier("config_supportsMultiWindow", "bool", "android").let { it == 0 || sys.getBoolean(it) }
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            (Build.VERSION.SDK_INT >= 24 && context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE) &&
+                !am.isLowRamDevice && multiWindow).also { pipSupport = it }
+        }
+
+        /** Phim đang thu nhỏ — hình trong hình hoặc cửa sổ nhỏ trong app (vd "Tiên Nghịch — Tập 165"); null = không có. */
+        val pipTitle: String?
+            get() = current?.takeIf { it.small }?.let { p -> p.osdTitle.text.toString().ifEmpty { "phim đang xem" } }
+
+        /** Phóng phim đang thu nhỏ ra toàn màn hình (mở lại trình phát duy nhất — singleTask, task riêng). */
+        fun expandPip(context: Context) {
+            if (current?.small != true) return
+            context.startActivity(Intent(context, PlayerActivity::class.java).putExtra("expand", true))
+        }
+
+        fun closePip() {
+            current?.takeIf { it.small }?.finish()
+        }
+
+        /** Thoát app (Back ở màn chính) lúc phim đang ở cửa sổ nhỏ trong app: tắt phim (ra ngoài app không xem được). */
+        fun closeMini() {
+            current?.takeIf { it.mini }?.finish()
+        }
+
+        /** Rời hẳn app (Home, mở app khác) lúc phim ở cửa sổ nhỏ trong app: dừng phim, lưu chỗ xem. */
+        fun appLeft() {
+            val p = current?.takeIf { it.mini } ?: return
+            p.cmd("pause")
+            p.savePosition()
+        }
+
+        /**
+         * Quay lại app (bấm biểu tượng app) mà trình phát toàn màn hình đang nằm ở nền — trình phát chạy task riêng nên
+         * Android mở màn chính: đưa trình phát ra lại như trước.
+         */
+        fun showHidden(context: Context) {
+            val p = current ?: return
+            if (p.small || !p.stopped) return
+            context.startActivity(Intent(context, PlayerActivity::class.java).putExtra("expand", true))
+        }
+
+        /** Đổi người xem: lưu chỗ đang xem cho người cũ rồi đóng trình phát (đang thu nhỏ). */
+        fun closeForProfileSwitch() {
+            val p = current ?: return
+            p.savePosition()
+            p.session?.save(System.currentTimeMillis())
+            p.session = null
+            p.saveDisabled = true
+            p.finish()
+        }
+
+        /** Phím phát / dừng / tua / chuyển tập (remote, bàn phím) bấm ở màn khác lúc phim đang thu nhỏ: điều khiển phim. */
+        fun mediaKey(e: KeyEvent): Boolean {
+            val p = current?.takeIf { it.small } ?: return false
+            val what = when (e.keyCode) {
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> "toggle"
+                KeyEvent.KEYCODE_MEDIA_PLAY -> "play"
+                KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_MEDIA_STOP -> "pause"
+                KeyEvent.KEYCODE_MEDIA_REWIND -> "back10"
+                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> "fwd10"
+                KeyEvent.KEYCODE_MEDIA_NEXT -> "next"
+                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> "prev"
+                else -> return false
+            }
+            if (e.action == KeyEvent.ACTION_DOWN && e.repeatCount == 0) p.pipCommand(what)
+            return true
+        }
 
         /** Hàng "Xem tiếp": mở thẳng tập trong lịch sử; tập đó đã xem hết thì mở tập kế tiếp. */
         fun resume(context: Context, item: HistoryItem): Intent =
@@ -78,8 +179,43 @@ class PlayerActivity : BaseActivity() {
 
     private data class PlayState(
         val t: Double, val d: Double, val paused: Boolean, val ended: Boolean, val waiting: Boolean, val ready: Boolean,
-        val droppedFrames: Int, val totalFrames: Int,
+        val droppedFrames: Int, val totalFrames: Int, val videoWidth: Int = 0, val videoHeight: Int = 0,
     )
+
+    // ---- Hình trong hình ----
+
+    /** Đang thu nhỏ trong cửa sổ hình trong hình. */
+    private var inPip = false
+
+    /** Đang ở cửa sổ nhỏ trong app (MiniPlayer) — TV không có hình trong hình. */
+    private var mini = false
+    private val small get() = inPip || mini
+
+    /** Chỗ của WebView trong màn trình phát (lấy lại từ cửa sổ nhỏ khi phóng to). */
+    private lateinit var webHost: ViewGroup
+
+    /** Vừa ở cửa sổ nhỏ mà chưa quay lại toàn màn hình: dừng hẳn (onStop) lúc này = người xem đã đóng cửa sổ nhỏ. */
+    private var leftPip = false
+    private var stopped = false
+    private var pipReceiverOn = false
+
+    /** Nút trong cửa sổ nhỏ đang vẽ cho trạng thái này (đổi phát ↔ dừng / khung hình thì vẽ lại). */
+    private var pipShownPaused: Boolean? = null
+    private var pipShownWidth = -1
+
+    /** Đã lưu chỗ xem cho người xem cũ rồi đóng (đổi người xem): không ghi gì nữa. */
+    private var saveDisabled = false
+
+    /** Số lần mở phim (mở phim khác trong lúc đang thu nhỏ thì bỏ kết quả tải của phim cũ). */
+    private var loadToken = 0
+
+    private val pipReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) {
+            i.getStringExtra("do")?.let { pipCommand(it) }
+        }
+    }
+
+    private val pipClosedCheck = Runnable { if (stopped && !isFinishing) finish() }
 
     private lateinit var web: WebView
     private lateinit var fullscreen: FrameLayout
@@ -212,6 +348,7 @@ class PlayerActivity : BaseActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_player)
         web = findViewById(R.id.web)
+        webHost = web.parent as ViewGroup
         fullscreen = findViewById(R.id.fullscreen)
         loading = findViewById(R.id.loading)
         loadingProgress = findViewById(R.id.loadingProgress)
@@ -251,18 +388,50 @@ class PlayerActivity : BaseActivity() {
         setupWebView()
         setupPanel()
         setupTouch()
+        setupPip()
 
-        filmUrl = intent.getStringExtra("film")!!
-        val epUrl = intent.getStringExtra("ep")!!
-        val cached = Site.cachedDetail(filmUrl)
+        val film = intent.getStringExtra("film")
+        val epUrl = intent.getStringExtra("ep")
+        if (film == null || epUrl == null) {
+            finish() // vd "Phóng to" mà phim thu nhỏ vừa bị đóng
+            return
+        }
+        currentRef = WeakReference(this)
+        load(film, epUrl)
+    }
+
+    private fun load(film: String, epUrl: String) {
+        filmUrl = film
+        val t = ++loadToken
+        val cached = Site.cachedDetail(film)
         if (cached != null) {
             start(cached, epUrl)
         } else {
             showLoading("Đang tải thông tin phim…")
-            background({ Site.detail(filmUrl) }) { r ->
+            background({ Site.detail(film) }) { r ->
+                if (t != loadToken) return@background
                 r.onSuccess { start(it, epUrl) }.onFailure { showError("Không tải được phim.\n${it.friendly()}") }
             }
         }
+    }
+
+    /**
+     * Trình phát đang mở (thường là đang thu nhỏ) mà người xem chọn phim / tập khác, hoặc bấm "Phóng to": hệ thống đưa
+     * trình phát duy nhất này ra toàn màn hình; phim khác thì lưu chỗ xem phim cũ rồi mở phim mới.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        exitMini()
+        if (intent.getBooleanExtra("expand", false)) return
+        val film = intent.getStringExtra("film") ?: return
+        val epUrl = intent.getStringExtra("ep") ?: return
+        if (film == filmUrl && epUrl == episodes.getOrNull(index)?.url) return // đúng tập đang phát: phát tiếp
+        setIntent(intent)
+        hidePanel()
+        hideTouch()
+        token++ // bỏ kết quả tải trang tập / server của phim cũ
+        stopVideo()
+        load(film, epUrl)
     }
 
     private fun start(d: FilmDetail, epUrl: String) {
@@ -436,6 +605,7 @@ class PlayerActivity : BaseActivity() {
         val groupName = group?.name?.takeIf { d.groups.size > 1 }?.let { " ($it)" } ?: ""
         osdTitle.text = "${d.title} — ${ep.title}$groupName"
         panelTitle.text = osdTitle.text
+        miniCaption()
         for (j in 0 until groupRow.childCount) groupRow.getChildAt(j).let { it.isActivated = it.tag == group?.name }
         resumeAt = Prefs.position(ep.url)
         introDone = false
@@ -567,6 +737,7 @@ class PlayerActivity : BaseActivity() {
 
     /** Server đang giật nhiều → gợi ý server khác (chấm tốt hơn hoặc chưa thử), người xem bấm OK mới chuyển. */
     private fun suggestServer(now: Long) {
+        if (small) return // cửa sổ nhỏ không bấm OK được: phóng to ra rồi mới gợi ý
         suggested = true // mỗi lần phát chỉ gợi ý một lần (không có server khác thì thôi)
         val src = source?.takeIf { !it.pageMode } ?: return
         val cur = server ?: return
@@ -629,7 +800,8 @@ class PlayerActivity : BaseActivity() {
         findViewById<View>(R.id.btnEpisodes).setOnClickListener { finish() }
         findViewById<View>(R.id.btnWebPage).setOnClickListener {
             hidePanel()
-            startActivity(WebActivity.intent(this, episodeUrl))
+            // NO_USER_ACTION: không tính là người xem rời trình phát (khỏi tự thu nhỏ phim — xem onUserLeaveHint)
+            startActivity(WebActivity.intent(this, episodeUrl).addFlags(Intent.FLAG_ACTIVITY_NO_USER_ACTION))
         }
         findViewById<View>(R.id.btnClose).setOnClickListener { hidePanel() }
         btnSpeed.setOnClickListener {
@@ -672,7 +844,10 @@ class PlayerActivity : BaseActivity() {
     /** Không ai bấm: lưu chỗ xem, thoát ra màn hình chính của TV (TV tự tắt màn hình / bảo vệ màn hình như thường). */
     private fun exitForSleep() {
         finish()
-        startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        startActivity(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION),
+        )
     }
 
     private fun next() {
@@ -718,11 +893,14 @@ class PlayerActivity : BaseActivity() {
         val s = PlayState(
             o.optDouble("t", 0.0), o.optDouble("d", 0.0), o.optBoolean("paused"),
             o.optBoolean("ended"), o.optBoolean("waiting"), o.optBoolean("ready"),
-            o.optInt("df"), o.optInt("tf"),
+            o.optInt("df"), o.optInt("tf"), o.optInt("vw"), o.optInt("vh"),
         )
         val wasPaused = state?.paused
         if (s.ready && state?.ready != true && !started) trace("trình phát sẵn sàng t=${s.t.toInt()}")
         state = s
+        // Cửa sổ nhỏ: nút Phát ↔ Dừng và khung hình theo đúng phim
+        if (inPip && (s.paused != pipShownPaused || s.videoWidth != pipShownWidth)) updatePipParams()
+        if (mini && s.paused != wasPaused) miniCaption()
         val now = System.currentTimeMillis()
         val err = o.optString("err")
         if (err.isNotEmpty() && !errShown) {
@@ -862,7 +1040,7 @@ class PlayerActivity : BaseActivity() {
 
     private fun savePosition() {
         val s = state ?: return
-        if (!started || episodeUrl.isEmpty() || resumePending) return
+        if (!started || episodeUrl.isEmpty() || resumePending || saveDisabled) return
         // Xem gần hết thì coi như xong (lần sau mở lại từ đầu)
         val done = s.ended || (s.d > 0 && s.t > s.d - 90)
         Prefs.savePosition(episodeUrl, if (done) 0 else s.t.toInt(), detail?.url ?: filmUrl)
@@ -910,6 +1088,11 @@ class PlayerActivity : BaseActivity() {
         }
         // ESC = Back (không để WebView chuyển ESC cho trang web / trình phát rồi mất)
         if (escapeAsBack(e)) return true
+        // Phím "cửa sổ" (remote TV có phím hình trong hình): thu nhỏ phim
+        if (code == KeyEvent.KEYCODE_WINDOW) {
+            if (e.action == KeyEvent.ACTION_UP) shrink()
+            return true
+        }
         if (!isPlayerKey(code)) return super.dispatchKeyEvent(e)
         if (e.action != KeyEvent.ACTION_DOWN) return true
         val first = e.repeatCount == 0
@@ -983,6 +1166,7 @@ class PlayerActivity : BaseActivity() {
     // ---- Giao diện phủ ----
 
     private fun showOsd(ms: Long = 4000) {
+        if (small) return
         // Đang hiện thanh cảm ứng (có thời gian riêng): khỏi chồng thêm thanh thời gian của remote; tính lại giờ tự ẩn
         // (vd vừa chạm Dừng: trình phát báo đã dừng sau ~1 giây → thanh ở lại để chạm Phát)
         if (touchBar.visibility == View.VISIBLE) {
@@ -1013,6 +1197,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun showPanel() {
+        if (small) return
         osd.visibility = View.GONE
         hideTouch()
         // Điểm server mới nhất + tình hình lần xem này
@@ -1113,6 +1298,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun showTouch() {
+        if (small) return
         osd.visibility = View.GONE
         touchBar.visibility = View.VISIBLE
         updateTouchBar()
@@ -1156,6 +1342,7 @@ class PlayerActivity : BaseActivity() {
         loading.visibility = View.VISIBLE
         loadingProgress.visibility = View.GONE
         loadingText.text = text
+        miniCaption(error = true)
     }
 
     /** Dòng hướng dẫn dưới màn chờ: phím remote, hoặc cách dùng khi đang dùng cảm ứng. */
@@ -1174,10 +1361,202 @@ class PlayerActivity : BaseActivity() {
     private fun htmlAttr(s: String) =
         s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 
+    // ---- Hình trong hình ----
+
+    // Dưới Android 13 chưa có cờ RECEIVER_NOT_EXPORTED; tin chỉ gửi trong app (Intent.setPackage)
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    private fun setupPip() {
+        val supported = pipSupported(this)
+        findViewById<View>(R.id.btnPip).apply {
+            visibility = View.VISIBLE
+            setOnClickListener {
+                hidePanel()
+                shrink()
+            }
+        }
+        if (!supported || Build.VERSION.SDK_INT < 26) return // Android 7 (TV): cửa sổ nhỏ không có nút riêng
+        val filter = IntentFilter(ACTION_PIP)
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(pipReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(pipReceiver, filter)
+        }
+        pipReceiverOn = true
+    }
+
+    private fun inPipNow() = Build.VERSION.SDK_INT >= 24 && isInPictureInPictureMode
+
+    /** "Thu nhỏ vào góc": hình trong hình của Android nếu TV có, không thì cửa sổ nhỏ trong app. */
+    private fun shrink() {
+        if (pipSupported(this)) enterPip() else enterMini()
+    }
+
+    /**
+     * Cửa sổ nhỏ trong app: trình phát (task riêng) lùi ra sau, màn trước đó của app hiện lại; WebView chuyển sang nổi
+     * ở góc màn đó (MiniPlayer, gắn vào ở BaseActivity.onResume). Phim chạy tiếp, trạng thái vẫn đọc mỗi giây.
+     */
+    private fun enterMini() {
+        if (mini || inPipNow() || isFinishing) return
+        if (customView != null) hideCustomView() // video đang xin toàn màn hình nằm ngoài WebView
+        hidePanel()
+        hideTouch()
+        osd.visibility = View.GONE
+        dismissSuggestion()
+        mini = true
+        notice.muted = true
+        MiniPlayer.start(web, osdTitle.text.toString()) { a -> expandPip(a) }
+        miniCaption()
+        moveTaskToBack(true)
+        pipListeners.toList().forEach { it() }
+    }
+
+    /** Ra khỏi cửa sổ nhỏ (phóng to / mở phim khác): lấy WebView về màn trình phát. */
+    private fun exitMini() {
+        if (!mini) return
+        mini = false
+        notice.muted = inPip
+        MiniPlayer.release(web)
+        if (web.parent == null) {
+            webHost.addView(web, 0, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        pipListeners.toList().forEach { it() }
+    }
+
+    /** Dòng chữ của cửa sổ nhỏ trong app: ▶ / ⏸ + tên phim — tập; lỗi thì nhắc phóng to để đổi server. */
+    private fun miniCaption(error: Boolean = false) {
+        if (!mini) return
+        val t = osdTitle.text.toString()
+        MiniPlayer.caption(
+            when {
+                error -> "⚠ $t — phóng to để chọn server khác"
+                state?.paused == true -> "⏸ $t"
+                else -> "▶ $t"
+            },
+        )
+    }
+
+    /** Thu nhỏ phim vào góc màn hình (phim chạy tiếp, màn bên dưới vẫn dùng được). */
+    private fun enterPip(): Boolean {
+        if (!pipSupported(this) || inPipNow() || isFinishing) return false
+        hidePanel()
+        hideTouch()
+        osd.visibility = View.GONE
+        return try {
+            val ok = when {
+                Build.VERSION.SDK_INT >= 26 -> enterPictureInPictureMode(pipParams())
+                Build.VERSION.SDK_INT >= 24 -> {
+                    @Suppress("DEPRECATION")
+                    enterPictureInPictureMode()
+                    true
+                }
+                else -> false
+            }
+            if (BuildConfig.DEBUG) Log.d("ChimToPip", "thu nhỏ: $ok")
+            ok
+        } catch (e: Exception) {
+            // vd người dùng tắt quyền hình trong hình của app trong Cài đặt Android
+            Log.w("ChimToPip", "không thu nhỏ được: $e")
+            notice.show("Không thu nhỏ được phim (TV không cho dùng hình trong hình).", 5000)
+            false
+        }
+    }
+
+    /** Bấm Home lúc đang phát: thu nhỏ phim thay vì dừng (Cài đặt → "Bấm Home khi đang xem"). */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (BuildConfig.DEBUG) Log.d("ChimToPip", "rời trình phát: started=$started paused=${state?.paused} custom=${customView != null}")
+        if (Prefs.pipOnHome && started && state?.paused == false && customView == null) enterPip()
+    }
+
+    /** Khung cửa sổ nhỏ theo đúng tỉ lệ phim (Android giới hạn 1:2,39 – 2,39:1) + nút lùi 10 giây / phát–dừng / tập sau. */
+    @TargetApi(26)
+    private fun pipParams(): PictureInPictureParams {
+        val s = state
+        val w = s?.videoWidth ?: 0
+        val h = s?.videoHeight ?: 0
+        val ratio = (if (w > 0 && h > 0) w.toDouble() / h else 16.0 / 9).coerceIn(1 / 2.38, 2.38)
+        val playing = s?.paused == false
+        pipShownPaused = s?.paused
+        pipShownWidth = w
+        return PictureInPictureParams.Builder()
+            .setAspectRatio(Rational((ratio * 1000).roundToInt(), 1000))
+            .setActions(
+                listOf(
+                    pipAction("back10", R.drawable.ic_pip_rewind, "Lùi 10 giây", 1),
+                    if (playing) pipAction("pause", R.drawable.ic_pip_pause, "Dừng", 2)
+                    else pipAction("play", R.drawable.ic_pip_play, "Phát", 2),
+                    pipAction("next", R.drawable.ic_pip_next, "Tập sau", 3),
+                ),
+            )
+            .build()
+    }
+
+    @TargetApi(26)
+    private fun pipAction(what: String, icon: Int, title: String, request: Int): RemoteAction {
+        val i = Intent(ACTION_PIP).setPackage(packageName).putExtra("do", what)
+        val pi = PendingIntent.getBroadcast(this, request, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        return RemoteAction(Icon.createWithResource(this, icon), title, title, pi)
+    }
+
+    private fun updatePipParams() {
+        if (Build.VERSION.SDK_INT < 26) return
+        try {
+            setPictureInPictureParams(pipParams())
+        } catch (e: Exception) {
+            Log.w("ChimToPip", "không cập nhật được cửa sổ nhỏ: $e")
+        }
+    }
+
+    /** Nút của cửa sổ nhỏ / phím media bấm ở màn khác. */
+    private fun pipCommand(what: String) {
+        when (what) {
+            "toggle" -> cmd(if (started) "toggle" else "play")
+            "play" -> cmd("play")
+            "pause" -> cmd("pause")
+            "back10" -> seekBy(-10.0)
+            "fwd10" -> seekBy(10.0)
+            "next" -> next()
+            "prev" -> prev()
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+        @Suppress("DEPRECATION")
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode)
+        inPip = isInPictureInPictureMode
+        notice.muted = inPip
+        // Cửa sổ nhỏ: chỉ còn phim (vòng xoay khi đang tải tập kế); chữ / thanh điều khiển để lúc phóng to
+        val text = if (inPip) View.GONE else View.VISIBLE
+        loadingText.visibility = text
+        findViewById<View>(R.id.loadingHint).visibility = text
+        touchLayer.visibility = text
+        if (inPip) {
+            leftPip = false
+            hidePanel()
+            hideTouch()
+            osd.visibility = View.GONE
+            dismissSuggestion()
+        } else {
+            // Ra khỏi cửa sổ nhỏ: phóng to (onResume ngay sau) hay đóng cửa sổ (✕ / TV đóng khi app khác phát video)
+            leftPip = true
+            mainHandler.removeCallbacks(pipClosedCheck)
+            mainHandler.postDelayed(pipClosedCheck, 800)
+        }
+        pipListeners.toList().forEach { it() }
+    }
+
     // ---- Vòng đời ----
+
+    override fun onStart() {
+        super.onStart()
+        stopped = false
+    }
 
     override fun onResume() {
         super.onResume()
+        leftPip = false
+        exitMini() // phóng to từ cửa sổ nhỏ trong app
         web.onResume()
         mainHandler.removeCallbacks(poll)
         mainHandler.post(poll)
@@ -1185,19 +1564,39 @@ class PlayerActivity : BaseActivity() {
 
     override fun onPause() {
         savePosition()
-        session?.save(System.currentTimeMillis())
+        if (!saveDisabled) session?.save(System.currentTimeMillis())
+        // Thu nhỏ (hình trong hình / cửa sổ nhỏ trong app): phim chạy tiếp, vẫn đọc trạng thái để lưu chỗ xem / tự sang
+        // tập. Rời hẳn app lúc ở cửa sổ nhỏ trong app thì AppUse báo appLeft() → dừng phim.
+        if (inPipNow() || mini) {
+            super.onPause()
+            return
+        }
         cmd("pause")
         mainHandler.removeCallbacks(poll)
         web.onPause()
         super.onPause()
     }
 
+    override fun onStop() {
+        super.onStop()
+        stopped = true
+        // Người xem đóng cửa sổ nhỏ: thoát hẳn trình phát (không để phim nằm dừng ở nền)
+        if (leftPip && !isFinishing) finish()
+    }
+
     override fun onDestroy() {
         mainHandler.removeCallbacks(poll)
         mainHandler.removeCallbacks(flushSeek)
+        mainHandler.removeCallbacks(pipClosedCheck)
+        if (pipReceiverOn) unregisterReceiver(pipReceiver)
+        if (currentRef?.get() === this) currentRef = null
+        MiniPlayer.release(web) // đang nổi ở màn khác: gỡ ra trước khi huỷ WebView
+        mini = false
+        inPip = false
         token++
         web.stopLoading()
         web.destroy()
         super.onDestroy()
+        pipListeners.toList().forEach { it() }
     }
 }

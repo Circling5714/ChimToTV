@@ -130,8 +130,19 @@
       tf: q ? q.totalVideoFrames : (v.webkitDecodedFrameCount || 0),
       ahead: Math.round(ahead), buf: window.__chimtoBuffer || 0,
       err: window.__chimtoErr || '', // trang phát HLS của app (hls.html) báo lỗi hẳn
-      rate: v.playbackRate
+      rate: v.playbackRate,
+      // Khung phim (cửa sổ hình trong hình theo đúng tỉ lệ) + đang ở cửa sổ hình trong hình của Safari (bản iPad)
+      vw: v.videoWidth || 0, vh: v.videoHeight || 0,
+      pip: v.webkitPresentationMode === 'picture-in-picture' || document.pictureInPictureElement === v
     };
+  }
+  // Hình trong hình của trình duyệt (bản iPad: WebKit; Android dùng hình trong hình của cả màn hình app)
+  function pip(v, on) {
+    try {
+      if (v.webkitSetPresentationMode) { v.webkitSetPresentationMode(on ? 'picture-in-picture' : 'inline'); return; }
+      if (on && v.requestPictureInPicture) { var p = v.requestPictureInPicture(); if (p && p.catch) p.catch(function () {}); }
+      else if (!on && document.exitPictureInPicture && document.pictureInPictureElement) document.exitPictureInPicture();
+    } catch (e) {}
   }
   function play(v) {
     // JW Player còn ở màn "bấm để phát" (trình phát không tự phát, vd NguonC) → nhờ JW phát để nó tắt màn đó
@@ -158,6 +169,7 @@
       case 'seekTo': v.currentTime = m.arg; break;
       case 'rate': want.rate = m.arg; applyView(v); break;
       case 'fit': want.fit = m.arg; applyView(v); break;
+      case 'pip': pip(v, !!m.arg); break;
     }
     var s = state(); if (s) up(s);
   }
@@ -169,6 +181,9 @@
     if (m.chimto === 'cmd') handle(m);
   });
   if (isTop) window.chimtoCmd = function (c, a) { handle({ chimto: 'cmd', cmd: c, arg: a }); return true; };
+  // Bản iPad gọi thẳng trong khung có <video> (hình trong hình cần "người dùng vừa bấm", qua postMessage thì mất):
+  // trả true nếu khung này có video
+  window.__chimtoHere = function (c, a) { if (!video()) return false; handle({ chimto: 'cmd', cmd: c, arg: a }); return true; };
 
   // Gỡ kẹt: một số trình phát (MSE) treo ở trạng thái "đang tua" dù dữ liệu phía trước đã tải xong
   // (hay gặp khi lệnh xem tiếp trùng lúc trình phát tự bỏ qua giới thiệu). Đứng yên ≥ 4 giây → đẩy nhẹ 0,5 giây.
