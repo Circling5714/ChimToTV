@@ -141,8 +141,8 @@ struct Sidebar: View {
             .padding(.horizontal, 16)
             .padding(.top, 18)
             .padding(.bottom, 12)
-            // Nhà nhiều người xem: người đang dùng — chạm để đổi
-            if app.profiles.count >= 2, let p = app.profiles.first(where: { $0.id == app.profileId }) {
+            // Người xem đang dùng — chạm để đổi / thêm người (hiện cả khi mới có một người, cho dễ thấy tính năng)
+            if let p = app.profiles.first(where: { $0.id == app.profileId }) {
                 Button {
                     app.showPicker(gate: false)
                     onPick()
@@ -329,6 +329,11 @@ struct FilmGridView: View {
                         ForEach(s.items) { item in FilmCard(item: item) }
                     }
                     .padding(.horizontal, 20)
+                    if let n = s.note {
+                        Text(n).font(.system(size: 15)).foregroundColor(Theme.dim)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 6)
+                    }
                 }
                 if app.nextUrl != nil {
                     ProgressView()

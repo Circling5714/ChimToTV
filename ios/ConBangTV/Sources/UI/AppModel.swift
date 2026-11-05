@@ -15,6 +15,8 @@ struct GridSection: Identifiable, Hashable {
     let id: String
     let title: String?
     var items: [GridFilm]
+    /// Dòng ghi chú chữ mờ dưới nhóm (vd tìm mọi trang: trang đang tìm / không có phim / không trả lời).
+    var note: String? = nil
 }
 
 /// Trạng thái màn chính (bản Android: MainActivity): menu bên trái, lưới phim, tìm kiếm, lịch sử, theo dõi.
@@ -388,11 +390,83 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - Tìm mọi trang
+
+    /// Một lần tìm mọi trang (bản Android: MainActivity.SearchRun).
+    private struct SearchRun {
+        let token: Int
+        let query: String
+        var pending: [String]
+        var empty: [String] = []
+        var failed: [String] = []
+        var found: [GridSection] = []
+    }
+
+    private var searchRun: SearchRun?
+
+    /// Tìm cùng lúc trên mọi trang trong danh sách: kết quả trang nào về trước hiện trước (không chờ trang chậm / không vào
+    /// được), dòng cuối ghi trang đang tìm / không có phim / không trả lời. Quá 12 giây thì thôi chờ trang đó.
     func doSearch() {
         let q = searchText.trimmed
         guard !q.isEmpty else { return }
         title = "Tìm: \(q) (mọi trang)"
-        showList(q) { try await Site.searchAll(q) }
+        token += 1
+        let t = token
+        nextUrl = nil
+        sections = []
+        let sites = ([Prefs.baseUrl] + Prefs.sites).distinct { $0 }
+        searchRun = SearchRun(token: t, query: q, pending: sites.map { Site.hostOf($0) ?? $0 })
+        status = .loading("Đang tìm «\(q)» trên \(sites.count) trang…")
+        retry = { [weak self] in self?.doSearch() }
+        for base in sites {
+            let host = Site.hostOf(base) ?? base
+            Task { [weak self] in
+                let r: Result<FilmPage, Error>
+                do {
+                    r = .success(try await withTimeout(12) { try await Site.search(q, base: base) })
+                } catch {
+                    r = .failure(error)
+                }
+                self?.siteSearched(t, host, r)
+            }
+        }
+    }
+
+    private func siteSearched(_ t: Int, _ host: String, _ r: Result<FilmPage, Error>) {
+        // Lần tìm khác / về quá muộn: bỏ
+        guard t == token, var run = searchRun, run.token == t, let i = run.pending.firstIndex(of: host) else { return }
+        run.pending.remove(at: i)
+        switch r {
+        case .success(let page):
+            let films = (page.films + page.sections.flatMap { $0.films }).distinct { $0.url }
+            if films.isEmpty {
+                run.empty.append(host)
+            } else {
+                run.found.append(GridSection(id: "site|\(host)", title: "\(host) — \(films.count) phim", items: films.map { GridFilm(film: $0) }))
+            }
+        case .failure(let e):
+            Log.d("Search", "\(host): \(friendly(e))")
+            run.failed.append(host)
+        }
+        searchRun = run
+        var notes: [String] = []
+        if !run.pending.isEmpty { notes.append("Đang tìm: " + run.pending.joined(separator: ", ") + "…") }
+        if !run.empty.isEmpty { notes.append("Không có phim: " + run.empty.joined(separator: ", ")) }
+        if !run.failed.isEmpty { notes.append("Không trả lời: " + run.failed.joined(separator: ", ")) }
+        guard !run.found.isEmpty else {
+            sections = []
+            let text = notes.joined(separator: "\n")
+            if !run.pending.isEmpty {
+                status = .loading("Đang tìm «\(run.query)»…\n\(text)")
+            } else if run.empty.isEmpty {
+                status = .message("Không tìm được — các trang không trả lời.\n\(text)", retry: true)
+            } else {
+                status = .message("Không tìm thấy phim nào tên «\(run.query)».\n\(text)", retry: false)
+            }
+            return
+        }
+        status = .none
+        sections = run.found + (notes.isEmpty ? [] : [GridSection(id: "search-note", title: nil, items: [], note: notes.joined(separator: "   ·   "))])
     }
 
     func retryNow() { retry?() }

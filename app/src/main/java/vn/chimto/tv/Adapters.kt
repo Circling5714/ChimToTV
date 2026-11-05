@@ -72,6 +72,9 @@ class MenuAdapter<T>(
 
 sealed interface GridRow
 data class HeaderRow(val title: String) : GridRow
+
+/** Dòng ghi chú chữ mờ chiếm cả hàng (vd tìm mọi trang: trang đang tìm / không có phim / không trả lời). */
+data class NoteRow(val text: String) : GridRow
 /**
  * resume: bấm là xem tiếp luôn (hàng "Xem tiếp"); removable: giữ OK / nhấn Menu để xoá (khỏi lịch sử, hoặc bỏ theo dõi
  * nếu follow).
@@ -101,7 +104,7 @@ class FilmGridAdapter(
     }
 
     val spanLookup = object : GridLayoutManager.SpanSizeLookup() {
-        override fun getSpanSize(position: Int) = if (rows.getOrNull(position) is HeaderRow) spanCount else 1
+        override fun getSpanSize(position: Int) = if (rows.getOrNull(position) is FilmRow) 1 else spanCount
     }
 
     val isEmpty get() = rows.isEmpty()
@@ -118,6 +121,17 @@ class FilmGridAdapter(
         val start = rows.size
         rows.addAll(list)
         notifyItemRangeInserted(start, list.size)
+    }
+
+    /** Thay các hàng từ vị trí from tới cuối bằng list (hàng phía trên giữ nguyên — tiêu điểm đang đứng không nhảy). */
+    fun replaceTail(from: Int, list: List<GridRow>) {
+        val removed = rows.size - from
+        if (removed > 0) {
+            rows.subList(from, rows.size).clear()
+            notifyItemRangeRemoved(from, removed)
+        }
+        rows.addAll(list)
+        notifyItemRangeInserted(from, list.size)
     }
 
     fun clear() = submit(emptyList(), false)
@@ -137,20 +151,32 @@ class FilmGridAdapter(
     fun firstFilmPosition() = rows.indexOfFirst { it is FilmRow }
 
     override fun getItemCount() = rows.size
-    override fun getItemViewType(position: Int) = if (rows[position] is HeaderRow) 0 else 1
+    override fun getItemViewType(position: Int) = when (rows[position]) {
+        is HeaderRow -> 0
+        is FilmRow -> 1
+        is NoteRow -> 2
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
-        return if (viewType == 0) {
-            HeaderHolder(inflater.inflate(R.layout.item_header, parent, false) as TextView)
-        } else {
-            CardHolder(inflater.inflate(R.layout.item_card, parent, false)).also { it.itemView.focusZoom() }
+        return when (viewType) {
+            0 -> HeaderHolder(inflater.inflate(R.layout.item_header, parent, false) as TextView)
+            2 -> HeaderHolder(
+                TextView(parent.context).apply {
+                    textSize = 15f
+                    setTextColor(context.colorOf(R.color.text_dim))
+                    setPadding(context.dp(4), context.dp(14), context.dp(4), context.dp(10))
+                    layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                },
+            )
+            else -> CardHolder(inflater.inflate(R.layout.item_card, parent, false)).also { it.itemView.focusZoom() }
         }
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val row = rows[position]) {
             is HeaderRow -> (holder as HeaderHolder).text.text = row.title
+            is NoteRow -> (holder as HeaderHolder).text.text = row.text
             is FilmRow -> {
                 val h = holder as CardHolder
                 val f = row.film
