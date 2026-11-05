@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chỉ bản gỡ lỗi (vn.chimto.tv.debug): cổng gỡ lỗi 8790 trong mạng nhà — xem DebugServer.kt. Bản phát hành không có. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider
+            android:name="vn.chimto.tv.DebugBoot"
+            android:authorities="${applicationId}.debugboot"
+            android:exported="false" />
+    </application>
+</manifest>

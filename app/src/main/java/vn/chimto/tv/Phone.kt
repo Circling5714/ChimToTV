@@ -34,12 +34,16 @@ object Screen {
     /** Màn hẹp: điện thoại cầm dọc. */
     fun narrow(c: Context) = c.resources.configuration.screenWidthDp in 1 until 600
 
+    /** Bản gỡ lỗi: hướng màn ép qua cổng gỡ lỗi (/orient — src/debug/DebugServer.kt); null = theo máy. */
+    @Volatile var debugOrientation: Int? = null
+
     /** Gọi ở onCreate các màn (trừ trình phát): máy không phải TV thì xoay theo cảm biến / khoá xoay của người dùng. */
     fun allowRotation(a: Activity) {
         if (isTv(a)) return
         // Bản gỡ lỗi: tệp files/force_portrait = ép dọc, force_landscape = ép ngang (TV box không có cảm biến xoay); đổi
         // tệp rồi mở / đóng một màn là màn bên dưới xoay theo — thử được onConfigurationChanged
         val want = when {
+            BuildConfig.DEBUG && debugOrientation != null -> debugOrientation!!
             BuildConfig.DEBUG && File(a.filesDir, "force_portrait").exists() -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             BuildConfig.DEBUG && File(a.filesDir, "force_landscape").exists() -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             else -> ActivityInfo.SCREEN_ORIENTATION_FULL_USER

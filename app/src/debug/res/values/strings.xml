@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bản gỡ lỗi cài song song bản thật: tên khác cho khỏi lẫn trên màn hình chính của máy -->
+    <string name="app_name">Côn Bằng Debug</string>
+</resources>
