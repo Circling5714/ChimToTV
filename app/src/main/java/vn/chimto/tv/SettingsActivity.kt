@@ -135,12 +135,17 @@ class SettingsActivity : BaseActivity() {
         }
         val unblockBtn = findViewById<TextView>(R.id.btnUnblock)
         fun showUnblock() {
-            unblockBtn.text = "Vượt chặn nhà mạng: ${if (Prefs.unblock) "Bật" else "Tắt"}" +
+            unblockBtn.text = "Vượt chặn nhà mạng: ${if (!Prefs.unblock) "Tắt" else if (Prefs.unblockLevel >= 2) "Mức 2 (đảo thứ tự)" else "Mức 1 (chia nhỏ)"}" +
                 if (Prefs.unblock && !AppProxy.webViewSupported) " (WebView quá cũ: chỉ phần đọc trang)" else ""
         }
         showUnblock()
         unblockBtn.setOnClickListener {
-            Prefs.unblock = !Prefs.unblock
+            // Tắt → Mức 1 → Mức 2 → Tắt
+            when {
+                !Prefs.unblock -> { Prefs.unblock = true; Prefs.unblockLevel = 1 }
+                Prefs.unblockLevel < 2 -> Prefs.unblockLevel = 2
+                else -> Prefs.unblock = false
+            }
             AppProxy.apply()
             showUnblock()
         }

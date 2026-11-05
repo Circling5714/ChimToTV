@@ -29,7 +29,11 @@ data class SocksConfig(
  * Cài đặt của cổng nội bộ: proxy SOCKS5 (null = đi thẳng) và DNS mã hoá cho các tên miền thiết bị tự phân giải
  * (null = DNS của thiết bị / nhà mạng).
  */
-data class RouteConfig(val socks: SocksConfig?, val doh: Doh.Server?, val split: Boolean = false)
+/** split: Vượt chặn nhà mạng (mức 1: chia nhỏ gói bắt tay); disorder: mức 2 — thêm đảo thứ tự (byte đầu gửi với TTL 1). */
+data class RouteConfig(val socks: SocksConfig?, val doh: Doh.Server?, val split: Boolean = false, val disorder: Boolean = false)
+
+/** Gói bắt tay sắp gửi: tên trang, có đi qua proxy không, có đảo thứ tự không (Socks5Bridge.writeHello). */
+internal data class Hello(val host: String, val viaProxy: Boolean, val disorder: Boolean)
 
 /** Lỗi khi mở kết nối; code = mã trả lời SOCKS5 gửi lại bên gọi; viaProxy = lỗi ở phía proxy (để báo người xem). */
 class SocksError(val code: Int, message: String, val viaProxy: Boolean = true) : IOException(message)
@@ -238,7 +242,7 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
             reply(o, 0)
             client.soTimeout = 0
             val viaProxy = c.socks != null && (!c.socks.sitesOnly || isSite(host))
-            relay(client, up, if (c.split) host to viaProxy else null)
+            relay(client, up, if (c.split) Hello(host, viaProxy, c.disorder) else null)
         } catch (e: Exception) {
             // bên gọi đóng giữa chừng, hoặc proxy vừa bị tắt — bỏ qua (không để lỗi lọt ra làm sập app)
         } finally {
@@ -288,13 +292,13 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
      * Chép hai chiều tới khi hết; một chiều lỗi thì đóng cả hai cho chiều kia khỏi treo. hello != null (tên trang, đi qua
      * proxy): gói đầu tiên từ bên gọi (a → b) là gói bắt tay HTTPS thì chia nhỏ (vượt chặn nhà mạng).
      */
-    private fun relay(a: Socket, b: Socket, hello: Pair<String, Boolean>?) {
+    private fun relay(a: Socket, b: Socket, hello: Hello?) {
         val back = pool.submit { pipe(b, a, null) }
         pipe(a, b, hello)
         runCatching { back.get() }
     }
 
-    private fun pipe(from: Socket, to: Socket, hello: Pair<String, Boolean>?) {
+    private fun pipe(from: Socket, to: Socket, hello: Hello?) {
         val buf = ByteArray(16 * 1024)
         try {
             val i = from.getInputStream()
@@ -306,7 +310,7 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
                 val h = first
                 if (h != null) {
                     first = null
-                    writeHello(o, buf, n, h.first, h.second)
+                    writeHello(to, o, buf, n, h)
                     continue
                 }
                 o.write(buf, 0, n)
@@ -315,6 +319,7 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
             to.shutdownOutput()
             to.soTimeout = 60_000
         } catch (e: Exception) {
+            if (hello != null) debugLog?.invoke("chiều gửi lỗi: $e")
             close(from)
             close(to)
         }
@@ -326,10 +331,26 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
      * lớn đều bị chặn; gửi riêng byte đầu là lọt. Ở đây: byte đầu riêng, tên trang thành từng mẩu 2 byte, rồi phần còn
      * lại — mỗi lần ghi là một gói (tcpNoDelay). Qua proxy: chờ chút sau byte đầu để proxy cũng gửi nó thành gói riêng.
      * Không phải gói bắt tay TLS thì gửi nguyên.
+     *
+     * Mức 2 (disorder, đi thẳng): byte đầu gửi với TTL 1 — gói chết ở router đầu tiên (trong nhà), không tới nhà mạng; phần
+     * còn lại đi bình thường, trang nhận rồi giữ chờ phần thiếu; hệ điều hành thấy byte đầu chưa được xác nhận thì tự gửi
+     * lại với TTL đã trả về bình thường → byte đầu tới sau. Máy soi của nhà mạng thấy gói bắt tay thiếu đầu, sai thứ tự.
+     * Đi qua proxy thì không dùng (proxy nhận đủ theo thứ tự rồi mới gửi tiếp — cách mức 1 có tác dụng hơn).
      */
-    private fun writeHello(o: OutputStream, buf: ByteArray, n: Int, host: String, viaProxy: Boolean) {
+    private fun writeHello(to: Socket, o: OutputStream, buf: ByteArray, n: Int, h: Hello) {
         if (n <= 5 || buf[0] != 0x16.toByte() || buf[1] != 0x03.toByte()) return o.write(buf, 0, n)
-        o.write(buf, 0, 1)
+        val viaProxy = h.viaProxy
+        val host = h.host
+        if (h.disorder && !viaProxy && TcpTtl.set(to, 1)) {
+            try {
+                o.write(buf, 0, 1) // tcpNoDelay: hệ điều hành gửi ngay trong lúc ghi, với TTL 1
+            } finally {
+                TcpTtl.set(to, -1) // gói gửi lại (và mọi gói sau) đi với TTL mặc định
+            }
+            disorderCount++
+        } else {
+            o.write(buf, 0, 1)
+        }
         if (viaProxy) Thread.sleep(40)
         var i = 1
         val name = host.lowercase().toByteArray(Charsets.US_ASCII)
@@ -346,6 +367,13 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
         }
         if (i < n) o.write(buf, i, n - i)
     }
+
+    /** Nhật ký gỡ lỗi (bản debug gắn Log.d). */
+    var debugLog: ((String) -> Unit)? = null
+
+    /** Số gói bắt tay đã gửi đảo thứ tự (mức 2) — để thử / gỡ lỗi. */
+    @Volatile var disorderCount = 0
+        private set
 
     private fun close(s: Socket) {
         open -= s

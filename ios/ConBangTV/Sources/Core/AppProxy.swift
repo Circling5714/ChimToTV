@@ -19,6 +19,7 @@ enum AppProxy {
     private static var direct = false
     /// Vượt chặn nhà mạng (Cài đặt): cổng nội bộ chạy cả khi không bật proxy, chia nhỏ gói bắt tay HTTPS.
     private static var split = false
+    private static var disorder = false
 
     private static func locked<T>(_ f: () -> T) -> T {
         lock.lock()
@@ -55,15 +56,17 @@ enum AppProxy {
         let c = Prefs.proxyConfig()
         let h = (Prefs.sites + [Prefs.baseUrl]).compactMap { Site.hostOf($0)?.lowercased() }
         let s = Prefs.unblock
+        let d = s && Prefs.unblockLevel >= 2
         lock.lock()
         defer { lock.unlock() }
         hosts = h
         let want = c != nil || direct || s
-        if c == config && s == split && want == (bridge != nil) { return }
+        if c == config && s == split && d == disorder && want == (bridge != nil) { return }
         bridge?.close()
-        bridge = want ? try? Socks5Bridge(socks: c, split: s, siteHosts: { AppProxy.siteHosts }) : nil
+        bridge = want ? try? Socks5Bridge(socks: c, split: s, disorder: d, siteHosts: { AppProxy.siteHosts }) : nil
         config = c
         split = s
+        disorder = d
         gen += 1
     }
 

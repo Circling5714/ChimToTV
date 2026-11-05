@@ -608,6 +608,12 @@ enum Prefs {
         set { store.set(newValue, forKey: "unblock") }
     }
 
+    /// Mức vượt chặn khi bật: 1 = chia nhỏ gói bắt tay, 2 = chia nhỏ + đảo thứ tự (byte đầu gửi với TTL 1). Như bản TV.
+    static var unblockLevel: Int {
+        get { min(2, max(1, store.object(forKey: "unblock_level") as? Int ?? 1)) }
+        set { store.set(newValue, forKey: "unblock_level") }
+    }
+
     /// Proxy đang dùng; nil = tắt (hoặc chưa nhập máy chủ / cổng hợp lệ).
     static func proxyConfig() -> SocksConfig? {
         guard proxyOn else { return nil }

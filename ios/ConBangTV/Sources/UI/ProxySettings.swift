@@ -163,6 +163,7 @@ struct ProxySection: View {
 struct UnblockSection: View {
     @EnvironmentObject var app: AppModel
     @State private var on = Prefs.unblock
+    @State private var level = Prefs.unblockLevel
 
     var body: some View {
         Section {
@@ -172,12 +173,24 @@ struct UnblockSection: View {
                     AppProxy.apply()
                     app.proxyChanged = true
                 }
+            if on {
+                Picker("Mức", selection: $level) {
+                    Text("Mức 1: chia nhỏ").tag(1)
+                    Text("Mức 2: đảo thứ tự").tag(2)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: level) {
+                    Prefs.unblockLevel = $0
+                    AppProxy.apply()
+                    app.proxyChanged = true
+                }
+            }
             if on && !WebSetup.canProxy {
                 Text("⚠ iOS bản này không cho trình phát đi qua cổng vượt chặn: chỉ phần đọc trang được vượt chặn.")
                     .foregroundColor(Theme.dim)
             }
         } header: { Text("Vượt chặn nhà mạng") } footer: {
-            Text("Một số nhà mạng chặn trang phim (vd phimmoir.fun) bằng cách đọc tên trang trong gói bắt tay HTTPS: trang mở mãi không được, dùng VPN thì vào được. Bật mục này: app chia nhỏ gói đó nên nhà mạng không đọc được tên trang — không cần VPN hay proxy. Trên iOS 15–16, lúc bật app không giữ cookie của trang web sau khi tắt app.")
+            Text("Một số nhà mạng chặn trang phim (vd phimmoir.fun) bằng cách đọc tên trang trong gói bắt tay HTTPS: trang mở mãi không được, dùng VPN thì vào được. Bật mục này: app chia nhỏ gói đó nên nhà mạng không đọc được tên trang — không cần VPN hay proxy. Mức 2 (khi mức 1 không còn lọt): thêm gửi đảo thứ tự — mẩu đầu đặt TTL thấp để chết giữa đường trong nhà, hệ thống tự gửi lại sau, nên máy soi của nhà mạng thấy gói bắt tay thiếu đầu. Trên iOS 15–16, lúc bật app không giữ cookie của trang web sau khi tắt app.")
         }
     }
 }

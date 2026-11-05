@@ -69,6 +69,24 @@ final class TcpSocket {
     private let lock = NSLock()
     private var shut = false
 
+    /// TTL (IPv4) / hop limit (IPv6) đang dùng — cho Vượt chặn mức 2. Tầng nào không áp dụng cho socket này thì nil.
+    func ttl() -> (v4: Int32?, v6: Int32?) {
+        var a: Int32 = 0, b: Int32 = 0
+        var la = socklen_t(MemoryLayout<Int32>.size), lb = la
+        let v4 = getsockopt(fd, IPPROTO_IP, IP_TTL, &a, &la) == 0 ? a : nil
+        let v6 = getsockopt(fd, Int32(IPPROTO_IPV6), IPV6_UNICAST_HOPS, &b, &lb) == 0 ? b : nil
+        return (v4, v6)
+    }
+
+    /// Đặt TTL / hop limit (tầng nào nil thì bỏ qua); true nếu đặt được ít nhất một tầng.
+    @discardableResult
+    func setTTL(v4: Int32?, v6: Int32?) -> Bool {
+        var ok = false
+        if var a = v4, setsockopt(fd, IPPROTO_IP, IP_TTL, &a, socklen_t(MemoryLayout<Int32>.size)) == 0 { ok = true }
+        if var b = v6, setsockopt(fd, Int32(IPPROTO_IPV6), IPV6_UNICAST_HOPS, &b, socklen_t(MemoryLayout<Int32>.size)) == 0 { ok = true }
+        return ok
+    }
+
     init(fd: Int32) {
         self.fd = fd
         var on: Int32 = 1
@@ -299,6 +317,8 @@ final class Socks5Bridge {
     let port: Int
     let socks: SocksConfig?
     let split: Bool
+    /// Vượt chặn mức 2: byte đầu của gói bắt tay gửi với TTL 1 (đảo thứ tự) — xem writeHello.
+    let disorder: Bool
     private let server: Int32
     private let siteHosts: () -> [String]
     private let lock = NSLock()
@@ -311,9 +331,10 @@ final class Socks5Bridge {
     /// Số kết nối đã mở theo đích ("host:cổng" → [qua proxy, đi thẳng, lỗi]) — cho cổng gỡ lỗi.
     private(set) var stats: [String: [Int]] = [:]
 
-    init(socks: SocksConfig?, split: Bool = false, siteHosts: @escaping () -> [String]) throws {
+    init(socks: SocksConfig?, split: Bool = false, disorder: Bool = false, siteHosts: @escaping () -> [String]) throws {
         self.socks = socks
         self.split = split
+        self.disorder = split && disorder
         self.siteHosts = siteHosts
         let fd = socket(AF_INET, SOCK_STREAM, Int32(IPPROTO_TCP))
         guard fd >= 0 else { throw SocksError(code: 1, message: "không mở được cổng nội bộ (\(errno))") }
@@ -436,7 +457,7 @@ final class Socks5Bridge {
             guard let u = up, track(u) else { return }
             try reply(client, 0)
             client.setReadTimeout(0)
-            relay(client, u, hello: split ? (host, viaProxy) : nil)
+            relay(client, u, hello: split ? (host, viaProxy, disorder) : nil)
         } catch {
             // bên gọi đóng giữa chừng, hoặc proxy vừa bị tắt — bỏ qua
         }
@@ -485,10 +506,24 @@ final class Socks5Bridge {
     /// mẩu lớn đều bị chặn; gửi riêng byte đầu là lọt. Ở đây: byte đầu riêng, tên trang thành từng mẩu 2 byte, rồi phần
     /// còn lại — mỗi lần ghi là một gói (TCP_NODELAY). Qua proxy: chờ chút sau byte đầu để proxy cũng gửi nó thành gói
     /// riêng. Không phải gói bắt tay TLS thì gửi nguyên.
-    static func writeHello(_ to: TcpSocket, _ p: UnsafeMutableRawPointer, _ n: Int, host: String, viaProxy: Bool) throws {
+    ///
+    /// Mức 2 (disorder, đi thẳng): byte đầu gửi với TTL 1 — chết ở router đầu tiên (trong nhà), không tới nhà mạng; phần
+    /// còn lại đi bình thường, trang giữ chờ phần thiếu; hệ điều hành thấy byte đầu chưa được xác nhận thì tự gửi lại với TTL
+    /// đã trả về như cũ → byte đầu tới sau. Đo trên TV (Linux): gửi lại sau ~11 ms. Qua proxy thì không dùng.
+    static func writeHello(_ to: TcpSocket, _ p: UnsafeMutableRawPointer, _ n: Int, host: String, viaProxy: Bool,
+                           disorder: Bool = false) throws {
         let b = p.assumingMemoryBound(to: UInt8.self)
         guard n > 5, b[0] == 0x16, b[1] == 0x03 else { return try to.write(p, n) }
-        try to.write(p, 1)
+        let old = disorder && !viaProxy ? to.ttl() : (v4: nil, v6: nil)
+        if (old.v4 != nil || old.v6 != nil) && to.setTTL(v4: old.v4 == nil ? nil : 1, v6: old.v6 == nil ? nil : 1) {
+            defer { to.setTTL(v4: old.v4, v6: old.v6) } // gói gửi lại (và mọi gói sau) đi với TTL cũ
+            try to.write(p, 1) // TCP_NODELAY: hệ điều hành gửi ngay trong lúc ghi, với TTL 1
+            disorderLock.lock()
+            disorderCount += 1
+            disorderLock.unlock()
+        } else {
+            try to.write(p, 1)
+        }
         if viaProxy { usleep(40_000) }
         var i = 1
         let name = Array(host.lowercased().utf8)
@@ -504,6 +539,10 @@ final class Socks5Bridge {
         }
         if i < n { try to.write(p + i, n - i) }
     }
+
+    /// Số gói bắt tay đã gửi đảo thứ tự (mức 2) — cho cổng gỡ lỗi.
+    private(set) static var disorderCount = 0
+    private static let disorderLock = NSLock()
 
     /// Vị trí đầu tiên của name (chữ thường) trong b[from..<to], không phân biệt hoa / thường.
     static func find(_ name: [UInt8], in b: UnsafeMutablePointer<UInt8>, from: Int, to: Int) -> Int? {
@@ -524,7 +563,7 @@ final class Socks5Bridge {
 
     /// Chép hai chiều tới khi hết; một chiều lỗi thì đóng cả hai cho chiều kia khỏi treo. hello != nil: gói đầu tiên
     /// từ bên gọi (a → b) là gói bắt tay HTTPS thì chia nhỏ (vượt chặn nhà mạng).
-    private func relay(_ a: TcpSocket, _ b: TcpSocket, hello: (host: String, viaProxy: Bool)?) {
+    private func relay(_ a: TcpSocket, _ b: TcpSocket, hello: (host: String, viaProxy: Bool, disorder: Bool)?) {
         let done = DispatchSemaphore(value: 0)
         let t = Thread { [weak self] in
             self?.pipe(b, a, hello: nil)
@@ -536,7 +575,7 @@ final class Socks5Bridge {
         done.wait()
     }
 
-    private func pipe(_ from: TcpSocket, _ to: TcpSocket, hello: (host: String, viaProxy: Bool)?) {
+    private func pipe(_ from: TcpSocket, _ to: TcpSocket, hello: (host: String, viaProxy: Bool, disorder: Bool)?) {
         let size = 16 * 1024
         let buf = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 8)
         defer { buf.deallocate() }
@@ -547,7 +586,7 @@ final class Socks5Bridge {
                 if n == 0 { break }
                 if let h = first {
                     first = nil
-                    try Self.writeHello(to, buf, n, host: h.host, viaProxy: h.viaProxy)
+                    try Self.writeHello(to, buf, n, host: h.host, viaProxy: h.viaProxy, disorder: h.disorder)
                     continue
                 }
                 try to.write(buf, n)

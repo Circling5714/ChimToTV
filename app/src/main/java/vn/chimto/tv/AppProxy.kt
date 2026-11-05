@@ -43,14 +43,19 @@ object AppProxy {
      * Http.kt buộc phải kết nối lại theo cài đặt mới ngay (không dùng lại kết nối keep-alive đi theo cài đặt cũ).
      */
     fun apply() {
-        val c = RouteConfig(Prefs.proxyConfig(), Prefs.dohServer, Prefs.unblock).takeIf { it.socks != null || it.doh != null || it.split }
+        val c = RouteConfig(Prefs.proxyConfig(), Prefs.dohServer, Prefs.unblock, Prefs.unblock && Prefs.unblockLevel >= 2)
+            .takeIf { it.socks != null || it.doh != null || it.split }
         if (c == bridgeConfig && (c == null) == (bridge == null)) return
         bridge?.close()
         Doh.clearCache()
         bridge = c?.let { cfg -> runCatching { Socks5Bridge({ cfg }, ::siteHosts) }.getOrNull() }
+        if (BuildConfig.DEBUG) bridge?.debugLog = { android.util.Log.d("ChimToTtl", it) }
         bridgeConfig = c
         setWebView(localPort())
     }
+
+    /** Số gói bắt tay đã gửi đảo thứ tự (Vượt chặn mức 2) từ lúc mở cổng nội bộ — để thử. */
+    val disorderCount: Int get() = bridge?.disorderCount ?: 0
 
     /** Lỗi proxy trong 30 giây gần đây, để ghép vào thông báo lỗi (vd "proxy báo sai tên đăng nhập / mật khẩu"). */
     fun recentError(): String? = if (bridgeConfig != null && bridge == null) "không mở được cổng nội bộ"

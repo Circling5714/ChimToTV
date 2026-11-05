@@ -301,6 +301,8 @@ enum DebugRoutes {
             o["canProxy"] = WebSetup.canProxy
             o["webMode"] = WebSetup.proxyMode
             o["keychain"] = Secret.works
+            o["unblock"] = Prefs.unblock ? Prefs.unblockLevel : 0
+            o["disorderCount"] = Socks5Bridge.disorderCount
             o["savedPassword"] = !Prefs.proxyPass.isEmpty // mật khẩu proxy đã lưu còn đọc được (đổi quyền Keychain)
             return .json(o)
         case "/prefs":

@@ -111,6 +111,11 @@ object Prefs {
         get() = sp.getBoolean("unblock", false)
         set(value) = sp.edit().putBoolean("unblock", value).apply()
 
+    /** Mức vượt chặn khi bật: 1 = chia nhỏ gói bắt tay, 2 = chia nhỏ + đảo thứ tự (byte đầu gửi với TTL 1). */
+    var unblockLevel: Int
+        get() = sp.getInt("unblock_level", 1).coerceIn(1, 2)
+        set(value) = sp.edit().putInt("unblock_level", value).apply()
+
     // ---- Người xem (hồ sơ) ----
 
     const val MAX_PROFILES = 8
