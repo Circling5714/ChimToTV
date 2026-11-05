@@ -21,6 +21,7 @@ struct ConBangTVApp: App {
                 AppModel.shared.appReturned() // quay lại sau ≥ 30 phút: hỏi lại "Ai đang xem?"
                 AppModel.shared.checkUpdate(manual: false)
                 AppModel.shared.checkFollows()
+                SyncService.shared.appActive() // đồng bộ trong nhà (đã ghép máy)
             case .background:
                 AppModel.shared.appLeft()
                 AutoClear.leftApp()

@@ -76,7 +76,9 @@ targets:
           - audio
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
-        NSLocalNetworkUsageDescription: Bản thử mở cổng gỡ lỗi trong mạng nhà để máy tính điều khiển và chụp màn hình app.
+        NSLocalNetworkUsageDescription: Đồng bộ trong nhà — tìm TV / iPad / iPhone có Côn Bằng TV trong mạng Wi‑Fi để đồng bộ lịch sử xem.
+        NSBonjourServices:
+          - _conbangtv._tcp
         LSApplicationQueriesSchemes:
           - apple-magnifier
         # Widget «Xem tiếp» mở app bằng conbangtv://play?… (bản thử: conbangtv-thu://)

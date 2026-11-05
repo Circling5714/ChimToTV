@@ -66,6 +66,15 @@ struct SettingsView: View {
         NavigationView {
             Form {
                 profileSection
+                Section {
+                    NavigationLink {
+                        SyncView()
+                    } label: {
+                        Label("Đồng bộ trong nhà (TV ↔ iPad / iPhone)", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                } footer: {
+                    Text("Xem dở trên TV thì mở iPad xem tiếp đúng chỗ, và ngược lại — ghép máy bằng mã 4 số.")
+                }
                 displaySection
                 siteSection
                 Section {

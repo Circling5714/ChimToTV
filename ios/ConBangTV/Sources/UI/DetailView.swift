@@ -83,6 +83,7 @@ final class DetailModel: ObservableObject {
         }
         refresh()
         AppModel.shared.rebuildMenu()
+        SyncService.shared.syncSoon()
     }
 
     // MARK: Bàn phím rời

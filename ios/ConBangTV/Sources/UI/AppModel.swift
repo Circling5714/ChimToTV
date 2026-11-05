@@ -328,6 +328,7 @@ final class AppModel: ObservableObject {
         }
         showSiteLabel()
         WidgetFeed.update() // xoá lịch sử / đổi tên người xem trong Cài đặt
+        SyncService.shared.syncSoon()
         let proxy = proxyChanged
         proxyChanged = false
         if loadedBase != nil && (loadedBase != Prefs.baseUrl || proxy) { reloadSite() } else { rebuildMenu() }
@@ -689,9 +690,18 @@ final class AppModel: ObservableObject {
     }
 
     /// Đóng trình phát: cập nhật hàng Xem tiếp, trang phim, số "mới" của phim theo dõi.
+    /// Đồng bộ trong nhà vừa nhận dữ liệu mới: vẽ lại hàng Xem tiếp / lịch sử / theo dõi, widget.
+    func syncApplied() {
+        historyVersion += 1
+        rebuildMenu()
+        if active?.kind == .history { showHistory() } else if active?.kind == .follows { showFollows() } else { refreshHead() }
+        WidgetFeed.update()
+    }
+
     func playerClosed() {
         historyVersion += 1
         WidgetFeed.update()
+        SyncService.shared.syncSoon()
         rebuildMenu()
         if active?.kind == .history { showHistory() } else if active?.kind == .follows { showFollows() } else { refreshHead() }
     }
@@ -704,6 +714,7 @@ final class AppModel: ObservableObject {
             Prefs.removeHistory(item.film.url)
             WidgetFeed.update()
         }
+        SyncService.shared.syncSoon()
         switch active?.kind {
         case .history: showHistory()
         case .follows: showFollows()

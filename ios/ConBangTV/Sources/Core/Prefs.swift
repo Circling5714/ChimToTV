@@ -85,6 +85,8 @@ enum Prefs {
     /// Khoá riêng từng người xem (còn lại — danh sách trang, điểm server, mốc nhạc mở đầu, cập nhật… — dùng chung).
     private static let profileKeys: Set<String> = [
         "history", "positions_v2", "follows", "last_follow_check", "private_mode",
+        // Đồng bộ trong nhà: lúc xoá phim khỏi lịch sử / bỏ theo dõi
+        "hist_del", "follow_del",
         "base_url", "seek_step", "auto_next", "video_fill",
         // Giới hạn giờ xem (WatchLimit)
         "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
@@ -221,7 +223,7 @@ enum Prefs {
     // MARK: - Giới hạn giờ xem (xem WatchLimit) — cùng tên khoá bản Android
 
     /// Khoá của người xem id (người đầu tiên — id "" — giữ khoá cũ không hậu tố).
-    private static func pk(_ id: String, _ key: String) -> String { id.isEmpty ? key : "\(key)#\(id)" }
+    static func pk(_ id: String, _ key: String) -> String { id.isEmpty ? key : "\(key)#\(id)" }
 
     /// Số phút xem mỗi ngày của người xem id (mặc định người đang dùng; 0 = không giới hạn).
     static func dailyLimit(_ id: String? = nil) -> Int { store.integer(forKey: pk(id ?? profileId, "limit_min")) }
@@ -305,8 +307,19 @@ enum Prefs {
     static var sites: [String] {
         get { store.stringArray(forKey: "sites") ?? presetSites }
         set {
-            var seen = Set<String>()
-            store.set(newValue.filter { seen.insert($0).inserted }, forKey: "sites")
+            locked {
+                // Đồng bộ trong nhà: ghi lúc thêm / bỏ từng trang
+                let old = Set(sites)
+                var seen = Set<String>()
+                let list = newValue.filter { seen.insert($0).inserted }
+                let now = nowMs()
+                var add = stamps("sites_add"), del = stamps("sites_del")
+                for s in list where !old.contains(s) { add[s] = now }
+                for s in old where !seen.contains(s) { del[s] = now }
+                setStamps("sites_add", add)
+                setStamps("sites_del", del)
+                store.set(list, forKey: "sites")
+            }
         }
     }
 
@@ -426,6 +439,10 @@ enum Prefs {
 
     static func clearHistory() {
         locked {
+            var del = stamps(k("hist_del"))
+            let now = nowMs()
+            for f in Set(history.map { $0.filmUrl } + positions().map { $0.film }) where !f.isEmpty { del[f] = now }
+            setStamps(k("hist_del"), del)
             privatePositions.removeAll()
             saveHistory([])
             savePositions([])
@@ -437,6 +454,9 @@ enum Prefs {
         locked {
             let item = historyFor(filmUrl)
             let eps = Set(positions().filter { $0.film == filmUrl }.map { $0.ep } + [item?.epUrl].compactMap { $0 })
+            var del = stamps(k("hist_del"))
+            del[filmUrl] = nowMs()
+            setStamps(k("hist_del"), del)
             for e in eps { privatePositions[e] = nil }
             savePositions(positions().filter { !eps.contains($0.ep) })
             saveHistory(history.filter { $0.filmUrl != filmUrl })
@@ -455,12 +475,20 @@ enum Prefs {
     static func follow(_ d: FilmDetail) {
         locked {
             let n = d.episodeCount
-            follows = [Follow(filmUrl: d.url, title: d.title, poster: d.poster, count: n, latest: d.latestEpisode?.title ?? "", seen: n)] +
+            follows = [Follow(filmUrl: d.url, title: d.title, poster: d.poster, count: n, latest: d.latestEpisode?.title ?? "", seen: n,
+                              t: nowMs())] +
                 follows.filter { $0.filmUrl != d.url }
         }
     }
 
-    static func unfollow(_ filmUrl: String) { locked { follows = follows.filter { $0.filmUrl != filmUrl } } }
+    static func unfollow(_ filmUrl: String) {
+        locked {
+            var del = stamps(k("follow_del"))
+            del[filmUrl] = nowMs()
+            setStamps(k("follow_del"), del)
+            follows = follows.filter { $0.filmUrl != filmUrl }
+        }
+    }
 
     /// Cập nhật số tập mới nhất; seen = true: người xem vừa mở phim (hết "tập mới").
     static func updateFollow(_ filmUrl: String, count: Int, latest: String, seen: Bool) {
@@ -594,6 +622,8 @@ enum Prefs {
         let ep: String
         var sec: Int
         var film: String
+        /// Lúc lưu (ms; nil = bản cũ) — đồng bộ trong nhà lấy lần lưu mới hơn.
+        var t: Int64?
     }
 
     /// Thứ tự lưu: cũ nhất trước (quá maxPositions thì bỏ bớt đầu danh sách).
@@ -640,20 +670,94 @@ enum Prefs {
             }
             privatePositions[epUrl] = nil
             var list = positions().filter { $0.ep != epUrl }
-            list.append(Position(ep: epUrl, sec: seconds, film: filmUrl))
+            list.append(Position(ep: epUrl, sec: seconds, film: filmUrl, t: nowMs()))
             if list.count > maxPositions { list.removeFirst(list.count - maxPositions) }
             savePositions(list)
         }
     }
 
+    // MARK: - Đồng bộ trong nhà (SyncData.swift)
+
+    /// Mốc thời gian theo khoá (lúc xoá / lúc thêm), lưu JSON {"khoá": ms}.
+    static func stamps(_ key: String) -> [String: Int64] { decode([String: Int64].self, key) ?? [:] }
+
+    static func setStamps(_ key: String, _ m: [String: Int64]) { encode(SyncMerge.tombstones(m, [:]), key) }
+
+    /// Mã máy (ngẫu nhiên, tạo lần đầu) — máy kia nhận ra máy này qua mã này.
+    static var deviceId: String {
+        locked {
+            if let id = store.string(forKey: "device_id") { return id }
+            let id = UUID().uuidString.lowercased()
+            store.set(id, forKey: "device_id")
+            return id
+        }
+    }
+
+    /// Dữ liệu đồng bộ của người xem id.
+    static func syncProfile(_ p: Profile) -> SyncProfile {
+        locked {
+            let id = p.id
+            let hist = decode([HistoryItem].self, pk(id, "history")) ?? []
+            let pos = decode([Position].self, pk(id, "positions_v2")) ?? []
+            let fol = decode([Follow].self, pk(id, "follows")) ?? []
+            return SyncProfile(
+                id: id, name: p.name,
+                history: hist.map { SyncHistory(film: $0.filmUrl, title: $0.title, poster: $0.poster ?? "", ep: $0.epTitle,
+                                                epUrl: $0.epUrl, time: $0.time) },
+                histDel: stamps(pk(id, "hist_del")),
+                pos: pos.map { SyncPos(ep: $0.ep, sec: $0.sec, film: $0.film, t: $0.t ?? 0) },
+                follows: fol.map { SyncFollow(film: $0.filmUrl, title: $0.title, poster: $0.poster ?? "", count: $0.count,
+                                              latest: $0.latest, seen: $0.seen, t: $0.t ?? 0) },
+                followDel: stamps(pk(id, "follow_del")))
+        }
+    }
+
+    /// Ghi dữ liệu đã gộp cho người xem id. Trả về true nếu có gì thay đổi.
+    @discardableResult
+    static func applySync(_ s: SyncProfile) -> Bool {
+        locked {
+            guard profiles.contains(where: { $0.id == s.id }) else { return false }
+            let p = profiles.first { $0.id == s.id }!
+            let old = syncProfile(p)
+            guard old != s else { return false }
+            let id = s.id
+            encode(s.history.map { HistoryItem(filmUrl: $0.film, title: $0.title, poster: $0.poster.nonEmpty, epTitle: $0.ep,
+                                               epUrl: $0.epUrl, time: $0.time) }, pk(id, "history"))
+            encode(s.pos.map { Position(ep: $0.ep, sec: $0.sec, film: $0.film, t: $0.t == 0 ? nil : $0.t) }, pk(id, "positions_v2"))
+            encode(s.follows.map { Follow(filmUrl: $0.film, title: $0.title, poster: $0.poster.nonEmpty, count: $0.count,
+                                          latest: $0.latest, seen: $0.seen, t: $0.t == 0 ? nil : $0.t) }, pk(id, "follows"))
+            setStamps(pk(id, "hist_del"), s.histDel)
+            setStamps(pk(id, "follow_del"), s.followDel)
+            historyCache = nil
+            positionsCache = nil
+            return true
+        }
+    }
+
+    static var syncSites: SyncSites {
+        SyncSites(list: sites, add: stamps("sites_add"), del: stamps("sites_del"))
+    }
+
+    /// Ghi danh sách trang đã gộp (không ghi lại mốc thêm / bỏ như khi người xem tự sửa). true = có thay đổi.
+    @discardableResult
+    static func applySites(_ s: SyncSites) -> Bool {
+        locked {
+            guard s != syncSites, !s.list.isEmpty else { return false }
+            setStamps("sites_add", s.add)
+            setStamps("sites_del", s.del)
+            store.set(s.list, forKey: "sites")
+            return true
+        }
+    }
+
     // MARK: - JSON trong UserDefaults
 
-    private static func decode<T: Decodable>(_ type: T.Type, _ key: String) -> T? {
+    static func decode<T: Decodable>(_ type: T.Type, _ key: String) -> T? {
         guard let d = store.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(type, from: d)
     }
 
-    private static func encode<T: Encodable>(_ value: T, _ key: String) {
+    static func encode<T: Encodable>(_ value: T, _ key: String) {
         if let d = try? JSONEncoder().encode(value) { store.set(d, forKey: key) }
     }
 

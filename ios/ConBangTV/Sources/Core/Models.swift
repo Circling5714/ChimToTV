@@ -116,6 +116,8 @@ struct Follow: Codable, Hashable {
     var count: Int
     var latest: String
     var seen: Int
+    /// Lúc bấm theo dõi (ms; nil = bản cũ) — đồng bộ trong nhà.
+    var t: Int64? = nil
 
     var newCount: Int { max(0, count - seen) }
 }
