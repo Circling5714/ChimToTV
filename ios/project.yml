@@ -17,6 +17,17 @@ settings:
     MARKETING_VERSION: "1.2"
     CURRENT_PROJECT_VERSION: "3"
     DEVELOPMENT_TEAM: ""
+  # Nhóm App Group (app ghi dữ liệu cho widget) và lược đồ URL mở app — bản thử khác bản chính để cài song song
+  configs:
+    Debug:
+      APP_GROUP: group.vn.chimto.tv.debug
+      URL_SCHEME: conbangtv-thu
+    Beta:
+      APP_GROUP: group.vn.chimto.tv.debug
+      URL_SCHEME: conbangtv-thu
+    Release:
+      APP_GROUP: group.vn.chimto.tv
+      URL_SCHEME: conbangtv
 packages:
   SwiftSoup:
     url: https://github.com/scinfu/SwiftSoup.git
@@ -29,12 +40,15 @@ targets:
       - path: ConBangTV
         excludes:
           - "Info.plist"
+      # Dữ liệu widget dùng chung app ↔ widget
+      - path: Shared
       # Trình phát dùng chung với bản Android (player-agent.js, player.html, hls.html, hls.js, page-focus.js)
       - path: ../app/src/main/assets
         group: SharedAssets
         buildPhase: resources
     dependencies:
       - package: SwiftSoup
+      - target: ConBangWidget
     info:
       path: ConBangTV/Info.plist
       properties:
@@ -65,6 +79,13 @@ targets:
         NSLocalNetworkUsageDescription: Bản thử mở cổng gỡ lỗi trong mạng nhà để máy tính điều khiển và chụp màn hình app.
         LSApplicationQueriesSchemes:
           - apple-magnifier
+        # Widget «Xem tiếp» mở app bằng conbangtv://play?… (bản thử: conbangtv-thu://)
+        CFBundleURLTypes:
+          - CFBundleURLName: vn.chimto.tv.widget
+            CFBundleURLSchemes:
+              - $(URL_SCHEME)
+        ConBangAppGroup: $(APP_GROUP)
+        ConBangURLScheme: $(URL_SCHEME)
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:
@@ -89,6 +110,40 @@ targets:
         Release:
           PRODUCT_BUNDLE_IDENTIFIER: vn.chimto.tv
           APP_DISPLAY_NAME: "Côn Bằng TV"
+
+  # Widget «Xem tiếp» (WidgetKit): đọc feed.json + ảnh bìa app ghi trong App Group
+  ConBangWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widget
+        excludes:
+          - "Info.plist"
+      - path: Shared
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: Côn Bằng TV
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ConBangAppGroup: $(APP_GROUP)
+        ConBangURLScheme: $(URL_SCHEME)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1,2"
+        PRODUCT_NAME: ConBangWidget
+        CODE_SIGN_STYLE: Manual
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+      configs:
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: vn.chimto.tv.debug.widget
+        Beta:
+          PRODUCT_BUNDLE_IDENTIFIER: vn.chimto.tv.debug.widget
+        Release:
+          PRODUCT_BUNDLE_IDENTIFIER: vn.chimto.tv.widget
 
   # Test phần lõi (đọc trang, chấm điểm server…) chạy thẳng trên macOS, không cần máy ảo iPad
   CoreTests:

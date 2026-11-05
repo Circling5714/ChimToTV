@@ -120,6 +120,7 @@ struct RootView: View {
             }
         )
         .onAppear { app.startIfNeeded() }
+        .onOpenURL { app.openURL($0) } // chạm phim trên widget «Xem tiếp»
     }
 }
 

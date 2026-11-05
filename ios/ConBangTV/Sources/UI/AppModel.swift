@@ -131,6 +131,35 @@ final class AppModel: ObservableObject {
         showSiteLabel()
         rebuildMenu()
         select(menu[0])
+        WidgetFeed.update()
+        runPendingPlay()
+    }
+
+    // MARK: - Mở từ widget «Xem tiếp»
+
+    /// Phim chạm trên widget lúc app chưa sẵn sàng (đang hỏi "Ai đang xem?" / chưa tải): phát sau khi chọn người xem.
+    private var pendingPlay: (profile: String, film: String, ep: String)?
+
+    func openURL(_ url: URL) {
+        guard let p = WidgetFeed.parse(url) else { return }
+        pendingPlay = p
+        if started && !askingProfile { runPendingPlay() }
+    }
+
+    /// Chỉ phát khi người xem đang dùng đúng là người của widget (đổi sang người khác thì thôi — lịch sử riêng).
+    private func runPendingPlay() {
+        guard let p = pendingPlay else { return }
+        pendingPlay = nil
+        guard p.profile == Prefs.profileId else {
+            showToast("Phim trên widget là của người xem khác.")
+            return
+        }
+        detailFilm = nil
+        sheet = nil
+        Task {
+            try? await Task.sleep(nanoseconds: 350_000_000) // chờ bảng đang mở (nếu có) đóng hẳn
+            Router.play(filmUrl: p.film, epUrl: p.ep, continueMode: true)
+        }
     }
 
     func refreshProfiles() {
@@ -165,9 +194,13 @@ final class AppModel: ObservableObject {
         askingProfile = false
         if !started {
             begin()
-        } else if changed {
-            reloadSite()
-            showToast("Người xem: \(p.name)")
+        } else {
+            if changed {
+                reloadSite()
+                showToast("Người xem: \(p.name)")
+                WidgetFeed.update()
+            }
+            runPendingPlay()
         }
     }
 
@@ -181,12 +214,16 @@ final class AppModel: ObservableObject {
             profileVersion += 1
         }
         refreshProfiles()
+        WidgetFeed.update()
         showToast("Đã xoá \(p.name).")
         if wasCurrent && started { reloadSite() }
     }
 
     /// App sang nền: nhớ lúc rời app (quay lại sau ≥ 30 phút thì hỏi lại người xem).
-    func appLeft() { leftAt = nowMs() }
+    func appLeft() {
+        leftAt = nowMs()
+        WidgetFeed.update()
+    }
 
     func appReturned() {
         defer { leftAt = 0 }
@@ -290,6 +327,7 @@ final class AppModel: ObservableObject {
             showPicker(gate: true)
         }
         showSiteLabel()
+        WidgetFeed.update() // xoá lịch sử / đổi tên người xem trong Cài đặt
         let proxy = proxyChanged
         proxyChanged = false
         if loadedBase != nil && (loadedBase != Prefs.baseUrl || proxy) { reloadSite() } else { rebuildMenu() }
@@ -653,6 +691,7 @@ final class AppModel: ObservableObject {
     /// Đóng trình phát: cập nhật hàng Xem tiếp, trang phim, số "mới" của phim theo dõi.
     func playerClosed() {
         historyVersion += 1
+        WidgetFeed.update()
         rebuildMenu()
         if active?.kind == .history { showHistory() } else if active?.kind == .follows { showFollows() } else { refreshHead() }
     }
@@ -663,6 +702,7 @@ final class AppModel: ObservableObject {
             rebuildMenu()
         } else {
             Prefs.removeHistory(item.film.url)
+            WidgetFeed.update()
         }
         switch active?.kind {
         case .history: showHistory()
