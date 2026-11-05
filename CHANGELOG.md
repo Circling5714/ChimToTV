@@ -6,6 +6,15 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 
+## 2.4.2 — 05/11/2026
+
+- **Điện thoại màn dài (vd 20:9): xem phim không còn bị lẹm mất phần dưới hình.** Một số trang phát đặt khung video theo
+  bề ngang (cao = ngang × 9/16) — trên màn dài hơn 16:9 khung cao hơn màn, phần dưới (phụ đề, chữ) bị cắt. Nay video tràn
+  khung thì app ghim vừa màn, giữ tỉ lệ (viền đen hai bên); «Khung hình: Lấp đầy» vẫn như cũ. TV 16:9 không đổi.
+- versionCode 24 · tag `v2.4.2` · commit `49b43b7` · SHA-256 APK
+  `ec6f6290cd4e8fa18c2ad33fa3157ae33bbbf339cdd0c106c950683d3a7d2724`
+- Anh thử trên vivo X200 Pro (bản debug) thấy hết lẹm. Cập nhật tự động 2.4.1 → 2.4.2 đã thử trên TV box.
+
 ## 2.4.1 — 05/11/2026
 
 Sửa lỗi sau khi thử 2.4 trên điện thoại thật (vivo X200 Pro, Android 15):

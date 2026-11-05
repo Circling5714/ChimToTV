@@ -128,6 +128,8 @@ của điện thoại); TV / TV box vẫn luôn nằm ngang như cũ.
 - Cầm dọc, nút **‹ Quay lại** (chi tiết phim, Cài đặt) nằm trên một dải riêng ở trên cùng — nội dung cuộn không bị nút che.
 - **Cài đặt:** hàng nút tự xuống dòng (cả trên TV khi hàng quá dài), nút chữ dài hiện 2 dòng; cầm dọc thì ô proxy xếp dọc.
 - **Xem phim:** trình phát luôn nằm ngang, ẩn thanh điều hướng của điện thoại (vuốt từ mép màn để hiện lại một lúc).
+  Màn dài hơn 16:9: video của trang phát tràn khung (trang đặt cao = ngang × 9/16) thì app ghim vừa màn, giữ tỉ lệ (từ
+  2.4.2 — `fitScreen` / `.chimto-pin` trong `player-agent.js`, dùng chung bản iPad / iPhone).
 - Xoay lúc đang dùng: màn tự đổi bố cục, không tải lại. Màn hẹp = bề ngang dưới 600dp (điện thoại cầm dọc); điện thoại
   cầm ngang / máy tính bảng dùng bố cục như TV.
 - Android 15: nội dung chừa chỗ tai thỏ / lỗ camera và thanh điều hướng (chỗ thanh điều hướng cùng màu nền app); Duyệt web
@@ -291,7 +293,8 @@ Thư mục `keys\` chứa khoá ký app — **giữ lại**, mất khoá thì b�
 cài song song bản thật (ký bằng khoá debug của máy dựng). Có **cổng gỡ lỗi 8790** trong mạng LAN (`app/src/debug/` —
 bản phát hành không có) để thử trên điện thoại khi không có adb: `GET /info` (màn, hướng, cỡ dp, khoảng chừa tai thỏ),
 `/shot?scale=0.5` (ảnh PNG, PixelCopy), `/views` (chữ + toạ độ), `/tap?x=&y=`, `/tapText?t=…`, `/swipe?x1=&y1=&x2=&y2=`,
-`/key?k=BACK`, `/orient?o=portrait|landscape|auto`, `/open?s=settings`. Thử giao diện điện thoại trên TV box: tạo tệp
+`/key?k=BACK`, `/orient?o=portrait|landscape|auto`, `/open?s=settings`, `/js?c=…` (chạy JS ở khung trên cùng của WebView —
+vd `JSON.stringify(__chimtoState.box)`: cỡ khung trang + khung video, kiểu co giãn, đã ghim chưa). Thử giao diện điện thoại trên TV box: tạo tệp
 `files/force_phone` (+ `force_portrait` / `force_landscape`) bằng `adb shell run-as vn.chimto.tv.debug touch …`.
 
 **Bản iPad** dựng trên máy macOS của GitHub Actions (`.github/workflows/ios.yml`, repo công khai nên miễn phí) — không
