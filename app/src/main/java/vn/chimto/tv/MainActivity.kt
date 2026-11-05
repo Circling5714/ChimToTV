@@ -198,7 +198,8 @@ class MainActivity : BaseActivity() {
         side.translationX = -side.layoutParams.width.toFloat()
         side.animate().translationX(0f).setDuration(200).start()
         val i = menuAdapter.items.indexOf(menuAdapter.active).coerceAtLeast(0)
-        menu.scrollToPosition(i)
+        // Mục đang chọn ở gần đầu, vẫn thấy vài mục trước nó (vd đang ở Tìm kiếm vẫn thấy Trang chủ, Người xem)
+        (menu.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(max(0, i - 3), 0)
         if (!TouchUi.active) menu.post { menu.findViewHolderForAdapterPosition(i)?.itemView?.focusForRemote() }
     }
 
@@ -929,7 +930,8 @@ class MainActivity : BaseActivity() {
             openDrawer()
             return
         }
-        if (grid.hasFocus() || search.hasFocus()) {
+        // (điện thoại cầm dọc + cảm ứng: menu ẩn trong ngăn kéo — bỏ bước này, Back hai lần là thoát)
+        if (!Screen.narrow(this) && (grid.hasFocus() || search.hasFocus())) {
             val i = menuAdapter.items.indexOf(menuAdapter.active)
             menu.scrollToPosition(max(0, i))
             menu.post { menu.findViewHolderForAdapterPosition(i)?.itemView?.requestFocus() }

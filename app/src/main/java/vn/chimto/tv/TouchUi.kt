@@ -169,7 +169,19 @@ abstract class BaseActivity : Activity() {
     }
 
     private fun showTouchBack() {
-        touchBack?.visibility = if (TouchUi.active && !touchBackHidden) View.VISIBLE else View.GONE
+        val shown = TouchUi.active && !touchBackHidden
+        touchBack?.visibility = if (shown) View.VISIBLE else View.GONE
+        // Điện thoại cầm dọc: nút ở góc trên có dải riêng — nội dung (Cài đặt, chi tiết phim) cuộn không chui xuống dưới nút
+        val reserve = shown && touchBack != null && touchBackGravity and Gravity.VERTICAL_GRAVITY_MASK == Gravity.TOP &&
+            Screen.narrow(this)
+        val root = findViewById<FrameLayout>(android.R.id.content).getChildAt(0)
+        (root?.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
+            val top = if (reserve) dp(58) else 0
+            if (lp.topMargin != top) {
+                lp.topMargin = top
+                root.layoutParams = lp
+            }
+        }
         onTouchUiChanged(TouchUi.active)
     }
 

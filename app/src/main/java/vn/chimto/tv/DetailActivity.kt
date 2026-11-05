@@ -97,7 +97,7 @@ class DetailActivity : BaseActivity() {
 
     /**
      * Ngang (TV, điện thoại xoay ngang): poster bên trái, chữ và hàng nút bên phải. Điện thoại cầm dọc: poster nhỏ, hàng
-     * nút xuống dưới rộng cả màn (cuộn ngang), lề nhỏ; chừa chỗ trên cùng cho nút "‹ Quay lại".
+     * nút xuống dưới rộng cả màn (cuộn ngang), lề nhỏ.
      */
     private fun applyLayout() {
         val narrow = Screen.narrow(this)
@@ -105,7 +105,7 @@ class DetailActivity : BaseActivity() {
         val head = findViewById<View>(R.id.headRow)
         val info = findViewById<LinearLayout>(R.id.infoCol)
         val buttons = findViewById<View>(R.id.btnScroll)
-        body.padH(dp(if (narrow) 14 else 36), top = dp(if (narrow) 58 else 24))
+        body.padH(dp(if (narrow) 14 else 36), top = dp(if (narrow) 8 else 24)) // dọc: chỗ cho nút "‹ Quay lại" do BaseActivity chừa
         findViewById<View>(R.id.poster).layoutParams.apply {
             width = dp(if (narrow) 96 else 124)
             height = dp(if (narrow) 144 else 186)
