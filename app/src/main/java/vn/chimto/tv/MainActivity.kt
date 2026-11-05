@@ -214,20 +214,37 @@ class MainActivity : BaseActivity() {
      */
     private fun pickSite() {
         val sites = Prefs.sites
+        // Cuối danh sách: thêm lại trang mẫu đã xoá (vd phimmoir.fun), thêm trang khác bằng tên miền
+        val missing = Prefs.missingPresets
         val names = sites.map { Site.hostOf(it) ?: it }
         val checks = arrayOfNulls<Result<SiteCheck>>(sites.size)
-        val labels = names.indices.map { siteLabel(names[it], null, false) }.toMutableList()
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_single_choice, labels)
+        val labels = (
+            names.indices.map { siteLabel(names[it], null, false) } +
+                missing.map { "＋ Thêm lại: ${Site.hostOf(it) ?: it}" } + "＋ Thêm trang khác…"
+            ).toMutableList()
+        val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_list_item_single_choice, labels) {
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+                val v = super.getView(position, convertView, parent) as android.widget.CheckedTextView
+                // Dòng «＋ Thêm…» là lệnh chứ không phải một lựa chọn: bỏ nút tròn (giữ lại để dùng lại view)
+                if (v.tag == null) v.tag = v.checkMarkDrawable ?: return v
+                v.checkMarkDrawable = if (position < sites.size) v.tag as android.graphics.drawable.Drawable else null
+                return v
+            }
+        }
         val dialog = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
             .setTitle("Chọn trang phim")
             .setSingleChoiceItems(adapter, sites.indexOf(Prefs.baseUrl)) { dialog, which ->
                 dialog.dismiss()
-                if (sites[which] != Prefs.baseUrl) {
-                    Prefs.baseUrl = sites[which]
-                    reloadSite()
+                when {
+                    which < sites.size -> if (sites[which] != Prefs.baseUrl) {
+                        Prefs.baseUrl = sites[which]
+                        reloadSite()
+                    }
+                    which < sites.size + missing.size -> useNewSite(missing[which - sites.size])
+                    else -> addSiteDialog()
                 }
             }
-            .setNeutralButton("Thêm / sửa…") { _, _ -> startActivity(Intent(this, SettingsActivity::class.java)) }
+            .setNeutralButton("Sửa tên miền…") { _, _ -> startActivity(Intent(this, SettingsActivity::class.java)) }
             .show()
         for (i in sites.indices) {
             background({ Site.check(sites[i]) }) { r ->
@@ -239,6 +256,55 @@ class MainActivity : BaseActivity() {
                 adapter.notifyDataSetChanged()
             }
         }
+    }
+
+    /** Thêm trang vào danh sách rồi chuyển sang trang đó. */
+    private fun useNewSite(url: String) {
+        Prefs.addSite(url)
+        Prefs.baseUrl = url
+        reloadSite()
+        toast("Đã thêm ${Site.hostOf(url)} vào danh sách trang phim.")
+    }
+
+    /** Gõ tên miền trang mới (vd phimmoir.fun) — trang kiểu yanhh3d / HaLim / PhimMoi. */
+    private fun addSiteDialog() {
+        val input = EditText(this).apply {
+            hint = "Tên miền, vd phimmoir.fun"
+            setSingleLine()
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+            imeOptions = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+            leaveWithUpDown()
+        }
+        val box = android.widget.FrameLayout(this).apply {
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(input)
+        }
+        val d = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("Thêm trang phim")
+            .setView(box)
+            .setPositiveButton("Thêm", null)
+            .setNegativeButton("Huỷ") { _, _ -> hideKeyboard(input) }
+            .create()
+        d.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+        fun submit() {
+            val url = Prefs.normalizeUrl(input.text.toString())
+            if (url == null) {
+                input.error = "Tên miền không hợp lệ (vd phimmoir.fun)"
+                return
+            }
+            hideKeyboard(input)
+            d.dismiss()
+            useNewSite(url)
+        }
+        d.setOnShowListener {
+            d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { submit() }
+            input.requestFocus()
+        }
+        input.setOnEditorActionListener { _, _, _ ->
+            submit()
+            true
+        }
+        d.show()
     }
 
     /** Thể loại / quốc gia đã tải của trang đang dùng (đổi trang thì tải lại). */

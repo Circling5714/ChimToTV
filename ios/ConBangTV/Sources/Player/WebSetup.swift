@@ -1,3 +1,4 @@
+import Network
 import UIKit
 import WebKit
 
@@ -77,12 +78,62 @@ enum WebSetup {
         c.mediaTypesRequiringUserActionForPlayback = []
         c.allowsPictureInPictureMediaPlayback = true
         c.allowsAirPlayForMediaPlayback = true
-        c.websiteDataStore = .default()
+        c.websiteDataStore = dataStore()
         c.preferences.javaScriptCanOpenWindowsAutomatically = false
         c.applicationNameForUserAgent = "Version/\(ProcessInfo.processInfo.operatingSystemVersion.majorVersion) Safari/605.1.15"
         attachAdRules(c.userContentController)
         return c
     }
+
+    /// Kho dữ liệu web theo proxy (AppProxy): tắt proxy → kho mặc định (lưu cookie như cũ). Bật: iPadOS 17+ đặt proxy
+    /// cho kho mặc định (API công khai); iPadOS 15–16 dùng kho riêng qua SPI của WebKit (WebKitSPI.m — không lưu xuống
+    /// máy: tắt app là quên cookie). Không đặt được → kho mặc định, trình phát đi thẳng (proxySupported = false).
+    private static var proxied: (generation: Int, store: WKWebsiteDataStore?)?
+    private static var defaultProxied = false
+
+    /// false: iPadOS này không cho WebView đi qua proxy (chỉ phần đọc trang của app đi qua proxy).
+    private(set) static var proxySupported = true
+
+    /// Cách WebView đang đi qua proxy (cho cổng gỡ lỗi): "tắt" | "ios17" | "spi" | "không hỗ trợ".
+    private(set) static var proxyMode = "tắt"
+
+    static func dataStore() -> WKWebsiteDataStore {
+        let gen = AppProxy.generation
+        guard let port = AppProxy.localPort, let dict = AppProxy.cfDictionary else {
+            if #available(iOS 17.0, *), defaultProxied {
+                WKWebsiteDataStore.default().proxyConfigurations = []
+                defaultProxied = false
+            }
+            proxied = nil
+            proxyMode = "tắt"
+            return .default()
+        }
+        if #available(iOS 17.0, *) {
+            if let p = NWEndpoint.Port(rawValue: UInt16(truncatingIfNeeded: port)) {
+                WKWebsiteDataStore.default().proxyConfigurations = [ProxyConfiguration(socksv5Proxy: .hostPort(host: "127.0.0.1", port: p))]
+                defaultProxied = true
+                proxySupported = true
+                proxyMode = "ios17"
+                return .default()
+            }
+        }
+        if let p = proxied, p.generation == gen { return p.store ?? .default() }
+        let store = CBTProxiedDataStore(dict)
+        proxied = (gen, store)
+        proxySupported = store != nil
+        proxyMode = store != nil ? "spi" : "không hỗ trợ"
+        if store == nil { Log.d("Proxy", "iPadOS không có SPI đặt proxy cho WebView — trình phát đi thẳng") }
+        return store ?? .default()
+    }
+
+    /// iPadOS này cho WebView đi qua proxy không (iPadOS 17+, hoặc có SPI của WebKit).
+    static var canProxy: Bool {
+        if #available(iOS 17.0, *) { return true }
+        return CBTWebKitSPIInfo().values.allSatisfy { $0.boolValue }
+    }
+
+    /// Kho riêng đang dùng cho proxy (để xoá dữ liệu duyệt web cả ở đó).
+    static var proxiedStore: WKWebsiteDataStore? { proxied?.store }
 
     static func make(_ config: WKWebViewConfiguration = configuration()) -> WKWebView {
         let w = WKWebView(frame: .zero, configuration: config)

@@ -223,4 +223,16 @@ class ProfilesTest {
         Prefs.setProfileColor(b.id, 6)
         assertEquals(Profile("p2", "Bé Na", 6), Prefs.profiles.first { it.id == b.id })
     }
+
+    @Test
+    fun deletedPresetSiteCanBeAddedBack() {
+        val phimmoir = "https://phimmoir.fun"
+        Prefs.sites = Prefs.PRESET_SITES.filter { it != phimmoir }
+        assertEquals(listOf(phimmoir), Prefs.missingPresets)
+        Prefs.addSite(phimmoir)
+        Prefs.addSite(phimmoir)
+        assertTrue(Prefs.missingPresets.isEmpty())
+        assertEquals(1, Prefs.sites.count { it == phimmoir })
+        assertEquals(Prefs.PRESET_SITES.size, Prefs.sites.size)
+    }
 }

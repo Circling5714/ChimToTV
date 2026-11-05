@@ -214,6 +214,14 @@ object Prefs {
         }
         set(value) = sp.edit().putString("sites", JSONArray(value.distinct()).toString()).apply()
 
+    /** Thêm trang vào danh sách (không đổi trang đang dùng); đã có thì thôi. */
+    fun addSite(url: String) {
+        if (url !in sites) sites = sites + url
+    }
+
+    /** Trang mẫu không còn trong danh sách (người xem đã xoá) — để thêm lại nhanh. */
+    val missingPresets: List<String> get() = sites.let { list -> PRESET_SITES.filter { it !in list } }
+
     /** data-type của server người xem chọn lần gần nhất trên từng trang (vd "tiktik"). Bản rất cũ lưu chung một khoá. */
     fun serverType(host: String?): String? =
         sp.getString(k("server_type@$host"), null) ?: sp.getString("server_type", null)?.takeIf { pid.isEmpty() }

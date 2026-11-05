@@ -109,19 +109,24 @@ func withTimeout<T>(_ seconds: Double, _ work: @escaping () async throws -> T) a
 }
 
 /// Câu báo lỗi dễ hiểu cho người xem.
-func friendly(_ error: Error) -> String {
+func friendly(_ error: Error, proxyNote: Bool = true) -> String {
     if let e = error as? AppError { return e.message }
     if let e = error as? URLError {
-        switch e.code {
-        case .notConnectedToInternet: return "Không có mạng."
-        case .timedOut: return "Trang không trả lời (quá thời gian chờ)."
-        case .cannotFindHost, .dnsLookupFailed: return "Không tìm thấy tên miền (trang đổi tên miền hoặc bị chặn?)."
-        case .cannotConnectToHost: return "Không kết nối được tới trang."
-        case .networkConnectionLost: return "Mất kết nối giữa chừng."
-        case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate:
-            return "Lỗi kết nối bảo mật (chứng chỉ của trang)."
-        default: return "Lỗi mạng (\(e.code.rawValue))."
-        }
+        // Đang bật proxy: ghép lời nhắc (kèm lỗi phía proxy nếu có, vd sai mật khẩu)
+        return urlErrorText(e) + (proxyNote ? AppProxy.note() : "")
     }
     return error.localizedDescription
+}
+
+private func urlErrorText(_ e: URLError) -> String {
+    switch e.code {
+    case .notConnectedToInternet: return "Không có mạng."
+    case .timedOut: return "Trang không trả lời (quá thời gian chờ)."
+    case .cannotFindHost, .dnsLookupFailed: return "Không tìm thấy tên miền (trang đổi tên miền hoặc bị chặn?)."
+    case .cannotConnectToHost: return "Không kết nối được tới trang."
+    case .networkConnectionLost: return "Mất kết nối giữa chừng."
+    case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate:
+        return "Lỗi kết nối bảo mật (chứng chỉ của trang)."
+    default: return "Lỗi mạng (\(e.code.rawValue))."
+    }
 }

@@ -363,6 +363,19 @@ class SettingsActivity : BaseActivity() {
             }
             recent.addView(b)
         }
+        // Trang mẫu đã xoá khỏi danh sách (vd phimmoir.fun): thêm lại một chạm
+        for (u in Prefs.missingPresets) {
+            val b = inflater.inflate(R.layout.item_button, recent, false) as TextView
+            b.text = "＋ ${Site.hostOf(u) ?: u}"
+            b.setOnClickListener {
+                Prefs.addSite(u)
+                showSites()
+                // Nút vừa bấm đã biến thành nút trang thường: đưa con trỏ về đúng nút đó
+                recent.getChildAt(Prefs.sites.indexOf(u))?.requestFocus()
+                toast("Đã thêm lại ${Site.hostOf(u)} vào danh sách trang phim.")
+            }
+            recent.addView(b)
+        }
     }
 
     private fun removeCurrent() {

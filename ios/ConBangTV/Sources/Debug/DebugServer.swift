@@ -19,6 +19,7 @@ import WebKit
 ///   POST /eval?target=player|browser   (thân = mã JS) chạy JS ở khung trên cùng
 ///   GET  /probe?fn=home|list|detail|source|video|search|searchAll|filters&url=…&q=…&server=…   chạy bộ đọc trang
 ///   GET  /prefs  ·  POST /prefs?key=…&value=…&type=int|bool|string|double|del
+///   GET  /proxy  ·  POST /proxy?direct=1|0 | pass=… | apply=1 | check=1   cổng proxy nội bộ: trạng thái, thử, đi thẳng
 ///   POST /upload  (thân = .ipa)    đẩy bản mới lên iPad  ·  GET /ipa  tải lại tệp đó
 ///   POST /update[?url=…]           cài .ipa qua TrollStore (apple-magnifier://install); không url = tệp vừa đẩy lên
 final class DebugServer {
@@ -243,6 +244,24 @@ enum DebugRoutes {
             return await eval(target: q["target"] ?? "player", js: js)
         case "/probe":
             return await probe(q)
+        case "/proxy":
+            // POST /proxy?direct=1|0 (cổng nội bộ đi thẳng, không proxy thật) · pass=… (lưu mật khẩu) · apply=1 · check=1
+            if r.method == "POST" {
+                if let d = q["direct"] { AppProxy.setDebugDirect(d == "1") }
+                if let p = q["pass"] { Prefs.proxyPass = p }
+                if q["apply"] == "1" { AppProxy.apply() }
+                if q["check"] == "1" {
+                    let c = SocksConfig(host: Prefs.proxyHost, port: Prefs.proxyPort, user: Prefs.proxyUser, pass: Prefs.proxyPass,
+                                        remoteDns: Prefs.proxyRemoteDns)
+                    do { return .json(["check": try await AppProxy.check(c)]) } catch { return .json(["checkError": friendly(error, proxyNote: false)]) }
+                }
+            }
+            var o = AppProxy.debugState()
+            o["spi"] = CBTWebKitSPIInfo()
+            o["canProxy"] = WebSetup.canProxy
+            o["webMode"] = WebSetup.proxyMode
+            o["keychain"] = Secret.works
+            return .json(o)
         case "/prefs":
             if r.method == "POST", let key = q["key"] {
                 let v = q["value"] ?? ""

@@ -109,6 +109,8 @@ final class AppModel: ObservableObject {
     private var pickerGate = false
     /// Vừa xoá người đang xem mà ai còn lại cũng có mã PIN: hỏi "Ai đang xem?" khi đóng Cài đặt.
     private var pendingGate = false
+    /// Cài đặt proxy vừa đổi: đóng Cài đặt thì tải lại trang phim qua đường mới.
+    var proxyChanged = false
     private var leftAt: Int64 = 0
 
     /// Mở app phải chọn người xem: nhà có từ 2 người (và bật "hỏi khi mở app"), hoặc người đang dùng có mã PIN.
@@ -271,6 +273,7 @@ final class AppModel: ObservableObject {
     }
 
     func reloadSite() {
+        AppProxy.apply() // chế độ "chỉ trang phim": cập nhật danh sách tên miền đi qua proxy
         showSiteLabel()
         categories = []
         rebuildMenu()
@@ -285,7 +288,9 @@ final class AppModel: ObservableObject {
             showPicker(gate: true)
         }
         showSiteLabel()
-        if loadedBase != nil && loadedBase != Prefs.baseUrl { reloadSite() } else { rebuildMenu() }
+        let proxy = proxyChanged
+        proxyChanged = false
+        if loadedBase != nil && (loadedBase != Prefs.baseUrl || proxy) { reloadSite() } else { rebuildMenu() }
     }
 
     func selectSite(_ url: String) {
@@ -734,6 +739,8 @@ enum BrowsingData {
     @MainActor
     static func clear(images: Bool, done: @escaping @MainActor () -> Void) {
         let store = WKWebsiteDataStore.default()
+        // Đang bật proxy (iPadOS 15–16): WebView dùng kho riêng — xoá cả ở đó
+        WebSetup.proxiedStore?.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {}
         store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast) {
             Task { @MainActor in
                 HTTPCookieStorage.shared.removeCookies(since: .distantPast)

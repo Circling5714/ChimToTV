@@ -29,7 +29,16 @@ enum Http {
             "Version/\(v.majorVersion).\(v.minorVersion) Safari/605.1.15"
     }
 
-    static let session: URLSession = {
+    private static let sessionLock = NSLock()
+    private static var cached: (generation: Int, session: URLSession)?
+
+    /// Phiên tải chung; bật / tắt / đổi proxy (AppProxy.generation đổi) thì mở phiên mới đi theo cài đặt mới.
+    static var session: URLSession {
+        let gen = AppProxy.generation
+        sessionLock.lock()
+        defer { sessionLock.unlock() }
+        if let c = cached, c.generation == gen { return c.session }
+        cached?.session.finishTasksAndInvalidate()
         let c = URLSessionConfiguration.default
         c.timeoutIntervalForRequest = 20
         c.timeoutIntervalForResource = 60
@@ -37,8 +46,11 @@ enum Http {
         c.urlCache = nil
         c.httpAdditionalHeaders = ["Accept-Language": "vi-VN,vi;q=0.9,en;q=0.8"]
         c.httpMaximumConnectionsPerHost = 6
-        return URLSession(configuration: c)
-    }()
+        if let p = AppProxy.cfDictionary { c.connectionProxyDictionary = p }
+        let s = URLSession(configuration: c)
+        cached = (gen, s)
+        return s
+    }
 
     static func get(_ url: String, headers: [String: String] = [:]) async throws -> Response {
         do {

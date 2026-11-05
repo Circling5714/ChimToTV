@@ -1,0 +1,171 @@
+import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
+/// Proxy SOCKS5 cho toàn app (Cài đặt → Proxy SOCKS5), như bản Android (AppProxy.kt).
+///
+/// URLSession và WebKit không đăng nhập được SOCKS5 có tên / mật khẩu, nên app mở một cổng SOCKS5 nội bộ
+/// (Socks5Bridge, chỉ nghe 127.0.0.1): URLSession (Http) và WKWebView (WebSetup) đều đi qua cổng này; cổng nội bộ tự
+/// đăng nhập proxy thật, chọn DNS (của proxy / của iPad) và ở chế độ "chỉ trang phim" thì cho kết nối tới nơi khác đi
+/// thẳng. Tắt proxy → app đi mạng mặc định như trước.
+enum AppProxy {
+    private static let lock = NSLock()
+    private static var bridge: Socks5Bridge?
+    private static var config: SocksConfig?
+    private static var hosts: [String] = []
+    private static var gen = 0
+    /// Cổng gỡ lỗi: mở cổng nội bộ không có proxy thật (mọi kết nối đi thẳng) — để xem WebKit có đi qua cổng không.
+    private static var direct = false
+
+    private static func locked<T>(_ f: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return f()
+    }
+
+    /// Đang bật proxy SOCKS5.
+    static var active: Bool { locked { config != nil } }
+
+    /// Tăng mỗi lần đổi cài đặt: Http mở URLSession mới, WebSetup dùng kho dữ liệu web mới.
+    static var generation: Int { locked { gen } }
+
+    /// Cổng nội bộ; nil = tắt. Bật mà không mở được cổng (rất hiếm) thì trỏ vào cổng 1 (đóng): kết nối báo lỗi chứ không
+    /// lén đi thẳng.
+    static var localPort: Int? { locked { bridge?.port ?? (config != nil ? 1 : nil) } }
+
+    /// Từ điển proxy CFNetwork (URLSession.connectionProxyDictionary, WebKit); nil = đi thẳng.
+    static var cfDictionary: [AnyHashable: Any]? { localPort.map { dictionary(port: $0) } }
+
+    static func dictionary(port: Int) -> [AnyHashable: Any] {
+        [
+            "SOCKSEnable": 1,
+            kCFStreamPropertySOCKSProxyHost as String: "127.0.0.1",
+            kCFStreamPropertySOCKSProxyPort as String: port,
+            kCFStreamPropertySOCKSVersion as String: kCFStreamSocketSOCKSVersion5 as String,
+        ]
+    }
+
+    /// Áp dụng cài đặt trong Prefs — lúc mở app, mỗi lần đổi trong Cài đặt, đổi / thêm trang phim. Cài đặt khác đi thì mở
+    /// cổng nội bộ mới và đóng cổng cũ cùng mọi kết nối đang giữ: URLSession / WebKit buộc phải kết nối lại theo cài đặt
+    /// mới (không dùng lại kết nối keep-alive đi theo cài đặt cũ).
+    static func apply() {
+        let c = Prefs.proxyConfig()
+        let h = (Prefs.sites + [Prefs.baseUrl]).compactMap { Site.hostOf($0)?.lowercased() }
+        lock.lock()
+        defer { lock.unlock() }
+        hosts = h
+        let want = c != nil || direct
+        if c == config && want == (bridge != nil) { return }
+        bridge?.close()
+        bridge = want ? try? Socks5Bridge(socks: c, siteHosts: { AppProxy.siteHosts }) : nil
+        config = c
+        gen += 1
+    }
+
+    /// Cổng gỡ lỗi: bật / tắt cổng nội bộ đi thẳng (khi không bật proxy thật).
+    static func setDebugDirect(_ on: Bool) {
+        locked { direct = on }
+        apply()
+    }
+
+    private static var siteHosts: [String] { locked { hosts } }
+
+    /// Lỗi proxy trong 30 giây gần đây, để ghép vào thông báo lỗi (vd "proxy báo sai tên đăng nhập / mật khẩu").
+    static var recentError: String? {
+        locked { config != nil && bridge == nil ? "không mở được cổng nội bộ" : bridge?.recentError }
+    }
+
+    /// Câu nhắc thêm vào thông báo lỗi khi đang bật proxy.
+    static func note() -> String {
+        guard active else { return "" }
+        return "\nĐang bật proxy" + (recentError.map { ": \($0)" } ?? "") + " — kiểm tra Cài đặt → Proxy SOCKS5, hoặc tắt proxy."
+    }
+
+    /// Video cũng đi qua proxy (chế độ "toàn bộ app").
+    static var videoViaProxy: Bool { locked { config.map { !$0.sitesOnly } ?? false } }
+
+    /// Câu nhắc cho lỗi video: máy chủ video hay chặn IP của proxy → gợi ý cho video đi thẳng.
+    static func videoNote() -> String {
+        guard videoViaProxy, recentError == nil else { return note() }
+        return "\nĐang bật proxy cho toàn bộ app: máy chủ video có thể chặn IP của proxy — thử Cài đặt → Proxy SOCKS5 → " +
+            "«Dùng cho: chỉ trang phim», hoặc tắt proxy."
+    }
+
+    /// Khoá chấm điểm server (PlayStats): video đi qua proxy thì chấm riêng.
+    static func statsHost(_ host: String?) -> String? { videoViaProxy ? "\(host ?? "")·proxy" : host }
+
+    /// Cho cổng gỡ lỗi.
+    static func debugState() -> [String: Any] {
+        locked {
+            [
+                "active": config != nil, "direct": direct, "port": bridge?.port ?? 0, "generation": gen,
+                "proxy": config.map { "\($0.host):\($0.port)" + ($0.user.isEmpty ? "" : " (có đăng nhập)") } ?? "",
+                "remoteDns": config?.remoteDns ?? true, "sitesOnly": config?.sitesOnly ?? false,
+                "lastError": bridge?.recentError ?? "", "hosts": hosts,
+                "stats": bridge?.statsCopy.map { "\($0.key) proxy=\($0.value[0]) thẳng=\($0.value[1]) lỗi=\($0.value[2])" }.sorted() ?? [],
+            ]
+        }
+    }
+
+    /// Nút "Kiểm tra proxy": tải https://www.cloudflare.com/cdn-cgi/trace qua proxy c (mở cổng nội bộ tạm, thử được trước
+    /// khi lưu) → IP ra ngoài kèm nơi đặt máy, vd "103.1.2.3 (SG)".
+    static func check(_ c: SocksConfig) async throws -> String {
+        var t = c
+        t.sitesOnly = false
+        let b = try Socks5Bridge(socks: t, siteHosts: { [] })
+        defer { b.close() }
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.connectionProxyDictionary = dictionary(port: b.port)
+        cfg.timeoutIntervalForRequest = 20
+        cfg.timeoutIntervalForResource = 30
+        let s = URLSession(configuration: cfg)
+        defer { s.invalidateAndCancel() }
+        var r = URLRequest(url: URL(string: "https://www.cloudflare.com/cdn-cgi/trace")!)
+        r.setValue(Http.userAgent, forHTTPHeaderField: "User-Agent")
+        let text: String
+        do {
+            let (data, _) = try await s.data(for: r)
+            text = String(decoding: data, as: UTF8.self)
+        } catch {
+            // Lỗi ở phía proxy (sai mật khẩu, không tới được proxy…) rõ hơn lỗi chung của URLSession
+            if let e = b.recentError { throw AppError(e) }
+            throw error
+        }
+        func field(_ name: String) -> String? {
+            text.split(separator: "\n").first { $0.hasPrefix("\(name)=") }.map { String($0.dropFirst(name.count + 1)) }
+        }
+        guard let ip = field("ip") else { throw AppError("không đọc được kết quả từ www.cloudflare.com") }
+        return ip + (field("loc").map { " (\($0))" } ?? "")
+    }
+
+    /// Đọc chữ người xem nhập; nhận cả dạng dán sẵn "socks5://user:pass@host:cổng" hoặc "host:cổng".
+    /// Trả về cấu hình, hoặc câu báo lỗi.
+    static func parse(host rawHost: String, port rawPort: String, user rawUser: String, pass rawPass: String) -> Result<SocksConfig, AppError> {
+        var host = rawHost.trimmed
+        if let r = host.range(of: "://") { host = String(host[r.upperBound...]) }
+        host = host.trimmingSuffix("/")
+        var port = rawPort.trimmed, user = rawUser, pass = rawPass
+        if let at = host.lastIndex(of: "@") {
+            let login = String(host[..<at])
+            host = String(host[host.index(after: at)...])
+            if let colon = login.firstIndex(of: ":") {
+                user = String(login[..<colon])
+                pass = String(login[login.index(after: colon)...])
+            } else {
+                user = login
+                pass = ""
+            }
+        }
+        if host.filter({ $0 == ":" }).count == 1, let colon = host.firstIndex(of: ":") {
+            port = String(host[host.index(after: colon)...])
+            host = String(host[..<colon])
+        }
+        guard !host.isEmpty, !host.contains(" ") else { return .failure(AppError("Nhập máy chủ proxy (vd 103.1.2.3).")) }
+        guard let p = Int(port), (1...65535).contains(p) else { return .failure(AppError("Cổng proxy không hợp lệ (1–65535, vd 1080).")) }
+        guard user.utf8.count <= 255, pass.utf8.count <= 255 else {
+            return .failure(AppError("Tên đăng nhập / mật khẩu tối đa 255 ký tự."))
+        }
+        return .success(SocksConfig(host: host, port: p, user: user, pass: pass, remoteDns: Prefs.proxyRemoteDns, sitesOnly: Prefs.proxySitesOnly))
+    }
+}

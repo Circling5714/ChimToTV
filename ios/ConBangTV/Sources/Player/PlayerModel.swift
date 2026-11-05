@@ -202,9 +202,9 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
                 } else {
                     let host = Site.hostOf(src.epUrl)
                     let usual = src.servers.first { $0.type == Prefs.serverType(host) } ?? src.servers.first
-                    let pick = PlayStats.choose(host, src.servers, usual)
+                    let pick = PlayStats.choose(AppProxy.statsHost(host), src.servers, usual)
                     if let u = usual, let p = pick, p != u {
-                        let why = PlayStats.score(host, u.type).label ?? "hay giật"
+                        let why = PlayStats.score(AppProxy.statsHost(host), u.type).label ?? "hay giật"
                         showNotice("\(u.label) \(why) gần đây — mở \(p.label) (Menu để đổi server).", 6)
                     }
                     playServer(pick)
@@ -221,7 +221,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         stopVideo()
         pageMode = true
         loadStartedAt = nowMs()
-        session = PlaySession(host: Site.hostOf(src.epUrl), server: "page", openedAt: loadStartedAt)
+        session = PlaySession(host: AppProxy.statsHost(Site.hostOf(src.epUrl)), server: "page", openedAt: loadStartedAt)
         showLoading("Đang mở trang tập phim…")
         startHint = startFor()
         installScripts(hls: false, page: true)
@@ -242,7 +242,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
                 let v = try await Site.video(src, s)
                 guard t == token else { return }
                 loadStartedAt = nowMs()
-                session = PlaySession(host: Site.hostOf(src.epUrl), server: s?.type ?? "embed", openedAt: loadStartedAt)
+                session = PlaySession(host: AppProxy.statsHost(Site.hostOf(src.epUrl)), server: s?.type ?? "embed", openedAt: loadStartedAt)
                 startHint = startFor()
                 Log.d("Player", "phát \(v.url) (server \(s?.type ?? "-"), báo trước \(startHint) s)")
                 if URL(string: v.url)?.path.hasSuffix(".m3u8") == true {
@@ -316,7 +316,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
 
     func serverText(_ s: Server) -> String {
         let host = source.flatMap { Site.hostOf($0.epUrl) }
-        return PlayStats.score(host, s.type).summary.map { "\(s.label)  ·  \($0)" } ?? s.label
+        return PlayStats.score(AppProxy.statsHost(host), s.type).summary.map { "\(s.label)  ·  \($0)" } ?? s.label
     }
 
     var sessionText: String? { session?.describe() }
@@ -376,7 +376,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     private func suggestServer(_ now: Int64) {
         suggested = true // mỗi lần phát chỉ gợi ý một lần
         guard let src = source, !src.pageMode, let cur = server,
-              let pair = PlayStats.alternative(Site.hostOf(src.epUrl), src.servers, cur) else { return }
+              let pair = PlayStats.alternative(AppProxy.statsHost(Site.hostOf(src.epUrl)), src.servers, cur) else { return }
         let (alt, score) = pair
         suggestion = alt
         suggestionText = "\(cur.label) đang giật nhiều. Chuyển sang \(alt.label)\(score.summary.map { " (\($0))" } ?? "")?"
@@ -450,9 +450,9 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             errShown = true
             session?.fail()
             if started {
-                showNotice("Mất kết nối video (\(err)).\nMenu → Tải lại, hoặc chọn server khác.", 10)
+                showNotice("Mất kết nối video (\(err)).\nMenu → Tải lại, hoặc chọn server khác." + AppProxy.videoNote(), 10)
             } else {
-                showError("\(server?.label ?? "Server") không phát được video (\(err)).\nMở Menu để chọn server khác.")
+                showError("\(server?.label ?? "Server") không phát được video (\(err)).\nMở Menu để chọn server khác." + AppProxy.videoNote())
                 showPanel()
             }
         }

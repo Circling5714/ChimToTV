@@ -64,7 +64,19 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    // Trang mẫu đã xoá khỏi danh sách (vd phimmoir.fun): thêm lại một chạm
+                    ForEach(Prefs.missingPresets.filter { !sites.contains($0) }, id: \.self) { s in
+                        Button {
+                            Prefs.addSite(s)
+                            sites = Prefs.sites
+                            siteStatus = "Đã thêm lại \(Site.hostOf(s) ?? s) vào danh sách."
+                        } label: {
+                            Label("Thêm lại \(Site.hostOf(s) ?? s)", systemImage: "plus.circle").foregroundColor(Theme.brand)
+                        }
+                    }
                 } header: { Text("Danh sách trang phim (chọn để chuyển trang)") }
+
+                ProxySection()
 
                 Section {
                     Button("Bước tua ◀ ▶ (bàn phím): \(seekStep) giây") {
@@ -197,7 +209,7 @@ struct SettingsView: View {
             Toggle("Hỏi «Ai đang xem?» khi mở app", isOn: $askProfile)
                 .onChange(of: askProfile) { Prefs.askProfile = $0 }
         } header: { Text("Người xem") } footer: {
-            Text("Mỗi người có riêng: lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, phim theo dõi, trang phim đang dùng, server ưu tiên, Xem riêng, bước tua, tự chuyển tập, khung hình. Dùng chung cả nhà: danh sách trang phim, dữ liệu duyệt web, điểm server, mốc nhạc mở đầu. Chạm một người để đổi tên / màu, đặt hoặc tắt mã PIN, chuyển sang, xoá.")
+            Text("Mỗi người có riêng: lịch sử xem, hàng Xem tiếp, chỗ đang xem dở, phim theo dõi, trang phim đang dùng, server ưu tiên, Xem riêng, bước tua, tự chuyển tập, khung hình. Dùng chung cả nhà: danh sách trang phim, proxy, dữ liệu duyệt web, điểm server, mốc nhạc mở đầu. Chạm một người để đổi tên / màu, đặt hoặc tắt mã PIN, chuyển sang, xoá.")
         }
     }
 

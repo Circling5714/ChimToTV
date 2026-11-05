@@ -6,8 +6,9 @@ struct SitesView: View {
     @EnvironmentObject var app: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var checks: [String: Result<SiteCheck, Error>] = [:]
-
-    private var sites: [String] { Prefs.sites }
+    @State private var sites = Prefs.sites
+    @State private var newSite = ""
+    @State private var addError = ""
 
     private var fastest: String? {
         let ok = checks.compactMap { k, r -> (String, Int)? in
@@ -36,8 +37,33 @@ struct SitesView: View {
                             .padding(.vertical, 4)
                         }
                     }
+                    .onDelete { idx in
+                        // Vuốt sang trái để xoá trang khỏi danh sách (còn ít nhất một trang)
+                        for s in idx.map({ sites[$0] }) where Prefs.removeSite(s) { checks[s] = nil }
+                        sites = Prefs.sites
+                        app.showSiteLabel()
+                    }
                 } footer: {
-                    Text("Thêm trang mới hoặc sửa tên miền trong Cài đặt.")
+                    Text("Vuốt một trang sang trái để xoá khỏi danh sách. Sửa tên miền khi trang đổi tên: Cài đặt.")
+                }
+                Section {
+                    // Trang mẫu đã xoá (vd phimmoir.fun): thêm lại một chạm
+                    ForEach(Prefs.missingPresets.filter { !sites.contains($0) }, id: \.self) { s in
+                        Button { add(s) } label: {
+                            Label("Thêm lại \(Site.hostOf(s) ?? s)", systemImage: "plus.circle").foregroundColor(Theme.brand)
+                        }
+                    }
+                    HStack {
+                        TextField("Tên miền trang khác, vd phimmoir.fun", text: $newSite)
+                            .keyboardType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+                            .onSubmit { addTyped() }
+                        Button("Thêm") { addTyped() }.disabled(newSite.trimmed.isEmpty)
+                    }
+                    if !addError.isEmpty { Text(addError).foregroundColor(.red) }
+                } header: { Text("Thêm trang") } footer: {
+                    Text("Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…) và kiểu PhimMoi (phimmoir). Thêm xong là chuyển sang trang đó.")
                 }
             }
             .navigationTitle("Chọn trang phim")
@@ -45,7 +71,7 @@ struct SitesView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Đóng") { dismiss() } }
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Thêm / sửa…") {
+                    Button("Sửa tên miền…") {
                         app.sheet = nil
                         Task { @MainActor in
                             try? await Task.sleep(nanoseconds: 500_000_000)
@@ -66,6 +92,24 @@ struct SitesView: View {
                 for await (s, r) in group { checks[s] = r }
             }
         }
+    }
+
+    private func addTyped() {
+        guard let u = Prefs.normalizeUrl(newSite) else {
+            addError = "Tên miền không hợp lệ. Ví dụ đúng: phimmoir.fun"
+            return
+        }
+        add(u)
+    }
+
+    /// Thêm trang vào danh sách rồi chuyển sang trang đó.
+    private func add(_ url: String) {
+        addError = ""
+        newSite = ""
+        Prefs.addSite(url)
+        sites = Prefs.sites
+        app.showToast("Đã thêm \(Site.hostOf(url) ?? url) vào danh sách trang phim.")
+        app.selectSite(url)
     }
 
     /// vd "0,4 s · 36 phim · video mượt"

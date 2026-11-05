@@ -213,6 +213,27 @@ enum Prefs {
         }
     }
 
+    /// Thêm trang vào danh sách (không đổi trang đang dùng); đã có thì thôi.
+    static func addSite(_ url: String) {
+        if !sites.contains(url) { sites = sites + [url] }
+    }
+
+    /// Bỏ trang khỏi danh sách (còn ít nhất một trang); đang dùng trang đó thì sang trang đầu danh sách.
+    @discardableResult
+    static func removeSite(_ url: String) -> Bool {
+        let rest = sites.filter { $0 != url }
+        guard !rest.isEmpty else { return false }
+        sites = rest
+        if baseUrl == url { baseUrl = rest[0] }
+        return true
+    }
+
+    /// Trang mẫu không còn trong danh sách (người xem đã xoá) — để thêm lại nhanh.
+    static var missingPresets: [String] {
+        let list = sites
+        return presetSites.filter { !list.contains($0) }
+    }
+
     /// Server người xem chọn lần gần nhất trên từng trang (vd "tiktik").
     static func serverType(_ host: String?) -> String? { store.string(forKey: k("server_type@\(host ?? "")")) }
     static func serverLabel(_ host: String?) -> String? { store.string(forKey: k("server_label@\(host ?? "")")) }
@@ -395,6 +416,69 @@ enum Prefs {
         set { store.set(newValue, forKey: "web_dirty") }
     }
 
+    // MARK: - Proxy SOCKS5 (xem AppProxy) — dùng chung cả nhà
+
+    static var proxyOn: Bool {
+        get { store.bool(forKey: "proxy_on") }
+        set { store.set(newValue, forKey: "proxy_on") }
+    }
+
+    static var proxyHost: String {
+        get { store.string(forKey: "proxy_host") ?? "" }
+        set { store.set(newValue, forKey: "proxy_host") }
+    }
+
+    static var proxyPort: Int {
+        get { store.object(forKey: "proxy_port") as? Int ?? 1080 }
+        set { store.set(newValue, forKey: "proxy_port") }
+    }
+
+    static var proxyUser: String {
+        get { store.string(forKey: "proxy_user") ?? "" }
+        set { store.set(newValue, forKey: "proxy_user") }
+    }
+
+    private static var proxyPassCache: String?
+
+    /// Mật khẩu proxy: lưu trong Keychain của iPad (bản Android: Android Keystore). Keychain không dùng được (app thiếu
+    /// quyền) thì lưu trong cài đặt của app như bản Android cũ.
+    static var proxyPass: String {
+        get {
+            locked {
+                if let c = proxyPassCache { return c }
+                let v = Secret.get("proxy_pass") ?? store.string(forKey: "proxy_pass") ?? ""
+                proxyPassCache = v
+                return v
+            }
+        }
+        set {
+            locked {
+                proxyPassCache = newValue
+                if Secret.set("proxy_pass", newValue) { store.removeObject(forKey: "proxy_pass") } else { store.set(newValue, forKey: "proxy_pass") }
+            }
+        }
+    }
+
+    /// true: DNS của proxy; false: DNS của iPad.
+    static var proxyRemoteDns: Bool {
+        get { store.object(forKey: "proxy_remote_dns") as? Bool ?? true }
+        set { store.set(newValue, forKey: "proxy_remote_dns") }
+    }
+
+    /// true: chỉ trang phim đi qua proxy; false: toàn bộ app.
+    static var proxySitesOnly: Bool {
+        get { store.bool(forKey: "proxy_sites_only") }
+        set { store.set(newValue, forKey: "proxy_sites_only") }
+    }
+
+    /// Proxy đang dùng; nil = tắt (hoặc chưa nhập máy chủ / cổng hợp lệ).
+    static func proxyConfig() -> SocksConfig? {
+        guard proxyOn else { return nil }
+        let host = proxyHost.trimmed
+        guard !host.isEmpty, (1...65535).contains(proxyPort) else { return nil }
+        return SocksConfig(host: host, port: proxyPort, user: proxyUser, pass: proxyPass, remoteDns: proxyRemoteDns, sitesOnly: proxySitesOnly)
+    }
+
     // MARK: - Vị trí đang xem từng tập (giây)
 
     struct Position: Codable {
@@ -466,6 +550,8 @@ enum Prefs {
 
     /// Toàn bộ khoá (cho cổng gỡ lỗi /prefs).
     static func dump() -> [String: Any] {
-        store.dictionaryRepresentation().filter { k, _ in !k.hasPrefix("Apple") && !k.hasPrefix("NS") && !k.hasPrefix("com.apple") }
+        store.dictionaryRepresentation().filter { k, _ in
+            !k.hasPrefix("Apple") && !k.hasPrefix("NS") && !k.hasPrefix("com.apple") && k != "proxy_pass"
+        }
     }
 }
