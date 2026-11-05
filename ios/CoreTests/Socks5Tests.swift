@@ -9,20 +9,21 @@ final class Socks5Tests: XCTestCase {
         private let fd: Int32
 
         init(_ serve: @escaping (TcpSocket) -> Void) {
-            fd = socket(AF_INET, SOCK_STREAM, Int32(IPPROTO_TCP))
+            // Dùng biến cục bộ: khối lệnh (closure) không được nhắc tới self trước khi gán đủ thuộc tính
+            let sock = socket(AF_INET, SOCK_STREAM, Int32(IPPROTO_TCP))
             var a = sockaddr_in()
             a.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
             a.sin_family = sa_family_t(AF_INET)
             a.sin_addr.s_addr = inet_addr("127.0.0.1")
-            _ = withUnsafePointer(to: &a) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) } }
-            _ = Darwin.listen(fd, 16)
+            _ = withUnsafePointer(to: &a) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.bind(sock, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) } }
+            _ = Darwin.listen(sock, 16)
             var len = socklen_t(MemoryLayout<sockaddr_in>.size)
-            _ = withUnsafeMutablePointer(to: &a) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.getsockname(fd, $0, &len) } }
+            _ = withUnsafeMutablePointer(to: &a) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.getsockname(sock, $0, &len) } }
+            fd = sock
             port = Int(UInt16(bigEndian: a.sin_port))
-            let fd = self.fd
             Thread {
                 while true {
-                    let c = Darwin.accept(fd, nil, nil)
+                    let c = Darwin.accept(sock, nil, nil)
                     if c < 0 { return }
                     let s = TcpSocket(fd: c)
                     Thread { serve(s) }.start()
