@@ -95,6 +95,23 @@ public sealed class Follow
     public int NewCount => Math.Max(0, Count - Seen);
 }
 
+/// Người xem (hồ sơ) — cùng bản TV / iPad. Id "" = người xem đầu tiên (khoá cũ); Color = chỉ số trong Prefs.ProfileColors;
+/// Pin = mã băm của mã PIN (null = không khoá).
+public sealed class Profile
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public int Color { get; set; }
+    public string? Pin { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool Locked => Pin != null;
+
+    /// Chữ cái đầu tên (trên vòng tròn màu).
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string Initial => Name.Trim().Length > 0 ? Name.Trim()[..1].ToUpperInvariant() : "?";
+}
+
 /// Lỗi có câu báo tiếng Việt cho người xem.
 public sealed class AppError : Exception
 {

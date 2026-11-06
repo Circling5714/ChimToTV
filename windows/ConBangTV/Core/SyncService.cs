@@ -303,13 +303,13 @@ public static class SyncService
     public static SyncPayload Payload() => new()
     {
         Device = Prefs.DeviceId, Name = DeviceName, Platform = Platform,
-        Profiles = new() { Prefs.SyncProfileData() }, Sites = Prefs.SyncSitesData,
+        Profiles = Prefs.Profiles.Select(Prefs.SyncProfileData).ToList(), Sites = Prefs.SyncSitesData,
     };
 
     /// Gộp dữ liệu máy kia vào máy này. true = máy này có thay đổi.
     public static bool Absorb(SyncPayload remote)
     {
-        var local = new List<SyncProfile> { Prefs.SyncProfileData() };
+        var local = Prefs.Profiles.Select(Prefs.SyncProfileData).ToList();
         var changed = false;
         foreach (var (l, r) in SyncMerge.Match(local, remote.Profiles))
             if (Prefs.ApplySync(SyncMerge.Profile(local[l], remote.Profiles[r]))) changed = true;

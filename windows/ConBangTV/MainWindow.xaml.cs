@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Media;
 using ConBangTV.Core;
 using ConBangTV.Player;
 using ConBangTV.UI;
@@ -56,9 +57,14 @@ public partial class MainWindow : Window
             SyncService.Stop();
             Prefs.Flush();
         };
+        Deactivated += (_, _) => _deactivatedAt = Util.NowMs();
         Activated += (_, _) =>
         {
             _player?.Reactivate();
+            // Rời app hơn 30 phút (không xem phim): hỏi lại ai đang xem
+            if (_deactivatedAt > 0 && Util.NowMs() - _deactivatedAt > 30 * 60_000 && Player == null && Prefs.Profiles.Count > 1 &&
+                (Prefs.AskProfile || Prefs.CurrentProfile.Locked))
+                _ = PickProfile(!Prefs.CurrentProfile.Locked);
             // Quay lại app (vd vừa xem trên tivi): đồng bộ, tối đa 1 phút một lần
             if (Util.NowMs() - _lastActiveSync > 60_000)
             {
@@ -66,7 +72,12 @@ public partial class MainWindow : Window
                 SyncService.SyncSoon(1);
             }
         };
-        StateChanged += (_, _) => _player?.Follow();
+        StateChanged += (_, _) =>
+        {
+            // Thu nhỏ cửa sổ app lúc đang xem: phim chạy tiếp ở cửa sổ nhỏ
+            if (WindowState == WindowState.Minimized && Player != null && Prefs.MiniOnMinimize) _player!.EnterMini();
+            _player?.Follow();
+        };
         LocationChanged += (_, _) => _player?.Follow();
         SizeChanged += (_, _) => _player?.Follow();
     }
@@ -84,7 +95,12 @@ public partial class MainWindow : Window
         SyncService.DataChanged += () => Dispatcher.BeginInvoke(SyncApplied);
         SyncService.Message += m => Dispatcher.BeginInvoke(() => Toast(m));
         SyncService.AppStarted();
+        // «Ai đang xem?» khi mở app (từ 2 người xem), hoặc người đang dùng có khoá
+        if (Prefs.CurrentProfile.Locked || (Prefs.AskProfile && Prefs.Profiles.Count > 1))
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => _ = PickProfile(!Prefs.CurrentProfile.Locked));
     }
+
+    private long _deactivatedAt;
 
     private long _lastActiveSync;
 
@@ -160,6 +176,13 @@ public partial class MainWindow : Window
 
     private IEnumerable<MenuEntry> MenuEntries()
     {
+        if (_player is { IsMini: true } mini)
+        {
+            yield return new("mini-expand", "⤢  Phóng to phim đang xem", () => mini.ExitMini(true));
+            yield return new("mini-close", "✕  Tắt phim thu nhỏ", () => mini.Close());
+        }
+        var me = Prefs.CurrentProfile;
+        yield return new("profile", $"👤  Người xem: {me.Name}{(me.Locked ? " 🔒" : "")}", () => _ = PickProfile(true));
         yield return new("home", "🏠  Trang chủ", () => ShowRoot(new HomePage()));
         yield return new("search", "🔍  Tìm kiếm", () => ShowRoot(new SearchPage()));
         yield return new("history", "🕘  Xem tiếp / Lịch sử", () => ShowRoot(new HistoryPage()));
@@ -288,6 +311,7 @@ public partial class MainWindow : Window
         PlayerHost.Visibility = Visibility.Visible;
         Shell.Visibility = Visibility.Hidden;
         _player.Open(filmUrl, epUrl, resume);
+        RebuildMenu();
     }
 
     /// Trình phát đã đóng (người xem thoát): về trang trước, cập nhật tập đã xem / xem tiếp.
@@ -309,7 +333,230 @@ public partial class MainWindow : Window
         RebuildMenu();
     }
 
-    public PlayerView? Player => _player is { IsOpen: true } ? _player : null;
+    public PlayerView? Player => _player is { IsOpen: true, IsMini: false } ? _player : null;
+
+    /// Trình phát đang mở (kể cả ở cửa sổ nhỏ).
+    public PlayerView? OpenPlayer => _player is { IsOpen: true } ? _player : null;
+
+    /// Phim đang chạy ở cửa sổ nhỏ: cửa sổ app trở lại các trang.
+    public void PlayerMinimized()
+    {
+        PlayerHost.Visibility = Visibility.Collapsed;
+        Shell.Visibility = Visibility.Visible;
+        RebuildMenu();
+        if (WindowState != WindowState.Minimized)
+        {
+            Activate();
+            if (Current is { } p)
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+                {
+                    if (p.LastFocus is { IsVisible: true } f) KeyNav.FocusAndShow(f);
+                    else FocusMenu();
+                });
+        }
+    }
+
+    /// Phóng to phim từ cửa sổ nhỏ.
+    public void PlayerRestored()
+    {
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        if (Current is { } cur) cur.LastFocus = Keyboard.FocusedElement as FrameworkElement;
+        PlayerHost.Visibility = Visibility.Visible;
+        Shell.Visibility = Visibility.Hidden;
+        Activate();
+        RebuildMenu();
+    }
+
+    /// Hết giờ xem: người lớn nhập mã PIN phụ huynh để cho xem thêm (rồi mở lại đúng tập, xem tiếp), hoặc thôi.
+    public async Task LimitReached(WatchLimit.Block b, string film, string ep)
+    {
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+        var who = Prefs.CurrentProfile.Name;
+        var why = b == WatchLimit.Block.Bedtime
+            ? $"Đã tới giờ đi ngủ của {who} (từ {WatchLimit.BedtimeLabel(Prefs.Bedtime())} tới 6 giờ sáng)."
+            : $"{who} đã xem hết {WatchLimit.DailyLabel(Prefs.DailyLimit())} của hôm nay.";
+        while (true)
+        {
+            var r = await Ask("Hết giờ xem", why + "\nNgười lớn nhập mã PIN phụ huynh để cho xem thêm.", new[] { "Cho xem thêm…", "Thoát" }, focus: 1);
+            if (r != 0) return;
+            var pin = await AskPin("Mã PIN phụ huynh", "Nhập mã PIN phụ huynh (4 số) để cho xem thêm.");
+            if (pin == null) continue;
+            if (!Prefs.CheckParentPin(pin))
+            {
+                Toast("Sai mã PIN phụ huynh.");
+                continue;
+            }
+            var labels = WatchLimit.Grants.Select(m => $"Thêm {WatchLimit.DailyLabel(m)}").Append("Tới 6 giờ sáng").ToArray();
+            var g = await Ask("Cho xem thêm bao lâu?", $"Người xem: {who}.", labels);
+            if (g < 0) continue;
+            if (g < WatchLimit.Grants.Length) WatchLimit.Grant(WatchLimit.Grants[g]);
+            else WatchLimit.GrantUntilMorning();
+            Toast("Đã cho xem thêm.");
+            Play(film, ep);
+            return;
+        }
+    }
+
+    // ---- Người xem ----
+
+    /// Nhập mã PIN 4 số (đủ 4 số là tự xong). null = huỷ.
+    public async Task<string?> AskPin(string title, string text)
+    {
+        var box = new PasswordBox { MaxLength = Prefs.PinLength, MinWidth = 160, HorizontalAlignment = HorizontalAlignment.Left,
+            Style = (Style)FindResource("PassBox"), FontSize = 26 };
+        box.PasswordChanged += (_, _) =>
+        {
+            if (box.Password.Length == Prefs.PinLength && box.Password.All(char.IsDigit)) CloseDialog(0);
+        };
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            e.Handled = true;
+            CloseDialog(0);
+        };
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () => box.Focus());
+        var r = await Ask(title, text, new[] { "OK", "Huỷ" }, box);
+        var pin = box.Password;
+        return r == 0 && pin.Length == Prefs.PinLength && pin.All(char.IsDigit) ? pin : null;
+    }
+
+    /// Đặt mã PIN mới (nhập hai lần). null = huỷ / không khớp.
+    public async Task<string?> AskNewPin(string title)
+    {
+        var a = await AskPin(title, "Nhập mã PIN mới (4 số).");
+        if (a == null) return null;
+        var b = await AskPin(title, "Nhập lại mã PIN để xác nhận.");
+        if (b == a) return a;
+        if (b != null) Toast("Hai lần nhập không khớp.");
+        return null;
+    }
+
+    /// Hỏi mã PIN phụ huynh (chưa có thì đặt mới). true = đúng / vừa đặt.
+    public async Task<bool> CheckParent(string why)
+    {
+        if (!Prefs.HasParentPin)
+        {
+            var np = await AskNewPin("Đặt mã PIN phụ huynh");
+            if (np == null) return false;
+            Prefs.SetParentPin(np);
+            Toast("Đã đặt mã PIN phụ huynh — nhớ mã này, quên thì phải xoá dữ liệu app.");
+            return true;
+        }
+        var pin = await AskPin("Mã PIN phụ huynh", why);
+        if (pin == null) return false;
+        if (Prefs.CheckParentPin(pin)) return true;
+        Toast("Sai mã PIN phụ huynh.");
+        return false;
+    }
+
+    private bool _picking;
+
+    /// «Ai đang xem?»: chọn người xem (người có khoá phải nhập mã PIN). cancellable = false: người đang dùng có khoá →
+    /// phải chọn được ai đó mới vào app.
+    public async Task PickProfile(bool cancellable)
+    {
+        if (_picking) return;
+        _picking = true;
+        // Bắt buộc chọn (người đang dùng có khoá): nền đen kín, không lộ lịch sử của người đó phía sau
+        var dim = DialogLayer.Background;
+        if (!cancellable) DialogLayer.Background = (Brush)FindResource("Bg");
+        try
+        {
+            while (true)
+            {
+                var list = Prefs.Profiles;
+                var tiles = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
+                for (var i = 0; i < list.Count; i++)
+                {
+                    var idx = i;
+                    tiles.Children.Add(ProfileTile(list[i], () => CloseDialog(100 + idx)));
+                }
+                var buttons = cancellable ? new[] { "Quản lý người xem…", "Huỷ" } : new[] { "Quản lý người xem…" };
+                var cur = list.FindIndex(p => p.Id == Prefs.ProfileId);
+                Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () =>
+                {
+                    if (cur >= 0 && cur < tiles.Children.Count) ((Button)tiles.Children[cur]).Focus();
+                });
+                var r = await Ask("Ai đang xem?", "", buttons, tiles);
+                if (r == 0)
+                {
+                    if (cancellable || !Prefs.CurrentProfile.Locked)
+                    {
+                        ShowRoot(new ProfilesPage());
+                        return;
+                    }
+                    Toast("Chọn người xem trước.");
+                    continue;
+                }
+                if (r < 100)
+                {
+                    if (!cancellable && Prefs.CurrentProfile.Locked) continue;
+                    return;
+                }
+                var p = list[r - 100];
+                if (p.Locked && !(cancellable && p.Id == Prefs.ProfileId))
+                {
+                    var pin = await AskPin($"Mã PIN của {p.Name}", "Nhập mã PIN 4 số.");
+                    if (pin == null) continue;
+                    if (!Prefs.CheckPin(p, pin))
+                    {
+                        Toast("Sai mã PIN.");
+                        continue;
+                    }
+                }
+                SwitchTo(p);
+                return;
+            }
+        }
+        finally
+        {
+            _picking = false;
+            DialogLayer.Background = dim;
+        }
+    }
+
+    /// Đổi sang người xem p: đóng phim đang xem, về Trang chủ (trang phim / lịch sử của người đó).
+    public void SwitchTo(Profile p)
+    {
+        if (p.Id == Prefs.ProfileId) return;
+        _player?.Close(false);
+        WatchLimit.Flush();
+        WatchLimit.Reset();
+        Prefs.SwitchProfile(p.Id);
+        PlayerHost.Visibility = Visibility.Collapsed;
+        Shell.Visibility = Visibility.Visible;
+        _categories = new();
+        RebuildMenu();
+        ShowRoot(new HomePage());
+        Toast($"Đang xem: {p.Name}.");
+    }
+
+    /// Ô người xem: vòng tròn màu + chữ cái đầu, tên, 🔒 nếu có khoá.
+    public static Button ProfileTile(Profile p, Action onClick)
+    {
+        var color = Prefs.ProfileColors[Math.Clamp(p.Color, 0, Prefs.ProfileColors.Length - 1)];
+        var circle = new Border
+        {
+            Width = 84, Height = 84, CornerRadius = new CornerRadius(42), HorizontalAlignment = HorizontalAlignment.Center,
+            Background = new SolidColorBrush(Color.FromRgb((byte)(color >> 16), (byte)(color >> 8), (byte)color)),
+            Child = new TextBlock
+            {
+                Text = p.Initial, FontSize = 38, FontWeight = FontWeights.Bold, Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        var panel = new StackPanel { Width = 120 };
+        panel.Children.Add(circle);
+        panel.Children.Add(new TextBlock
+        {
+            Text = p.Name + (p.Locked ? " 🔒" : ""), FontSize = 16, Margin = new Thickness(0, 8, 0, 0), TextAlignment = TextAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        });
+        var b = new Button { Content = panel, Padding = new Thickness(10), Margin = new Thickness(0, 0, 12, 12), Background = Brushes.Transparent };
+        b.Click += (_, _) => onClick();
+        return b;
+    }
 
     // ---- Phím ----
 
@@ -408,7 +655,7 @@ public partial class MainWindow : Window
     public async Task<bool> Confirm(string title, string text, string ok = "Đồng ý", string cancel = "Huỷ") =>
         await Ask(title, text, new[] { ok, cancel }, focus: 1) == 0;
 
-    private void CloseDialog(int result)
+    public void CloseDialog(int result)
     {
         DialogLayer.Visibility = Visibility.Collapsed;
         DialogExtra.Content = null;

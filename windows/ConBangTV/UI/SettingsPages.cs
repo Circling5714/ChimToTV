@@ -183,7 +183,9 @@ public sealed class SettingsPage : Page
     {
         Body.Children.Clear();
         Body.Children.Add(Ui.Header("Cài đặt"));
-        Body.Children.Add(Ui.Row(Ui.Pill($"🌐  Trang phim: {Site.HostOf(Prefs.BaseUrl)}", () => Main.ShowRoot(new SitesPage()))));
+        Body.Children.Add(Ui.Row(
+            Ui.Pill($"🌐  Trang phim: {Site.HostOf(Prefs.BaseUrl)}", () => Main.ShowRoot(new SitesPage())),
+            Ui.Pill($"👤  Người xem: {Prefs.CurrentProfile.Name} — quản lý / giới hạn giờ xem…", () => Main.Push(new ProfilesPage()))));
 
         Option("Mỗi lần bấm ◀ ▶ khi xem phim tua", new[] { 5, 10, 15, 30 }.Select(s =>
             ($"{s} giây", Prefs.SeekStep == s, (Action)(() => Prefs.SeekStep = s))), "Giữ phím thì tua nhanh dần.");
@@ -207,6 +209,11 @@ public sealed class SettingsPage : Page
             })),
             ("Tắt", !Prefs.StartFullscreen, () => Prefs.StartFullscreen = false),
         }, "F11 (hoặc Alt+Enter) để bật / tắt toàn màn hình bất cứ lúc nào.");
+        Option("Thu nhỏ cửa sổ app lúc đang xem phim", new[]
+        {
+            ("Phim chạy tiếp ở cửa sổ nhỏ", Prefs.MiniOnMinimize, (Action)(() => Prefs.MiniOnMinimize = true)),
+            ("Dừng theo app", !Prefs.MiniOnMinimize, () => Prefs.MiniOnMinimize = false),
+        }, "Lúc xem: nút «▣ Thu nhỏ» (phím W) đưa phim ra cửa sổ nhỏ góc màn hình; bấm đúp thanh dưới cửa sổ nhỏ để phóng to.");
         Option("Vượt chặn nhà mạng", new[]
         {
             ("Tắt", Prefs.UnblockLevel == 0, (Action)(() => SetUnblock(0))),
@@ -240,7 +247,7 @@ public sealed class SettingsPage : Page
         Body.Children.Add(Ui.Dim(
             "Mũi tên: di chuyển  •  Enter: chọn  •  Esc / Backspace / Back của remote: quay lại  •  F11: toàn màn hình  •  Ctrl+F: tìm kiếm\n" +
             "Khi xem phim: Space / Enter / K: phát / dừng  •  ◀ ▶ (J / L): tua  •  ▲: thời gian  •  ▼ / M: menu (server, tập, tốc độ…)  •  " +
-            "N / P (PageDown / PageUp): tập sau / trước  •  0–9: nhảy tới 0–90%  •  F: toàn màn hình  •  Esc: thoát phim\n" +
+            "N / P (PageDown / PageUp): tập sau / trước  •  0–9: nhảy tới 0–90%  •  F: toàn màn hình  •  W: thu nhỏ phim  •  Esc: thoát phim\n" +
             "Chuột: rê để hiện thanh điều khiển, bấm vào phim để phát / dừng, bấm đúp để toàn màn hình.", 14.5));
 
         Body.Children.Add(Ui.Header("Giới thiệu", new Thickness(0, 26, 0, 10)));

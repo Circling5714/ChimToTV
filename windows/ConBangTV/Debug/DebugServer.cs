@@ -74,7 +74,7 @@ public static class DebugServer
                     break;
                 case "/js":
                     var code = q["code"] ?? (ctx.Request.HasEntityBody ? new StreamReader(ctx.Request.InputStream).ReadToEnd() : "");
-                    var player = await _w!.Dispatcher.InvokeAsync(() => _w.Player);
+                    var player = await _w!.Dispatcher.InvokeAsync(() => _w.OpenPlayer);
                     body = Text(player == null ? "trình phát chưa mở" : await await _w.Dispatcher.InvokeAsync(() => player.Js(code)));
                     break;
                 case "/log":
@@ -97,6 +97,10 @@ public static class DebugServer
                         tb.CaretIndex = tb.Text.Length;
                         return "đã gõ: " + tb.Text;
                     }));
+                    break;
+                case "/pref":
+                    Prefs.DebugSet(q["key"]!, q["json"]!);
+                    body = Text("ok");
                     break;
                 case "/play":
                     await _w!.Dispatcher.InvokeAsync(() => _w.Play(q["film"]!, q["ep"]!));
@@ -131,7 +135,7 @@ public static class DebugServer
         var sb = new StringBuilder();
         sb.AppendLine($"page={w.Current?.GetType().Name} fullscreen={w.IsFullscreen} state={w.WindowState} size={w.ActualWidth}x{w.ActualHeight}");
         sb.AppendLine($"focus={f?.GetType().Name} '{Describe(f)}'");
-        sb.AppendLine($"player={w.Player?.Debug() ?? "đóng"}");
+        sb.AppendLine($"player={w.OpenPlayer?.Debug() ?? "đóng"}{(w.OpenPlayer?.IsMini == true ? " (cửa sổ nhỏ)" : "")}");
         sb.AppendLine($"site={Prefs.BaseUrl}");
         return sb.ToString();
     }
@@ -141,6 +145,7 @@ public static class DebugServer
         null => "",
         Button { Content: string s } => s,
         Button { Content: TextBlock t } => t.Text,
+        Button { Content: Panel pnl } => string.Join(" ", pnl.Children.OfType<TextBlock>().Select(x => x.Text)),
         Button { DataContext: Film film } => "thẻ: " + film.Title,
         TextBox t => "ô chữ: " + t.Text,
         _ => f.ToString(),

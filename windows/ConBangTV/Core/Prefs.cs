@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -50,6 +52,7 @@ public static class Prefs
             }
             _historyCache = null;
             _positionsCache = null;
+            _pidCache = null;
         }
     }
 
@@ -114,15 +117,264 @@ public static class Prefs
 
     public static void Remove(string key) => Set<object>(key, null);
 
-    /// Khoá riêng của người xem (bản này chưa có hồ sơ: người xem đầu tiên dùng khoá gốc, như bản TV).
-    private static string K(string key) => key;
+#if DEBUG
+    /// Cổng gỡ lỗi: đặt một khoá bằng JSON (thử giới hạn giờ xem…).
+    public static void DebugSet(string key, string json)
+    {
+        lock (Lock) _store[key] = JsonNode.Parse(json);
+        _historyCache = null;
+        _positionsCache = null;
+        Changed();
+    }
+#endif
+
+    // ---- Người xem (hồ sơ) — cùng cách lưu bản TV / iPad ----
+
+    public const int MaxProfiles = 8;
+    public const int PinLength = 4;
+    public const string FirstProfileName = "Cả nhà";
+
+    /// Màu vòng tròn của người xem (RGB, cùng thứ tự bản Android / iPad).
+    public static readonly uint[] ProfileColors = { 0x2BAF85, 0xE5533D, 0x3B82F6, 0xF59E0B, 0x8B5CF6, 0x06B6D4, 0xEC4899, 0x84CC16 };
+    public static readonly string[] ProfileColorNames = { "Xanh lá", "Đỏ cam", "Xanh dương", "Vàng", "Tím", "Xanh ngọc", "Hồng", "Xanh nõn chuối" };
+
+    /// Khoá riêng từng người xem (còn lại — danh sách trang, mốc nhạc mở đầu, cập nhật… — dùng chung).
+    private static readonly HashSet<string> ProfileKeys = new()
+    {
+        "history", "positions_v2", "follows", "last_follow_check", "private_mode",
+        "hist_del", "follow_del",
+        "base_url", "seek_step", "auto_next", "video_fill",
+        "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
+    };
+
+    private static readonly string[] ProfilePrefixes = { "server_type@", "server_label@" };
+
+    /// Người thêm sau bắt đầu với trang phim / server ưu tiên / cách xem của người đang dùng.
+    private static readonly HashSet<string> CopiedKeys = new() { "base_url", "seek_step", "auto_next", "video_fill" };
+
+    private static string? _pidCache;
+
+    /// Người xem đang dùng ("" = người đầu tiên, giữ khoá cũ không hậu tố).
+    public static string ProfileId
+    {
+        get
+        {
+            lock (Lock)
+            {
+                if (_pidCache != null) return _pidCache;
+                var saved = Get<string>("profile") ?? "";
+                var list = Profiles;
+                _pidCache = list.Any(p => p.Id == saved) ? saved : list[0].Id;
+                return _pidCache;
+            }
+        }
+    }
+
+    /// Khoá của người xem id (người đầu tiên — id "" — giữ khoá cũ không hậu tố).
+    public static string Pk(string id, string key) => id.Length == 0 ? key : $"{key}#{id}";
+
+    /// Khoá của người xem đang dùng.
+    private static string K(string key) => Pk(ProfileId, key);
+
+    private static bool IsProfileKey(string b) => ProfileKeys.Contains(b) || ProfilePrefixes.Any(b.StartsWith);
+
+    /// Các khoá riêng đang có của một người xem: (khoá thật, khoá gốc không hậu tố).
+    private static List<(string Key, string Base)> OwnKeys(string id)
+    {
+        lock (Lock)
+        {
+            var outList = new List<(string, string)>();
+            foreach (var key in _store.Select(kv => kv.Key).ToList())
+            {
+                string? b = id.Length == 0 ? (key.Contains('#') ? null : key) : key.EndsWith("#" + id) ? key[..^(id.Length + 1)] : null;
+                if (b != null && IsProfileKey(b)) outList.Add((key, b));
+            }
+            return outList;
+        }
+    }
+
+    public static List<Profile> Profiles
+    {
+        get
+        {
+            var list = Get<List<Profile>>("profiles") ?? new();
+            return list.Count == 0 ? new() { new Profile { Id = "", Name = FirstProfileName, Color = 0 } } : list;
+        }
+    }
+
+    private static void SaveProfiles(List<Profile> list) => Set("profiles", list);
+
+    /// Người xem đang dùng.
+    public static Profile CurrentProfile
+    {
+        get
+        {
+            var id = ProfileId;
+            var list = Profiles;
+            return list.FirstOrDefault(p => p.Id == id) ?? list[0];
+        }
+    }
+
+    public static void SwitchProfile(string id)
+    {
+        lock (Lock)
+        {
+            if (Profiles.All(p => p.Id != id)) return;
+            _pidCache = id;
+            Set("profile", id);
+            _historyCache = null;
+            _positionsCache = null;
+        }
+    }
+
+    /// Thêm người xem (chưa chuyển sang): lịch sử trống; trang phim / server ưu tiên / cách xem chép từ người đang dùng.
+    public static Profile AddProfile(string name)
+    {
+        lock (Lock)
+        {
+            var list = Profiles;
+            var n = 1;
+            while (list.Any(p => p.Id == $"p{n}")) n++;
+            var id = $"p{n}";
+            var used = list.Select(p => p.Color).ToHashSet();
+            var color = Enumerable.Range(0, ProfileColors.Length).FirstOrDefault(i => !used.Contains(i), list.Count % ProfileColors.Length);
+            foreach (var (key, b) in OwnKeys(ProfileId))
+            {
+                if (!CopiedKeys.Contains(b) && !ProfilePrefixes.Any(b.StartsWith)) continue;
+                if (_store.TryGetPropertyValue(key, out var v)) _store[$"{b}#{id}"] = v?.DeepClone();
+            }
+            _store[$"base_url#{id}"] = BaseUrl;
+            var p = new Profile { Id = id, Name = name.Trim(), Color = color };
+            list.Add(p);
+            SaveProfiles(list);
+            return p;
+        }
+    }
+
+    public static void RenameProfile(string id, string name)
+    {
+        lock (Lock)
+        {
+            var list = Profiles;
+            foreach (var p in list.Where(p => p.Id == id)) p.Name = name.Trim();
+            SaveProfiles(list);
+        }
+    }
+
+    public static void SetProfileColor(string id, int color)
+    {
+        lock (Lock)
+        {
+            var list = Profiles;
+            foreach (var p in list.Where(p => p.Id == id)) p.Color = color;
+            SaveProfiles(list);
+        }
+    }
+
+    /// Đặt mã PIN (4 số); null = tắt khoá.
+    public static void SetProfilePin(string id, string? pin)
+    {
+        lock (Lock)
+        {
+            var list = Profiles;
+            foreach (var p in list.Where(p => p.Id == id)) p.Pin = pin == null ? null : PinHash(id, pin);
+            SaveProfiles(list);
+        }
+    }
+
+    public static bool CheckPin(Profile p, string pin) => p.Pin == null || p.Pin == PinHash(p.Id, pin);
+
+    /// Không lưu mã PIN thật, chỉ lưu mã băm (khoá cho trẻ em khỏi vào nhầm, không phải mật khẩu bảo mật). Cùng cách băm
+    /// bản TV / iPad.
+    public static string PinHash(string id, string pin) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"chimto-pin:{id}:{pin}"))).ToLowerInvariant();
+
+    /// Xoá người xem cùng toàn bộ dữ liệu riêng; còn một người thì không xoá được.
+    public static void DeleteProfile(string id)
+    {
+        lock (Lock)
+        {
+            var list = Profiles;
+            if (list.Count <= 1 || list.All(p => p.Id != id)) return;
+            foreach (var (key, _) in OwnKeys(id)) _store.Remove(key);
+            var rest = list.Where(p => p.Id != id).ToList();
+            SaveProfiles(rest);
+            if (ProfileId == id) SwitchProfile(rest[0].Id);
+        }
+        Changed();
+    }
+
+    // ---- Giới hạn giờ xem (xem WatchLimit) — cùng tên khoá bản TV / iPad ----
+
+    /// Số phút xem mỗi ngày của người xem id (mặc định người đang dùng; 0 = không giới hạn).
+    public static int DailyLimit(string? id = null) => Get<int>(Pk(id ?? ProfileId, "limit_min"));
+
+    public static void SetDailyLimit(string id, int minutes) => Set(Pk(id, "limit_min"), minutes);
+
+    /// Giờ đi ngủ (phút trong ngày, vd 21:00 = 1260; -1 = không): từ giờ đó tới 6 giờ sáng không xem được.
+    public static int Bedtime(string? id = null) => Has(Pk(id ?? ProfileId, "bedtime")) ? Get<int>(Pk(id ?? ProfileId, "bedtime")) : -1;
+
+    public static void SetBedtime(string id, int minute) => Set(Pk(id, "bedtime"), minute);
+
+    public static string WatchDay
+    {
+        get => Get<string>(K("watch_day")) ?? "";
+        set => Set(K("watch_day"), value);
+    }
+
+    public static int WatchSeconds
+    {
+        get => Get<int>(K("watch_sec"));
+        set => Set(K("watch_sec"), value);
+    }
+
+    public static int WatchExtra
+    {
+        get => Get<int>(K("watch_extra"));
+        set => Set(K("watch_extra"), value);
+    }
+
+    /// Người đang xem được xem không giới hạn tới thời điểm này (ms) — phụ huynh cho thêm lúc giờ đi ngủ.
+    public static long UnblockUntil
+    {
+        get => Get<long>(K("unblock_until"));
+        set => Set(K("unblock_until"), value);
+    }
+
+    /// Có ai đang bị giới hạn giờ xem (khi đó thêm / xoá người xem cũng cần mã PIN phụ huynh).
+    public static bool AnyLimits => Profiles.Any(p => DailyLimit(p.Id) > 0 || Bedtime(p.Id) >= 0);
+
+    /// Mã PIN phụ huynh (cả nhà): đặt / đổi giới hạn giờ xem, cho xem thêm khi hết giờ.
+    public static bool HasParentPin => Get<string>("parent_pin") != null;
+
+    public static void SetParentPin(string? pin)
+    {
+        if (pin != null) Set("parent_pin", PinHash("parent", pin));
+        else Remove("parent_pin");
+    }
+
+    public static bool CheckParentPin(string pin) => Get<string>("parent_pin") == PinHash("parent", pin);
+
+    /// Hỏi "Ai đang xem?" khi mở app (từ 2 người xem).
+    public static bool AskProfile
+    {
+        get => !Has("ask_profile") || Get<bool>("ask_profile");
+        set => Set("ask_profile", value);
+    }
+
+    /// Thu nhỏ cửa sổ app lúc đang xem → phim chạy tiếp ở cửa sổ nhỏ trên màn hình.
+    public static bool MiniOnMinimize
+    {
+        get => !Has("mini_on_minimize") || Get<bool>("mini_on_minimize");
+        set => Set("mini_on_minimize", value);
+    }
 
     // ---- Trang phim ----
 
     /// Trang phim đang dùng (địa chỉ gốc, không có dấu / ở cuối). Đặt trang mới thì tự thêm vào danh sách.
     public static string BaseUrl
     {
-        get => Get<string>(K("base_url")) ?? DefaultBase;
+        get => Get<string>(K("base_url")) ?? Get<string>("base_url") ?? DefaultBase;
         set
         {
             Set(K("base_url"), value);
@@ -530,44 +782,49 @@ public static class Prefs
         }
     }
 
-    /// Tên người xem đầu tiên (bản Windows chưa có nhiều người xem).
-    public const string ProfileName = "Cả nhà";
-
-    /// Dữ liệu đồng bộ của người xem đầu tiên.
-    public static SyncProfile SyncProfileData()
+    /// Dữ liệu đồng bộ của người xem p.
+    public static SyncProfile SyncProfileData(Profile p)
     {
         lock (Lock)
         {
+            var id = p.Id;
+            var hist = Get<List<HistoryItem>>(Pk(id, "history")) ?? new();
+            var pos = Get<List<Position>>(Pk(id, "positions_v2")) ?? new();
+            var fol = Get<List<Follow>>(Pk(id, "follows")) ?? new();
             return new SyncProfile
             {
-                Id = "", Name = ProfileName,
-                History = History.Select(h => new SyncHistory(h.FilmUrl, h.Title, h.Poster ?? "", h.EpTitle, h.EpUrl, h.Time)).ToList(),
-                HistDel = Stamps(K("hist_del")),
-                Pos = Positions().Select(p => new SyncPos(p.Ep, p.Sec, p.Film, p.T ?? 0)).ToList(),
-                Follows = Follows.Select(f => new SyncFollow(f.FilmUrl, f.Title, f.Poster ?? "", f.Count, f.Latest, f.Seen, f.T ?? 0)).ToList(),
-                FollowDel = Stamps(K("follow_del")),
+                Id = id, Name = p.Name,
+                History = hist.Select(h => new SyncHistory(h.FilmUrl, h.Title, h.Poster ?? "", h.EpTitle, h.EpUrl, h.Time)).ToList(),
+                HistDel = Stamps(Pk(id, "hist_del")),
+                Pos = pos.Select(x => new SyncPos(x.Ep, x.Sec, x.Film, x.T ?? 0)).ToList(),
+                Follows = fol.Select(f => new SyncFollow(f.FilmUrl, f.Title, f.Poster ?? "", f.Count, f.Latest, f.Seen, f.T ?? 0)).ToList(),
+                FollowDel = Stamps(Pk(id, "follow_del")),
             };
         }
     }
 
-    /// Ghi dữ liệu đã gộp. true = có thay đổi.
+    /// Ghi dữ liệu đã gộp cho người xem s.Id. true = có thay đổi.
     public static bool ApplySync(SyncProfile s)
     {
         lock (Lock)
         {
-            if (s.Id.Length != 0 || SyncProfileData().SameAs(s)) return false;
-            SaveHistory(s.History.Select(h => new HistoryItem
+            var p = Profiles.FirstOrDefault(x => x.Id == s.Id);
+            if (p == null || SyncProfileData(p).SameAs(s)) return false;
+            var id = s.Id;
+            Set(Pk(id, "history"), s.History.Select(h => new HistoryItem
             {
                 FilmUrl = h.Film, Title = h.Title, Poster = h.Poster.NonEmpty(), EpTitle = h.Ep, EpUrl = h.EpUrl, Time = h.Time,
             }).ToList());
-            SavePositions(s.Pos.Select(p => new Position { Ep = p.Ep, Sec = p.Sec, Film = p.Film, T = p.T == 0 ? null : p.T }).ToList());
-            Follows = s.Follows.Select(f => new Follow
+            Set(Pk(id, "positions_v2"), s.Pos.Select(x => new Position { Ep = x.Ep, Sec = x.Sec, Film = x.Film, T = x.T == 0 ? null : x.T }).ToList());
+            Set(Pk(id, "follows"), s.Follows.Select(f => new Follow
             {
                 FilmUrl = f.Film, Title = f.Title, Poster = f.Poster.NonEmpty(), Count = f.Count, Latest = f.Latest, Seen = f.Seen,
                 T = f.T == 0 ? null : f.T,
-            }).ToList();
-            SetStamps(K("hist_del"), s.HistDel);
-            SetStamps(K("follow_del"), s.FollowDel);
+            }).ToList());
+            SetStamps(Pk(id, "hist_del"), s.HistDel);
+            SetStamps(Pk(id, "follow_del"), s.FollowDel);
+            _historyCache = null;
+            _positionsCache = null;
             return true;
         }
     }

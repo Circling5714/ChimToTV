@@ -98,6 +98,13 @@ public sealed class PlayerView : UserControl
     private bool _clickThrough;
     private bool _polling;
 
+    // Cửa sổ phim nhỏ (MiniWindow) và giới hạn giờ xem
+    private MiniWindow? _miniWin;
+    private bool _limitWarned;
+
+    /// Đang ở cửa sổ phim nhỏ (phím / chuột của cửa sổ app dành cho app, không cho trình phát).
+    public bool IsMini => _miniWin != null;
+
     public PlayerView(MainWindow main)
     {
         _instance = this;
@@ -303,6 +310,7 @@ public sealed class PlayerView : UserControl
 
     public void Open(string filmUrl, string epUrl, bool resume)
     {
+        if (IsMini) ExitMini(false);
         var wasOpen = IsOpen;
         IsOpen = true;
         if (wasOpen)
@@ -317,6 +325,7 @@ public sealed class PlayerView : UserControl
         _filmUrl = filmUrl;
         _resumeOpen = resume;
         _detail = null;
+        _limitWarned = false;
         _poll.Start();
         ApplyOverlayScale();
         var t = ++_loadToken;
@@ -366,10 +375,12 @@ public sealed class PlayerView : UserControl
     public void Close(bool notify = true)
     {
         if (!IsOpen) return;
+        if (IsMini) ExitMini(false);
         IsOpen = false;
         _token++;
         _loadToken++;
         StopVideo();
+        WatchLimit.Flush();
         _poll.Stop();
         _clickTimer.Stop();
         ExitClickThrough();
@@ -382,7 +393,7 @@ public sealed class PlayerView : UserControl
     /// Cửa sổ chính được chọn (vd bấm thanh tác vụ): đưa lớp phủ lên lại để giữ phím.
     public void Reactivate()
     {
-        if (!IsOpen || _clickThrough) return;
+        if (!IsOpen || _clickThrough || IsMini) return;
         Dispatcher.BeginInvoke(() =>
         {
             if (IsOpen && _ov.IsVisible) _ov.Activate();
@@ -392,7 +403,7 @@ public sealed class PlayerView : UserControl
     /// Đặt lớp phủ đúng chỗ trình phát (theo cửa sổ chính).
     public void Follow()
     {
-        if (!IsOpen) return;
+        if (!IsOpen || IsMini) return;
         if (_main.WindowState == WindowState.Minimized) return;
         var src = PresentationSource.FromVisual(this);
         if (src?.CompositionTarget == null || ActualWidth <= 0) return;
@@ -421,6 +432,12 @@ public sealed class PlayerView : UserControl
         var d = _detail;
         if (d == null || i < 0 || i >= Episodes.Count) return;
         var ep = Episodes[i];
+        // Người đang xem đã hết giờ xem: chưa mở tập, hỏi mã phụ huynh trước
+        if (WatchLimit.Blocked() is { } blocked)
+        {
+            LimitBlock(blocked, d.Url, ep.Url);
+            return;
+        }
         _index = i;
         var t = ++_token;
         StopVideo();
@@ -658,6 +675,9 @@ public sealed class PlayerView : UserControl
                 ShowPanel();
             }
         }
+        WatchLimit.Tick(_started && !st.Paused && !st.Waiting, now);
+        if (CheckLimit()) return;
+        _miniWin?.Update(_ov.TitleText.Text, st.Paused);
         // Bắt đầu khi video thật sự chạy (không phải lúc mới nạp xong mà còn dừng)
         if (!_started && st.Ready && !st.Paused)
         {
@@ -703,6 +723,78 @@ public sealed class PlayerView : UserControl
                 OpenEpisode(_index + 1);
             }
         }
+    }
+
+    // ---- Giới hạn giờ xem (WatchLimit) ----
+
+    /// Mỗi lần đọc trạng thái: sắp hết giờ thì nhắc, hết giờ thì dừng phim, thoát trình phát và hỏi mã PIN phụ huynh.
+    /// true = đã chặn.
+    private bool CheckLimit()
+    {
+        var b = WatchLimit.Blocked();
+        if (b == null)
+        {
+            if (_started && !_limitWarned && WatchLimit.Remaining() is { } r and > 0 and <= 300)
+            {
+                _limitWarned = true;
+                Notice($"Còn {WatchLimit.MinutesText(r)} xem hôm nay ({Prefs.CurrentProfile.Name}).", 8000);
+            }
+            return false;
+        }
+        Cmd("pause");
+        LimitBlock(b.Value, _detail?.Url ?? _filmUrl, _episodeUrl);
+        return true;
+    }
+
+    private void LimitBlock(WatchLimit.Block b, string film, string ep)
+    {
+        Log.D("player", $"Hết giờ xem ({b}) — {Prefs.CurrentProfile.Name}");
+        Close();
+        _ = _main.LimitReached(b, film, ep);
+    }
+
+    // ---- Cửa sổ phim nhỏ ----
+
+    /// Thu nhỏ: chuyển trình phát sang cửa sổ nhỏ góc màn hình, cửa sổ app trở lại các trang.
+    public void EnterMini()
+    {
+        if (!IsOpen || IsMini) return;
+        HidePanel();
+        ExitClickThrough();
+        _ov.Hide();
+        Content = null;
+        _miniWin = new MiniWindow(Toggle, () => ExitMini(true), () => Close());
+        _miniWin.Host.Content = _web;
+        _miniWin.Update(_ov.TitleText.Text, _state?.Paused);
+        var mw = _miniWin;
+        mw.Closed += (_, _) =>
+        {
+            // Đóng bằng Alt+F4: lấy trình phát về rồi tắt phim
+            if (_miniWin != mw) return;
+            _miniWin = null;
+            mw.Host.Content = null;
+            Content = _web;
+            Dispatcher.BeginInvoke(() => Close());
+        };
+        _miniWin.Show();
+        _main.PlayerMinimized();
+    }
+
+    /// Phóng to lại (show = hiện trình phát trong cửa sổ app); false khi sắp đóng / mở phim khác.
+    public void ExitMini(bool show)
+    {
+        var w = _miniWin;
+        if (w == null) return;
+        _miniWin = null;
+        w.Host.Content = null;
+        Content = _web;
+        w.Close();
+        if (!show) return;
+        _main.PlayerRestored();
+        _ov.Show();
+        Follow();
+        _ov.Activate();
+        ShowOsd();
     }
 
     private string IntroKey => _detail?.Url ?? _filmUrl;
@@ -830,6 +922,9 @@ public sealed class PlayerView : UserControl
             case Key.Escape or Key.BrowserBack or Key.Back:
                 if (first) Close();
                 break;
+            case Key.W:
+                if (first) EnterMini();
+                break;
             case Key.Space or Key.Enter or Key.K or Key.MediaPlayPause or Key.Play:
                 if (first) Toggle();
                 break;
@@ -872,6 +967,7 @@ public sealed class PlayerView : UserControl
         o.PreviewKeyDown += (_, e) => HandleKey(e);
         o.BtnBack.Click += (_, _) => Close();
         o.BtnFull.Click += (_, _) => _main.ToggleFullscreen();
+        o.BtnMini.Click += (_, _) => EnterMini();
         o.BtnPlay.Click += (_, _) => Toggle();
         o.BtnBack10.Click += (_, _) => SeekBy(-10);
         o.BtnFwd10.Click += (_, _) => SeekBy(10);
@@ -926,7 +1022,7 @@ public sealed class PlayerView : UserControl
 
     private void ShowOsd(int ms = 4000)
     {
-        if (!IsOpen || _clickThrough) return;
+        if (!IsOpen || _clickThrough || IsMini) return;
         _ov.Osd.Visibility = Visibility.Visible;
         _ov.TopBar.Visibility = Visibility.Visible;
         UpdateOsd();
@@ -975,7 +1071,7 @@ public sealed class PlayerView : UserControl
 
     public void Notice(string text, int ms = 4000)
     {
-        if (!IsOpen) return;
+        if (!IsOpen || IsMini) return;
         _ov.NoticeText.Text = text;
         _ov.NoticeBox.Visibility = Visibility.Visible;
         _noticeTimer.Stop();
@@ -1145,6 +1241,7 @@ public sealed class PlayerView : UserControl
 
         Section("Khác");
         var other = Row();
+        other.Children.Add(Ui.Pill("▣  Thu nhỏ (cửa sổ nhỏ)", EnterMini));
         other.Children.Add(Ui.Pill("🖱  Bấm thẳng vào trang", EnterClickThrough));
         other.Children.Add(Ui.Pill("↗  Mở trang tập trên trình duyệt", () =>
         {
