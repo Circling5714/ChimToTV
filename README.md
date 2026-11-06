@@ -13,8 +13,8 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.5`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.5)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.0`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.0)
-— xem mục [Bản Windows](#bản-windows).
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.2`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.2)
+— xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
 **Liên hệ**.
@@ -106,19 +106,29 @@ cả chuột lẫn bàn phím / remote:
   .NET. Lần đầu Windows báo «Windows protected your PC» (app chưa có chữ ký số): **More info → Run anyway**. Cần Microsoft
   Edge WebView2 Runtime (Windows 10 / 11 cập nhật thường có sẵn; máy chưa có thì app báo và mở trang tải). Dữ liệu ở
   `%LOCALAPPDATA%\ConBangTV`. Bản sau tự cập nhật (Cài đặt → **Kiểm tra cập nhật**; tự hỏi tối đa 2 giờ một lần).
-- **Màn chính:** menu bên trái (Trang chủ, Tìm kiếm, Xem tiếp / Lịch sử, Theo dõi, các mục của trang, Thể loại… /
-  Quốc gia…, Đổi trang phim, Cài đặt), lưới phim; chi tiết phim có Xem tiếp, Xem từ đầu, Mới nhất, Theo dõi, các bản
+- **Màn chính:** menu bên trái (Người xem, Trang chủ, Tìm kiếm, Xem tiếp / Lịch sử, Theo dõi, các mục của trang, Thể loại… /
+  Quốc gia…, Đổi trang phim, Đồng bộ trong nhà, Cài đặt), lưới phim; chi tiết phim có Xem tiếp, Xem từ đầu, Mới nhất, Theo dõi, các bản
   (Vietsub / Thuyết Minh) và danh sách tập (tập đã xem màu xanh).
 - **Phím:** mũi tên đi theo vị trí trên màn (như remote TV), Enter chọn, Esc / Backspace / phím Back của remote quay lại,
   F11 (Alt+Enter) toàn màn hình, Ctrl+F tìm kiếm. Xem phim: Space / Enter / K phát – dừng, ◀ ▶ (J / L) tua (giữ phím tua
   nhanh dần), ▲ thời gian, ▼ / M / phím Menu mở bảng (server, bản, tập, tốc độ, khung hình, nhạc mở đầu, tải lại, bấm
   thẳng vào trang, mở trang tập trên trình duyệt), N / P (PageDown / PageUp, phím tập sau / trước) đổi tập, 0–9 nhảy
-  0–90%, F toàn màn hình, Esc thoát phim.
+  0–90%, F toàn màn hình, W thu nhỏ phim, Esc thoát phim.
 - **Chuột:** rê để hiện thanh điều khiển, bấm vào phim phát / dừng, bấm đúp toàn màn hình, bấm thanh tua nhảy tới chỗ đó,
   Delete hoặc chuột phải trên thẻ phim (Lịch sử / Theo dõi) để xoá; nút lùi của chuột = quay lại.
 - **Cài đặt:** bước tua, tự chuyển tập, **cỡ giao diện** 100–175% (ngồi xa tivi), mở app ở toàn màn hình, **vượt chặn nhà
-  mạng** mức 1 / 2, tự kiểm tra bản mới, xoá lịch sử / dữ liệu duyệt web.
-- **Chưa có** (bản sau): người xem có mã PIN, giới hạn giờ xem, cửa sổ phim nhỏ, đồng bộ trong nhà, proxy SOCKS5.
+  mạng** mức 1 / 2, **proxy SOCKS5** (từ 1.2), tự kiểm tra bản mới, xoá lịch sử / dữ liệu duyệt web.
+- **Người xem** (từ 1.2, như TV 2.0): menu «👤 Người xem» → «Ai đang xem?» / «Quản lý người xem…»: tối đa 8 người, mỗi người
+  một lịch sử / Xem tiếp / theo dõi / trang phim / server / cách xem; khoá bằng mã PIN 4 số; hỏi khi mở app (từ 2 người) và
+  khi rời app hơn 30 phút; người đang dùng có khoá thì nền đen kín tới khi nhập đúng mã. **Giới hạn giờ xem** + mã PIN phụ
+  huynh như TV 2.1 (cùng khoá, cùng cách đếm).
+- **Cửa sổ phim nhỏ** (từ 1.2): nút «▣ Thu nhỏ» / phím W / thu nhỏ cửa sổ app lúc đang xem (Cài đặt bật / tắt) → phim chạy tiếp
+  ở cửa sổ nhỏ luôn nổi trên cùng, góc dưới phải (kéo thanh dưới để dời, kéo góc để đổi cỡ, bấm đúp / ⤢ để phóng to); menu có
+  «Phóng to phim đang xem» / «Tắt phim thu nhỏ».
+- **Đồng bộ trong nhà** (từ 1.2): menu «⇄ Đồng bộ trong nhà» — như mục [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22): hiện mã
+  ghép của máy tính, tìm máy trong mạng, ghép bằng mã hoặc IP của máy kia. Lần đầu Windows hỏi cho dùng mạng: **Cho phép** (mạng
+  riêng) — không thì TV / iPad không gọi sang máy tính được (máy tính vẫn tự gọi sang TV / iPad).
+- **Chưa có:** DNS mã hoá, xem riêng, chấm điểm server.
 
 ## Phím điều khiển
 
@@ -551,8 +561,13 @@ phát nhúng thấy Referer của trang phim); agent chèn vào mọi khung bằ
 miền, chặn cửa sổ mới và điều hướng cả trang do trang tự gây ra. Thanh điều khiển nằm ở một cửa sổ phủ trong suốt
 (`Player/PlayerOverlay`) vì WPF không vẽ đè lên cửa sổ của WebView2; WebView2 không bao giờ giữ phím. Ảnh bìa WebP giải mã
 bằng SkiaSharp. Vượt chặn nhà mạng: kết nối của HttpClient (`ConnectCallback`) tách gói bắt tay (`Core/Unblock.cs`, cùng
-cách tách với `writeHello` của TV, mức 2 đặt `Socket.Ttl = 1` cho byte đầu); trình phát đi qua proxy nội bộ 127.0.0.1
-(`--proxy-server`, chọn lúc tạo WebView2 → đổi mức thì mở lại app).
+cách tách với `writeHello` của TV, mức 2 đặt `Socket.Ttl = 1` cho byte đầu). Từ 1.2 trình phát **luôn** đi qua cổng SOCKS5
+nội bộ 127.0.0.1 (`Core/Net.cs`, `--proxy-server=socks5://…`, như cầu nối của TV) — proxy SOCKS5 thật (RFC 1929) và vượt chặn
+dùng chung đường này, đổi cài đặt là có hiệu lực ngay (`Net.SettingsChanged` đóng mọi kết nối cũ, cả của HttpClient); mật
+khẩu proxy mã hoá DPAPI (`Core/Secret.cs`). Đồng bộ trong nhà: `Core/SyncData.cs` + `Core/SyncService.cs` (cùng giao thức /
+JSON / HMAC, cổng 8791 — bản Debug 8792; tìm máy bằng câu hỏi mDNS kiểu legacy unicast, quảng bá bằng `DnsServiceRegister`).
+Người xem / giới hạn giờ: `Prefs.cs` (khoá `…#<id>`, mã PIN băm như TV / iPad), `WatchLimit.cs`. Cửa sổ phim nhỏ: điều khiển
+WebView2 được chuyển sang `Player/MiniWindow` (WPF WebView2 tự đổi cửa sổ cha, phim không dừng / không tải lại).
 
 Bản iPad (`ios/ConBangTV/Sources`): `Core/` chuyển gần như từng dòng từ Kotlin (Site, NextSite, Prefs, PlayStats,
 Follows, AdBlock — giữ cùng tên hàm / bộ chọn CSS, sửa bộ đọc trang thì sửa cả hai bên); dữ liệu Next.js đọc bằng

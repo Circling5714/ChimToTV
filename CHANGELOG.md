@@ -7,6 +7,25 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## Windows 1.2 — 06/11/2026
+
+- **Người xem**: mỗi người một lịch sử, Xem tiếp, chỗ đang xem, phim theo dõi, trang phim / server / cách xem riêng; khoá bằng mã
+  PIN; hỏi «Ai đang xem?» khi mở app và khi rời app hơn 30 phút (lịch sử của bản 1.0 thuộc «Cả nhà»).
+- **Giới hạn giờ xem** theo từng người (mỗi ngày 30 phút – 3 giờ, giờ đi ngủ tới 6 giờ sáng) + mã PIN phụ huynh; còn 5 phút thì
+  nhắc; hết giờ phim dừng, cho xem thêm 15 / 30 / 60 phút hoặc tới 6 giờ sáng.
+- **Cửa sổ phim nhỏ**: «▣ Thu nhỏ» / phím W / thu nhỏ cửa sổ app lúc xem → phim chạy tiếp ở cửa sổ nhỏ luôn nổi trên cùng.
+- **Đồng bộ trong nhà** với TV 2.2+ và iPad / iPhone 1.3+ (cùng giao thức, theo từng người xem cùng tên).
+- **Proxy SOCKS5** (đăng nhập, DNS của proxy / máy, toàn app / chỉ trang phim); proxy và vượt chặn đổi là có hiệu lực ngay.
+- bản 1.2.0 (không có bản 1.1) · tag `win-v1.2` (không phải "latest") · commit `7209da7` · `ConBangTV-Windows-1.2.exe`
+  72 792 073 byte · SHA-256 `f17b404f5b44b04acf29ba0db8c3c91a21578562cfd588197f7744ab4260966c`
+- Đã thử trên máy Windows 10: 53 test lõi; cửa sổ phim nhỏ (thu nhỏ / phóng to / thu nhỏ cửa sổ app — phim chạy liền, không
+  tải lại; tắt từ menu lưu đúng chỗ xem); thêm người xem, khoá PIN, mở lại app hiện «Ai đang xem?» nền kín; giới hạn 30 phút →
+  phim dừng đúng lúc hết giờ, sai mã phụ huynh bị từ chối, đúng mã + «Thêm 15 phút» mở lại tập; nhắc «Còn 4 phút»; proxy SOCKS5
+  giả trên máy (sai mật khẩu / đúng / sai cổng → báo lỗi, không đi thẳng; video cũng đi qua proxy); vượt chặn mức 1 / 2 với
+  phimmois.fun; đồng bộ thật với TV box (TV 2.5): ghép bằng IP, hai chiều dữ liệu, xoá lan sang TV (rồi bỏ ghép).
+  **Tự cập nhật thật 1.0 → 1.2 từ GitHub**: hộp thoại «Có bản mới 1.2» → Cập nhật ngay → mở lại 1.2, lịch sử còn nguyên.
+  Chưa thử: TV / iPad gọi sang máy tính (tường lửa), iPad / iPhone, remote thật.
+
 ## Windows 1.0 — 06/11/2026
 
 - **Bản đầu tiên cho máy Windows 10 / 11** (máy tính hoặc mini PC cắm tivi), dùng chuột hoặc bàn phím / remote: đủ 6 trang
