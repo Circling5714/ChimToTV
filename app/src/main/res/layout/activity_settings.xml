@@ -309,7 +309,19 @@
             <TextView
                 android:id="@+id/btnServer"
                 style="@style/TvButton" />
+
+            <TextView
+                android:id="@+id/btnKkBackup"
+                style="@style/TvButton" />
         </vn.chimto.tv.FlowRow>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Server dự phòng KKPhim: với yanhh3d, hoathinh3d, hhkungfu… (trình phát của trang hay hỏng cùng lúc) app tìm cùng phim, cùng tập trên KKPhim và thêm server «KKPhim Vietsub / Thuyết Minh» vào menu ▼ lúc xem. Trang không vào được mà KKPhim có tập đó thì vẫn xem được."
+            android:textColor="@color/text_dim"
+            android:textSize="14sp" />
 
         <!-- Hình trong hình (ẩn trên TV không có tính năng này) -->
         <TextView

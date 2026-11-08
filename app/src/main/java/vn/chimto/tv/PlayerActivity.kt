@@ -624,13 +624,15 @@ class PlayerActivity : BaseActivity() {
         introDone = false
         if (!Prefs.privateMode) Prefs.addHistory(HistoryItem(d.url, d.title, d.poster, ep.title, ep.url, System.currentTimeMillis()))
         showLoading("Đang mở ${ep.title}…")
-        background({ Site.source(ep.url) }) { r ->
+        val g = group
+        // Trang tập + server dự phòng KKPhim (tải song song; trang lỗi mà KKPhim có tập này thì vẫn phát được)
+        background({ KkPhim.source(d, g, ep) }) { r ->
             trace("trang tập")
             if (t != token) return@background
             r.onSuccess { src ->
                 source = src
                 buildServerButtons(src)
-                if (src.pageMode) {
+                if (src.pageOnly) {
                     playPage(src)
                 } else {
                     val host = Site.hostOf(src.epUrl)
@@ -667,6 +669,12 @@ class PlayerActivity : BaseActivity() {
         val src = source ?: return
         server = s
         for (i in 0 until serverRow.childCount) serverRow.getChildAt(i).let { it.isActivated = it.tag == s?.type }
+        // "Trình phát của trang" (trang mở thẳng trang tập, có thêm server KKPhim)
+        if (s?.type == PAGE_SERVER) {
+            ++token
+            playPage(src)
+            return
+        }
         val t = ++token
         stopVideo()
         showLoading("Đang tải ${s?.label ?: "trình phát"}…")
@@ -722,7 +730,7 @@ class PlayerActivity : BaseActivity() {
 
     private fun buildServerButtons(src: EpisodeSource) {
         serverRow.removeAllViews()
-        val servers = if (src.pageMode) emptyList() else src.servers
+        val servers = if (src.pageOnly) emptyList() else src.servers
         serverLabel.visibility = if (servers.isEmpty()) View.GONE else View.VISIBLE
         val inflater = LayoutInflater.from(this)
         val host = AppProxy.statsHost(Site.hostOf(src.epUrl))
@@ -752,7 +760,7 @@ class PlayerActivity : BaseActivity() {
     private fun suggestServer(now: Long) {
         if (small) return // cửa sổ nhỏ không bấm OK được: phóng to ra rồi mới gợi ý
         suggested = true // mỗi lần phát chỉ gợi ý một lần (không có server khác thì thôi)
-        val src = source?.takeIf { !it.pageMode } ?: return
+        val src = source?.takeIf { !it.pageOnly } ?: return
         val cur = server ?: return
         val (alt, score) = PlayStats.alternative(AppProxy.statsHost(Site.hostOf(src.epUrl)), src.servers, cur) ?: return
         suggestion = alt
@@ -806,7 +814,7 @@ class PlayerActivity : BaseActivity() {
             val src = source
             when {
                 src == null -> openEpisode(index)
-                src.pageMode -> playPage(src)
+                src.pageOnly -> playPage(src)
                 else -> playServer(server)
             }
         }
@@ -888,7 +896,7 @@ class PlayerActivity : BaseActivity() {
         if (!started && !errShown && !hintShown && !inAd && (embedUrl != null || hlsUrl != null || pageMode) && waited > 25_000) {
             hintShown = true
             hideLoading()
-            val other = if (pageMode) "▼ → Tải lại / Mở trang Web" else "▼ để đổi server"
+            val other = if (source?.pageOnly != false) "▼ → Tải lại / Mở trang Web" else "▼ để đổi server"
             notice.show("Video chưa chạy? Nhấn OK để thử phát, hoặc $other." + AppProxy.videoNote(), 10_000)
         }
         if (json == null || json == "null") return

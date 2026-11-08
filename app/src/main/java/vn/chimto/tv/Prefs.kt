@@ -299,6 +299,11 @@ object Prefs {
         get() = sp.getBoolean("ask_profile", true)
         set(value) = sp.edit().putBoolean("ask_profile", value).apply()
 
+    /** Thêm server dự phòng KKPhim cho các trang tự có trình phát (xem KkPhim). Dùng chung cả máy. */
+    var kkBackup: Boolean
+        get() = sp.getBoolean("kk_backup", true)
+        set(value) = sp.edit().putBoolean("kk_backup", value).apply()
+
     /** Bấm Home khi đang xem: thu nhỏ phim vào góc màn hình (hình trong hình) thay vì dừng. */
     var pipOnHome: Boolean
         get() = sp.getBoolean("pip_on_home", true)

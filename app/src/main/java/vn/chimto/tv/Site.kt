@@ -53,7 +53,13 @@ data class EpisodeSource(
     val epUrl: String, val servers: List<Server>, val postId: String, val ep: String, val sv: String,
     val playerUrl: String?, val directEmbed: String?, val pageMode: Boolean,
     val links: Map<String, Video> = emptyMap(), val next: Boolean = false,
-)
+) {
+    /** Chỉ có trình phát của trang tập (không có server nào khác để chọn, kể cả server dự phòng KKPhim). */
+    val pageOnly get() = pageMode && servers.none { it.type == PAGE_SERVER }
+}
+
+/** Loại server "Trình phát của trang" (mở thẳng trang tập) khi trang pageMode có thêm server dự phòng KKPhim. */
+const val PAGE_SERVER = "page"
 
 /**
  * Đọc dữ liệu từ trang phim. Không viết riêng cho từng trang: nhận dạng theo các mẫu giao diện phổ biến của
@@ -388,7 +394,8 @@ object Site {
         }
     }
 
-    private fun epNumber(s: String): Double? =
+    /** Số tập trong tên / đường dẫn tập: "Tập 165" → 165, "tap-08" → 8 (dùng cả để ghép tập với KKPhim). */
+    fun epNumber(s: String): Double? =
         (Regex("""(?i)t[aậ]p[\s\-_]*(\d+(?:\.\d+)?)""").find(s) ?: Regex("""(\d+(?:\.\d+)?)""").find(s))
             ?.groupValues?.get(1)?.toDoubleOrNull()
 
@@ -435,6 +442,8 @@ object Site {
 
     /** Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server (trang Next.js: link .m3u8 / iframe). */
     fun video(src: EpisodeSource, server: Server?): Video {
+        // Server dự phòng KKPhim: link .m3u8 có sẵn (KkPhim.attach)
+        if (server != null && server.type.startsWith(KkPhim.PREFIX)) src.links[server.type]?.let { return it }
         if (src.next) return NextSite.video(src, server ?: throw IOException("Không có server"))
         val playerUrl = src.playerUrl
         if (server == null || playerUrl == null) return Video(src.directEmbed ?: throw IOException("Không có server"))

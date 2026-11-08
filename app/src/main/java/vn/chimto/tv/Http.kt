@@ -17,7 +17,7 @@ object Http {
     class Response(val url: String, val code: Int, val body: String)
 
     /** Trang trả lời bằng mã lỗi (4xx / 5xx): thử lại cũng vậy. */
-    class HttpError(code: Int) : IOException("Trang trả về lỗi HTTP $code")
+    class HttpError(val code: Int) : IOException("Trang trả về lỗi HTTP $code")
 
     /**
      * Mở kết nối, tự đi theo chuyển hướng (kể cả http → https, đổi tên miền).

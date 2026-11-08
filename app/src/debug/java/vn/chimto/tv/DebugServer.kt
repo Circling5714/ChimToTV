@@ -152,7 +152,20 @@ object DebugServer {
                     onMain { (top ?: app).startActivity(Intent(top ?: app, cls).addFlags(if (top == null) Intent.FLAG_ACTIVITY_NEW_TASK else 0)) }
                     text(out, 200, "ok")
                 }
-                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /js")
+                "/play" -> {
+                    // Mở thẳng trình phát: /play?film=<địa chỉ phim>&ep=<địa chỉ tập>
+                    val film = q["film"] ?: return text(out, 400, "thiếu film")
+                    val ep = q["ep"] ?: return text(out, 400, "thiếu ep")
+                    onMain {
+                        val ctx = top ?: app
+                        ctx.startActivity(
+                            Intent(ctx, PlayerActivity::class.java).putExtra("film", film).putExtra("ep", ep)
+                                .addFlags(if (top == null) Intent.FLAG_ACTIVITY_NEW_TASK else 0),
+                        )
+                    }
+                    text(out, 200, "ok")
+                }
+                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /play /js")
             }
         } catch (e: Throwable) {
             runCatching { text(out, 500, e.toString()) }

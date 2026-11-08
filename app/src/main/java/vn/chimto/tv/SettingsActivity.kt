@@ -131,6 +131,16 @@ class SettingsActivity : BaseActivity() {
             toast("Đã đặt lại. App sẽ nhớ server được chọn lần tới trong lúc xem.")
         }
 
+        val kk = findViewById<TextView>(R.id.btnKkBackup)
+        fun showKk() {
+            kk.text = "Server dự phòng KKPhim: ${if (Prefs.kkBackup) "Bật" else "Tắt"}"
+        }
+        showKk()
+        kk.setOnClickListener {
+            Prefs.kkBackup = !Prefs.kkBackup
+            showKk()
+        }
+
         // Thu nhỏ phim: hình trong hình của Android (TV có tính năng này) hoặc cửa sổ nhỏ trong app
         val pipHelp = findViewById<TextView>(R.id.pipHelp)
         pipHelp.visibility = View.VISIBLE
