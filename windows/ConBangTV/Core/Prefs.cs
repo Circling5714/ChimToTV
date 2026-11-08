@@ -16,7 +16,14 @@ public static class Prefs
     public static readonly string[] PresetSites =
     {
         DefaultBase, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun", "https://mephim.ddns.net",
+        KkSite,
     };
+
+    /// Trang KKPhim (từ 1.3) — dữ liệu lấy thẳng từ API công khai phimapi.com (xem ApiSite).
+    public const string KkSite = "https://www.kkphim.com";
+
+    /// Trang mẫu thêm ở bản sau: thêm một lần vào danh sách đã lưu (xoá đi thì thôi, không thêm lại).
+    public static readonly string[] AddedSites = { KkSite };
 
     private const int MaxHistory = 60;
     private const int MaxPositions = 400;
@@ -53,6 +60,19 @@ public static class Prefs
             _historyCache = null;
             _positionsCache = null;
             _pidCache = null;
+        }
+        AddNewPresets();
+    }
+
+    /// Trang mẫu thêm ở bản sau (AddedSites): người đã có danh sách trang thì thêm một lần.
+    private static void AddNewPresets()
+    {
+        foreach (var url in AddedSites)
+        {
+            var key = "preset_added@" + url;
+            if (Get<bool>(key)) continue;
+            if (Get<List<string>>("sites") is { } list && !list.Contains(url)) Sites = list.Append(url).ToList();
+            Set(key, true);
         }
     }
 
@@ -360,6 +380,13 @@ public static class Prefs
     {
         get => !Has("ask_profile") || Get<bool>("ask_profile");
         set => Set("ask_profile", value);
+    }
+
+    /// Thêm server dự phòng KKPhim cho các trang tự có trình phát (xem KkPhim). Dùng chung cả máy.
+    public static bool KkBackup
+    {
+        get => !Has("kk_backup") || Get<bool>("kk_backup");
+        set => Set("kk_backup", value);
     }
 
     /// Thu nhỏ cửa sổ app lúc đang xem → phim chạy tiếp ở cửa sổ nhỏ trên màn hình.

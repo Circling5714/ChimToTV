@@ -454,17 +454,18 @@ public sealed class PlayerView : UserControl
         });
         ShowLoading($"Đang mở {ep.Title}…");
         ShowOsd();
-        _ = LoadSource(t, ep);
+        _ = LoadSource(t, d, _group, ep);
     }
 
-    private async Task LoadSource(int t, Episode ep)
+    private async Task LoadSource(int t, FilmDetail d, EpisodeGroup? group, Episode ep)
     {
         try
         {
-            var src = await Site.Source(ep.Url);
+            // Trang tập + server dự phòng KKPhim (tải song song; trang lỗi mà KKPhim có tập này thì vẫn phát được)
+            var src = await KkPhim.Source(d, group, ep);
             if (t != _token || !IsOpen) return;
             _source = src;
-            if (src.PageMode)
+            if (src.PageOnly)
             {
                 await PlayPage(src);
                 return;
@@ -481,10 +482,10 @@ public sealed class PlayerView : UserControl
     }
 
     /// Mở thẳng trang tập: trang tự nạp trình phát, page-focus.js phóng nó ra toàn màn hình.
-    private async Task PlayPage(EpisodeSource src)
+    private async Task PlayPage(EpisodeSource src, Server? asServer = null)
     {
         StopVideo();
-        _server = null;
+        _server = asServer;
         _pageMode = true;
         _loadStartedAt = Util.NowMs();
         ShowLoading("Đang mở trang tập phim…");
@@ -496,6 +497,13 @@ public sealed class PlayerView : UserControl
     {
         var src = _source;
         if (src == null) return;
+        // "Trình phát của trang" (trang mở thẳng trang tập, có thêm server KKPhim)
+        if (s?.Type == EpisodeSource.PageServer)
+        {
+            ++_token;
+            await PlayPage(src, s);
+            return;
+        }
         _server = s;
         var t = ++_token;
         StopVideo();
@@ -568,7 +576,7 @@ public sealed class PlayerView : UserControl
         if (CurrentTime() is { } t) _resumeAt = t;
         var src = _source;
         if (src == null) OpenEpisode(_index);
-        else if (src.PageMode) _ = PlayPage(src);
+        else if (src.PageOnly) _ = PlayPage(src);
         else _ = PlayServer(_server);
     }
 
@@ -647,7 +655,7 @@ public sealed class PlayerView : UserControl
         {
             _hintShown = true;
             HideLoading();
-            var other = _pageMode ? "▼ → «Tải lại» / «Bấm thẳng vào trang»" : "▼ để đổi server";
+            var other = _source?.PageOnly != false ? "▼ → «Tải lại» / «Bấm thẳng vào trang»" : "▼ để đổi server";
             Notice($"Video chưa chạy? Nhấn Enter để thử phát, hoặc {other}.", 10_000);
         }
         if (o == null) return;
@@ -1122,7 +1130,7 @@ public sealed class PlayerView : UserControl
         Button? focus = null;
 
         var src = _source;
-        if (src != null && !src.PageMode && src.Servers.Count > 0)
+        if (src != null && !src.PageOnly && src.Servers.Count > 0)
         {
             Section("Server", "Video giật / không chạy: chọn server khác (app nhớ cho lần sau).");
             var row = Row();
@@ -1134,7 +1142,7 @@ public sealed class PlayerView : UserControl
                 if (active) focus = b;
             }
         }
-        else if (src is { PageMode: true })
+        else if (src is { PageOnly: true })
         {
             Section("Server", "Trang này không chia server: app mở thẳng trang tập phim.");
         }

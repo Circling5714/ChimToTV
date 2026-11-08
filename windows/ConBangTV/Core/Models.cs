@@ -68,6 +68,12 @@ public sealed class EpisodeSource
     public bool PageMode;
     public Dictionary<string, Video> Links = new();
     public bool Next;
+
+    /// Loại server "Trình phát của trang" (mở thẳng trang tập) khi trang PageMode có thêm server dự phòng KKPhim.
+    public const string PageServer = "page";
+
+    /// Chỉ có trình phát của trang tập (không có server nào khác để chọn, kể cả server dự phòng KKPhim).
+    public bool PageOnly => PageMode && Servers.All(s => s.Type != PageServer);
 }
 
 public sealed class HistoryItem

@@ -11,8 +11,12 @@ using JObj = Dictionary<string, object?>;
 /// (Vietsub / Thuyết Minh cùng tên tập nên phải ghi bản). Danh sách = địa chỉ API.
 public static class ApiSite
 {
+    /// Trang KKPhim (www.kkphim.com, từ 1.3): không có API /api/movies riêng — mọi dữ liệu gọi thẳng API công khai
+    /// phimapi.com (cùng định dạng, qua Fallback). Địa chỉ phim / tập trong app vẫn theo tên miền kkphim.com.
+    public const string KkHost = "kkphim.com";
+
     private static readonly object Lock = new();
-    private static readonly HashSet<string> Known = new() { "mephim.ddns.net" };
+    private static readonly HashSet<string> Known = new() { "mephim.ddns.net", KkHost };
     private static readonly HashSet<string> NotApi = new();
     private const string Cdn = "https://phimimg.com";
     private const int Limit = 24;
@@ -52,6 +56,13 @@ public static class ApiSite
         ("Indonesia", "indonesia"), ("Malaysia", "malaysia"), ("Nga", "nga"), ("Đức", "duc"), ("Tây Ban Nha", "tay-ban-nha"),
         ("Thổ Nhĩ Kỳ", "tho-nhi-ky"), ("Úc", "uc"), ("Quốc Gia Khác", "quoc-gia-khac"),
     };
+
+    /// Trang KKPhim (gọi thẳng phimapi.com) thêm vài mục theo các danh sách riêng của KKPhim.
+    private static readonly (string, string)[] KkMenu = Menu.Take(1)
+        .Append(("Hoạt hình Trung Quốc thuyết minh", "category/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh"))
+        .Concat(Menu.Skip(1)).Append(("Phim chiếu rạp", "category/phim-chieu-rap")).ToArray();
+
+    public static bool IsKk(string url) => Site.HostOf(url) == KkHost;
 
     public static bool IsKnown(string url)
     {
@@ -93,13 +104,24 @@ public static class ApiSite
     public static async Task<Home> Home(string baseUrl)
     {
         var o = Origin(baseUrl);
-        var blocks = new[]
-        {
-            ("Hoạt hình Trung Quốc mới cập nhật", Api(o, "category/hoat-hinh?country=trung-quoc", 1)),
-            ("Phim mới cập nhật", NewestUrl(o)),
-            ("Thịnh hành", $"{o}/api/movies/trending"),
-            ("Song ngữ / Thuyết minh", $"{o}/api/movies/song-ngu"),
-        };
+        var kk = IsKk(baseUrl);
+        // KKPhim không có khối thịnh hành / song ngữ: thêm hoạt hình thuyết minh, phim bộ, phim lẻ mới
+        var blocks = kk
+            ? new[]
+            {
+                ("Hoạt hình Trung Quốc mới cập nhật", Api(o, "category/hoat-hinh?country=trung-quoc", 1)),
+                ("Hoạt hình Trung Quốc thuyết minh", Api(o, "category/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh", 1)),
+                ("Phim mới cập nhật", NewestUrl(o)),
+                ("Phim bộ mới", Api(o, "category/phim-bo", 1)),
+                ("Phim lẻ mới", Api(o, "category/phim-le", 1)),
+            }
+            : new[]
+            {
+                ("Hoạt hình Trung Quốc mới cập nhật", Api(o, "category/hoat-hinh?country=trung-quoc", 1)),
+                ("Phim mới cập nhật", NewestUrl(o)),
+                ("Thịnh hành", $"{o}/api/movies/trending"),
+                ("Song ngữ / Thuyết minh", $"{o}/api/movies/song-ngu"),
+            };
         var tasks = blocks.Select(b => GetJson(b.Item2)).ToList();
         try
         {
@@ -121,7 +143,7 @@ public static class ApiSite
             if (films.Count > 0) sections.Add(new FilmSection(blocks[i].Item1, films));
         }
         if (sections.Count == 0) throw firstError ?? new AppError("Không tải được danh sách phim");
-        return new Home { Sections = sections, Categories = Menu.Select(m => new Category(m.Item1, Api(o, m.Item2, 1))).ToList() };
+        return new Home { Sections = sections, Categories = (kk ? KkMenu : Menu).Select(m => new Category(m.Item1, Api(o, m.Item2, 1))).ToList() };
     }
 
     public static async Task<FilmPage> List(string url) => ParseList(await GetJson(url), url);
@@ -274,6 +296,8 @@ public static class ApiSite
     /// dạng), như chính trang web làm.
     private static async Task<JObj> GetJson(string url, bool useFallback = true)
     {
+        // Trang KKPhim: gọi thẳng phimapi.com (kkphim.com không có /api/movies)
+        if (IsKk(url)) return await FetchJson(Fallback(url) ?? url);
         try
         {
             return await FetchJson(url);

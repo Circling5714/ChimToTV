@@ -194,6 +194,12 @@ public sealed class SettingsPage : Page
             ("Bật", Prefs.AutoNext, (Action)(() => Prefs.AutoNext = true)),
             ("Tắt", !Prefs.AutoNext, () => Prefs.AutoNext = false),
         });
+        Option("Server dự phòng KKPhim", new[]
+        {
+            ("Bật", Prefs.KkBackup, (Action)(() => Prefs.KkBackup = true)),
+            ("Tắt", !Prefs.KkBackup, () => Prefs.KkBackup = false),
+        }, "Với yanhh3d, hoathinh3d, hhkungfu… (trình phát của trang hay hỏng cùng lúc) app tìm cùng phim, cùng tập trên KKPhim " +
+           "và thêm server «KKPhim Vietsub / Thuyết Minh» vào bảng ▼ lúc xem; trang không vào được mà KKPhim có tập đó thì vẫn xem được.");
         Option("Cỡ giao diện", new[] { 1.0, 1.25, 1.5, 1.75 }.Select(s =>
             ($"{s * 100:0}%", Math.Abs(Prefs.UiScale - s) < 0.01, (Action)(() =>
             {

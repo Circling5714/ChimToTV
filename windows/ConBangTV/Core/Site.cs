@@ -568,6 +568,8 @@ public static class Site
     /// Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server (trang Next.js / API: link .m3u8 / iframe).
     public static async Task<Video> VideoOf(EpisodeSource src, Server? server)
     {
+        // Server dự phòng KKPhim: link .m3u8 có sẵn (KkPhim.Attach)
+        if (server != null && server.Type.StartsWith(KkPhim.Prefix) && src.Links.TryGetValue(server.Type, out var kk)) return kk;
         if (src.Next)
         {
             if (server == null) throw new AppError("Không có server");
