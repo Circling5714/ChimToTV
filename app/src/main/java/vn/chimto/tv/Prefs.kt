@@ -477,7 +477,12 @@ object Prefs {
         if (!s.startsWith("http://", true) && !s.startsWith("https://", true)) s = "https://$s"
         return try {
             val u = URL(s)
-            if (u.host.isNullOrBlank() || !u.host.contains('.')) null else s
+            when {
+                u.host.isNullOrBlank() || !u.host.contains('.') -> null
+                // Nhà mạng chặn tên miền trần kkphim.com: gõ «kkphim.com» là trang KKPhim mẫu (www)
+                u.host.equals(ApiSite.KK_HOST, true) -> KK_SITE
+                else -> s
+            }
         } catch (e: Exception) {
             null
         }

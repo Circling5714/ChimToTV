@@ -149,4 +149,13 @@ class KkPhimTest {
         // Còn server cùng trang chưa thử thì thử nó trước
         assertEquals(v2, PlayStats.alternative(all, v1) { unknown }?.first)
     }
+
+    @Test
+    fun bareKkDomainBecomesTheWwwSite() {
+        // kkphim.com trần bị nhà mạng chặn, và trùng với trang mẫu www.kkphim.com trong danh sách
+        assertEquals(Prefs.KK_SITE, Prefs.normalizeUrl("kkphim.com"))
+        assertEquals(Prefs.KK_SITE, Prefs.normalizeUrl("https://KKPhim.com/"))
+        assertEquals(Prefs.KK_SITE, Prefs.normalizeUrl("www.kkphim.com"))
+        assertEquals("https://yanhh3d.ee", Prefs.normalizeUrl("yanhh3d.ee/"))
+    }
 }
