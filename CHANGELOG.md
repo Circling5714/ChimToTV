@@ -7,6 +7,56 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## Windows 1.4 — 08/11/2026
+
+- **Thêm 3 trang** như TV 2.7 (`NguonC.cs`, `Stremio.cs`, VSMOV trong `ApiSite.cs`): NguonC, VSMOV, CLB Phim Xưa (qua add-on k-20);
+  có sẵn trong Đổi trang phim (người đã cài được thêm một lần). **Server dự phòng NguonC** cạnh KKPhim; Cài đặt: «Server dự phòng
+  NguonC».
+- **Thoát được toàn màn hình** (anh báo lỗi, có từ 1.0): «Mở app ở chế độ toàn màn hình: Tắt» nay thoát luôn; khi toàn màn hình
+  (cửa sổ không còn thanh tiêu đề) menu có «⤡ Thoát toàn màn hình (F11)»; Esc ở menu cũng thoát.
+- Cập nhật app: link tải github.com lỗi thì tải cùng tệp qua API GitHub, thử lại cả hai đường sau 5 s / 15 s.
+- bản 1.4.0 · tag `win-v1.4` (không phải "latest") · commit `7c879e4` · `ConBangTV-Windows-1.4.exe` 72 813 124 byte ·
+  SHA-256 `de0435cf258bac80b7743fa9df260602e79ffd5eda00e8a2675116ff508b5401`
+- 71 test lõi. Thử trên máy Windows 10 (bản gỡ lỗi): danh sách trang được thêm 3 trang đúng một lần; trang chủ NguonC / VSMOV /
+  CLB Phim Xưa; phát VSMOV (HLS), NguonC, CLB Phim Xưa (MP4); NguonC dự phòng trên yanhh3d; thoát toàn màn hình bằng menu / F11
+  / Esc; đường tải dự phòng (máy chủ giả trả 504 → tải qua API → bước kiểm tệp vẫn chạy). Tệp tải từ link công khai khớp SHA-256.
+  **Tự cập nhật thật 1.3 → 1.4** từ GitHub: hộp thoại «Có bản mới: Côn Bằng TV 1.4» → Cập nhật ngay → mở lại 1.4.
+
+## iPad 1.7 — 08/11/2026
+
+- **Thêm 3 trang** như TV 2.7 (`NguonC.swift`, `Stremio.swift`, VSMOV trong `ApiSite.swift`) và **server dự phòng NguonC** cạnh
+  KKPhim (Cài đặt → Phát video: «Server dự phòng NguonC»). VSMOV phát HLS được cả trên iPhone (trình phát của iOS tự bỏ phần ảnh
+  PNG đứng trước dữ liệu video).
+- bản 1.7 (CFBundleVersion 8) · mã gói `vn.chimto.tv` · tag `ios-v1.7` (không phải "latest") · commit `7c879e4` ·
+  `ConBangTV-iPad-1.7.ipa` 3 912 873 byte · SHA-256 `76d585319ba2638d8011087bf0321e922216fa41657a6b3cb50de619a5a028c6`
+- 90 test lõi trên macOS. Bản thử 54 đã thử thật trên iPad Pro và iPhone 6s Plus: trang chủ 3 trang, phát VSMOV (HLS), NguonC,
+  CLB Phim Xưa (MP4 mượt), NguonC dự phòng trên yanhh3d (iPad). **Bản chính thức đã cài thật**: iPad 1.6 → 1.7 (danh sách trang
+  được thêm 3 trang đúng một lần), iPhone 1.7; app mở và chạy. Tệp tải từ link công khai khớp SHA-256.
+
+## 2.7 — 08/11/2026
+
+- **Thêm 3 trang**, có sẵn trong ☰ → Đổi trang phim (người đã cài được thêm một lần):
+  - **NguonC** (phim.nguonc.com, `NguonC.kt`): API riêng — trang chủ Hoạt hình mới cập nhật / Phim mới / Phim bộ, lẻ mới /
+    Thuyết minh; menu theo loại phim, ngôn ngữ, nước; «Thể loại…», «Quốc gia…», tìm kiếm. Phát bằng trình phát của NguonC
+    (iframe, app tự bỏ quảng cáo trước phim).
+  - **VSMOV** (vsmov.com, trong `ApiSite.kt`): API kiểu KKPhim khác đường dẫn; app đọc luồng HLS (link có chữ ký) trong trang
+    trình phát và tự phát — `hls.html` cắt phần ảnh PNG ngụy trang trước dữ liệu TS; còn «Trình phát VSMOV» dự phòng.
+  - **CLB Phim Xưa** (add-on Stremio k-20, `Stremio.kt`): phim Hồng Kông / TVB / kiếm hiệp cũ; mỗi chất lượng một server MP4 (phát
+    thẳng bằng `<video>`). Qua máy chủ trung gian nên trên TV mở chậm (~25–35 s), thỉnh thoảng khựng, tua xa có khi không được.
+- **Server dự phòng NguonC** cạnh KKPhim cho yanhh3d / hoathinh3d / hhkungfu / hoathinh3d.pw (NguonC hay có tập mới sớm, vd Mục
+  Thần Ký tập 108 khi KKPhim chưa có). Hai nguồn dự phòng tìm song song, nguồn chậm không làm mất nguồn nhanh. Cài đặt → Phát video:
+  «Server dự phòng NguonC».
+- **Cập nhật app**: link tải github.com lỗi thì tải cùng tệp qua API GitHub (8/11 GitHub vùng Đông Nam Á trả 504 / 500 xen kẽ
+  nhiều giờ); thử lại cả hai đường sau 5 s / 15 s; tệp vẫn qua bước kiểm gói + chữ ký + số hiệu.
+- Tên tập VSMOV ghi số trần → «Tập N»; tên bản có xuống dòng được gộp lại; nhãn trang «nguonc», «CLB Phim Xưa».
+- versionCode 28 · tag `v2.7` · commit `7c879e4` · `ChimToTV-2.7.apk` 1 160 565 byte · SHA-256
+  `a879c8aef5e6ec847f3b003bd53b929746577daffd71f3c001767e7a642f5ee0`
+- 87 test. Thử bản gỡ lỗi trên TV box và Skyworth: trang chủ / chi tiết 3 trang, đo tốc độ, phát VSMOV (HLS, server nhúng),
+  NguonC, CLB Phim Xưa, NguonC dự phòng trên yanhh3d; đường tải dự phòng (máy chủ giả trả 504 → tải qua API). Bản chính thức thử
+  trên TV box (Tiên Nghịch tập 165 có «KKPhim Vietsub» và «NguonC Vietsub»). API `releases/latest` trả `v2.7` + `.apk`, tệp tải
+  từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.6 → 2.7** trên TV box (cũng đã thử 2.5 → 2.6 cho bản 2.6). Skyworth
+  (bản 1.8.1) tải được bản mới nhưng bước cài bị khoá trẻ em TiviKit chặn (cần mã bố mẹ).
+
 ## Windows 1.3 — 08/11/2026
 
 - **Server dự phòng KKPhim** như TV 2.6 (`KkPhim.cs`): yanhh3d / hoathinh3d / hhkungfu / hoathinh3d.pw có thêm «KKPhim Vietsub /

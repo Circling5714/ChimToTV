@@ -10,10 +10,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.6`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.6)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.7`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.7)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.3`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.3)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.4`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.4)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -33,6 +33,9 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | phimmois.fun (trước là phimmoir.fun; từ 06/11/2026 tự chuyển sang phimmoiw.fun — app tự đổi theo) | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
 | mephim.ddns.net (từ 2.5 / iPad 1.5) | ứng dụng React — đọc API JSON `/api/movies/…` của trang (nguồn KKPhim), chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
 | KKPhim — www.kkphim.com (từ 2.6 / iPad 1.6 / Windows 1.3) | không đọc trang: gọi thẳng API công khai `phimapi.com`, chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
+| NguonC — phim.nguonc.com (từ 2.7 / iPad 1.7 / Windows 1.4) | không đọc trang: API công khai `/api/films/…` của NguonC (định dạng riêng) | trình phát NguonC → iframe (app tự bỏ quảng cáo trước phim) |
+| VSMOV — vsmov.com (từ 2.7 / iPad 1.7 / Windows 1.4) | không đọc trang: API `/api/…` kiểu KKPhim (khác đường dẫn) | app đọc luồng `.m3u8` trong trang trình phát rồi tự phát (cắt ảnh PNG ngụy trang trước dữ liệu); trình phát VSMOV → iframe |
+| CLB Phim Xưa — sc.k-20.xyz (từ 2.7 / iPad 1.7 / Windows 1.4) | add-on Stremio «K20 Phim Tổng Hợp» (`catalog` / `meta` / `stream`), chỉ lấy mục CLB Phim Xưa | tệp MP4 (qua máy chủ trung gian của k-20) → `<video>` |
 
 **Tìm kiếm** (từ 1.9.1) tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm, trang đang dùng đứng đầu.
 
@@ -51,6 +54,18 @@ Vietsub / Thuyết Minh thì chỉ thêm đúng ngôn ngữ đang xem; hoathinh3
 trình phát gốc. KKPhim được tìm song song với trang tập (chậm / lỗi thì bỏ qua); trang lỗi mà KKPhim có tập thì vẫn xem
 được. Tắt / bật: **Cài đặt → Phát video → Server dự phòng KKPhim** (mặc định bật). Lưu ý: bản trên KKPhim có khi dài ngắn
 khác bản của trang (vd cắt đoạn đầu), đổi server giữa chừng giữ số giây nên có thể lệch cảnh.
+
+**Server dự phòng NguonC** (từ 2.7 / iPad 1.7 / Windows 1.4): như KKPhim nhưng tìm trên NguonC (hay có tập mới sớm, vd Mục Thần
+Ký tập 108 khi KKPhim chưa có) và thêm **NguonC Vietsub / Thuyết Minh** (trình phát của NguonC, app tự bỏ quảng cáo trước phim).
+KKPhim và NguonC tìm song song, nguồn chậm không làm mất nguồn nhanh. Tắt / bật riêng: **Cài đặt → Phát video → Server dự phòng
+NguonC**.
+
+NguonC (từ 2.7): ~33 000 phim; trang chủ Hoạt hình mới cập nhật, Phim mới, Phim bộ / lẻ mới, Thuyết minh; menu Hoạt hình, Phim bộ,
+Phim lẻ, TV Shows, Thuyết minh, Lồng tiếng, phim theo nước; **Thể loại…** / **Quốc gia…**. VSMOV (từ 2.7): mạnh phim lồng tiếng /
+thuyết minh / 4K, ít hoạt hình Trung Quốc; server **HLS** (app tự phát) + **Trình phát VSMOV**. CLB Phim Xưa (từ 2.7, tên miền
+`sc.k-20.xyz` của add-on k-20 — app ghi «CLB Phim Xưa»): phim Hồng Kông / TVB / kiếm hiệp cũ, menu theo thể loại / thập niên, mỗi
+chất lượng (1080p / 720p / 360p) là một server. Video đi qua máy chủ trung gian của k-20: trên TV mở chậm (~25–35 s), thỉnh thoảng
+khựng, tua xa có khi không được (iPad / iPhone / Windows mượt).
 
 App không viết riêng cho từng trang mà nhận dạng theo mẫu giao diện, nên trang khác cùng kiểu (yanhh3d / theme HaLim /
 Next.js kiểu PhimMoi) thường cũng chạy: **Đổi trang phim** → **＋ Thêm trang khác…** rồi gõ tên miền (từ 2.1), hoặc nhập
@@ -123,14 +138,15 @@ cả chuột lẫn bàn phím / remote:
   Quốc gia…, Đổi trang phim, Đồng bộ trong nhà, Cài đặt), lưới phim; chi tiết phim có Xem tiếp, Xem từ đầu, Mới nhất, Theo dõi, các bản
   (Vietsub / Thuyết Minh) và danh sách tập (tập đã xem màu xanh).
 - **Phím:** mũi tên đi theo vị trí trên màn (như remote TV), Enter chọn, Esc / Backspace / phím Back của remote quay lại,
-  F11 (Alt+Enter) toàn màn hình, Ctrl+F tìm kiếm. Xem phim: Space / Enter / K phát – dừng, ◀ ▶ (J / L) tua (giữ phím tua
+  F11 (Alt+Enter) toàn màn hình (đang toàn màn hình thì menu có «⤡ Thoát toàn màn hình», Esc ở menu cũng thoát — từ 1.4),
+  Ctrl+F tìm kiếm. Xem phim: Space / Enter / K phát – dừng, ◀ ▶ (J / L) tua (giữ phím tua
   nhanh dần), ▲ thời gian, ▼ / M / phím Menu mở bảng (server, bản, tập, tốc độ, khung hình, nhạc mở đầu, tải lại, bấm
   thẳng vào trang, mở trang tập trên trình duyệt), N / P (PageDown / PageUp, phím tập sau / trước) đổi tập, 0–9 nhảy
   0–90%, F toàn màn hình, W thu nhỏ phim, Esc thoát phim.
 - **Chuột:** rê để hiện thanh điều khiển, bấm vào phim phát / dừng, bấm đúp toàn màn hình, bấm thanh tua nhảy tới chỗ đó,
   Delete hoặc chuột phải trên thẻ phim (Lịch sử / Theo dõi) để xoá; nút lùi của chuột = quay lại.
 - **Cài đặt:** bước tua, tự chuyển tập, **cỡ giao diện** 100–175% (ngồi xa tivi), mở app ở toàn màn hình, **vượt chặn nhà
-  mạng** mức 1 / 2, **proxy SOCKS5** (từ 1.2), **server dự phòng KKPhim** (từ 1.3), tự kiểm tra bản mới, xoá lịch sử / dữ
+  mạng** mức 1 / 2, **proxy SOCKS5** (từ 1.2), **server dự phòng KKPhim** (từ 1.3) / **NguonC** (từ 1.4), tự kiểm tra bản mới, xoá lịch sử / dữ
   liệu duyệt web.
 - **Người xem** (từ 1.2, như TV 2.0): menu «👤 Người xem» → «Ai đang xem?» / «Quản lý người xem…»: tối đa 8 người, mỗi người
   một lịch sử / Xem tiếp / theo dõi / trang phim / server / cách xem; khoá bằng mã PIN 4 số; hỏi khi mở app (từ 2 người) và
@@ -401,6 +417,10 @@ App duyệt danh sách release, lấy tag `win-v*` có tệp `.exe`; tải về,
 đúng tên sản phẩm + số bản trong tệp, rồi đổi tên tệp đang chạy thành `.old`, đặt tệp mới vào chỗ cũ và mở lại app
 (`--updated`; lần mở sau xoá `.old`). Thư mục chứa app không ghi được thì mở trang Releases để tải tay.
 
+Link tải github.com lỗi (8/11/2026 máy chủ GitHub vùng Đông Nam Á trả 504 / 500 xen kẽ nhiều giờ) thì bản TV (từ 2.7) và
+Windows (từ 1.4) tải cùng tệp qua API (`assets[].url` + `Accept: application/octet-stream`), thử lại cả hai đường sau 5 s rồi
+15 s; tệp từ đường nào cũng phải qua bước kiểm như trên. Bản iPad không đổi (TrollStore tự tải theo link).
+
 Thử OTA không cần phát hành thật: bản debug hỏi `http://127.0.0.1:8765/latest.json` (cùng định dạng GitHub API).
 Dựng bản giả số hiệu cao hơn bằng `gradlew assembleDebug "-Pvc=5" "-Pvn=1.4"`, phục vụ JSON + APK từ máy tính
 rồi `adb reverse tcp:8765 tcp:8765`. Tệp APK lớn nên phục vụ ngay trên TV (`toybox nc`) vì `adb reverse` qua mạng
@@ -518,6 +538,14 @@ Tập: `EpisodeSource(next = true)` với `links` sẵn (`m3u8`, `embed`) → `N
 Dự phòng: `ApiSite.fallback` đổi `/api/movies/newest|category|the-loai|quoc-gia|search|detail` sang `phimapi.com/v1/api/…`.
 Trang KKPhim (từ 2.6, `ApiSite.KK_HOST`): không có `/api/movies` riêng — `ApiSite.get` gọi luôn `fallback` (phimapi.com);
 địa chỉ phim / tập trong app vẫn theo `www.kkphim.com`. Thêm một lần cho người đã cài qua khoá `preset_added@<trang>`.
+
+Nguồn mới (từ 2.7, cùng tên hàm ở 3 bản): `NguonC.kt` (trang NguonC + server dự phòng `nc-…`), `Stremio.kt` (CLB Phim Xưa
+qua add-on k-20: phim `/clbpx/<slug>`, tập `/clbpx/<slug>/<mã tập>`, phim lẻ `…/full`; chỉ trả dữ liệu cho User-Agent kiểu
+trình duyệt), VSMOV trong `ApiSite` (`VS_HOST`: `/api/danh-sach|the-loai|quoc-gia|tim-kiem|phim/…`, phân trang ở gốc; `vsHlsFrom`
+đọc `signedMasterUrl` hoặc `baseUrl` + `videoHash` trong trang trình phát). `ApiSite` chuyển việc cho `NguonC` / `Stremio` theo tên
+miền nên `Site` / menu không phải sửa. `Video.file` = tệp MP4 → `hls.html` phát thẳng bằng `<video src>`; `hls.html` có `fLoader`
+bỏ phần ảnh PNG đứng trước dữ liệu MPEG-TS (VSMOV). `KkPhim.combineAll` chạy mọi nguồn dự phòng song song (`KkPhim.isBackup`:
+`kk-…` / `nc-…`).
 
 Server dự phòng KKPhim (từ 2.6 — `KkPhim.kt` / `KkPhim.swift` / `KkPhim.cs`, cùng tên hàm): `KkPhim.source` chạy song song
 trang tập và tìm KKPhim (`combine`: trang xong thì chờ KKPhim tới 6 s tính từ lúc bắt đầu, trang lỗi thì tới 15 s). Tìm
