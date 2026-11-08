@@ -76,6 +76,30 @@ class ApiSiteTest {
         assertNull(ApiSite.fallback("$o/api/movies/trending"))
     }
 
+    /** Trang KKPhim (2.6): địa chỉ trong app theo www.kkphim.com, dữ liệu gọi thẳng phimapi.com. */
+    @Test
+    fun kkPhimSiteUsesPublicApi() {
+        val kk = Prefs.KK_SITE
+        assertTrue(ApiSite.isKnown("$kk/"))
+        assertTrue(ApiSite.isKk("$kk/phim/tien-nghich/tap-165?sv=0"))
+        assertTrue(ApiSite.isKk("https://kkphim.com"))
+        assertTrue(!ApiSite.isKk("$o/phim/tien-nghich"))
+        assertEquals("https://phimapi.com/v1/api/danh-sach/phim-moi-cap-nhat?page=1&limit=24", ApiSite.fallback(ApiSite.newestUrl(kk)))
+        assertEquals("https://phimapi.com/v1/api/tim-kiem?keyword=gi%C3%A0+thi%C3%AAn&page=1&limit=24", ApiSite.fallback(ApiSite.searchUrl(kk, "già thiên")))
+        assertEquals("https://phimapi.com/v1/api/danh-sach/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh&page=1&limit=24",
+            ApiSite.fallback("$kk/api/movies/category/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh&page=1&limit=24"))
+        assertEquals("$kk/phim/tien-nghich", ApiSite.filmUrl("$kk/phim/tien-nghich/tap-165?sv=0"))
+        // Danh sách v1 của phimapi.com: ảnh tương đối + APP_DOMAIN_CDN_IMAGE, phim mở theo tên miền kkphim.com
+        val json = """{"status":true,"data":{"items":[{"name":"Đấu Phá Thương Khung (Phần 5)","slug":"dau-pha-thuong-khung-phan-5",
+            "poster_url":"upload/vod/20240822-1/58a4.jpg","episode_current":"Tập 218"}],
+            "params":{"pagination":{"totalItems":462,"totalItemsPerPage":24,"currentPage":1,"totalPages":20}},
+            "APP_DOMAIN_CDN_IMAGE":"https://phimimg.com"}}"""
+        val p = ApiSite.parseList(json, "$kk/api/movies/category/hoat-hinh?country=trung-quoc&page=1&limit=24")
+        assertEquals("https://www.kkphim.com/phim/dau-pha-thuong-khung-phan-5", p.films.single().url)
+        assertEquals("https://phimimg.com/upload/vod/20240822-1/58a4.jpg", p.films.single().poster)
+        assertEquals("$kk/api/movies/category/hoat-hinh?country=trung-quoc&page=2&limit=24", p.nextUrl)
+    }
+
     @Test
     fun filmUrlFromEpisode() {
         assertEquals("$o/phim/tien-nghich", ApiSite.filmUrl("$o/phim/tien-nghich/tap-01?sv=1"))

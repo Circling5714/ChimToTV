@@ -41,11 +41,14 @@ object Prefs {
     /** Các trang mẫu có sẵn trong danh sách lần đầu cài. */
     val PRESET_SITES = listOf(
         DEFAULT_BASE, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun",
-        "https://mephim.ddns.net",
+        "https://mephim.ddns.net", KK_SITE,
     )
 
+    /** Trang KKPhim (từ 2.6) — dữ liệu lấy thẳng từ API công khai phimapi.com (xem ApiSite). */
+    const val KK_SITE = "https://www.kkphim.com"
+
     /** Trang mẫu thêm ở bản sau: thêm một lần vào danh sách người xem đã lưu (xoá đi thì thôi, không thêm lại). */
-    private val ADDED_SITES = listOf("https://phimmois.fun", "https://mephim.ddns.net")
+    private val ADDED_SITES = listOf("https://phimmois.fun", "https://mephim.ddns.net", KK_SITE)
 
     /**
      * Trang đổi hẳn tên miền, đường dẫn giữ nguyên (tên cũ chuyển hướng 301 sang tên mới). Tên cũ hay bị nhà mạng chặn nên

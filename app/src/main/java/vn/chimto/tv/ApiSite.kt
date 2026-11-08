@@ -19,8 +19,14 @@ import kotlin.concurrent.thread
  * /phim/<slug>/<tập>?sv=<số thứ tự bản> (Vietsub / Thuyết Minh cùng tên tập nên phải ghi bản). Danh sách = địa chỉ API.
  */
 object ApiSite {
+    /**
+     * Trang KKPhim (www.kkphim.com, từ 2.6): không có API /api/movies riêng — mọi dữ liệu gọi thẳng API công khai
+     * phimapi.com (cùng định dạng, qua fallback). Địa chỉ phim / tập trong app vẫn theo tên miền kkphim.com.
+     */
+    const val KK_HOST = "kkphim.com"
+
     /** Trang đã biết là kiểu này (có sẵn + trang dò thấy lúc chạy, xem probe). */
-    private val known = ConcurrentHashMap.newKeySet<String>().apply { add("mephim.ddns.net") }
+    private val known = ConcurrentHashMap.newKeySet<String>().apply { add("mephim.ddns.net"); add(KK_HOST) }
     private val notApi = ConcurrentHashMap.newKeySet<String>()
     private const val CDN = "https://phimimg.com"
 
@@ -58,7 +64,14 @@ object ApiSite {
     )
     private const val LIMIT = 24
 
+    /** Trang KKPhim (gọi thẳng phimapi.com) thêm vài mục theo các danh sách riêng của KKPhim. */
+    private val KK_MENU = MENU.take(1) + listOf(
+        "Hoạt hình Trung Quốc thuyết minh" to "category/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh",
+    ) + MENU.drop(1) + listOf("Phim chiếu rạp" to "category/phim-chieu-rap")
+
     fun isKnown(url: String) = Site.hostOf(url) in known
+
+    fun isKk(url: String) = Site.hostOf(url) == KK_HOST
 
     /**
      * Trang chưa biết (người dùng vừa thêm) mà HTML là trang trắng của ứng dụng JS: thử API (một lần mỗi trang) —
@@ -79,12 +92,24 @@ object ApiSite {
     /** Trang chủ: các khối tải song song (TV mạng chậm đỡ chờ); khối nào lỗi thì bỏ. */
     fun home(base: String): Home {
         val o = origin(base)
-        val blocks = listOf(
-            "Hoạt hình Trung Quốc mới cập nhật" to api(o, "category/hoat-hinh?country=trung-quoc", 1),
-            "Phim mới cập nhật" to newestUrl(o),
-            "Thịnh hành" to "$o/api/movies/trending",
-            "Song ngữ / Thuyết minh" to "$o/api/movies/song-ngu",
-        )
+        val kk = isKk(base)
+        val blocks = if (kk) {
+            // KKPhim không có khối thịnh hành / song ngữ: thêm hoạt hình thuyết minh, phim bộ, phim lẻ mới
+            listOf(
+                "Hoạt hình Trung Quốc mới cập nhật" to api(o, "category/hoat-hinh?country=trung-quoc", 1),
+                "Hoạt hình Trung Quốc thuyết minh" to api(o, "category/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh", 1),
+                "Phim mới cập nhật" to newestUrl(o),
+                "Phim bộ mới" to api(o, "category/phim-bo", 1),
+                "Phim lẻ mới" to api(o, "category/phim-le", 1),
+            )
+        } else {
+            listOf(
+                "Hoạt hình Trung Quốc mới cập nhật" to api(o, "category/hoat-hinh?country=trung-quoc", 1),
+                "Phim mới cập nhật" to newestUrl(o),
+                "Thịnh hành" to "$o/api/movies/trending",
+                "Song ngữ / Thuyết minh" to "$o/api/movies/song-ngu",
+            )
+        }
         val found = arrayOfNulls<Section>(blocks.size)
         var error: Throwable? = null
         blocks.mapIndexed { i, (title, url) ->
@@ -96,7 +121,7 @@ object ApiSite {
         }.forEach { it.join() }
         val sections = found.filterNotNull()
         if (sections.isEmpty()) throw (error as? IOException ?: IOException("Không tải được danh sách phim", error))
-        return Home(sections, MENU.map { (t, p) -> Category(t, api(o, p, 1)) }, null)
+        return Home(sections, (if (kk) KK_MENU else MENU).map { (t, p) -> Category(t, api(o, p, 1)) }, null)
     }
 
     fun list(url: String): FilmPage = parseList(get(url), url)
@@ -227,6 +252,8 @@ object ApiSite {
      * gọi thẳng nguồn KKPhim (phimapi.com — cùng định dạng), như chính trang web làm.
      */
     private fun get(url: String): String {
+        // Trang KKPhim: gọi thẳng phimapi.com (kkphim.com không có /api/movies)
+        if (isKk(url)) return Http.get(fallback(url) ?: url, mapOf("Accept" to "application/json")).body.also(::checkJson)
         val first = runCatching { Http.get(url, mapOf("Accept" to "application/json")).body.also(::checkJson) }
         val alt = first.exceptionOrNull()?.let { fallback(url) } ?: return first.getOrThrow()
         return runCatching { Http.get(alt, mapOf("Accept" to "application/json")).body.also(::checkJson) }
