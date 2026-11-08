@@ -168,4 +168,12 @@ final class KkPhimTests: XCTestCase {
         XCTAssertEqual(p.films.first?.poster, "https://phimimg.com/upload/vod/20240822-1/58a4.jpg")
         XCTAssertEqual(p.nextUrl, "\(kk)/api/movies/category/hoat-hinh?country=trung-quoc&page=2&limit=24")
     }
+
+    func testBareKkDomainBecomesTheWwwSite() {
+        // kkphim.com trần bị nhà mạng chặn, và trùng với trang mẫu www.kkphim.com trong danh sách
+        XCTAssertEqual(Prefs.normalizeUrl("kkphim.com"), Prefs.kkSite)
+        XCTAssertEqual(Prefs.normalizeUrl("https://KKPhim.com/"), Prefs.kkSite)
+        XCTAssertEqual(Prefs.normalizeUrl("www.kkphim.com"), Prefs.kkSite)
+        XCTAssertEqual(Prefs.normalizeUrl("yanhh3d.ee/"), "https://yanhh3d.ee")
+    }
 }

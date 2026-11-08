@@ -398,6 +398,8 @@ enum Prefs {
         if s.isEmpty || s.contains(" ") { return nil }
         if !s.lowercased().hasPrefix("http://") && !s.lowercased().hasPrefix("https://") { s = "https://" + s }
         guard let host = URL(string: s)?.host, host.contains(".") else { return nil }
+        // Nhà mạng chặn tên miền trần kkphim.com: gõ «kkphim.com» là trang KKPhim mẫu (www)
+        if host.lowercased() == ApiSite.kkHost { return kkSite }
         return s
     }
 
