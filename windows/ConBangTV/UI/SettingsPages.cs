@@ -39,7 +39,7 @@ public sealed class SitesPage : Page
         {
             var row = new WrapPanel { Margin = new Thickness(0, 0, 0, 2) };
             var host = Site.HostOf(s) ?? s;
-            row.Children.Add(Ui.Pill((s == cur ? "●  " : "") + host, () => Use(s), s == cur ? "active" : null, 260));
+            row.Children.Add(Ui.Pill((s == cur ? "●  " : "") + Site.DisplayName(host), () => Use(s), s == cur ? "active" : null, 260));
             row.Children.Add(Ui.Pill("Đo", () => _ = Check(s)));
             row.Children.Add(Ui.Pill("Xoá", async () =>
             {
@@ -68,7 +68,8 @@ public sealed class SitesPage : Page
         add.Children.Add(Ui.Pill("Thêm", Add));
         Body.Children.Add(add);
         Body.Children.Add(Ui.Dim("Gõ tên miền, vd yanhh3d.ee. App đọc được trang kiểu yanhh3d, theme HaLim (hoathinh3d…), kiểu PhimMoi " +
-                                 "(phimmois.fun), mephim.ddns.net và KKPhim (kkphim.com).", 14, new Thickness(0, 0, 0, 10)));
+                                 "(phimmois.fun), mephim.ddns.net, KKPhim (kkphim.com), NguonC (phim.nguonc.com), VSMOV (vsmov.com) và " +
+                                 "CLB Phim Xưa (sc.k-20.xyz).", 14, new Thickness(0, 0, 0, 10)));
         var missing = Prefs.MissingPresets;
         if (missing.Count > 0)
         {
@@ -186,7 +187,7 @@ public sealed class SettingsPage : Page
         Body.Children.Clear();
         Body.Children.Add(Ui.Header("Cài đặt"));
         Body.Children.Add(Ui.Row(
-            Ui.Pill($"🌐  Trang phim: {Site.HostOf(Prefs.BaseUrl)}", () => Main.ShowRoot(new SitesPage())),
+            Ui.Pill($"🌐  Trang phim: {Site.DisplayName(Site.HostOf(Prefs.BaseUrl) ?? Prefs.BaseUrl)}", () => Main.ShowRoot(new SitesPage())),
             Ui.Pill($"👤  Người xem: {Prefs.CurrentProfile.Name} — quản lý / giới hạn giờ xem…", () => Main.Push(new ProfilesPage()))));
 
         Option("Mỗi lần bấm ◀ ▶ khi xem phim tua", new[] { 5, 10, 15, 30 }.Select(s =>
@@ -202,6 +203,12 @@ public sealed class SettingsPage : Page
             ("Tắt", !Prefs.KkBackup, () => Prefs.KkBackup = false),
         }, "Với yanhh3d, hoathinh3d, hhkungfu… (trình phát của trang hay hỏng cùng lúc) app tìm cùng phim, cùng tập trên KKPhim " +
            "và thêm server «KKPhim Vietsub / Thuyết Minh» vào bảng ▼ lúc xem; trang không vào được mà KKPhim có tập đó thì vẫn xem được.");
+        Option("Server dự phòng NguonC", new[]
+        {
+            ("Bật", Prefs.NcBackup, (Action)(() => Prefs.NcBackup = true)),
+            ("Tắt", !Prefs.NcBackup, () => Prefs.NcBackup = false),
+        }, "Như KKPhim nhưng tìm trên NguonC (hay có tập mới sớm) và thêm server «NguonC Vietsub…». Trình phát của NguonC chạy " +
+           "quảng cáo trước phim — app tự bỏ qua.");
         Option("Cỡ giao diện", new[] { 1.0, 1.25, 1.5, 1.75 }.Select(s =>
             ($"{s * 100:0}%", Math.Abs(Prefs.UiScale - s) < 0.01, (Action)(() =>
             {

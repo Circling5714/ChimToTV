@@ -109,11 +109,12 @@ final class NguonCTests: XCTestCase {
         XCTAssertEqual(p.films.first?.url, "\(vs)/phim/tuy-linh-lung")
         XCTAssertEqual(p.nextUrl, "\(vs)/api/the-loai/hoat-hinh?country=trung-quoc&page=2")
         let d = try ApiSite.parseDetail(json(#"""
-        {"status":true,"movie":{"name":"Túy Linh Lung"},"episodes":[{"server_name":"Lồng tiếng #1","server_data":[
+        {"status":true,"movie":{"name":"Túy Linh Lung"},"episodes":[{"server_name":"Lồng tiếng\r\n      #1","server_data":[
          {"name":"1","slug":"tap-1","link_embed":"https://v15.streamvsmov.com/video/fc1d03d9"}]}]}
         """#), "\(vs)/phim/tuy-linh-lung")
         XCTAssertEqual(d.groups.first?.episodes.first?.url, "\(vs)/phim/tuy-linh-lung/tap-1?sv=0")
         XCTAssertEqual(d.groups.first?.episodes.first?.title, "Tập 1")
+        XCTAssertEqual(d.groups.first?.name, "Lồng tiếng #1")
     }
 
     func testVsmovHlsFromPlayerPage() {

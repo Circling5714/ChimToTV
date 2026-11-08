@@ -127,10 +127,11 @@ class ApiSiteTest {
         assertEquals("$vs/api/the-loai/hoat-hinh?country=trung-quoc&page=2", p.nextUrl)
         // Chi tiết: tập chỉ có link_embed vẫn được giữ
         val d = ApiSite.parseDetail("""{"status":true,"movie":{"name":"Túy Linh Lung","lang":"Lồng tiếng"},"episodes":[
-            {"server_name":"Lồng tiếng #1","server_data":[{"name":"1","slug":"tap-1","filename":"1",
+            {"server_name":"Lồng tiếng\r\n      #1","server_data":[{"name":"1","slug":"tap-1","filename":"1",
              "link_embed":"https://v15.streamvsmov.com/video/fc1d03d9-0667-4a14-8891-7dee0d362b05"}]}]}""", "$vs/phim/tuy-linh-lung")
         assertEquals("$vs/phim/tuy-linh-lung/tap-1?sv=0", d.groups.single().episodes.single().url)
         assertEquals("Tập 1", d.groups.single().episodes.single().title) // VSMOV ghi số trần
+        assertEquals("Lồng tiếng #1", d.groups.single().name) // tên server có xuống dòng
     }
 
     @Test

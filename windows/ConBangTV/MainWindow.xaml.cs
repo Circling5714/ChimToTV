@@ -212,7 +212,7 @@ public partial class MainWindow : Window
         var focused = Keyboard.FocusedElement is Button fb && _menuButtons.Contains(fb) ? (string?)fb.CommandParameter : null;
         MenuPanel.Children.Clear();
         _menuButtons.Clear();
-        SiteName.Text = Site.HostOf(Prefs.BaseUrl) ?? Prefs.BaseUrl;
+        SiteName.Text = Site.DisplayName(Site.HostOf(Prefs.BaseUrl) ?? Prefs.BaseUrl);
         var i = 0;
         foreach (var m in MenuEntries())
         {

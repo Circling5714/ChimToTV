@@ -568,8 +568,8 @@ public static class Site
     /// Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server (trang Next.js / API: link .m3u8 / iframe).
     public static async Task<Video> VideoOf(EpisodeSource src, Server? server)
     {
-        // Server dự phòng KKPhim: link .m3u8 có sẵn (KkPhim.Attach)
-        if (server != null && server.Type.StartsWith(KkPhim.Prefix) && src.Links.TryGetValue(server.Type, out var kk)) return kk;
+        // Server dự phòng KKPhim / NguonC: link có sẵn (KkPhim.Attach)
+        if (server != null && KkPhim.IsBackup(server.Type) && src.Links.TryGetValue(server.Type, out var kk)) return kk;
         if (src.Next)
         {
             if (server == null) throw new AppError("Không có server");
@@ -597,6 +597,9 @@ public static class Site
         if (Uri.TryCreate(baseUrl, UriKind.Absolute, out var b) && Uri.TryCreate(b, reference, out var u)) return u.AbsoluteUri;
         return reference;
     }
+
+    /// Tên trang hiện trong app: tên miền, riêng add-on k-20 ghi «CLB Phim Xưa (sc.k-20.xyz)».
+    public static string DisplayName(string host) => host == Stremio.Host ? $"{Stremio.Name} ({host})" : host;
 
     public static string? HostOf(string url)
     {

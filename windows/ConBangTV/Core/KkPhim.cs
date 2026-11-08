@@ -35,25 +35,43 @@ public static class KkPhim
         return h != null && !h.EndsWith("phimapi.com") && !h.EndsWith("kkphim.com");
     }
 
-    /// Trang tập + server KKPhim, tải song song. KKPhim chậm / lỗi thì thôi; trang tập lỗi mà KKPhim có tập này → chỉ KKPhim.
-    public static Task<EpisodeSource> Source(FilmDetail d, EpisodeGroup? group, Episode ep) =>
-        AppliesTo(d.Url) ? Combine(ep.Url, () => Site.Source(ep.Url), () => Servers(d, group, ep)) : Site.Source(ep.Url);
+    /// Server dự phòng (KKPhim "kk-…", NguonC "nc-…"): link có sẵn trong EpisodeSource.Links.
+    public static bool IsBackup(string type) => type.StartsWith(Prefix) || type.StartsWith(NguonC.Prefix);
 
-    /// Chạy song song trang tập (site) và tìm KKPhim (kk). Trang xong thì chờ KKPhim thêm tới waitMs tính từ lúc bắt đầu;
-    /// trang lỗi thì chờ tới failWaitMs (lúc đó KKPhim là đường duy nhất). KKPhim lỗi = không có server dự phòng.
-    public static async Task<EpisodeSource> Combine(string epUrl, Func<Task<EpisodeSource>> site, Func<Task<List<(Server, Video)>>> kk,
-        long waitMs = 6_000, long failWaitMs = 15_000)
+    /// Trang tập + server dự phòng KKPhim và NguonC, tải song song. Nguồn dự phòng chậm / lỗi thì thôi; trang tập lỗi mà
+    /// nguồn dự phòng có tập này → chỉ phát bằng nguồn dự phòng.
+    public static Task<EpisodeSource> Source(FilmDetail d, EpisodeGroup? group, Episode ep)
+    {
+        var backups = new List<Func<Task<List<(Server, Video)>>>>();
+        if (AppliesTo(d.Url)) backups.Add(() => Servers(d, group, ep));
+        if (NguonC.AppliesTo(d.Url)) backups.Add(() => NguonC.Servers(d, group, ep));
+        return backups.Count == 0 ? Site.Source(ep.Url) : CombineAll(ep.Url, () => Site.Source(ep.Url), backups);
+    }
+
+    public static Task<EpisodeSource> Combine(string epUrl, Func<Task<EpisodeSource>> site, Func<Task<List<(Server, Video)>>> kk,
+        long waitMs = 6_000, long failWaitMs = 15_000) => CombineAll(epUrl, site, new() { kk }, waitMs, failWaitMs);
+
+    /// Chạy song song trang tập (site) và các nguồn dự phòng (mỗi nguồn một task). Trang xong thì chờ nguồn dự phòng thêm
+    /// tới waitMs tính từ lúc bắt đầu; trang lỗi thì chờ tới failWaitMs (lúc đó dự phòng là đường duy nhất). Nguồn nào chưa
+    /// xong / lỗi thì bỏ, nguồn đã xong vẫn dùng.
+    public static async Task<EpisodeSource> CombineAll(string epUrl, Func<Task<EpisodeSource>> site,
+        List<Func<Task<List<(Server, Video)>>>> backups, long waitMs = 6_000, long failWaitMs = 15_000)
     {
         var start = Util.NowMs();
-        var task = Task.Run(async () =>
+        var tasks = backups.Select(b => Task.Run(async () =>
         {
-            try { return await kk(); } catch (Exception) { return new List<(Server, Video)>(); }
-        });
+            try { return await b(); } catch (Exception) { return new List<(Server, Video)>(); }
+        })).ToList();
         EpisodeSource? src = null;
         Exception? siteError = null;
         try { src = await site(); } catch (Exception e) { siteError = e; }
-        var budget = Math.Max(1, (src != null ? waitMs : failWaitMs) - (Util.NowMs() - start));
-        var extra = await Task.WhenAny(task, Task.Delay(TimeSpan.FromMilliseconds(budget))) == task ? task.Result : new();
+        var deadline = start + (src != null ? waitMs : failWaitMs);
+        var extra = new List<(Server, Video)>();
+        foreach (var t in tasks)
+        {
+            var left = Math.Max(1, deadline - Util.NowMs());
+            if (await Task.WhenAny(t, Task.Delay(TimeSpan.FromMilliseconds(left))) == t) extra.AddRange(t.Result);
+        }
         if (src != null) return Attach(src, extra);
         if (extra.Count == 0) throw siteError ?? new AppError("Không mở được tập này");
         return new EpisodeSource
@@ -230,7 +248,9 @@ public static class KkPhim
     public static HashSet<string> Names(JObj m)
     {
         var output = new HashSet<string>();
-        foreach (var raw in new[] { J.Str(m, "name"), J.Str(m, "origin_name") })
+        // NguonC: original_name có thể gồm nhiều tên cách nhau dấu phẩy ("Mu Shen Ji, Tales of Herding Gods")
+        var others = J.Str(m, "original_name").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var raw in new[] { J.Str(m, "name"), J.Str(m, "origin_name") }.Concat(others))
         {
             output.Add(Norm(raw));
             if (Paren.Groups(raw) is { } g)

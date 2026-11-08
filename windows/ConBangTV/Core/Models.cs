@@ -53,7 +53,8 @@ public sealed class FilmDetail
 public sealed record Server(string Label, string Type);
 
 /// Link phát của một server: iframe trình phát / trang tập, hoặc luồng .m3u8 (kèm phụ đề rời nếu có).
-public sealed record Video(string Url, string? Subtitle = null);
+/// File: tệp video phát thẳng bằng &lt;video&gt; (MP4 của CLB Phim Xưa), không phải trang trình phát.
+public sealed record Video(string Url, string? Subtitle = null, bool File = false);
 
 /// Cách phát một tập: player.php → iframe; PageMode → mở thẳng trang tập; Next → trang Next.js / trang API.
 public sealed class EpisodeSource

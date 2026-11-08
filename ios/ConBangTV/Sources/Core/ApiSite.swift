@@ -259,7 +259,9 @@ enum ApiSite {
                 if J.str(e, "link_m3u8").isEmpty && J.str(e, "link_embed").isEmpty { return nil }
                 return Episode(title: title(J.str(e, "name").nonEmpty ?? slug), url: "\(url)/\(slug)?sv=\(i)")
             }.distinct { $0.url }
-            if !eps.isEmpty { groups.append(EpisodeGroup(name: J.str(s, "server_name").nonEmpty ?? "Bản \(i + 1)", episodes: eps)) }
+            // VSMOV: "Vietsub\r\n      #1" → gộp khoảng trắng
+            let name = J.str(s, "server_name").components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator: " ")
+            if !eps.isEmpty { groups.append(EpisodeGroup(name: name.nonEmpty ?? "Bản \(i + 1)", episodes: eps)) }
         }
         return FilmDetail(url: url, title: J.str(m, "name").nonEmpty ?? url, otherTitle: J.str(m, "origin_name").nonEmpty,
                           poster: image(J.str(m, "poster_url").nonEmpty ?? J.str(m, "thumb_url"), cdn),

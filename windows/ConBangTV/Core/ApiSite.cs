@@ -15,8 +15,12 @@ public static class ApiSite
     /// phimapi.com (cùng định dạng, qua Fallback). Địa chỉ phim / tập trong app vẫn theo tên miền kkphim.com.
     public const string KkHost = "kkphim.com";
 
+    /// VSMOV (vsmov.com, từ 1.4): API riêng cùng định dạng KKPhim nhưng khác đường dẫn (/api/danh-sach/…, /api/phim/…,
+    /// /api/tim-kiem). Tập chỉ có trình phát nhúng; app đọc luồng HLS trong trang trình phát (link có chữ ký) để tự phát.
+    public const string VsHost = "vsmov.com";
+
     private static readonly object Lock = new();
-    private static readonly HashSet<string> Known = new() { "mephim.ddns.net", KkHost };
+    private static readonly HashSet<string> Known = new() { "mephim.ddns.net", KkHost, VsHost, NguonC.Host, Stremio.Host };
     private static readonly HashSet<string> NotApi = new();
     private const string Cdn = "https://phimimg.com";
     private const int Limit = 24;
@@ -64,6 +68,49 @@ public static class ApiSite
 
     public static bool IsKk(string url) => Site.HostOf(url) == KkHost;
 
+    public static bool IsVs(string url) => Site.HostOf(url) == VsHost;
+
+    /// Menu VSMOV: lọc hoạt hình theo nước có trên /api/the-loai/…?country=.
+    private static readonly (string, string)[] VsMenu =
+    {
+        ("Hoạt hình Trung Quốc", "the-loai/hoat-hinh?country=trung-quoc"),
+        ("Hoạt hình", "the-loai/hoat-hinh"),
+        ("Phim bộ", "danh-sach/phim-bo"),
+        ("Phim lẻ", "danh-sach/phim-le"),
+        ("Phim nhóm sub VSMOV", "danh-sach/subteam"),
+        ("Phim Trung Quốc", "quoc-gia/trung-quoc"),
+        ("Phim Hàn Quốc", "quoc-gia/han-quoc"),
+        ("Phim Âu Mỹ", "quoc-gia/au-my"),
+        ("Phim Nhật Bản", "quoc-gia/nhat-ban"),
+        ("Phim Thái Lan", "quoc-gia/thai-lan"),
+    };
+
+    private static readonly (string, string)[] VsGenres =
+    {
+        ("Hành Động", "hanh-dong"), ("Cổ Trang", "co-trang"), ("Kiếm Hiệp", "kiem-hiep"), ("Tiên Hiệp", "tien-hiep"),
+        ("Võ Thuật", "vo-thuat"), ("Viễn Tưởng", "vien-tuong"), ("Giả Tưởng", "gia-tuong"), ("Kinh Dị", "kinh-di"),
+        ("Lãng Mạn", "lang-man"), ("Hài", "hai"), ("Chính Kịch", "chinh-kich"), ("Phiêu Lưu", "phieu-luu"),
+        ("Hình Sự", "hinh-su"), ("Tội Phạm", "toi-pham"), ("Chiến Tranh", "chien-tranh"), ("Bí Ẩn", "bi-an"),
+        ("Học Đường", "hoc-duong"), ("Gia Đình", "gia-dinh"), ("Thiếu Nhi", "thieu-nhi"), ("Thanh Xuân", "thanh-xuan"),
+        ("Thương Trường", "thuong-truong"), ("Xã Hội Đen", "xa-hoi-den"), ("Truyền Hình Thực Tế", "truyen-hinh-thuc-te"),
+        ("Phim Nhạc", "phim-nhac"),
+    };
+
+    private static readonly (string, string)[] VsCountries =
+    {
+        ("Trung Quốc", "trung-quoc"), ("Hàn Quốc", "han-quoc"), ("Nhật Bản", "nhat-ban"), ("Âu Mỹ", "au-my"), ("Mỹ", "my"),
+        ("Thái Lan", "thai-lan"), ("Đài Loan", "dai-loan"), ("Hồng Kông", "hong-kong"), ("Ấn Độ", "an-do"),
+        ("Việt Nam", "viet-nam"), ("Anh", "anh"), ("Pháp", "phap"), ("Canada", "canada"), ("Úc", "uc"), ("Đức", "duc"),
+        ("Tây Ban Nha", "tay-ban-nha"), ("Thổ Nhĩ Kỳ", "tho-nhi-ky"), ("Philippines", "philippines"), ("Indonesia", "indonesia"),
+    };
+
+    /// Địa chỉ API của VSMOV: "danh-sach/phim-bo" → https://vsmov.com/api/danh-sach/phim-bo?page=1.
+    private static string VsApi(string origin, string path, int page)
+    {
+        var parts = path.Split('?', 2);
+        return $"{origin}/api/{parts[0]}?" + (parts.Length > 1 ? parts[1] + "&" : "") + $"page={page}";
+    }
+
     public static bool IsKnown(string url)
     {
         var h = Site.HostOf(url);
@@ -103,10 +150,22 @@ public static class ApiSite
     /// Trang chủ: các khối tải song song; khối nào lỗi thì bỏ.
     public static async Task<Home> Home(string baseUrl)
     {
+        if (NguonC.IsSite(baseUrl)) return await NguonC.Home(baseUrl);
+        if (Stremio.IsSite(baseUrl)) return await Stremio.Home(baseUrl);
         var o = Origin(baseUrl);
         var kk = IsKk(baseUrl);
+        var vs = IsVs(baseUrl);
         // KKPhim không có khối thịnh hành / song ngữ: thêm hoạt hình thuyết minh, phim bộ, phim lẻ mới
-        var blocks = kk
+        var blocks = vs
+            ? new[]
+            {
+                ("Hoạt hình Trung Quốc", VsApi(o, "the-loai/hoat-hinh?country=trung-quoc", 1)),
+                ("Phim mới cập nhật", NewestUrl(o)),
+                ("Phim bộ mới", VsApi(o, "danh-sach/phim-bo", 1)),
+                ("Phim lẻ mới", VsApi(o, "danh-sach/phim-le", 1)),
+                ("Phim nhóm sub VSMOV", VsApi(o, "danh-sach/subteam", 1)),
+            }
+            : kk
             ? new[]
             {
                 ("Hoạt hình Trung Quốc mới cập nhật", Api(o, "category/hoat-hinh?country=trung-quoc", 1)),
@@ -122,7 +181,17 @@ public static class ApiSite
                 ("Thịnh hành", $"{o}/api/movies/trending"),
                 ("Song ngữ / Thuyết minh", $"{o}/api/movies/song-ngu"),
             };
-        var tasks = blocks.Select(b => GetJson(b.Item2)).ToList();
+        var sections = await Sections(blocks, async u => ParseItems(await GetJson(u), o));
+        var cats = vs
+            ? VsMenu.Select(m => new Category(m.Item1, VsApi(o, m.Item2, 1))).ToList()
+            : (kk ? KkMenu : Menu).Select(m => new Category(m.Item1, Api(o, m.Item2, 1))).ToList();
+        return new Home { Sections = sections, Categories = cats };
+    }
+
+    /// Các khối trang chủ tải song song; khối nào lỗi / rỗng thì bỏ, lỗi hết thì báo lỗi.
+    public static async Task<List<FilmSection>> Sections((string, string)[] blocks, Func<string, Task<List<Film>>> load)
+    {
+        var tasks = blocks.Select(b => load(b.Item2)).ToList();
         try
         {
             await Task.WhenAll(tasks);
@@ -139,35 +208,53 @@ public static class ApiSite
                 firstError ??= tasks[i].Exception?.InnerException;
                 continue;
             }
-            var films = ParseItems(tasks[i].Result, o);
-            if (films.Count > 0) sections.Add(new FilmSection(blocks[i].Item1, films));
+            if (tasks[i].Result.Count > 0) sections.Add(new FilmSection(blocks[i].Item1, tasks[i].Result));
         }
         if (sections.Count == 0) throw firstError ?? new AppError("Không tải được danh sách phim");
-        return new Home { Sections = sections, Categories = (kk ? KkMenu : Menu).Select(m => new Category(m.Item1, Api(o, m.Item2, 1))).ToList() };
+        return sections;
     }
 
-    public static async Task<FilmPage> List(string url) => ParseList(await GetJson(url), url);
+    public static async Task<FilmPage> List(string url)
+    {
+        if (NguonC.IsSite(url)) return await NguonC.List(url);
+        if (Stremio.IsSite(url)) return await Stremio.List(url);
+        return ParseList(await GetJson(url), url);
+    }
 
-    /// Danh sách có phân trang (data.params.pagination) → trang sau = page + 1.
+    /// Danh sách có phân trang (data.params.pagination; VSMOV: pagination ở gốc) → trang sau = page + 1.
     public static FilmPage ParseList(JObj root, string url)
     {
         var films = ParseItems(root, Origin(url));
         var data = J.Obj(root, "data") ?? root;
-        var p = J.Obj(J.Obj(data, "params"), "pagination");
+        var p = J.Obj(J.Obj(data, "params"), "pagination") ?? J.Obj(root, "pagination");
         int page = J.Int(p, "currentPage"), pages = J.Int(p, "totalPages");
         var next = films.Count > 0 && page >= 1 && page < pages ? WithPage(url, page + 1) : null;
         return new FilmPage { Films = films, NextUrl = next };
     }
 
     /// Phim mới cập nhật (đo nhanh trang trong Cài đặt).
-    public static string NewestUrl(string baseUrl) => $"{Origin(baseUrl)}/api/movies/newest?page=1&limit={Limit}";
+    public static string NewestUrl(string baseUrl) =>
+        NguonC.IsSite(baseUrl) ? NguonC.NewestUrl(baseUrl)
+        : Stremio.IsSite(baseUrl) ? Stremio.NewestUrl(baseUrl)
+        : IsVs(baseUrl) ? $"{Origin(baseUrl)}/api/danh-sach/phim-moi-cap-nhat?page=1"
+        : $"{Origin(baseUrl)}/api/movies/newest?page=1&limit={Limit}";
 
     public static string SearchUrl(string baseUrl, string query) =>
-        $"{Origin(baseUrl)}/api/movies/search?keyword=" + query.Trim().FormEncoded() + $"&page=1&limit={Limit}";
+        NguonC.IsSite(baseUrl) ? NguonC.SearchUrl(baseUrl, query)
+        : Stremio.IsSite(baseUrl) ? Stremio.SearchUrl(baseUrl, query)
+        : IsVs(baseUrl) ? $"{Origin(baseUrl)}/api/tim-kiem?keyword=" + query.Trim().FormEncoded() + $"&page=1&limit={Limit}"
+        : $"{Origin(baseUrl)}/api/movies/search?keyword=" + query.Trim().FormEncoded() + $"&page=1&limit={Limit}";
 
     public static (List<Category> Genres, List<Category> Countries) Filters(string baseUrl)
     {
+        if (NguonC.IsSite(baseUrl)) return NguonC.Filters(baseUrl);
+        if (Stremio.IsSite(baseUrl)) return Stremio.Filters(baseUrl);
         var o = Origin(baseUrl);
+        if (IsVs(baseUrl))
+        {
+            return (VsGenres.Select(g => new Category(g.Item1, VsApi(o, $"the-loai/{g.Item2}", 1))).ToList(),
+                VsCountries.Select(c => new Category(c.Item1, VsApi(o, $"quoc-gia/{c.Item2}", 1))).ToList());
+        }
         return (Genres.Select(g => new Category(g.Item1, Api(o, $"the-loai/{g.Item2}", 1))).ToList(),
             Countries.Select(c => new Category(c.Item1, Api(o, $"quoc-gia/{c.Item2}", 1))).ToList());
     }
@@ -193,6 +280,8 @@ public static class ApiSite
 
     public static async Task<FilmDetail> Detail(string url)
     {
+        if (NguonC.IsSite(url)) return await NguonC.Detail(url);
+        if (Stremio.IsSite(url)) return await Stremio.Detail(url);
         var film = FilmUrl(url);
         return ParseDetail(await GetJson(DetailApi(film)), film);
     }
@@ -220,7 +309,9 @@ public static class ApiSite
                 if (J.Str(e, "link_m3u8").Length == 0 && J.Str(e, "link_embed").Length == 0) return null;
                 return new Episode(Title(J.Str(e, "name").NonEmpty() ?? slug), $"{url}/{slug}?sv={i}");
             }).OfType<Episode>().DistinctBy(e => e.Url).ToList();
-            if (eps.Count > 0) groups.Add(new EpisodeGroup(J.Str(s, "server_name").NonEmpty() ?? $"Bản {i + 1}", eps));
+            // VSMOV: "Vietsub\r\n      #1" → gộp khoảng trắng
+            var name = Regex.Replace(J.Str(s, "server_name"), @"\s+", " ").NonEmpty();
+            if (eps.Count > 0) groups.Add(new EpisodeGroup(name ?? $"Bản {i + 1}", eps));
         }
         return new FilmDetail
         {
@@ -232,14 +323,27 @@ public static class ApiSite
 
     private static readonly Rx LeadingZero = new(@"^(Tập\s*)0+(\d)", RegexOptions.IgnoreCase);
 
-    /// "Tập 01" → "Tập 1"; "Full" giữ nguyên.
-    private static string Title(string name) => LeadingZero.Replace(name.Trim(), "${1}${2}");
+    private static readonly Rx BareNumber = new(@"^\d+(\.\d+)?$");
+
+    /// "Tập 01" → "Tập 1", "164" → "Tập 164" (VSMOV ghi số trần); "Full" giữ nguyên.
+    public static string Title(string name)
+    {
+        var s = name.Trim();
+        if (BareNumber.Matches(s))
+        {
+            var n = s.TrimStart('0');
+            return "Tập " + (n.Length == 0 || n.StartsWith('.') ? "0" + n : n);
+        }
+        return LeadingZero.Replace(s, "${1}${2}");
+    }
 
     // ---- Tập phim ----
 
     /// Hai server cho mỗi tập: luồng HLS (app tự phát, bỏ quảng cáo) và trình phát nhúng của KKPhim (dự phòng).
     public static async Task<EpisodeSource> Source(string epUrl)
     {
+        if (NguonC.IsSite(epUrl)) return await NguonC.Source(epUrl);
+        if (Stremio.IsSite(epUrl)) return await Stremio.Source(epUrl);
         var root = await GetJson(DetailApi(FilmUrl(epUrl)));
         var u = new Uri(epUrl);
         var svText = Regex.Match(u.Query, @"[?&]sv=(\d+)").Groups[1].Value;
@@ -251,18 +355,50 @@ public static class ApiSite
             ?? throw new AppError("Không tìm thấy tập này trên trang");
         var links = new Dictionary<string, Video>();
         var list = new List<Server>();
-        if (J.Str(e, "link_m3u8").StartsWith("http"))
+        var vs = IsVs(epUrl);
+        var embed = J.Str(e, "link_embed").StartsWith("http") ? J.Str(e, "link_embed") : null;
+        var hls = J.Str(e, "link_m3u8").StartsWith("http") ? J.Str(e, "link_m3u8") : null;
+        if (hls == null && vs && embed != null) hls = await VsHls(embed);
+        if (hls != null)
         {
-            links["m3u8"] = new Video(J.Str(e, "link_m3u8"));
-            list.Add(new Server("HLS (bỏ quảng cáo)", "m3u8"));
+            links["m3u8"] = new Video(hls);
+            list.Add(new Server(vs ? "HLS" : "HLS (bỏ quảng cáo)", "m3u8"));
         }
-        if (J.Str(e, "link_embed").StartsWith("http"))
+        if (embed != null)
         {
-            links["embed"] = new Video(J.Str(e, "link_embed"));
-            list.Add(new Server("Trình phát KKPhim", "embed"));
+            links["embed"] = new Video(embed);
+            list.Add(new Server(vs ? "Trình phát VSMOV" : "Trình phát KKPhim", "embed"));
         }
         if (links.Count == 0) throw new AppError("Tập này chưa có video");
         return new EpisodeSource { EpUrl = epUrl, Servers = list, Ep = tap, Sv = sv.ToString(), Links = links, Next = true };
+    }
+
+    /// Luồng HLS trong trang trình phát VSMOV (vN.streamvsmov.com/video/&lt;mã&gt;): link có chữ ký (signedMasterUrl, hết hạn sau
+    /// khoảng một giờ) hoặc /stream/&lt;mã&gt;/master.m3u8 khi máy chủ đó không ký. Đoạn video ngụy trang ảnh PNG — hls.html cắt
+    /// phần ảnh. Không đọc được thì null (vẫn còn trình phát nhúng).
+    private static async Task<string?> VsHls(string embed)
+    {
+        try
+        {
+            var r = await Http.Get(embed, new() { ["Referer"] = "https://vsmov.com/" });
+            return VsHlsFrom(r.Body);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static readonly Rx SignedRx = new(@"signedMasterUrl\s*:\s*""(https?://[^""]+)""");
+    private static readonly Rx BaseRx = new(@"baseUrl\s*=\s*""(https?://[^""]+)""");
+    private static readonly Rx HashRx = new(@"videoHash\s*=\s*""([0-9a-zA-Z-]+)""");
+
+    public static string? VsHlsFrom(string page)
+    {
+        if (SignedRx.Group(1, page) is { } signed) return signed;
+        var b = BaseRx.Group(1, page);
+        var h = HashRx.Group(1, page);
+        return b != null && h != null ? $"{b}/stream/{h}/master.m3u8" : null;
     }
 
     // ---- Tiện ích ----
@@ -276,7 +412,8 @@ public static class ApiSite
         return $"{Origin(url)}/phim/{parts[i + 1]}";
     }
 
-    private static string DetailApi(string url) => $"{Origin(url)}/api/movies/detail/" + FilmUrl(url).AfterLast('/');
+    private static string DetailApi(string url) =>
+        IsVs(url) ? $"{Origin(url)}/api/phim/" + FilmUrl(url).AfterLast('/') : $"{Origin(url)}/api/movies/detail/" + FilmUrl(url).AfterLast('/');
 
     private static string Api(string origin, string path, int page)
     {
@@ -286,7 +423,7 @@ public static class ApiSite
 
     private static readonly Rx PageRx = new(@"([?&]page=)\d+");
 
-    private static string WithPage(string url, int page)
+    public static string WithPage(string url, int page)
     {
         if (PageRx.Matches(url)) return PageRx.Re.Replace(url, "${1}" + page, 1);
         return url + (url.Contains('?') ? "&" : "?") + $"page={page}";
@@ -343,7 +480,7 @@ public static class ApiSite
         return null;
     }
 
-    private static string Origin(string url) => Site.OriginOf(url) ?? url.TrimEnd('/');
+    public static string Origin(string url) => Site.OriginOf(url) ?? url.TrimEnd('/');
 
     /// Ảnh: đường dẫn đầy đủ giữ nguyên; "uploads/movies/…" → nối vào máy chủ ảnh.
     private static string? Image(string reference, string b)

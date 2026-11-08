@@ -521,7 +521,7 @@ public sealed class PlayerView : UserControl
             if (t != _token || !IsOpen) return;
             _loadStartedAt = Util.NowMs();
             _startHint = StartFor();
-            var isHls = Uri.TryCreate(v.Url, UriKind.Absolute, out var vu) && vu.AbsolutePath.EndsWith(".m3u8");
+            var isHls = v.File || Uri.TryCreate(v.Url, UriKind.Absolute, out var vu) && vu.AbsolutePath.EndsWith(".m3u8");
             string page;
             if (isHls)
             {

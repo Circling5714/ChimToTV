@@ -16,14 +16,19 @@ public static class Prefs
     public static readonly string[] PresetSites =
     {
         DefaultBase, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun", "https://mephim.ddns.net",
-        KkSite,
+        KkSite, NcSite, VsSite, K20Site,
     };
 
     /// Trang KKPhim (từ 1.3) — dữ liệu lấy thẳng từ API công khai phimapi.com (xem ApiSite).
     public const string KkSite = "https://www.kkphim.com";
 
+    /// Từ 1.4: NguonC (API phim.nguonc.com), VSMOV (API vsmov.com), CLB Phim Xưa (add-on Stremio k-20).
+    public const string NcSite = "https://phim.nguonc.com";
+    public const string VsSite = "https://vsmov.com";
+    public const string K20Site = "https://sc.k-20.xyz";
+
     /// Trang mẫu thêm ở bản sau: thêm một lần vào danh sách đã lưu (xoá đi thì thôi, không thêm lại).
-    public static readonly string[] AddedSites = { KkSite };
+    public static readonly string[] AddedSites = { KkSite, NcSite, VsSite, K20Site };
 
     private const int MaxHistory = 60;
     private const int MaxPositions = 400;
@@ -387,6 +392,13 @@ public static class Prefs
     {
         get => !Has("kk_backup") || Get<bool>("kk_backup");
         set => Set("kk_backup", value);
+    }
+
+    /// Server dự phòng NguonC (từ 1.4) cho yanhh3d / hoathinh3d / hhkungfu / hoathinh3d.pw. Dùng chung cả máy.
+    public static bool NcBackup
+    {
+        get => !Has("nc_backup") || Get<bool>("nc_backup");
+        set => Set("nc_backup", value);
     }
 
     /// Thu nhỏ cửa sổ app lúc đang xem → phim chạy tiếp ở cửa sổ nhỏ trên màn hình.

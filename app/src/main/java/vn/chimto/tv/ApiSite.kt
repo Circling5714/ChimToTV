@@ -282,7 +282,8 @@ object ApiSite {
                 if (str(e, "link_m3u8").isEmpty() && str(e, "link_embed").isEmpty()) return@mapNotNull null
                 Episode(title(str(e, "name").ifEmpty { slug }), "$url/$slug?sv=$i")
             }.distinctBy { it.url }
-            if (eps.isEmpty()) null else EpisodeGroup(str(s, "server_name").ifEmpty { "Bản ${i + 1}" }, eps)
+            val name = str(s, "server_name").replace(Regex("\\s+"), " ") // VSMOV: "Vietsub\r\n      #1"
+            if (eps.isEmpty()) null else EpisodeGroup(name.ifEmpty { "Bản ${i + 1}" }, eps)
         }
         return FilmDetail(
             url, str(m, "name").ifEmpty { url }, str(m, "origin_name").ifEmpty { null },
