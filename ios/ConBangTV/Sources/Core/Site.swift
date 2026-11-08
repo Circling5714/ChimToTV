@@ -556,6 +556,19 @@ enum Site {
         return p.count > 2 && ["phim", "www", "m"].contains(p[0]) ? p[1] : (p.first ?? host)
     }
 
+    /// Tên ngắn của trang trong danh sách; hai trang cùng tên ngắn (hoathinh3d.ee / hoathinh3d.pw) thì ghi đủ tên miền.
+    static func tag(_ host: String, _ sites: [String]) -> String {
+        let short = shortName(host)
+        let clash = sites.contains { s in
+            guard let o = hostOf(s) else { return false }
+            return o != host && shortName(o) == short
+        }
+        return clash ? host : short
+    }
+
+    /// Menu cố định của trang API (không cần tải trang chủ); trang web thì nil (menu đọc từ trang chủ).
+    static func menu(_ base: String) -> [Category]? { ApiSite.isKnown(base) ? ApiSite.menuOf(base) : nil }
+
     static func hostOf(_ url: String) -> String? {
         guard let h = URL(string: url)?.host?.lowercased() else { return nil }
         return h.hasPrefix("www.") ? String(h.dropFirst(4)) : h

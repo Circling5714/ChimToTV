@@ -3,12 +3,23 @@ import UIKit
 import WebKit
 
 /// Một ô phim trên lưới (kèm cách mở: resume = phát tiếp luôn; removable = giữ để xoá khỏi lịch sử / bỏ theo dõi).
+/// Trang chủ tổng hợp: chip = nhãn góc ("3 nguồn", tên nguồn, "bản lưu"); links = các nguồn có phim (trang phim đổi nguồn
+/// được); more = ô «Xem thêm» cuối hàng (id hàng); topic = ô chọn chủ đề (topicOn = đã chọn).
 struct GridFilm: Identifiable, Hashable {
     let film: Film
     var resume = false
     var removable = false
     var follow = false
-    var id: String { film.url + (resume ? "#r" : "") + (follow ? "#f" : "") }
+    var chip: String? = nil
+    var links: [FeedItem] = []
+    var more: String? = nil
+    var topic: String? = nil
+    var topicOn = false
+    var id: String {
+        if let m = more { return "more:\(m)" }
+        if let t = topic { return "chip:\(t)" }
+        return film.url + (resume ? "#r" : "") + (follow ? "#f" : "")
+    }
 }
 
 struct GridSection: Identifiable, Hashable {
@@ -74,6 +85,16 @@ final class AppModel: ObservableObject {
     @Published private(set) var siteLabel = ""
     @Published private(set) var toast: String?
     @Published var detailFilm: Film?
+    /// Các nguồn có phim đang mở (trang chủ tổng hợp) — trang phim có nút «Nguồn: … ▾».
+    @Published var detailLinks: [FeedItem] = []
+    /// Trang chủ tổng hợp: dòng trạng thái (cập nhật lúc…, nguồn lỗi / chậm); moreFrom = đang xem cả một hàng («Xem thêm»).
+    @Published private(set) var homeNote = ""
+    @Published private(set) var moreFrom: String?
+    private var feedSnap: HomeFeed.Snapshot?
+    private var feedAt: Int64 = 0
+    private var autoFresh: [FreshCard] = []
+    private var loadedMix: Bool?
+    private var loadedKids: Bool?
     @Published var sheet: Sheet?
     @Published var confirmClear = false
     @Published var removeTarget: GridFilm?
@@ -226,6 +247,11 @@ final class AppModel: ObservableObject {
     }
 
     func appReturned() {
+        // Trang chủ tổng hợp mở lâu (quay lại app sau 20 phút): làm mới
+        if started, Prefs.homeMixOn, active?.kind == .home, moreFrom == nil, homeToken == token, feedAt > 0,
+           nowMs() - feedAt > 20 * 60_000, detailFilm == nil {
+            showHome()
+        }
         defer { leftAt = 0 }
         guard leftAt > 0, nowMs() - leftAt >= 30 * 60_000, started, !askingProfile, sheet == nil, mustAskProfile else { return }
         // Phim đang mở / đang ở cửa sổ hình trong hình: vẫn đang xem — thôi
@@ -288,6 +314,8 @@ final class AppModel: ObservableObject {
         detailFilm = nil
         active = e
         title = e.title
+        moreFrom = nil
+        if e.kind != .home { homeNote = "" }
         switch e.kind {
         case .home: showHome()
         case .search:
@@ -331,7 +359,9 @@ final class AppModel: ObservableObject {
         SyncService.shared.syncSoon()
         let proxy = proxyChanged
         proxyChanged = false
-        if loadedBase != nil && (loadedBase != Prefs.baseUrl || proxy) { reloadSite() } else { rebuildMenu() }
+        // Đổi trang, proxy, kiểu trang chủ hoặc hồ sơ trẻ em → tải lại
+        let homeChanged = (loadedMix != nil && loadedMix != Prefs.homeMixOn) || (loadedKids != nil && loadedKids != Prefs.kids)
+        if (loadedBase != nil && (loadedBase != Prefs.baseUrl || proxy)) || homeChanged { reloadSite() } else { rebuildMenu() }
     }
 
     func selectSite(_ url: String) {
@@ -345,6 +375,14 @@ final class AppModel: ObservableObject {
     // MARK: - Nội dung
 
     func showHome() {
+        loadedMix = Prefs.homeMixOn
+        loadedKids = Prefs.kids
+        if Prefs.homeMixOn {
+            showMixHome()
+            return
+        }
+        homeNote = ""
+        autoFresh = []
         token += 1
         let t = token
         let base = Prefs.baseUrl
@@ -383,6 +421,173 @@ final class AppModel: ObservableObject {
                 status = .message("Không tải được trang chủ.\n\(friendly(error))", retry: true)
             }
         }
+    }
+
+    // MARK: - Trang chủ tổng hợp (HomeFeed)
+
+    /// 1) Hiện ngay trang chủ lần trước của người xem, 2) lập kế hoạch (đọc lịch sử, tính sở thích — ngoài luồng chính),
+    /// 3) chưa có trang lần trước thì dựng từ bản lưu từng nguồn, 4) tải mới mọi nguồn (mỗi nguồn tối đa 6 giây) rồi thay vào.
+    /// Nguồn lỗi / chậm ghi ở dòng trạng thái, không che màn hình.
+    private func showMixHome() {
+        // Trang chủ đang hiện (làm mới / vừa chọn chủ đề): giữ nguyên lưới tới khi có bản mới
+        let refreshing = homeToken == token && feedSnap != nil && !sections.isEmpty && moreFrom == nil
+        token += 1
+        let t = token
+        nextUrl = nil
+        moreFrom = nil
+        loadedBase = Prefs.baseUrl
+        retry = { [weak self] in self?.showHome() }
+        homeNote = "Đang làm mới…"
+        if refreshing {
+            homeToken = t
+        } else {
+            sections = []
+            status = .loading("Đang tải trang chủ…")
+        }
+        let pid = Prefs.profileId
+        Task {
+            var shown = refreshing
+            if !refreshing, let last = await Task.detached(operation: { HomeFeed.last(pid) }).value {
+                guard t == token else { return }
+                shown = showSnapshot(t, last, first: true)
+            }
+            let plan = await Task.detached(operation: { HomeFeed.plan() }).value
+            guard t == token else { return }
+            homeNote = "Đang làm mới \(plan.src.count) nguồn…"
+            if !shown {
+                status = .loading("Đang tải trang chủ từ \(plan.src.count) nguồn…")
+                if let c = await Task.detached(operation: { HomeFeed.cached(plan) }).value {
+                    guard t == token else { return }
+                    shown = showSnapshot(t, c, first: true)
+                }
+            }
+            let snap = await HomeFeed.load(plan)
+            guard t == token else { return }
+            feedAt = nowMs()
+            if !showSnapshot(t, snap, first: !shown) && !shown {
+                status = .message("Không tải được phim từ nguồn nào.\n\(snap.note)", retry: true)
+            }
+            followLate(t, snap, 0)
+        }
+    }
+
+    /// Hiện một lần dựng trang chủ tổng hợp. false nếu không có gì để hiện.
+    @discardableResult
+    private func showSnapshot(_ t: Int, _ snap: HomeFeed.Snapshot, first: Bool) -> Bool {
+        feedSnap = snap
+        autoFresh = snap.fresh
+        homeNote = kidsNote(snap.note)
+        if let m = snap.movedTo, m.old == Prefs.baseUrl {
+            Prefs.replaceSite(m.old, with: m.new)
+            loadedBase = Prefs.baseUrl
+            showSiteLabel()
+            showToast("Trang đã chuyển sang \(Site.hostOf(m.new) ?? m.new) — đã tự cập nhật link.")
+        }
+        if let c = snap.categories, !c.isEmpty, c != categories { categories = c }
+        rebuildMenu()
+        let body = feedSections(snap)
+        let head = headSections()
+        guard !(body.isEmpty && head.isEmpty) else { return false }
+        status = .none
+        homeToken = t
+        sections = head + body
+        if !snap.fromCache { checkFollows() }
+        return true
+    }
+
+    /// Nguồn chậm về muộn: cứ 4 giây xem bản lưu của chúng đã mới chưa, có thì dựng lại; thôi sau 5 lần.
+    private func followLate(_ t: Int, _ snap: HomeFeed.Snapshot, _ tries: Int) {
+        guard snap.pending else { return }
+        if tries >= 5 {
+            if t == token { homeNote = kidsNote(snap.noteGaveUp) }
+            return
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard t == token else { return }
+            let next = await Task.detached(operation: { HomeFeed.late(snap) }).value
+            guard t == token else { return }
+            if let n = next { showSnapshot(t, n, first: false) }
+            followLate(t, next ?? snap, tries + 1)
+        }
+    }
+
+    private func kidsNote(_ s: String) -> String { Prefs.kids ? "Hồ sơ trẻ em · \(s)" : s }
+
+    /// Các hàng phim của trang chủ tổng hợp: mỗi hàng một dòng lưới, ô cuối «Xem thêm».
+    private func feedSections(_ snap: HomeFeed.Snapshot) -> [GridSection] {
+        var out: [GridSection] = []
+        let cols = max(2, gridCols)
+        if Prefs.history.isEmpty && !Prefs.kids {
+            let on = Prefs.homeTopics
+            out.append(GridSection(id: "feed-topics", title: "Chọn vài chủ đề bạn thích — trang chủ sẽ gợi ý theo đó",
+                                   items: HomeFeed.topics.map {
+                                       GridFilm(film: Film(url: "chip:\($0.id)", title: $0.label, poster: nil, badge: nil),
+                                                topic: $0.id, topicOn: on.contains($0.id))
+                                   }))
+        }
+        for r in snap.rows {
+            let n = r.cards.count
+            var items = (n > cols ? Array(r.cards.prefix(cols - 1)) : r.cards).map { GridFilm(film: $0.film, chip: $0.chip, links: $0.links) }
+            if n > cols {
+                // Hàng có danh sách nhiều trang của nguồn: không ghi số phim (mới tải trang đầu)
+                items.append(GridFilm(film: Film(url: "more:\(r.id)", title: r.title, poster: nil, badge: r.more == nil ? "\(n) phim" : nil),
+                                      more: r.id))
+            }
+            out.append(GridSection(id: "feed-\(r.id)", title: r.title, items: items))
+        }
+        return out
+    }
+
+    /// Số cột đổi (xoay máy, cỡ chữ): xếp lại các hàng một dòng.
+    private func relayoutFeed() {
+        guard Prefs.homeMixOn, active?.kind == .home, moreFrom == nil, homeToken == token, let snap = feedSnap else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.homeToken == self.token, self.moreFrom == nil else { return }
+            let next = self.headSections() + self.feedSections(snap)
+            if next != self.sections { self.sections = next }
+        }
+    }
+
+    /// «Xem thêm»: cả hàng (danh sách có phân trang của nguồn nếu có, không thì mọi phim đã gộp). Nút ‹ quay lại trang chủ.
+    func openMore(_ key: String) {
+        guard let row = feedSnap?.rows.first(where: { $0.id == key }) else { return }
+        title = row.title
+        homeNote = ""
+        if let u = row.more {
+            showList(u)
+        } else {
+            token += 1
+            nextUrl = nil
+            status = .none
+            sections = [GridSection(id: "more", title: nil, items: row.cards.map { GridFilm(film: $0.film, chip: $0.chip, links: $0.links) })]
+        }
+        moreFrom = key
+    }
+
+    /// Quay lại trang chủ từ «Xem thêm» (dựng lại từ lần tải gần nhất, chọn đúng ô «Xem thêm» vừa bấm).
+    func backFromMore() {
+        guard let key = moreFrom, let snap = feedSnap else { return }
+        moreFrom = nil
+        title = active?.title ?? "Trang chủ"
+        token += 1
+        showSnapshot(token, snap, first: true)
+        keySel = "more:\(key)"
+    }
+
+    /// Chọn / bỏ một chủ đề (người xem chưa có lịch sử) rồi tải các hàng theo chủ đề.
+    func toggleTopic(_ id: String) {
+        var set = Prefs.homeTopics
+        if set.contains(id) { set.remove(id) } else { set.insert(id) }
+        Prefs.homeTopics = set
+        if let s = feedSnap { showSnapshot(token, s, first: false) } // ô đổi màu ngay
+        showHome()
+    }
+
+    /// Mở trang phim (kèm các nguồn có phim này — nút đổi nguồn).
+    func openDetail(_ film: Film, links: [FeedItem]) {
+        detailLinks = links
+        detailFilm = film
     }
 
     func showList(_ url: String, loader: (() async throws -> FilmPage)? = nil) {
@@ -440,8 +645,10 @@ final class AppModel: ObservableObject {
 
     /// Ô phim đang chọn bằng phím mũi tên (id của GridFilm); nil = chưa dùng bàn phím.
     @Published var keySel: String?
-    /// Số cột lưới phim hiện tại (lưới tự báo theo bề rộng).
-    var gridCols = 4
+    /// Số cột lưới phim hiện tại (lưới tự báo theo bề rộng). Trang chủ tổng hợp xếp lại hàng một dòng khi đổi.
+    var gridCols = 4 {
+        didSet { if gridCols != oldValue { relayoutFeed() } }
+    }
 
     /// Màn chính đang ở trên cùng (không có bảng / trình phát / trang phim che): phím tắt của lưới mới có tác dụng.
     var keysOnGrid: Bool { sheet == nil && !askingProfile && detailFilm == nil && Router.topController?.presentingViewController == nil }
@@ -608,9 +815,13 @@ final class AppModel: ObservableObject {
     private func headSections() -> [GridSection] {
         var out: [GridSection] = []
         let fresh = Prefs.follows.filter { $0.newCount > 0 }
-        if !fresh.isEmpty {
+        // Trang chủ tổng hợp: cả phim đang xem dở vừa có tập mới ở bất kỳ nguồn nào (đã mở phim từ lúc dựng trang thì thôi)
+        let followed = Set(Prefs.follows.map { KkPhim.norm($0.title) })
+        let auto = Prefs.homeMixOn ? autoFresh.filter { (Prefs.seenEp($0.key) ?? -1) < $0.ep && !followed.contains($0.key) } : []
+        if !fresh.isEmpty || !auto.isEmpty {
             out.append(GridSection(id: "head-new", title: "Có tập mới",
-                                   items: fresh.map { GridFilm(film: followFilm($0), removable: true, follow: true) }))
+                                   items: fresh.map { GridFilm(film: followFilm($0), removable: true, follow: true) } +
+                                       auto.map { GridFilm(film: $0.card.film, chip: $0.card.chip, links: $0.card.links) }))
         }
         let items = Prefs.history.prefix(Self.headCount)
         if !items.isEmpty {
@@ -682,10 +893,14 @@ final class AppModel: ObservableObject {
     // MARK: - Mở phim
 
     func open(_ item: GridFilm) {
-        if item.resume, let h = Prefs.historyFor(item.film.url) {
+        if let k = item.more {
+            openMore(k)
+        } else if let t = item.topic {
+            toggleTopic(t)
+        } else if item.resume, let h = Prefs.historyFor(item.film.url) {
             Router.play(filmUrl: h.filmUrl, epUrl: h.epUrl, continueMode: true)
         } else {
-            detailFilm = item.film
+            openDetail(item.film, links: item.links)
         }
     }
 

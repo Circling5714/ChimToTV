@@ -31,8 +31,12 @@ enum Stremio {
         let blocks = ["Mới cập nhật", "Kiếm Hiệp", "TV Series", "Thập Niên 90", "Thập Niên 80"]
             .map { ($0, catalog(o, genre: $0 == "Mới cập nhật" ? nil : $0)) }
         let sections = try await ApiSite.sections(blocks) { parseList(try await getData($0), $0).films }
-        return Home(sections: sections, categories: genres.dropFirst().map { Category(title: $0, url: catalog(o, genre: $0)) },
-                    movedTo: nil)
+        return Home(sections: sections, categories: menuOf(base), movedTo: nil)
+    }
+
+    static func menuOf(_ base: String) -> [Category] {
+        let o = ApiSite.origin(base)
+        return genres.dropFirst().map { Category(title: $0, url: catalog(o, genre: $0)) }
     }
 
     static func newestUrl(_ base: String) -> String { catalog(ApiSite.origin(base)) }

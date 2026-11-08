@@ -46,6 +46,7 @@ final class DetailModel: ObservableObject {
         apply(d)
         // Đang theo dõi: mở phim là đã thấy các tập mới
         if let latest = d.latestEpisode { Prefs.updateFollow(d.url, count: d.episodeCount, latest: latest.title, seen: true) }
+        HomeFeed.markSeen(d) // trang chủ tổng hợp: hết báo «tập mới» tới khi có tập sau
         refresh()
         AppModel.shared.rebuildMenu()
         if let r = resumeEp { scrollTarget = r.url }
@@ -160,10 +161,16 @@ struct DetailView: View {
     /// Màn hẹp (iPhone dọc, iPad chia đôi): ảnh bìa nhỏ, lề hẹp.
     @Environment(\.horizontalSizeClass) private var hClass
     private var narrow: Bool { hClass == .compact }
+    /// Các nguồn có phim này (mở từ trang chủ tổng hợp) — có từ 2 nguồn thì có nút đổi nguồn.
+    private let links: [FeedItem]
+    @State private var pickSource = false
 
-    init(film: Film) {
+    init(film: Film, links: [FeedItem] = []) {
         _m = StateObject(wrappedValue: DetailModel(film: film))
+        self.links = links
     }
+
+    private func sourceName(_ url: String) -> String { Site.hostOf(url).map { Site.tag($0, Prefs.sites) } ?? url }
 
     private var title: String { m.detail?.title ?? m.film.title }
     private var poster: String? { m.detail?.poster ?? m.film.poster }
@@ -258,6 +265,18 @@ struct DetailView: View {
                 }
                 if eps.count > 1, let first = eps.first {
                     ChipButton(text: "Xem từ \(first.title)", icon: "backward.end") { m.play(first) }
+                }
+                // Phim có ở nhiều nguồn (trang chủ tổng hợp): đổi nguồn
+                if links.count >= 2 {
+                    ChipButton(text: "Nguồn: \(sourceName(m.film.url)) ▾", icon: "arrow.left.arrow.right") { pickSource = true }
+                        .confirmationDialog("Mở phim ở nguồn khác", isPresented: $pickSource, titleVisibility: .visible) {
+                            ForEach(links, id: \.url) { l in
+                                Button(sourceName(l.url) + (l.badge.map { " — \($0)" } ?? "") + (l.url == m.film.url ? "  ✓" : "")) {
+                                    guard l.url != m.film.url else { return }
+                                    app.openDetail(Film(url: l.url, title: l.title, poster: l.poster ?? m.film.poster, badge: nil), links: links)
+                                }
+                            }
+                        }
                 }
                 ChipButton(text: m.following ? "✓ Đang theo dõi" : "＋ Theo dõi", icon: "bell") { m.toggleFollow() }
                 ChipButton(text: "Mở trang web", icon: "safari") { Router.browse(d.url) }

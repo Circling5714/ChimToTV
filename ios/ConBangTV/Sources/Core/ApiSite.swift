@@ -148,10 +148,30 @@ enum ApiSite {
             ("Song ngữ / Thuyết minh", "\(o)/api/movies/song-ngu"),
         ]
         let sections = try await sections(blocks) { parseItems(try await getJSON($0), o) }
-        let cats = vs ? vsMenu.map { Category(title: $0.0, url: vsApi(o, $0.1, 1)) }
-            : (kk ? kkMenu : menu).map { Category(title: $0.0, url: api(o, $0.1, 1)) }
-        return Home(sections: sections, categories: cats, movedTo: nil)
+        return Home(sections: sections, categories: menuOf(base), movedTo: nil)
     }
+
+    /// Mục menu của trang (cố định — không cần tải trang chủ; trang chủ tổng hợp dùng).
+    static func menuOf(_ base: String) -> [Category] {
+        if NguonC.isSite(base) { return NguonC.menuOf(base) }
+        if Stremio.isSite(base) { return Stremio.menuOf(base) }
+        let o = origin(base)
+        return isVs(base) ? vsMenu.map { Category(title: $0.0, url: vsApi(o, $0.1, 1)) }
+            : (isKk(base) ? kkMenu : menu).map { Category(title: $0.0, url: api(o, $0.1, 1)) }
+    }
+
+    /// Tên thể loại theo slug ("vo-thuat" → "võ thuật") — tiêu đề hàng gợi ý của trang chủ tổng hợp.
+    static func genreName(_ slug: String) -> String {
+        (genres + vsGenres).first { $0.1 == slug }?.0.lowercased() ?? slug.replacingOccurrences(of: "-", with: " ")
+    }
+
+    /// Tên nước theo slug ("trung-quoc" → "Trung Quốc").
+    static func countryName(_ slug: String) -> String {
+        (countries + vsCountries).first { $0.1 == slug }?.0 ?? slug.replacingOccurrences(of: "-", with: " ")
+    }
+
+    /// JSON của một API (KKPhim: gọi thẳng phimapi.com; trang lỗi thì phimapi.com) — trang chủ tổng hợp dùng.
+    static func json(_ url: String) async throws -> [String: Any] { try await getJSON(url) }
 
     /// Các khối trang chủ tải song song; khối nào lỗi / rỗng thì bỏ, lỗi hết thì báo lỗi.
     static func sections(_ blocks: [(String, String)], _ load: @escaping (String) async throws -> [Film]) async throws -> [FilmSection] {
@@ -402,7 +422,7 @@ enum ApiSite {
     static func origin(_ url: String) -> String { Site.originOf(url) ?? url.trimmingSuffix("/") }
 
     /// Ảnh: đường dẫn đầy đủ giữ nguyên; "uploads/movies/…" → nối vào máy chủ ảnh.
-    private static func image(_ ref: String, _ base: String) -> String? {
+    static func image(_ ref: String, _ base: String) -> String? {
         guard !ref.isEmpty else { return nil }
         if ref.hasPrefix("http") { return ref }
         let host = Site.originOf(base) ?? cdn

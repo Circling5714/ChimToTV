@@ -58,7 +58,12 @@ enum NguonC {
             ("Phim thuyết minh", apiUrl(o, "films/ngon-ngu/thuyet-minh")),
         ]
         let sections = try await ApiSite.sections(blocks) { parseList(try await getJSON($0), $0).films }
-        return Home(sections: sections, categories: menu.map { Category(title: $0.0, url: apiUrl(o, $0.1)) }, movedTo: nil)
+        return Home(sections: sections, categories: menuOf(base), movedTo: nil)
+    }
+
+    static func menuOf(_ base: String) -> [Category] {
+        let o = ApiSite.origin(base)
+        return menu.map { Category(title: $0.0, url: apiUrl(o, $0.1)) }
     }
 
     static func newestUrl(_ base: String) -> String { apiUrl(ApiSite.origin(base), "films/phim-moi-cap-nhat") }

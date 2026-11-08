@@ -220,7 +220,7 @@ struct MainContent: View {
                 .background(
                     NavigationLink(isActive: Binding(get: { app.detailFilm != nil }, set: { if !$0 { app.detailFilm = nil } })) {
                         if let f = app.detailFilm {
-                            DetailView(film: f).id(f.url)
+                            DetailView(film: f, links: app.detailLinks).id(f.url)
                         }
                     } label: { EmptyView() }
                     .hidden()
@@ -246,9 +246,21 @@ struct HomeContent: View {
                     }
                     .accessibilityLabel("Menu")
                 }
+                // Đang xem cả một hàng («Xem thêm») của trang chủ tổng hợp: nút quay lại trang chủ
+                if app.moreFrom != nil {
+                    Button { app.backFromMore() } label: {
+                        Image(systemName: "chevron.left").appFont(22, .semibold).foregroundColor(Theme.text).frame(width: 36, height: 44)
+                    }
+                    .accessibilityLabel("Trang chủ")
+                    .keyboardShortcut(.escape, modifiers: [])
+                }
                 Text(app.title).appFont(26, .bold).foregroundColor(Theme.text).lineLimit(1).minimumScaleFactor(0.7)
                 Spacer()
-                if showMenuButton {
+                if !app.homeNote.isEmpty && app.active?.kind == .home && app.moreFrom == nil {
+                    // Trang chủ tổng hợp: lúc cập nhật, nguồn lỗi / chậm
+                    Text(app.homeNote).appFont(13).foregroundColor(Theme.dim).lineLimit(showMenuButton ? 2 : 1)
+                        .multilineTextAlignment(.trailing)
+                } else if showMenuButton {
                     Text(app.siteLabel).appFont(14).foregroundColor(Theme.dim).lineLimit(1)
                 }
             }
@@ -385,6 +397,55 @@ struct FilmCard: View {
     let item: GridFilm
 
     var body: some View {
+        if item.topic != nil {
+            topicChip
+        } else if item.more != nil {
+            moreTile
+        } else {
+            filmCard
+        }
+    }
+
+    /// Ô chọn chủ đề (trang chủ tổng hợp, người xem chưa có lịch sử).
+    private var topicChip: some View {
+        Button { app.open(item) } label: {
+            Text((item.topicOn ? "✓ " : "") + item.film.title)
+                .appFont(15, .semibold)
+                .foregroundColor(item.topicOn ? Theme.onBrand : Theme.text)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, minHeight: 54)
+                .padding(.horizontal, 8)
+                .background(RoundedRectangle(cornerRadius: 12).fill(item.topicOn ? Theme.brand : Theme.surface2))
+                .overlay { if app.keySel == item.id { RoundedRectangle(cornerRadius: 12).stroke(Theme.focus, lineWidth: 4) } }
+        }
+        .buttonStyle(PressScale())
+        .accessibilityLabel(item.film.title)
+    }
+
+    /// Ô «Xem thêm ›» cuối hàng (trang chủ tổng hợp).
+    private var moreTile: some View {
+        Button { app.open(item) } label: {
+            VStack(alignment: .leading, spacing: 7) {
+                Color.clear
+                    .aspectRatio(2.0 / 3.0, contentMode: .fit)
+                    .overlay(
+                        VStack(spacing: 6) {
+                            Text("Xem thêm ›").appFont(18, .bold).foregroundColor(Theme.text)
+                            if let b = item.film.badge { Text(b).appFont(14).foregroundColor(Theme.dim) }
+                        }
+                    )
+                    .background(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.dim.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [6])))
+                    .overlay { if app.keySel == item.id { RoundedRectangle(cornerRadius: 10).stroke(Theme.focus, lineWidth: 4) } }
+                Text(item.film.title).appFont(15, .medium).foregroundColor(Theme.dim).lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .buttonStyle(PressScale())
+        .accessibilityLabel("Xem thêm: \(item.film.title)")
+    }
+
+    private var filmCard: some View {
         Button { app.open(item) } label: {
             VStack(alignment: .leading, spacing: 7) {
                 Color.clear
@@ -407,6 +468,19 @@ struct FilmCard: View {
                                 .padding(.vertical, 3)
                                 .background(Capsule().fill(item.follow ? Theme.focus : Theme.brand))
                                 .padding(7)
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        // Trang chủ tổng hợp: số nguồn / tên nguồn / bản lưu / «có ở …»
+                        if let c = item.chip {
+                            Text(c)
+                                .appFont(11, .semibold)
+                                .lineLimit(1)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.black.opacity(0.72)))
+                                .padding(6)
                         }
                     }
                     .overlay(alignment: .bottomTrailing) {

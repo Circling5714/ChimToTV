@@ -27,6 +27,11 @@ struct SettingsView: View {
     @State private var limitsShown = false
     /// Đã có giới hạn giờ xem: thêm người xem cần mã PIN phụ huynh (khỏi lách giới hạn bằng hồ sơ mới).
     @State private var parentForAdd = false
+    @State private var homeMix = Prefs.homeMix
+    @State private var kids = Prefs.kids
+    /// Tắt hồ sơ trẻ em: hỏi mã PIN phụ huynh (nếu đã đặt).
+    @State private var parentForKids = false
+    @State private var resting = Feed.restingHosts()
     @ObservedObject private var textScale = TextScale.shared
 
     /// Thêm / sửa người xem.
@@ -64,10 +69,46 @@ struct SettingsView: View {
         }
     }
 
+    /// Trang chủ: tổng hợp mọi nguồn / theo trang đang dùng; hồ sơ trẻ em; thử lại nguồn đang tạm nghỉ.
+    private var homeSection: some View {
+        Section {
+            Toggle("Trang chủ\(who) tổng hợp mọi nguồn", isOn: Binding(get: { homeMix || kids }, set: { v in
+                guard !kids else {
+                    app.showToast("Hồ sơ trẻ em luôn dùng trang chủ tổng hợp (chỉ phim hoạt hình hợp trẻ em).")
+                    return
+                }
+                homeMix = v
+                Prefs.homeMix = v
+            }))
+            Toggle("Hồ sơ trẻ em\(who)", isOn: Binding(get: { kids }, set: { v in
+                if v {
+                    kids = true
+                    Prefs.kids = true
+                } else if Prefs.hasParentPin {
+                    parentForKids = true // tắt: phải nhập mã PIN phụ huynh
+                } else {
+                    kids = false
+                    Prefs.kids = false
+                }
+            }))
+            if !resting.isEmpty {
+                let until = Date(timeIntervalSince1970: Double(resting.values.max() ?? 0) / 1000)
+                Button("Thử lại ngay: \(resting.keys.sorted().map { Site.tag($0, Prefs.sites) }.joined(separator: ", ")) (đang tạm nghỉ tới \(until.formatted(date: .omitted, time: .shortened)))") {
+                    Feed.clearRest()
+                    resting = [:]
+                    app.showToast("Trang chủ sẽ hỏi lại các trang này ở lần tải tới.")
+                }
+            }
+        } header: { Text("Trang chủ") } footer: {
+            Text("Tổng hợp: trang chủ lấy phim mới từ mọi trang trong danh sách (KKPhim, NguonC, VSMOV, CLB Phim Xưa và trang đang dùng), gộp phim trùng giữa các trang («3 nguồn» — trang phim có nút đổi nguồn), xếp hàng theo lịch sử xem của từng người: phim đang xem dở có tập mới ở bất kỳ trang nào, phim giống phim vừa xem, thể loại hay xem. Trang nào lỗi / quá 6 giây thì dùng bản lưu; lỗi 3 lần liên tiếp thì tạm nghỉ 30 phút. Tắt: trang chủ của trang đang dùng như trước.\n\nHồ sơ trẻ em: trang chủ chỉ có phim hoạt hình hợp trẻ em — thiếu nhi, gia đình, lồng tiếng; bỏ phim kinh dị / hình sự / chiến tranh / 18+. Chỉ lọc trang chủ (tìm kiếm, mục của trang vẫn như cũ). Tắt cần mã PIN phụ huynh nếu đã đặt (Giới hạn giờ xem).")
+        }
+    }
+
     var body: some View {
         NavigationView {
             Form {
                 profileSection
+                homeSection
                 Section {
                     NavigationLink {
                         SyncView()
@@ -212,6 +253,13 @@ struct SettingsView: View {
         }
         .navigationViewStyle(.stack)
         .overlay {
+            if parentForKids {
+                ParentPinView(title: "Mã PIN phụ huynh để tắt hồ sơ trẻ em", onCancel: { parentForKids = false }) {
+                    parentForKids = false
+                    kids = false
+                    Prefs.kids = false
+                }
+            }
             if parentForAdd {
                 ParentPinView(title: "Mã PIN phụ huynh để thêm người xem", onCancel: { parentForAdd = false }) {
                     parentForAdd = false

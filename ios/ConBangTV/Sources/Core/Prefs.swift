@@ -112,10 +112,12 @@ enum Prefs {
         "base_url", "seek_step", "auto_next", "video_fill",
         // Giới hạn giờ xem (WatchLimit)
         "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
+        // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy, hồ sơ trẻ em, ngôn ngữ bản hay xem
+        "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
     ]
     private static let profilePrefixes = ["server_type@", "server_label@"]
     /// Người thêm sau bắt đầu với trang phim / server ưu tiên / cách xem của người đang dùng.
-    private static let copiedKeys: Set<String> = ["base_url", "seek_step", "auto_next", "video_fill"]
+    private static let copiedKeys: Set<String> = ["base_url", "seek_step", "auto_next", "video_fill", "home_mix"]
 
     private static var pidCache: String?
 
@@ -790,6 +792,74 @@ enum Prefs {
             store.set(s.list, forKey: "sites")
             return true
         }
+    }
+
+    // MARK: - Trang chủ tổng hợp (HomeFeed, từ 1.8)
+
+    /// true: trang chủ gộp phim từ mọi nguồn, xếp theo lịch sử xem; false: trang chủ của trang đang dùng.
+    static var homeMix: Bool {
+        get { store.object(forKey: k("home_mix")) as? Bool ?? true }
+        set { store.set(newValue, forKey: k("home_mix")) }
+    }
+
+    /// Hồ sơ trẻ em: trang chủ (luôn kiểu tổng hợp) chỉ có phim hoạt hình hợp trẻ em. Tắt cần mã PIN phụ huynh (nếu có).
+    static var kids: Bool {
+        get { store.bool(forKey: k("kids")) }
+        set { store.set(newValue, forKey: k("kids")) }
+    }
+
+    /// Trang chủ tổng hợp đang dùng (người xem chọn, hoặc hồ sơ trẻ em).
+    static var homeMixOn: Bool { homeMix || kids }
+
+    /// Chủ đề người xem chưa có lịch sử đã chọn (id trong HomeFeed.topics).
+    static var homeTopics: Set<String> {
+        get { Set(store.stringArray(forKey: k("home_topics")) ?? []) }
+        set { store.set(Array(newValue).sorted(), forKey: k("home_topics")) }
+    }
+
+    /// Tập mới nhất người xem đã thấy của từng phim (khoá = tên đã chuẩn hoá — chung mọi nguồn).
+    static func seenEp(_ key: String) -> Double? {
+        (store.dictionary(forKey: k("seen_eps")) as? [String: Double])?[key]
+    }
+
+    static func setSeenEp(_ key: String, _ ep: Double) {
+        guard !key.isEmpty else { return }
+        locked {
+            var d = (store.dictionary(forKey: k("seen_eps")) as? [String: Double]) ?? [:]
+            if let old = d[key], old >= ep { return }
+            d[key] = ep
+            if d.count > 300 { for old in d.keys.prefix(d.count - 300) { d[old] = nil } }
+            store.set(d, forKey: k("seen_eps"))
+        }
+    }
+
+    /// Số tập đã xem của mọi phim (theo chỗ đang xem đã lưu) — dùng tính sở thích.
+    static func watchedCounts() -> [String: Int] {
+        var out: [String: Int] = [:]
+        for p in positions() where !p.film.isEmpty { out[p.film, default: 0] += 1 }
+        return out
+    }
+
+    /// Ghi ngôn ngữ của bản vừa mở ("vs" / "tm" / "lt"), giữ 40 lần gần nhất.
+    static func recordWatchLang(_ lang: String) {
+        locked {
+            let list = (store.stringArray(forKey: k("watch_langs")) ?? []) + [lang]
+            store.set(Array(list.suffix(40)), forKey: k("watch_langs"))
+        }
+    }
+
+    static var watchLangs: [String] { store.stringArray(forKey: k("watch_langs")) ?? [] }
+
+    /// Tình trạng nguồn của trang chủ tổng hợp (Feed) — chung cả máy.
+    static var feedHealth: String {
+        get { store.string(forKey: "feed_health") ?? "{}" }
+        set { store.set(newValue, forKey: "feed_health") }
+    }
+
+    /// Thể loại / quốc gia của phim đã xem (FilmTags) — chung cả máy.
+    static var filmTags: String {
+        get { store.string(forKey: "film_tags") ?? "{}" }
+        set { store.set(newValue, forKey: "film_tags") }
     }
 
     // MARK: - JSON trong UserDefaults

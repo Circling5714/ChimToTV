@@ -197,7 +197,10 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         introDone = false
         if !Prefs.privateMode {
             Prefs.addHistory(HistoryItem(filmUrl: d.url, title: d.title, poster: d.poster, epTitle: ep.title, epUrl: ep.url, time: nowMs()))
+            // Trang chủ tổng hợp: người hay xem bản thuyết minh / lồng tiếng thì có hàng riêng
+            if let l = group.flatMap({ PlayStats.lang($0.name) }) { Prefs.recordWatchLang(l) }
         }
+        HomeFeed.markSeen(d)
         showLoading("Đang mở \(ep.title)…")
         let g = group
         Task {
