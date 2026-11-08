@@ -182,11 +182,30 @@ public static class ApiSite
                 ("Song ngữ / Thuyết minh", $"{o}/api/movies/song-ngu"),
             };
         var sections = await Sections(blocks, async u => ParseItems(await GetJson(u), o));
-        var cats = vs
-            ? VsMenu.Select(m => new Category(m.Item1, VsApi(o, m.Item2, 1))).ToList()
-            : (kk ? KkMenu : Menu).Select(m => new Category(m.Item1, Api(o, m.Item2, 1))).ToList();
-        return new Home { Sections = sections, Categories = cats };
+        return new Home { Sections = sections, Categories = MenuOf(baseUrl) };
     }
+
+    /// Mục menu của trang (cố định — không cần tải trang chủ; trang chủ tổng hợp dùng).
+    public static List<Category> MenuOf(string baseUrl)
+    {
+        if (NguonC.IsSite(baseUrl)) return NguonC.MenuOf(baseUrl);
+        if (Stremio.IsSite(baseUrl)) return Stremio.MenuOf(baseUrl);
+        var o = Origin(baseUrl);
+        return IsVs(baseUrl)
+            ? VsMenu.Select(m => new Category(m.Item1, VsApi(o, m.Item2, 1))).ToList()
+            : (IsKk(baseUrl) ? KkMenu : Menu).Select(m => new Category(m.Item1, Api(o, m.Item2, 1))).ToList();
+    }
+
+    /// Tên thể loại theo slug ("vo-thuat" → "võ thuật") — tiêu đề hàng gợi ý của trang chủ tổng hợp.
+    public static string GenreName(string slug) =>
+        Genres.Concat(VsGenres).FirstOrDefault(g => g.Item2 == slug).Item1?.ToLowerInvariant() ?? slug.Replace('-', ' ');
+
+    /// Tên nước theo slug ("trung-quoc" → "Trung Quốc").
+    public static string CountryName(string slug) =>
+        Countries.Concat(VsCountries).FirstOrDefault(c => c.Item2 == slug).Item1 ?? slug.Replace('-', ' ');
+
+    /// JSON của một API (KKPhim: gọi thẳng phimapi.com; trang lỗi thì phimapi.com) — trang chủ tổng hợp dùng.
+    public static Task<JObj> Json(string url) => GetJson(url);
 
     /// Các khối trang chủ tải song song; khối nào lỗi / rỗng thì bỏ, lỗi hết thì báo lỗi.
     public static async Task<List<FilmSection>> Sections((string, string)[] blocks, Func<string, Task<List<Film>>> load)
@@ -483,7 +502,7 @@ public static class ApiSite
     public static string Origin(string url) => Site.OriginOf(url) ?? url.TrimEnd('/');
 
     /// Ảnh: đường dẫn đầy đủ giữ nguyên; "uploads/movies/…" → nối vào máy chủ ảnh.
-    private static string? Image(string reference, string b)
+    public static string? Image(string reference, string b)
     {
         if (reference.Length == 0) return null;
         if (reference.StartsWith("http")) return reference;

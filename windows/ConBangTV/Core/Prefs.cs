@@ -170,12 +170,14 @@ public static class Prefs
         "hist_del", "follow_del",
         "base_url", "seek_step", "auto_next", "video_fill",
         "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
+        // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy, hồ sơ trẻ em, ngôn ngữ bản hay xem
+        "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
     };
 
     private static readonly string[] ProfilePrefixes = { "server_type@", "server_label@" };
 
     /// Người thêm sau bắt đầu với trang phim / server ưu tiên / cách xem của người đang dùng.
-    private static readonly HashSet<string> CopiedKeys = new() { "base_url", "seek_step", "auto_next", "video_fill" };
+    private static readonly HashSet<string> CopiedKeys = new() { "base_url", "seek_step", "auto_next", "video_fill", "home_mix" };
 
     private static string? _pidCache;
 
@@ -399,6 +401,80 @@ public static class Prefs
     {
         get => !Has("nc_backup") || Get<bool>("nc_backup");
         set => Set("nc_backup", value);
+    }
+
+    // ---- Trang chủ tổng hợp (HomeFeed, từ 1.5) ----
+
+    /// true: trang chủ gộp phim từ mọi nguồn, xếp theo lịch sử xem; false: trang chủ của trang đang dùng.
+    public static bool HomeMix
+    {
+        get => !Has(K("home_mix")) || Get<bool>(K("home_mix"));
+        set => Set(K("home_mix"), value);
+    }
+
+    /// Hồ sơ trẻ em: trang chủ (luôn kiểu tổng hợp) chỉ có phim hoạt hình hợp trẻ em. Tắt cần mã PIN phụ huynh (nếu có).
+    public static bool Kids
+    {
+        get => Get<bool>(K("kids"));
+        set => Set(K("kids"), value);
+    }
+
+    /// Trang chủ tổng hợp đang dùng (người xem chọn, hoặc hồ sơ trẻ em).
+    public static bool HomeMixOn => HomeMix || Kids;
+
+    /// Chủ đề người xem chưa có lịch sử đã chọn (id trong HomeFeed.Topics).
+    public static HashSet<string> HomeTopics
+    {
+        get => (Get<List<string>>(K("home_topics")) ?? new()).ToHashSet();
+        set => Set(K("home_topics"), value.OrderBy(x => x).ToList());
+    }
+
+    /// Tập mới nhất người xem đã thấy của từng phim (khoá = tên đã chuẩn hoá — chung mọi nguồn).
+    public static double? SeenEp(string key) => Get<Dictionary<string, double>>(K("seen_eps")) is { } d && d.TryGetValue(key, out var v) ? v : null;
+
+    public static void SetSeenEp(string key, double ep)
+    {
+        if (key.Length == 0) return;
+        lock (Lock)
+        {
+            var d = Get<Dictionary<string, double>>(K("seen_eps")) ?? new();
+            if (d.TryGetValue(key, out var old) && old >= ep) return;
+            d[key] = ep;
+            if (d.Count > 300) foreach (var k in d.Keys.Take(d.Count - 300).ToList()) d.Remove(k);
+            Set(K("seen_eps"), d);
+        }
+    }
+
+    /// Số tập đã xem của mọi phim (theo chỗ đang xem đã lưu) — dùng tính sở thích.
+    public static Dictionary<string, int> WatchedCounts()
+    {
+        lock (Lock) return Positions().Where(p => p.Film.Length > 0).GroupBy(p => p.Film).ToDictionary(g => g.Key, g => g.Count());
+    }
+
+    /// Ghi ngôn ngữ của bản vừa mở ("vs" / "tm" / "lt"), giữ 40 lần gần nhất.
+    public static void RecordWatchLang(string lang)
+    {
+        lock (Lock)
+        {
+            var list = (Get<List<string>>(K("watch_langs")) ?? new()).Append(lang).ToList();
+            Set(K("watch_langs"), list.Skip(Math.Max(0, list.Count - 40)).ToList());
+        }
+    }
+
+    public static List<string> WatchLangs => Get<List<string>>(K("watch_langs")) ?? new();
+
+    /// Tình trạng nguồn của trang chủ tổng hợp (Feed) — chung cả máy.
+    public static string FeedHealth
+    {
+        get => Get<string>("feed_health") ?? "{}";
+        set => Set("feed_health", value);
+    }
+
+    /// Thể loại / quốc gia của phim đã xem (FilmTags) — chung cả máy.
+    public static string FilmTags
+    {
+        get => Get<string>("film_tags") ?? "{}";
+        set => Set("film_tags", value);
     }
 
     /// Thu nhỏ cửa sổ app lúc đang xem → phim chạy tiếp ở cửa sổ nhỏ trên màn hình.

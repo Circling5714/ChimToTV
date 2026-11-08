@@ -188,6 +188,7 @@ public static class DebugServer
     [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr obj);
     [DllImport("gdi32.dll")] private static extern bool DeleteDC(IntPtr dc);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out RECT r);
+    [DllImport("user32.dll")] private static extern bool PrintWindow(IntPtr hwnd, IntPtr dc, uint flags);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
@@ -205,7 +206,8 @@ public static class DebugServer
         var mem = CreateCompatibleDC(screen);
         var bmp = CreateCompatibleBitmap(screen, w, h);
         var old = SelectObject(mem, bmp);
-        BitBlt(mem, 0, 0, w, h, screen, r.Left, r.Top, 0x00CC0020 | 0x40000000);
+        // PrintWindow (PW_RENDERFULLCONTENT) chụp đúng cửa sổ app kể cả khi cửa sổ khác đè lên; lỗi thì chụp màn hình
+        if (!PrintWindow(hwnd, mem, 2)) BitBlt(mem, 0, 0, w, h, screen, r.Left, r.Top, 0x00CC0020 | 0x40000000);
         SelectObject(mem, old);
         var src = Imaging.CreateBitmapSourceFromHBitmap(bmp, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
         DeleteObject(bmp);

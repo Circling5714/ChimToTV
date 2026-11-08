@@ -269,6 +269,20 @@ public partial class MainWindow : Window
         _ = p.Start();
     }
 
+    /// Thay trang trên cùng (vd đổi nguồn ở trang phim): Esc vẫn về trang trước đó, giữ ô đang chọn ở đó.
+    public void Replace(Page p)
+    {
+        if (_stack.Count == 0)
+        {
+            Push(p);
+            return;
+        }
+        _stack[^1] = p;
+        SetActiveMenu(p.MenuKey);
+        PageHost.Content = p;
+        _ = p.Start();
+    }
+
     public void Back()
     {
         if (DialogLayer.Visibility == Visibility.Visible)
@@ -619,7 +633,9 @@ public partial class MainWindow : Window
             if (first != null) KeyNav.FocusAndShow(first);
             return;
         }
-        var next = KeyNav.Next(root, focused, dir);
+        // ▲ / ▼ trong trang chỉ đi trong trang (không nhảy sang menu bên trái khi hàng dưới cách xa vì có tiêu đề)
+        var area = root == Shell && dir is KeyNav.Dir.Up or KeyNav.Dir.Down && KeyNav.IsInside(focused, PageHost) ? PageHost : root;
+        var next = KeyNav.Next(area, focused, dir);
         if (next != null) KeyNav.FocusAndShow(next);
         else if (dir == KeyNav.Dir.Down || dir == KeyNav.Dir.Up) (PageHost.Content as Page)?.ScrollEdge(dir);
     }

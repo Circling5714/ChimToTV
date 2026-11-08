@@ -69,7 +69,13 @@ public static class NguonC
             ("Phim thuyết minh", ApiUrl(o, "films/ngon-ngu/thuyet-minh")),
         };
         var sections = await ApiSite.Sections(blocks, async u => ParseList(await GetJson(u), u).Films);
-        return new Home { Sections = sections, Categories = Menu.Select(m => new Category(m.Item1, ApiUrl(o, m.Item2))).ToList() };
+        return new Home { Sections = sections, Categories = MenuOf(baseUrl) };
+    }
+
+    public static List<Category> MenuOf(string baseUrl)
+    {
+        var o = ApiSite.Origin(baseUrl);
+        return Menu.Select(m => new Category(m.Item1, ApiUrl(o, m.Item2))).ToList();
     }
 
     public static string NewestUrl(string baseUrl) => ApiUrl(ApiSite.Origin(baseUrl), "films/phim-moi-cap-nhat");

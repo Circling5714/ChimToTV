@@ -190,6 +190,50 @@ public sealed class SettingsPage : Page
             Ui.Pill($"🌐  Trang phim: {Site.DisplayName(Site.HostOf(Prefs.BaseUrl) ?? Prefs.BaseUrl)}", () => Main.ShowRoot(new SitesPage())),
             Ui.Pill($"👤  Người xem: {Prefs.CurrentProfile.Name} — quản lý / giới hạn giờ xem…", () => Main.Push(new ProfilesPage()))));
 
+        // Trang chủ (riêng từng người xem): tổng hợp mọi nguồn / theo trang đang dùng; hồ sơ trẻ em (tắt cần mã PIN phụ huynh)
+        var who = Prefs.Profiles.Count >= 2 ? $" của {Prefs.CurrentProfile.Name}" : "";
+        Option($"Trang chủ{who}", Prefs.Kids
+            ? new[] { ("Tổng hợp (hồ sơ trẻ em)", true, (Action)(() => { })) }
+            : new[]
+            {
+                ("Tổng hợp mọi nguồn", Prefs.HomeMix, (Action)(() => Prefs.HomeMix = true)),
+                ("Theo trang đang dùng", !Prefs.HomeMix, () => Prefs.HomeMix = false),
+            },
+            "Tổng hợp: trang chủ lấy phim mới từ mọi trang trong danh sách (KKPhim, NguonC, VSMOV, CLB Phim Xưa và trang đang dùng), gộp " +
+            "phim trùng giữa các trang («3 nguồn» — trang phim có nút đổi nguồn), xếp hàng theo lịch sử xem của từng người: phim đang xem " +
+            "dở có tập mới ở bất kỳ trang nào, phim giống phim vừa xem, thể loại hay xem. Trang nào lỗi / quá 6 giây thì dùng bản lưu; lỗi " +
+            "3 lần liên tiếp thì tạm nghỉ 30 phút.");
+        Body.Children.Add(Ui.Text($"Hồ sơ trẻ em{who}", 16, weight: FontWeights.SemiBold, margin: new Thickness(0, 14, 0, 8)));
+        var kidsRow = new WrapPanel();
+        kidsRow.Children.Add(Ui.Pill("Bật", () =>
+        {
+            Prefs.Kids = true;
+            Build();
+        }, Prefs.Kids ? "active" : null, 90));
+        kidsRow.Children.Add(Ui.Pill("Tắt", async () =>
+        {
+            if (!Prefs.Kids) return;
+            // Trẻ không tự tắt được: phải nhập mã PIN phụ huynh (nếu đã đặt)
+            if (Prefs.HasParentPin && !await Main.CheckParent("Nhập mã PIN phụ huynh để tắt hồ sơ trẻ em.")) return;
+            Prefs.Kids = false;
+            Build();
+        }, !Prefs.Kids ? "active" : null, 90));
+        Body.Children.Add(kidsRow);
+        Body.Children.Add(Ui.Dim("Trang chủ chỉ có phim hoạt hình hợp trẻ em — thiếu nhi, gia đình, lồng tiếng; bỏ phim kinh dị / hình sự / " +
+                                 "chiến tranh / 18+. Chỉ lọc trang chủ (tìm kiếm, mục của trang vẫn như cũ).", 13.5, new Thickness(0, 0, 0, 4)));
+        var resting = Feed.RestingHosts();
+        if (resting.Count > 0)
+        {
+            var until = DateTimeOffset.FromUnixTimeMilliseconds(resting.Values.Max()).ToLocalTime().ToString("HH:mm");
+            var names = string.Join(", ", resting.Keys.Select(h => Site.Tag(h, Prefs.Sites)));
+            Body.Children.Add(Ui.Pill($"↻  Thử lại ngay: {names} (đang tạm nghỉ tới {until})", () =>
+            {
+                Feed.ClearRest();
+                Main.Toast("Trang chủ sẽ hỏi lại các trang này ở lần tải tới.");
+                Build();
+            }));
+        }
+
         Option("Mỗi lần bấm ◀ ▶ khi xem phim tua", new[] { 5, 10, 15, 30 }.Select(s =>
             ($"{s} giây", Prefs.SeekStep == s, (Action)(() => Prefs.SeekStep = s))), "Giữ phím thì tua nhanh dần.");
         Option("Hết tập tự chuyển sang tập sau", new[]

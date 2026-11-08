@@ -13,11 +13,14 @@ public sealed class DetailPage : Page
     private readonly Film? _hint;
     private FilmDetail? _d;
     private EpisodeGroup? _group;
+    /// Các nguồn có phim này (mở từ trang chủ tổng hợp) — có từ 2 nguồn thì có nút đổi nguồn.
+    private readonly List<FeedItem> _links;
 
-    public DetailPage(string url, Film? hint = null)
+    public DetailPage(string url, Film? hint = null, List<FeedItem>? links = null)
     {
         _url = url;
         _hint = hint;
+        _links = links ?? new();
     }
 
     protected override async Task Load()
@@ -26,6 +29,7 @@ public sealed class DetailPage : Page
         var d = Site.CachedDetail(_url) ?? await Site.Detail(_url);
         _d = d;
         if (Prefs.FollowOf(d.Url) != null && d.LatestEpisode is { } last) Prefs.UpdateFollow(d.Url, d.EpisodeCount, last.Title, false);
+        HomeFeed.MarkSeen(d); // trang chủ tổng hợp: hết báo «tập mới» tới khi có tập sau
         var h = Prefs.HistoryFor(d.Url);
         _group = (h != null ? d.GroupOf(h.EpUrl) : null) ?? d.Groups.FirstOrDefault();
         Build(true);
@@ -82,6 +86,8 @@ public sealed class DetailPage : Page
             main ??= first;
             if (eps.Count > 2) buttons.Children.Add(Ui.Pill($"Mới nhất: {eps[^1].Title}", () => Main.Play(d.Url, eps[^1].Url)));
         }
+        // Phim có ở nhiều nguồn (trang chủ tổng hợp): «Nguồn: … ▾» → chọn nguồn khác (mở lại trang phim)
+        if (_links.Count >= 2) buttons.Children.Add(Ui.Pill($"⇄  Nguồn: {SourceName(_url)} ▾", () => _ = PickSource()));
         var followed = Prefs.FollowOf(d.Url) != null;
         buttons.Children.Add(Ui.Pill(followed ? "★  Đang theo dõi" : "☆  Theo dõi", () =>
         {
@@ -146,6 +152,35 @@ public sealed class DetailPage : Page
         }
         if (focus && main != null)
             Dispatcher.BeginInvoke(() => KeyNav.FocusAndShow(main), DispatcherPriority.Loaded);
+    }
+
+    private static string SourceName(string url) => Site.HostOf(url) is { } host ? Site.Tag(host, Prefs.Sites) : url;
+
+    /// Hộp chọn nguồn (kiểu hộp thoại của app, đi bằng phím mũi tên): chọn nguồn khác thì mở trang phim ở nguồn đó.
+    private async Task PickSource()
+    {
+        var list = new StackPanel();
+        Button? other = null;
+        for (var i = 0; i < _links.Count; i++)
+        {
+            var l = _links[i];
+            var idx = i;
+            var cur = l.Url == _url;
+            var b = Ui.Pill(SourceName(l.Url) + (l.Badge != null ? $" — {l.Badge}" : "") + (cur ? "  ✓" : ""),
+                () => Main.CloseDialog(100 + idx), cur ? "active" : null, 360);
+            b.Margin = new Thickness(0, 0, 0, 10);
+            b.HorizontalContentAlignment = HorizontalAlignment.Left;
+            list.Children.Add(b);
+            if (!cur) other ??= b;
+        }
+        var ask = Main.Ask("Mở phim ở nguồn khác", "", new[] { "Huỷ" }, list);
+        // Chọn sẵn nguồn khác đầu tiên (chạy sau lệnh chọn nút «Huỷ» của hộp thoại)
+        if (other != null) _ = Dispatcher.BeginInvoke(() => other.Focus(), DispatcherPriority.Loaded);
+        var r = await ask;
+        if (r < 100 || r - 100 >= _links.Count) return;
+        var link = _links[r - 100];
+        if (link.Url == _url) return;
+        Main.Replace(new DetailPage(link.Url, new Film(link.Url, link.Title, link.Poster ?? _hint?.Poster, null), _links));
     }
 
     public override FrameworkElement? FirstTarget() => KeyNav.First(Body);

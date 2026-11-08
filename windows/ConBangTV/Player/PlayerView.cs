@@ -459,6 +459,9 @@ public sealed class PlayerView : UserControl
         {
             FilmUrl = d.Url, Title = d.Title, Poster = d.Poster, EpTitle = ep.Title, EpUrl = ep.Url, Time = Util.NowMs(),
         });
+        // Trang chủ tổng hợp: hết báo «tập mới» tới khi có tập sau; người hay xem bản thuyết minh / lồng tiếng thì có hàng riêng
+        HomeFeed.MarkSeen(d);
+        if (_group != null && KkPhim.Lang(_group.Name) is { } lang) Prefs.RecordWatchLang(lang);
         ShowLoading($"Đang mở {ep.Title}…");
         ShowOsd();
         _ = LoadSource(t, d, _group, ep);

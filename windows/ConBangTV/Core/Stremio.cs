@@ -39,7 +39,13 @@ public static class Stremio
         var blocks = new[] { "Mới cập nhật", "Kiếm Hiệp", "TV Series", "Thập Niên 90", "Thập Niên 80" }
             .Select(t => (t, Catalog(o, genre: t == "Mới cập nhật" ? null : t))).ToArray();
         var sections = await ApiSite.Sections(blocks, async u => ParseList(await GetData(u), u).Films);
-        return new Home { Sections = sections, Categories = GenreList.Skip(1).Select(g => new Category(g, Catalog(o, genre: g))).ToList() };
+        return new Home { Sections = sections, Categories = MenuOf(baseUrl) };
+    }
+
+    public static List<Category> MenuOf(string baseUrl)
+    {
+        var o = ApiSite.Origin(baseUrl);
+        return GenreList.Skip(1).Select(g => new Category(g, Catalog(o, genre: g))).ToList();
     }
 
     public static string NewestUrl(string baseUrl) => Catalog(ApiSite.Origin(baseUrl));

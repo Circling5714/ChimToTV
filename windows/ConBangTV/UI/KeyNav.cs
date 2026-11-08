@@ -60,8 +60,8 @@ public static class KeyNav
     {
         var cur = Bounds(current, root);
         if (cur.IsEmpty) return null;
-        FrameworkElement? best = null;
-        var bestScore = double.MaxValue;
+        FrameworkElement? best = null, bestRow = null;
+        double bestScore = double.MaxValue, bestRowScore = double.MaxValue;
         foreach (var t in Targets(root))
         {
             if (ReferenceEquals(t, current)) continue;
@@ -99,8 +99,14 @@ public static class KeyNav
                 bestScore = score;
                 best = t;
             }
+            // ◄ / ►: mục cùng hàng (chồng nhau theo chiều dọc) được ưu tiên — hàng nút xuống dòng thì không nhảy sang dòng kia
+            if (dir is Dir.Left or Dir.Right && r.Bottom > cur.Top + 2 && r.Top < cur.Bottom - 2 && score < bestRowScore)
+            {
+                bestRowScore = score;
+                bestRow = t;
+            }
         }
-        return best;
+        return bestRow ?? best;
     }
 
     /// Khoảng lệch giữa hai đoạn (0 nếu chồng lên nhau).

@@ -601,6 +601,25 @@ public static class Site
     /// Tên trang hiện trong app: tên miền, riêng add-on k-20 ghi «CLB Phim Xưa (sc.k-20.xyz)».
     public static string DisplayName(string host) => host == Stremio.Host ? $"{Stremio.Name} ({host})" : host;
 
+    /// Tên ngắn của trang: "yanhh3d", "nguonc" (bỏ nhãn chung "phim." / "www."), "CLB Phim Xưa".
+    public static string ShortName(string host)
+    {
+        if (host == Stremio.Host) return Stremio.Name;
+        var p = host.Split('.');
+        return p.Length > 2 && p[0] is "phim" or "www" or "m" ? p[1] : p[0];
+    }
+
+    /// Tên ngắn của trang trong danh sách; hai trang cùng tên ngắn (hoathinh3d.ee / hoathinh3d.pw) thì ghi đủ tên miền.
+    public static string Tag(string host, IEnumerable<string> sites)
+    {
+        var s = ShortName(host);
+        var clash = sites.Any(x => HostOf(x) is { } o && o != host && ShortName(o) == s);
+        return clash ? host : s;
+    }
+
+    /// Menu cố định của trang API (không cần tải trang chủ); trang web thì null (menu đọc từ trang chủ).
+    public static List<Category>? Menu(string baseUrl) => ApiSite.IsKnown(baseUrl) ? ApiSite.MenuOf(baseUrl) : null;
+
     public static string? HostOf(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || string.IsNullOrEmpty(u.Host)) return null;
