@@ -12,8 +12,12 @@ enum ApiSite {
     /// phimapi.com (cùng định dạng, qua fallback). Địa chỉ phim / tập trong app vẫn theo tên miền kkphim.com.
     static let kkHost = "kkphim.com"
 
+    /// VSMOV (vsmov.com, từ 1.7): API riêng cùng định dạng KKPhim nhưng khác đường dẫn (/api/danh-sach/…, /api/phim/…,
+    /// /api/tim-kiem). Tập chỉ có trình phát nhúng; app đọc luồng HLS trong trang trình phát (link có chữ ký) để tự phát.
+    static let vsHost = "vsmov.com"
+
     private static let lock = NSLock()
-    private static var known: Set<String> = ["mephim.ddns.net", kkHost]
+    private static var known: Set<String> = ["mephim.ddns.net", kkHost, vsHost, NguonC.host, Stremio.host]
     private static var notApi: Set<String> = []
     private static let cdn = "https://phimimg.com"
     private static let limit = 24
@@ -57,6 +61,43 @@ enum ApiSite {
 
     static func isKk(_ url: String) -> Bool { Site.hostOf(url) == kkHost }
 
+    static func isVs(_ url: String) -> Bool { Site.hostOf(url) == vsHost }
+
+    /// Menu VSMOV: lọc hoạt hình theo nước có trên /api/the-loai/…?country=.
+    private static let vsMenu: [(String, String)] = [
+        ("Hoạt hình Trung Quốc", "the-loai/hoat-hinh?country=trung-quoc"),
+        ("Hoạt hình", "the-loai/hoat-hinh"),
+        ("Phim bộ", "danh-sach/phim-bo"),
+        ("Phim lẻ", "danh-sach/phim-le"),
+        ("Phim nhóm sub VSMOV", "danh-sach/subteam"),
+        ("Phim Trung Quốc", "quoc-gia/trung-quoc"),
+        ("Phim Hàn Quốc", "quoc-gia/han-quoc"),
+        ("Phim Âu Mỹ", "quoc-gia/au-my"),
+        ("Phim Nhật Bản", "quoc-gia/nhat-ban"),
+        ("Phim Thái Lan", "quoc-gia/thai-lan"),
+    ]
+    private static let vsGenres: [(String, String)] = [
+        ("Hành Động", "hanh-dong"), ("Cổ Trang", "co-trang"), ("Kiếm Hiệp", "kiem-hiep"), ("Tiên Hiệp", "tien-hiep"),
+        ("Võ Thuật", "vo-thuat"), ("Viễn Tưởng", "vien-tuong"), ("Giả Tưởng", "gia-tuong"), ("Kinh Dị", "kinh-di"),
+        ("Lãng Mạn", "lang-man"), ("Hài", "hai"), ("Chính Kịch", "chinh-kich"), ("Phiêu Lưu", "phieu-luu"),
+        ("Hình Sự", "hinh-su"), ("Tội Phạm", "toi-pham"), ("Chiến Tranh", "chien-tranh"), ("Bí Ẩn", "bi-an"),
+        ("Học Đường", "hoc-duong"), ("Gia Đình", "gia-dinh"), ("Thiếu Nhi", "thieu-nhi"), ("Thanh Xuân", "thanh-xuan"),
+        ("Thương Trường", "thuong-truong"), ("Xã Hội Đen", "xa-hoi-den"), ("Truyền Hình Thực Tế", "truyen-hinh-thuc-te"),
+        ("Phim Nhạc", "phim-nhac"),
+    ]
+    private static let vsCountries: [(String, String)] = [
+        ("Trung Quốc", "trung-quoc"), ("Hàn Quốc", "han-quoc"), ("Nhật Bản", "nhat-ban"), ("Âu Mỹ", "au-my"), ("Mỹ", "my"),
+        ("Thái Lan", "thai-lan"), ("Đài Loan", "dai-loan"), ("Hồng Kông", "hong-kong"), ("Ấn Độ", "an-do"),
+        ("Việt Nam", "viet-nam"), ("Anh", "anh"), ("Pháp", "phap"), ("Canada", "canada"), ("Úc", "uc"), ("Đức", "duc"),
+        ("Tây Ban Nha", "tay-ban-nha"), ("Thổ Nhĩ Kỳ", "tho-nhi-ky"), ("Philippines", "philippines"), ("Indonesia", "indonesia"),
+    ]
+
+    /// Địa chỉ API của VSMOV: "danh-sach/phim-bo" → https://vsmov.com/api/danh-sach/phim-bo?page=1.
+    private static func vsApi(_ origin: String, _ path: String, _ page: Int) -> String {
+        let parts = path.split(separator: "?", maxSplits: 1).map(String.init)
+        return "\(origin)/api/\(parts[0])?" + (parts.count > 1 ? parts[1] + "&" : "") + "page=\(page)"
+    }
+
     static func isKnown(_ url: String) -> Bool {
         guard let h = Site.hostOf(url) else { return false }
         lock.lock()
@@ -83,10 +124,18 @@ enum ApiSite {
 
     /// Trang chủ: các khối tải song song; khối nào lỗi thì bỏ.
     static func home(_ base: String) async throws -> Home {
+        if NguonC.isSite(base) { return try await NguonC.home(base) }
+        if Stremio.isSite(base) { return try await Stremio.home(base) }
         let o = origin(base)
-        let kk = isKk(base)
+        let kk = isKk(base), vs = isVs(base)
         // KKPhim không có khối thịnh hành / song ngữ: thêm hoạt hình thuyết minh, phim bộ, phim lẻ mới
-        let blocks: [(String, String)] = kk ? [
+        let blocks: [(String, String)] = vs ? [
+            ("Hoạt hình Trung Quốc", vsApi(o, "the-loai/hoat-hinh?country=trung-quoc", 1)),
+            ("Phim mới cập nhật", newestUrl(o)),
+            ("Phim bộ mới", vsApi(o, "danh-sach/phim-bo", 1)),
+            ("Phim lẻ mới", vsApi(o, "danh-sach/phim-le", 1)),
+            ("Phim nhóm sub VSMOV", vsApi(o, "danh-sach/subteam", 1)),
+        ] : kk ? [
             ("Hoạt hình Trung Quốc mới cập nhật", api(o, "category/hoat-hinh?country=trung-quoc", 1)),
             ("Hoạt hình Trung Quốc thuyết minh", api(o, "category/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh", 1)),
             ("Phim mới cập nhật", newestUrl(o)),
@@ -98,12 +147,20 @@ enum ApiSite {
             ("Thịnh hành", "\(o)/api/movies/trending"),
             ("Song ngữ / Thuyết minh", "\(o)/api/movies/song-ngu"),
         ]
+        let sections = try await sections(blocks) { parseItems(try await getJSON($0), o) }
+        let cats = vs ? vsMenu.map { Category(title: $0.0, url: vsApi(o, $0.1, 1)) }
+            : (kk ? kkMenu : menu).map { Category(title: $0.0, url: api(o, $0.1, 1)) }
+        return Home(sections: sections, categories: cats, movedTo: nil)
+    }
+
+    /// Các khối trang chủ tải song song; khối nào lỗi / rỗng thì bỏ, lỗi hết thì báo lỗi.
+    static func sections(_ blocks: [(String, String)], _ load: @escaping (String) async throws -> [Film]) async throws -> [FilmSection] {
         var found = [FilmSection?](repeating: nil, count: blocks.count)
         var firstError: Error?
         await withTaskGroup(of: (Int, Result<[Film], Error>).self) { group in
             for (i, b) in blocks.enumerated() {
                 group.addTask {
-                    do { return (i, .success(parseItems(try await getJSON(b.1), o))) } catch { return (i, .failure(error)) }
+                    do { return (i, .success(try await load(b.1))) } catch { return (i, .failure(error)) }
                 }
             }
             for await (i, r) in group {
@@ -115,17 +172,20 @@ enum ApiSite {
         }
         let sections = found.compactMap { $0 }
         if sections.isEmpty { throw firstError ?? AppError("Không tải được danh sách phim") }
-        return Home(sections: sections, categories: (kk ? kkMenu : menu).map { Category(title: $0.0, url: api(o, $0.1, 1)) },
-                    movedTo: nil)
+        return sections
     }
 
-    static func list(_ url: String) async throws -> FilmPage { parseList(try await getJSON(url), url) }
+    static func list(_ url: String) async throws -> FilmPage {
+        if NguonC.isSite(url) { return try await NguonC.list(url) }
+        if Stremio.isSite(url) { return try await Stremio.list(url) }
+        return parseList(try await getJSON(url), url)
+    }
 
-    /// Danh sách có phân trang (data.params.pagination) → trang sau = page + 1.
+    /// Danh sách có phân trang (data.params.pagination; VSMOV: pagination ở gốc) → trang sau = page + 1.
     static func parseList(_ root: [String: Any], _ url: String) -> FilmPage {
         let films = parseItems(root, origin(url))
         let data = J.obj(root, "data") ?? root
-        let p = J.obj(J.obj(data, "params"), "pagination")
+        let p = J.obj(J.obj(data, "params"), "pagination") ?? J.obj(root, "pagination")
         let page = J.int(p, "currentPage"), pages = J.int(p, "totalPages")
         let next = (!films.isEmpty && page >= 1 && page < pages) ? withPage(url, page + 1) : nil
         return FilmPage(films: films, nextUrl: next)
@@ -136,14 +196,28 @@ enum ApiSite {
     }
 
     /// Phim mới cập nhật (đo nhanh trang trong Cài đặt).
-    static func newestUrl(_ base: String) -> String { "\(origin(base))/api/movies/newest?page=1&limit=\(limit)" }
+    static func newestUrl(_ base: String) -> String {
+        if NguonC.isSite(base) { return NguonC.newestUrl(base) }
+        if Stremio.isSite(base) { return Stremio.newestUrl(base) }
+        if isVs(base) { return "\(origin(base))/api/danh-sach/phim-moi-cap-nhat?page=1" }
+        return "\(origin(base))/api/movies/newest?page=1&limit=\(limit)"
+    }
 
     static func searchUrl(_ base: String, _ query: String) -> String {
-        "\(origin(base))/api/movies/search?keyword=" + query.trimmed.formEncoded + "&page=1&limit=\(limit)"
+        if NguonC.isSite(base) { return NguonC.searchUrl(base, query) }
+        if Stremio.isSite(base) { return Stremio.searchUrl(base, query) }
+        if isVs(base) { return "\(origin(base))/api/tim-kiem?keyword=" + query.trimmed.formEncoded + "&page=1&limit=\(limit)" }
+        return "\(origin(base))/api/movies/search?keyword=" + query.trimmed.formEncoded + "&page=1&limit=\(limit)"
     }
 
     static func filters(_ base: String) -> (genres: [Category], countries: [Category]) {
+        if NguonC.isSite(base) { return NguonC.filters(base) }
+        if Stremio.isSite(base) { return Stremio.filters(base) }
         let o = origin(base)
+        if isVs(base) {
+            return (vsGenres.map { Category(title: $0.0, url: vsApi(o, "the-loai/\($0.1)", 1)) },
+                    vsCountries.map { Category(title: $0.0, url: vsApi(o, "quoc-gia/\($0.1)", 1)) })
+        }
         return (genres.map { Category(title: $0.0, url: api(o, "the-loai/\($0.1)", 1)) },
                 countries.map { Category(title: $0.0, url: api(o, "quoc-gia/\($0.1)", 1)) })
     }
@@ -164,6 +238,8 @@ enum ApiSite {
     // MARK: - Chi tiết phim
 
     static func detail(_ url: String) async throws -> FilmDetail {
+        if NguonC.isSite(url) { return try await NguonC.detail(url) }
+        if Stremio.isSite(url) { return try await Stremio.detail(url) }
         let film = try filmUrl(url)
         return try parseDetail(try await getJSON(try detailApi(film)), film)
     }
@@ -192,9 +268,16 @@ enum ApiSite {
 
     private static let leadingZero = Rx(#"^(Tập\s*)0+(\d)"#, [.caseInsensitive])
 
-    /// "Tập 01" → "Tập 1"; "Full" giữ nguyên.
-    private static func title(_ name: String) -> String {
+    private static let bareNumber = Rx(#"^\d+(\.\d+)?$"#)
+
+    /// "Tập 01" → "Tập 1", "164" → "Tập 164" (VSMOV ghi số trần); "Full" giữ nguyên.
+    static func title(_ name: String) -> String {
         let s = name.trimmed
+        if bareNumber.matches(s) {
+            var n = s
+            while n.count > 1 && n.hasPrefix("0") && !n.hasPrefix("0.") { n.removeFirst() }
+            return "Tập " + n
+        }
         let ns = s as NSString
         guard let m = leadingZero.all(in: s).first else { return s }
         return ns.replacingCharacters(in: m.range, with: ns.substring(with: m.range(at: 1)) + ns.substring(with: m.range(at: 2)))
@@ -204,6 +287,8 @@ enum ApiSite {
 
     /// Hai server cho mỗi tập: luồng HLS (app tự phát, bỏ quảng cáo) và trình phát nhúng của KKPhim (dự phòng).
     static func source(_ epUrl: String) async throws -> EpisodeSource {
+        if NguonC.isSite(epUrl) { return try await NguonC.source(epUrl) }
+        if Stremio.isSite(epUrl) { return try await Stremio.source(epUrl) }
         let root = try await getJSON(try detailApi(try filmUrl(epUrl)))
         let sv = Int(URLComponents(string: epUrl)?.queryItems?.first { $0.name == "sv" }?.value ?? "") ?? 0
         let tap = (URL(string: epUrl)?.path ?? "").trimmingSuffix("/").afterLast("/")
@@ -213,17 +298,39 @@ enum ApiSite {
         else { throw AppError("Không tìm thấy tập này trên trang") }
         var links: [String: Video] = [:]
         var list: [Server] = []
-        if J.str(e, "link_m3u8").hasPrefix("http") {
-            links["m3u8"] = Video(url: J.str(e, "link_m3u8"))
-            list.append(Server(label: "HLS (bỏ quảng cáo)", type: "m3u8"))
+        let vs = isVs(epUrl)
+        let embed = J.str(e, "link_embed").hasPrefix("http") ? J.str(e, "link_embed") : nil
+        var hls = J.str(e, "link_m3u8").hasPrefix("http") ? J.str(e, "link_m3u8") : nil
+        if hls == nil, vs, let em = embed { hls = await vsHls(em) }
+        if let h = hls {
+            links["m3u8"] = Video(url: h)
+            list.append(Server(label: vs ? "HLS" : "HLS (bỏ quảng cáo)", type: "m3u8"))
         }
-        if J.str(e, "link_embed").hasPrefix("http") {
-            links["embed"] = Video(url: J.str(e, "link_embed"))
-            list.append(Server(label: "Trình phát KKPhim", type: "embed"))
+        if let em = embed {
+            links["embed"] = Video(url: em)
+            list.append(Server(label: vs ? "Trình phát VSMOV" : "Trình phát KKPhim", type: "embed"))
         }
         if links.isEmpty { throw AppError("Tập này chưa có video") }
         return EpisodeSource(epUrl: epUrl, servers: list, postId: "", ep: tap, sv: String(sv), playerUrl: nil, directEmbed: nil,
                              pageMode: false, links: links, next: true)
+    }
+
+    /// Luồng HLS trong trang trình phát VSMOV (vN.streamvsmov.com/video/<mã>): link có chữ ký (signedMasterUrl, hết hạn sau
+    /// khoảng một giờ) hoặc /stream/<mã>/master.m3u8 khi máy chủ đó không ký. Đoạn video ngụy trang ảnh PNG — hls.html cắt
+    /// phần ảnh. Không đọc được thì nil (vẫn còn trình phát nhúng).
+    private static func vsHls(_ embed: String) async -> String? {
+        guard let r = try? await Http.get(embed, headers: ["Referer": "https://vsmov.com/"]) else { return nil }
+        return vsHlsFrom(String(decoding: r.data, as: UTF8.self))
+    }
+
+    private static let signedRx = Rx(#"signedMasterUrl\s*:\s*"(https?://[^"]+)""#)
+    private static let baseRx = Rx(#"baseUrl\s*=\s*"(https?://[^"]+)""#)
+    private static let hashRx = Rx(#"videoHash\s*=\s*"([0-9a-zA-Z-]+)""#)
+
+    static func vsHlsFrom(_ page: String) -> String? {
+        if let g = signedRx.groups(in: page) { return g[1] }
+        guard let b = baseRx.groups(in: page)?[1], let h = hashRx.groups(in: page)?[1] else { return nil }
+        return "\(b)/stream/\(h)/master.m3u8"
     }
 
     // MARK: - Tiện ích
@@ -235,7 +342,10 @@ enum ApiSite {
         return "\(origin(url))/phim/\(parts[i + 1])"
     }
 
-    private static func detailApi(_ url: String) throws -> String { "\(origin(url))/api/movies/detail/" + (try filmUrl(url)).afterLast("/") }
+    private static func detailApi(_ url: String) throws -> String {
+        let slug = (try filmUrl(url)).afterLast("/")
+        return isVs(url) ? "\(origin(url))/api/phim/\(slug)" : "\(origin(url))/api/movies/detail/\(slug)"
+    }
 
     private static func api(_ origin: String, _ path: String, _ page: Int) -> String {
         let parts = path.split(separator: "?", maxSplits: 1).map(String.init)
@@ -244,7 +354,7 @@ enum ApiSite {
 
     private static let pageRx = Rx(#"([?&]page=)\d+"#)
 
-    private static func withPage(_ url: String, _ page: Int) -> String {
+    static func withPage(_ url: String, _ page: Int) -> String {
         let ns = url as NSString
         if let m = pageRx.all(in: url).first {
             return ns.replacingCharacters(in: m.range, with: ns.substring(with: m.range(at: 1)) + String(page))
@@ -287,7 +397,7 @@ enum ApiSite {
         return nil
     }
 
-    private static func origin(_ url: String) -> String { Site.originOf(url) ?? url.trimmingSuffix("/") }
+    static func origin(_ url: String) -> String { Site.originOf(url) ?? url.trimmingSuffix("/") }
 
     /// Ảnh: đường dẫn đầy đủ giữ nguyên; "uploads/movies/…" → nối vào máy chủ ảnh.
     private static func image(_ ref: String, _ base: String) -> String? {

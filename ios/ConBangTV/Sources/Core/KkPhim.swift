@@ -26,24 +26,39 @@ enum KkPhim {
         return !h.hasSuffix("phimapi.com") && !h.hasSuffix("kkphim.com")
     }
 
-    /// Trang tập + server KKPhim, tải song song. KKPhim chậm / lỗi thì thôi; trang tập lỗi mà KKPhim có tập này → chỉ KKPhim.
+    /// Server dự phòng (KKPhim "kk-…", NguonC "nc-…"): link có sẵn trong EpisodeSource.links.
+    static func isBackup(_ type: String) -> Bool { type.hasPrefix(prefix) || type.hasPrefix(NguonC.prefix) }
+
+    /// Trang tập + server dự phòng KKPhim và NguonC, tải song song. Nguồn dự phòng chậm / lỗi thì thôi; trang tập lỗi mà
+    /// nguồn dự phòng có tập này → chỉ phát bằng nguồn dự phòng.
     static func source(_ d: FilmDetail, _ group: EpisodeGroup?, _ ep: Episode) async throws -> EpisodeSource {
-        guard appliesTo(d.url) else { return try await Site.source(ep.url) }
-        return try await combine(ep.url, site: { try await Site.source(ep.url) }, kk: { try await servers(d, group, ep) })
+        var backups: [() async throws -> [(Server, Video)]] = []
+        if appliesTo(d.url) { backups.append { try await servers(d, group, ep) } }
+        if NguonC.appliesTo(d.url) { backups.append { try await NguonC.servers(d, group, ep) } }
+        if backups.isEmpty { return try await Site.source(ep.url) }
+        return try await combineAll(ep.url, site: { try await Site.source(ep.url) }, backups: backups)
     }
 
-    /// Chạy song song trang tập (site) và tìm KKPhim (kk). Trang xong thì chờ KKPhim thêm tới waitMs tính từ lúc bắt đầu;
-    /// trang lỗi thì chờ tới failWaitMs (lúc đó KKPhim là đường duy nhất). KKPhim lỗi = không có server dự phòng.
     static func combine(_ epUrl: String, site: @escaping () async throws -> EpisodeSource,
                         kk: @escaping () async throws -> [(Server, Video)],
                         waitMs: Int64 = 6_000, failWaitMs: Int64 = 15_000) async throws -> EpisodeSource {
+        try await combineAll(epUrl, site: site, backups: [kk], waitMs: waitMs, failWaitMs: failWaitMs)
+    }
+
+    /// Chạy song song trang tập (site) và các nguồn dự phòng (mỗi nguồn một task). Trang xong thì chờ nguồn dự phòng thêm
+    /// tới waitMs tính từ lúc bắt đầu; trang lỗi thì chờ tới failWaitMs (lúc đó dự phòng là đường duy nhất). Nguồn nào chưa
+    /// xong / lỗi thì bỏ, nguồn đã xong vẫn dùng.
+    static func combineAll(_ epUrl: String, site: @escaping () async throws -> EpisodeSource,
+                           backups: [() async throws -> [(Server, Video)]],
+                           waitMs: Int64 = 6_000, failWaitMs: Int64 = 15_000) async throws -> EpisodeSource {
         let start = nowMs()
-        let task = Task<[(Server, Video)], Never> { (try? await kk()) ?? [] }
+        let tasks = backups.map { b in Task<[(Server, Video)], Never> { (try? await b()) ?? [] } }
         var src: EpisodeSource?
         var siteError: Error?
         do { src = try await site() } catch { siteError = error }
-        let budget = (src != nil ? waitMs : failWaitMs) - (nowMs() - start)
-        let extra = await waitFor(task, ms: max(1, budget))
+        let deadline = start + (src != nil ? waitMs : failWaitMs)
+        var extra: [(Server, Video)] = []
+        for t in tasks { extra += await waitFor(t, ms: max(1, deadline - nowMs())) }
         if let s = src { return attach(s, extra) }
         if extra.isEmpty { throw siteError ?? AppError("Không mở được tập này") }
         var links: [String: Video] = [:]
@@ -206,7 +221,9 @@ enum KkPhim {
     /// ("Thần Y Cổ Đại Ở Đô Thị (Đô Thị Cổ Tiên Y)") — trừ khi trong ngoặc chỉ là số phần ("Đấu Phá Thương Khung (Phần 5)").
     static func names(_ m: [String: Any]) -> Set<String> {
         var out = Set<String>()
-        for raw in [J.str(m, "name"), J.str(m, "origin_name")] {
+        // NguonC: original_name có thể gồm nhiều tên cách nhau dấu phẩy ("Mu Shen Ji, Tales of Herding Gods")
+        let others = J.str(m, "original_name").split(separator: ",").map { String($0).trimmed }.filter { !$0.isEmpty }
+        for raw in [J.str(m, "name"), J.str(m, "origin_name")] + others {
             out.insert(norm(raw))
             if let g = paren.groups(in: raw) {
                 let inner = norm(g[2])

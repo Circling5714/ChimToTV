@@ -28,7 +28,7 @@ struct SitesView: View {
                                 Image(systemName: s == Prefs.baseUrl ? "checkmark.circle.fill" : "circle")
                                     .foregroundColor(s == Prefs.baseUrl ? Theme.brand : Theme.dim)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(Site.hostOf(s) ?? s).appFont(17, .semibold).foregroundColor(Theme.text)
+                                    Text(Site.hostOf(s).map(Site.displayName) ?? s).appFont(17, .semibold).foregroundColor(Theme.text)
                                     Text(label(s)).appFont(14).foregroundColor(Theme.dim)
                                 }
                                 Spacer()
@@ -63,7 +63,7 @@ struct SitesView: View {
                     }
                     if !addError.isEmpty { Text(addError).foregroundColor(.red) }
                 } header: { Text("Thêm trang") } footer: {
-                    Text("Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…), kiểu PhimMoi (phimmois), mephim.ddns.net và KKPhim (kkphim.com). Thêm xong là chuyển sang trang đó.")
+                    Text("Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…), kiểu PhimMoi (phimmois), mephim.ddns.net, KKPhim (kkphim.com), NguonC (phim.nguonc.com), VSMOV (vsmov.com) và CLB Phim Xưa (sc.k-20.xyz). Thêm xong là chuyển sang trang đó.")
                 }
             }
             .navigationTitle("Chọn trang phim")

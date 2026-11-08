@@ -306,7 +306,7 @@ final class AppModel: ObservableObject {
     }
 
     func showSiteLabel() {
-        var s = Site.hostOf(Prefs.baseUrl) ?? Prefs.baseUrl
+        var s = Site.hostOf(Prefs.baseUrl).map(Site.displayName) ?? Prefs.baseUrl
         if Prefs.privateMode { s += "  ·  xem riêng" }
         siteLabel = s
     }
@@ -645,10 +645,10 @@ final class AppModel: ObservableObject {
             return Film(url: h.filmUrl, title: h.title, poster: h.poster, badge: h.epTitle)
         }
         // Hai trang cùng tên ngắn (hoathinh3d.ee / hoathinh3d.pw) → ghi đủ tên miền cho khỏi lẫn
-        let short = host.before(".")
+        let short = Site.shortName(host)
         let clash = Prefs.sites.contains { s in
             guard let o = Site.hostOf(s) else { return false }
-            return o != host && o.before(".") == short
+            return o != host && Site.shortName(o) == short
         }
         return Film(url: h.filmUrl, title: "\(h.title) · \(clash ? host : short)", poster: h.poster, badge: h.epTitle)
     }

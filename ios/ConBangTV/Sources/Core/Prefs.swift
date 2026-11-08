@@ -22,13 +22,18 @@ enum Prefs {
 
     /// Các trang mẫu có sẵn trong danh sách lần đầu cài.
     static let presetSites = [defaultBase, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun",
-                              "https://mephim.ddns.net", kkSite]
+                              "https://mephim.ddns.net", kkSite, ncSite, vsSite, k20Site]
 
     /// Trang KKPhim (từ 1.6) — dữ liệu lấy thẳng từ API công khai phimapi.com (xem ApiSite).
     static let kkSite = "https://www.kkphim.com"
 
+    /// Từ 1.7: NguonC (API phim.nguonc.com), VSMOV (API vsmov.com), CLB Phim Xưa (add-on Stremio k-20).
+    static let ncSite = "https://phim.nguonc.com"
+    static let vsSite = "https://vsmov.com"
+    static let k20Site = "https://sc.k-20.xyz"
+
     /// Trang mẫu thêm ở bản sau: thêm một lần vào danh sách người xem đã lưu (xoá đi thì thôi, không thêm lại).
-    static let addedSites = ["https://mephim.ddns.net", kkSite]
+    static let addedSites = ["https://mephim.ddns.net", kkSite, ncSite, vsSite, k20Site]
 
     /// Gọi lúc mở app (sau migrateMovedHosts).
     static func addNewPresets() {
@@ -298,6 +303,12 @@ enum Prefs {
     static var kkBackup: Bool {
         get { store.object(forKey: "kk_backup") as? Bool ?? true }
         set { store.set(newValue, forKey: "kk_backup") }
+    }
+
+    /// Server dự phòng NguonC (từ 1.7) cho yanhh3d / hoathinh3d / hhkungfu / hoathinh3d.pw.
+    static var ncBackup: Bool {
+        get { store.object(forKey: "nc_backup") as? Bool ?? true }
+        set { store.set(newValue, forKey: "nc_backup") }
     }
 
     static var pipOnHome: Bool {

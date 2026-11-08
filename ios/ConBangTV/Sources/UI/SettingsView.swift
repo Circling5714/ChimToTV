@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var askProfile = Prefs.askProfile
     @State private var pipOnHome = Prefs.pipOnHome
     @State private var kkBackup = Prefs.kkBackup
+    @State private var ncBackup = Prefs.ncBackup
     @State private var profileSheet: ProfileSheet?
     @State private var unlockFor: Profile?
     @State private var limitsShown = false
@@ -128,12 +129,14 @@ struct SettingsView: View {
                     }
                     Toggle("Server dự phòng KKPhim", isOn: $kkBackup)
                         .onChange(of: kkBackup) { Prefs.kkBackup = $0 }
+                    Toggle("Server dự phòng NguonC", isOn: $ncBackup)
+                        .onChange(of: ncBackup) { Prefs.ncBackup = $0 }
                     if PlayerModel.pipSupported {
                         Toggle("Vuốt lên từ mép dưới lúc đang xem: thu nhỏ phim (hình trong hình)", isOn: $pipOnHome)
                             .onChange(of: pipOnHome) { Prefs.pipOnHome = $0 }
                     }
                 } header: { Text("Phát video") } footer: {
-                    Text("Server dự phòng KKPhim: với yanhh3d, hoathinh3d, hhkungfu… (trình phát của trang hay hỏng cùng lúc) app tìm cùng phim, cùng tập trên KKPhim và thêm server «KKPhim Vietsub / Thuyết Minh» vào Menu lúc xem; trang không vào được mà KKPhim có tập đó thì vẫn xem được.\n\nHình trong hình: lúc xem chạm nút thu nhỏ (cạnh nút Menu), hoặc vuốt lên từ mép dưới — phim chạy tiếp ở cửa sổ nổi, vẫn chọn phim khác / dùng app khác được; vuốt lên lần nữa để về màn hình chính. Cửa sổ nhỏ có nút phóng to và nút đóng. Tắt mục này thì vuốt lên về thẳng màn hình chính (phim dừng).")
+                    Text("Server dự phòng KKPhim / NguonC: với yanhh3d, hoathinh3d, hhkungfu… (trình phát của trang hay hỏng cùng lúc) app tìm cùng phim, cùng tập trên KKPhim và NguonC rồi thêm server «KKPhim Vietsub / Thuyết Minh», «NguonC Vietsub…» vào Menu lúc xem (NguonC hay có tập mới sớm; trình phát của nó chạy quảng cáo trước phim, app tự bỏ qua). Trang không vào được mà nguồn dự phòng có tập đó thì vẫn xem được.\n\nHình trong hình: lúc xem chạm nút thu nhỏ (cạnh nút Menu), hoặc vuốt lên từ mép dưới — phim chạy tiếp ở cửa sổ nổi, vẫn chọn phim khác / dùng app khác được; vuốt lên lần nữa để về màn hình chính. Cửa sổ nhỏ có nút phóng to và nút đóng. Tắt mục này thì vuốt lên về thẳng màn hình chính (phim dừng).")
                 }
 
                 Section {
@@ -279,7 +282,7 @@ struct SettingsView: View {
             }
             if !siteStatus.isEmpty { Text(siteStatus).foregroundColor(Theme.dim) }
         } header: { Text("Địa chỉ trang phim") } footer: {
-            Text("Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…), kiểu PhimMoi (phimmois), mephim.ddns.net và KKPhim (kkphim.com). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật.")
+            Text("Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…), kiểu PhimMoi (phimmois), mephim.ddns.net, KKPhim (kkphim.com), NguonC (phim.nguonc.com), VSMOV (vsmov.com) và CLB Phim Xưa (sc.k-20.xyz). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật.")
         }
     }
 

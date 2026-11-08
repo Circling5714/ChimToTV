@@ -520,8 +520,8 @@ enum Site {
 
     /// Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server (trang Next.js: link .m3u8 / iframe).
     static func video(_ src: EpisodeSource, _ server: Server?) async throws -> Video {
-        // Server dự phòng KKPhim: link .m3u8 có sẵn (KkPhim.attach)
-        if let s = server, s.type.hasPrefix(KkPhim.prefix), let v = src.links[s.type] { return v }
+        // Server dự phòng KKPhim / NguonC: link có sẵn (KkPhim.attach)
+        if let s = server, KkPhim.isBackup(s.type), let v = src.links[s.type] { return v }
         if src.next {
             guard let server = server else { throw AppError("Không có server") }
             return try await NextSite.video(src, server)
@@ -544,6 +544,16 @@ enum Site {
 
     static func resolve(_ base: String, _ ref: String) -> String {
         URL(string: ref, relativeTo: URL(string: base))?.absoluteString ?? ref
+    }
+
+    /// Tên trang hiện trong app: tên miền, riêng add-on k-20 ghi «CLB Phim Xưa (sc.k-20.xyz)».
+    static func displayName(_ host: String) -> String { host == Stremio.host ? "\(Stremio.name) (\(host))" : host }
+
+    /// Tên ngắn ghi sau tên phim của trang khác: "yanhh3d", "nguonc" (bỏ nhãn chung "phim." / "www."), "CLB Phim Xưa".
+    static func shortName(_ host: String) -> String {
+        if host == Stremio.host { return Stremio.name }
+        let p = host.split(separator: ".").map(String.init)
+        return p.count > 2 && ["phim", "www", "m"].contains(p[0]) ? p[1] : (p.first ?? host)
     }
 
     static func hostOf(_ url: String) -> String? {

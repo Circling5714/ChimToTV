@@ -79,9 +79,11 @@ struct Server: Hashable, Identifiable {
 }
 
 /// Link phát của một server: iframe trình phát / trang tập, hoặc luồng .m3u8 (kèm phụ đề rời nếu có).
+/// file: tệp video phát thẳng bằng <video> (MP4 của CLB Phim Xưa), không phải trang trình phát.
 struct Video {
     let url: String
     var subtitle: String?
+    var file: Bool = false
 }
 
 /// Cách phát một tập (xem Site.kt): player.php → iframe; pageMode → mở thẳng trang tập; next → trang Next.js.

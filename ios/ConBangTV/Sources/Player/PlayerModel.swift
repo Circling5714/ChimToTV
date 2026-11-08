@@ -261,7 +261,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
                 session = PlaySession(host: AppProxy.statsHost(Site.hostOf(src.epUrl)), server: s?.type ?? "embed", openedAt: loadStartedAt)
                 startHint = startFor()
                 Log.d("Player", "phát \(v.url) (server \(s?.type ?? "-"), báo trước \(startHint) s)")
-                if URL(string: v.url)?.path.hasSuffix(".m3u8") == true {
+                if v.file || URL(string: v.url)?.path.hasSuffix(".m3u8") == true {
                     hlsUrl = v.url
                     installScripts(hls: true, page: false)
                     loadHTML(Assets.hlsPage(src: v.url, start: startHint, sub: v.subtitle), base: src.epUrl)
