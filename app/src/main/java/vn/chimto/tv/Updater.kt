@@ -31,7 +31,8 @@ object Updater {
     private const val CHECK_EVERY = 2 * 60 * 60 * 1000L
     private const val SNOOZE = 24 * 60 * 60 * 1000L
 
-    data class Release(val version: String, val apkUrl: String, val notes: String)
+    /** apiUrl: link tải cùng tệp qua API (api.github.com/…/releases/assets/<id>) — dùng khi link github.com lỗi. */
+    data class Release(val version: String, val apkUrl: String, val notes: String, val apiUrl: String? = null)
 
     /** Bản đã tải và kiểm tra xong, chờ người xem đồng ý cài. */
     @Volatile private var ready: Pair<Release, File>? = null
@@ -46,7 +47,8 @@ object Updater {
         val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
             .firstOrNull { it.optString("name").endsWith(".apk", true) } ?: return null
         if (version.isEmpty()) return null
-        return Release(version, apk.getString("browser_download_url"), o.optString("body"))
+        val api = apk.optString("url").takeIf { it.startsWith("https://api.github.com/") }
+        return Release(version, apk.getString("browser_download_url"), o.optString("body"), api)
     }
 
     /** So số hiệu dạng 1.2.3 (bỏ hậu tố như "-debug"). */
@@ -63,23 +65,37 @@ object Updater {
 
     private fun parts(v: String) = v.substringBefore('-').split('.').map { it.trim().toIntOrNull() ?: 0 }
 
-    /** Tải APK; mạng TV hay chập chờn nên đứt giữa chừng thì thử lại (tối đa 3 lần). */
+    /**
+     * Tải APK; mạng TV hay chập chờn nên đứt giữa chừng thì thử lại (tối đa 3 lần). Link github.com lỗi (11/2026: máy chủ
+     * GitHub vùng Đông Nam Á trả 504 hàng giờ liền trong khi API vẫn chạy) thì tải cùng tệp qua API. Tệp tải về từ đường
+     * nào cũng phải qua verify (cùng gói, cùng chữ ký, số hiệu lớn hơn) mới được cài.
+     */
     fun download(context: Context, rel: Release): File {
         val dir = File(context.cacheDir, "update").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val file = File(dir, "ChimToTV-${rel.version}.apk")
         var lastError: IOException? = null
+        val sources = listOfNotNull(
+            rel.apkUrl to emptyMap(),
+            rel.apiUrl?.let { it to mapOf("Accept" to "application/octet-stream") },
+        )
         repeat(3) { attempt ->
-            val c = Http.open(rel.apkUrl)
-            try {
-                if (c.responseCode != 200) throw IOException("Tải bản cập nhật lỗi HTTP ${c.responseCode}")
-                c.inputStream.use { input -> file.outputStream().use { input.copyTo(it) } }
-                return file
-            } catch (e: IOException) {
-                lastError = e
-                Log.w("ChimToUpdate", "Tải lần ${attempt + 1} lỗi: ${e.message}")
-            } finally {
-                c.disconnect()
+            // GitHub lỗi thường chỉ vài chục giây: nghỉ 5 s rồi 15 s trước khi thử lại cả hai đường
+            if (attempt > 0) Thread.sleep(if (attempt == 1) 5_000L else 15_000L)
+            for ((url, headers) in sources) {
+                try {
+                    val c = Http.open(url, headers)
+                    try {
+                        if (c.responseCode != 200) throw IOException("Tải bản cập nhật lỗi HTTP ${c.responseCode}")
+                        c.inputStream.use { input -> file.outputStream().use { input.copyTo(it) } }
+                        return file
+                    } finally {
+                        c.disconnect()
+                    }
+                } catch (e: IOException) {
+                    lastError = e
+                    Log.w("ChimToUpdate", "Tải lần ${attempt + 1} ($url) lỗi: ${e.message}")
+                }
             }
         }
         file.delete()

@@ -222,8 +222,13 @@ public sealed class SettingsPage : Page
                 Prefs.StartFullscreen = true;
                 Main.SetFullscreen(true);
             })),
-            ("Tắt", !Prefs.StartFullscreen, () => Prefs.StartFullscreen = false),
-        }, "F11 (hoặc Alt+Enter) để bật / tắt toàn màn hình bất cứ lúc nào.");
+            ("Tắt", !Prefs.StartFullscreen, () =>
+            {
+                Prefs.StartFullscreen = false;
+                Main.SetFullscreen(false);
+            }),
+        }, "F11 (hoặc Alt+Enter) để bật / tắt toàn màn hình bất cứ lúc nào; đang toàn màn hình thì menu có mục «Thoát toàn màn hình», " +
+           "Esc ở menu cũng thoát.");
         Option("Thu nhỏ cửa sổ app lúc đang xem phim", new[]
         {
             ("Phim chạy tiếp ở cửa sổ nhỏ", Prefs.MiniOnMinimize, (Action)(() => Prefs.MiniOnMinimize = true)),

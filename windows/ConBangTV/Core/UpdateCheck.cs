@@ -16,7 +16,8 @@ public static class UpdateCheck
     public const long CheckEvery = 2 * 60 * 60 * 1000L;
     public const long Snooze = 24 * 60 * 60 * 1000L;
 
-    public sealed record Release(string Version, string ExeUrl, string Notes, string Tag, string? Sha256, long Size);
+    /// ApiUrl: link tải cùng tệp qua API (api.github.com/…/releases/assets/&lt;id&gt;) — dùng khi link github.com lỗi.
+    public sealed record Release(string Version, string ExeUrl, string Notes, string Tag, string? Sha256, long Size, string? ApiUrl = null);
 
     /// "1.0.0" → "1.0" (bỏ số 0 cuối cho gọn, khớp tên tag).
     public static string CurrentVersion
@@ -44,7 +45,8 @@ public static class UpdateCheck
             var digest = J.Str(exe, "digest");
             var sha = digest.StartsWith("sha256:") ? digest["sha256:".Length..].ToLowerInvariant() : null;
             long size = exe.TryGetValue("size", out var s) && s is long l ? l : 0;
-            return new Release(tag[Prefix.Length..], J.Str(exe, "browser_download_url"), J.Str(o, "body"), tag, sha, size);
+            var api = J.Str(exe, "url").StartsWith("https://api.github.com/") ? J.Str(exe, "url") : null;
+            return new Release(tag[Prefix.Length..], J.Str(exe, "browser_download_url"), J.Str(o, "body"), tag, sha, size, api);
         }).OfType<Release>().ToList();
         return releases.Count == 0 ? null : releases.Aggregate((a, b) => IsNewer(b.Version, a.Version) ? b : a);
     }
@@ -90,18 +92,27 @@ public static class UpdateCheck
         Directory.CreateDirectory(dir);
         foreach (var f in Directory.GetFiles(dir)) TryDelete(f);
         var file = Path.Combine(dir, $"ConBangTV-{rel.Version}.exe");
+        // Link github.com lỗi (11/2026: máy chủ GitHub vùng Đông Nam Á trả 504 hàng giờ liền trong khi API vẫn chạy) → tải cùng
+        // tệp qua API (Http.Download gửi Accept: application/octet-stream). Tệp từ đường nào cũng phải khớp cỡ + SHA-256 + số bản.
+        var sources = new[] { rel.ExeUrl, rel.ApiUrl }.OfType<string>().ToArray();
         Exception? last = null;
-        for (var attempt = 0; attempt < 3; attempt++)
+        for (var attempt = 0; attempt < 3 && (attempt == 0 || last != null); attempt++)
         {
-            try
+            // GitHub lỗi thường chỉ vài chục giây: nghỉ 5 s rồi 15 s trước khi thử lại cả hai đường
+            if (attempt > 0) await Task.Delay(attempt == 1 ? 5_000 : 15_000);
+            foreach (var url in sources)
             {
-                await using (var fs = File.Create(file)) await Http.Download(rel.ExeUrl, fs, progress);
-                last = null;
-                break;
-            }
-            catch (Exception e)
-            {
-                last = e;
+                try
+                {
+                    await using (var fs = File.Create(file)) await Http.Download(url, fs, progress);
+                    last = null;
+                    break;
+                }
+                catch (Exception e)
+                {
+                    last = e;
+                    Log.D("update", $"Tải lần {attempt + 1} ({url}) lỗi: {e.Message}");
+                }
             }
         }
         if (last != null) throw last;

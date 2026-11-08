@@ -168,6 +168,8 @@ public partial class MainWindow : Window
             WindowState = _prevState == WindowState.Maximized ? WindowState.Maximized : WindowState.Normal;
         }
         _player?.Follow();
+        // Toàn màn hình không có thanh tiêu đề (không nút thu nhỏ / đóng): menu có thêm mục thoát toàn màn hình
+        if (MenuPanel.Children.Count > 0) RebuildMenu();
     }
 
     public void ToggleFullscreen() => SetFullscreen(!_fullscreen);
@@ -182,6 +184,7 @@ public partial class MainWindow : Window
             yield return new("mini-close", "✕  Tắt phim thu nhỏ", () => mini.Close());
         }
         var me = Prefs.CurrentProfile;
+        if (_fullscreen) yield return new("windowed", "⤡  Thoát toàn màn hình (F11)", () => SetFullscreen(false));
         yield return new("profile", $"👤  Người xem: {me.Name}{(me.Locked ? " 🔒" : "")}", () => _ = PickProfile(true));
         yield return new("home", "🏠  Trang chủ", () => ShowRoot(new HomePage()));
         yield return new("search", "🔍  Tìm kiếm", () => ShowRoot(new SearchPage()));
@@ -287,8 +290,13 @@ public partial class MainWindow : Window
             });
             return;
         }
-        // Trang gốc: Back về menu (như bản TV)
+        // Trang gốc: Back về menu (như bản TV); đã ở menu mà đang toàn màn hình → Esc thoát toàn màn hình (như trình duyệt)
         if (Keyboard.FocusedElement is not Button fb || !_menuButtons.Contains(fb)) FocusMenu();
+        else if (_fullscreen)
+        {
+            SetFullscreen(false);
+            Toast("Đã thoát toàn màn hình (F11 để bật lại).");
+        }
     }
 
     public void Busy(string? text)
