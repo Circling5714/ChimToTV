@@ -41,14 +41,19 @@ object Prefs {
     /** Các trang mẫu có sẵn trong danh sách lần đầu cài. */
     val PRESET_SITES = listOf(
         DEFAULT_BASE, "https://hoathinh3d.pw", "https://hoathinh3d.ee", "https://hhkungfu.ee", "https://phimmois.fun",
-        "https://mephim.ddns.net", KK_SITE,
+        "https://mephim.ddns.net", KK_SITE, NC_SITE, VS_SITE, K20_SITE,
     )
 
     /** Trang KKPhim (từ 2.6) — dữ liệu lấy thẳng từ API công khai phimapi.com (xem ApiSite). */
     const val KK_SITE = "https://www.kkphim.com"
 
+    /** Từ 2.7: NguonC (API phim.nguonc.com), VSMOV (API vsmov.com), CLB Phim Xưa (add-on Stremio k-20). */
+    const val NC_SITE = "https://phim.nguonc.com"
+    const val VS_SITE = "https://vsmov.com"
+    const val K20_SITE = "https://sc.k-20.xyz"
+
     /** Trang mẫu thêm ở bản sau: thêm một lần vào danh sách người xem đã lưu (xoá đi thì thôi, không thêm lại). */
-    private val ADDED_SITES = listOf("https://phimmois.fun", "https://mephim.ddns.net", KK_SITE)
+    private val ADDED_SITES = listOf("https://phimmois.fun", "https://mephim.ddns.net", KK_SITE, NC_SITE, VS_SITE, K20_SITE)
 
     /**
      * Trang đổi hẳn tên miền, đường dẫn giữ nguyên (tên cũ chuyển hướng 301 sang tên mới). Tên cũ hay bị nhà mạng chặn nên
@@ -306,6 +311,11 @@ object Prefs {
     var kkBackup: Boolean
         get() = sp.getBoolean("kk_backup", true)
         set(value) = sp.edit().putBoolean("kk_backup", value).apply()
+
+    /** Server dự phòng NguonC (từ 2.7) cho yanhh3d / hoathinh3d / hhkungfu / hoathinh3d.pw. */
+    var ncBackup: Boolean
+        get() = sp.getBoolean("nc_backup", true)
+        set(value) = sp.edit().putBoolean("nc_backup", value).apply()
 
     /** Bấm Home khi đang xem: thu nhỏ phim vào góc màn hình (hình trong hình) thay vì dừng. */
     var pipOnHome: Boolean

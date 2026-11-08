@@ -25,8 +25,16 @@ object ApiSite {
      */
     const val KK_HOST = "kkphim.com"
 
-    /** Trang đã biết là kiểu này (có sẵn + trang dò thấy lúc chạy, xem probe). */
-    private val known = ConcurrentHashMap.newKeySet<String>().apply { add("mephim.ddns.net"); add(KK_HOST) }
+    /**
+     * VSMOV (vsmov.com, từ 2.7): API riêng cùng định dạng KKPhim nhưng khác đường dẫn (/api/danh-sach/…, /api/phim/…,
+     * /api/tim-kiem). Tập chỉ có trình phát nhúng; app đọc luồng HLS trong trang trình phát (link có chữ ký) để tự phát.
+     */
+    const val VS_HOST = "vsmov.com"
+
+    /** Trang đã biết là kiểu này (có sẵn + trang dò thấy lúc chạy, xem probe). NguonC / k-20 có định dạng riêng. */
+    private val known = ConcurrentHashMap.newKeySet<String>().apply {
+        add("mephim.ddns.net"); add(KK_HOST); add(VS_HOST); add(NguonC.HOST); add(Stremio.HOST)
+    }
     private val notApi = ConcurrentHashMap.newKeySet<String>()
     private const val CDN = "https://phimimg.com"
 
@@ -73,6 +81,43 @@ object ApiSite {
 
     fun isKk(url: String) = Site.hostOf(url) == KK_HOST
 
+    fun isVs(url: String) = Site.hostOf(url) == VS_HOST
+
+    /** Menu VSMOV: lọc hoạt hình theo nước có trên /api/the-loai/…?country=. */
+    private val VS_MENU = listOf(
+        "Hoạt hình Trung Quốc" to "the-loai/hoat-hinh?country=trung-quoc",
+        "Hoạt hình" to "the-loai/hoat-hinh",
+        "Phim bộ" to "danh-sach/phim-bo",
+        "Phim lẻ" to "danh-sach/phim-le",
+        "Phim nhóm sub VSMOV" to "danh-sach/subteam",
+        "Phim Trung Quốc" to "quoc-gia/trung-quoc",
+        "Phim Hàn Quốc" to "quoc-gia/han-quoc",
+        "Phim Âu Mỹ" to "quoc-gia/au-my",
+        "Phim Nhật Bản" to "quoc-gia/nhat-ban",
+        "Phim Thái Lan" to "quoc-gia/thai-lan",
+    )
+    private val VS_GENRES = listOf(
+        "Hành Động" to "hanh-dong", "Cổ Trang" to "co-trang", "Kiếm Hiệp" to "kiem-hiep", "Tiên Hiệp" to "tien-hiep",
+        "Võ Thuật" to "vo-thuat", "Viễn Tưởng" to "vien-tuong", "Giả Tưởng" to "gia-tuong", "Kinh Dị" to "kinh-di",
+        "Lãng Mạn" to "lang-man", "Hài" to "hai", "Chính Kịch" to "chinh-kich", "Phiêu Lưu" to "phieu-luu",
+        "Hình Sự" to "hinh-su", "Tội Phạm" to "toi-pham", "Chiến Tranh" to "chien-tranh", "Bí Ẩn" to "bi-an",
+        "Học Đường" to "hoc-duong", "Gia Đình" to "gia-dinh", "Thiếu Nhi" to "thieu-nhi", "Thanh Xuân" to "thanh-xuan",
+        "Thương Trường" to "thuong-truong", "Xã Hội Đen" to "xa-hoi-den", "Truyền Hình Thực Tế" to "truyen-hinh-thuc-te",
+        "Phim Nhạc" to "phim-nhac",
+    )
+    private val VS_COUNTRIES = listOf(
+        "Trung Quốc" to "trung-quoc", "Hàn Quốc" to "han-quoc", "Nhật Bản" to "nhat-ban", "Âu Mỹ" to "au-my", "Mỹ" to "my",
+        "Thái Lan" to "thai-lan", "Đài Loan" to "dai-loan", "Hồng Kông" to "hong-kong", "Ấn Độ" to "an-do",
+        "Việt Nam" to "viet-nam", "Anh" to "anh", "Pháp" to "phap", "Canada" to "canada", "Úc" to "uc", "Đức" to "duc",
+        "Tây Ban Nha" to "tay-ban-nha", "Thổ Nhĩ Kỳ" to "tho-nhi-ky", "Philippines" to "philippines", "Indonesia" to "indonesia",
+    )
+
+    /** Địa chỉ API của VSMOV: "danh-sach/phim-bo" → https://vsmov.com/api/danh-sach/phim-bo?page=1. */
+    private fun vsApi(origin: String, path: String, page: Int): String {
+        val (p, q) = path.split('?', limit = 2).let { it[0] to it.getOrNull(1) }
+        return "$origin/api/$p?" + (q?.let { "$it&" } ?: "") + "page=$page"
+    }
+
     /**
      * Trang chưa biết (người dùng vừa thêm) mà HTML là trang trắng của ứng dụng JS: thử API (một lần mỗi trang) —
      * trả về true nếu là kiểu trang này.
@@ -91,9 +136,20 @@ object ApiSite {
 
     /** Trang chủ: các khối tải song song (TV mạng chậm đỡ chờ); khối nào lỗi thì bỏ. */
     fun home(base: String): Home {
+        if (NguonC.isSite(base)) return NguonC.home(base)
+        if (Stremio.isSite(base)) return Stremio.home(base)
         val o = origin(base)
         val kk = isKk(base)
-        val blocks = if (kk) {
+        val vs = isVs(base)
+        val blocks = if (vs) {
+            listOf(
+                "Hoạt hình Trung Quốc" to vsApi(o, "the-loai/hoat-hinh?country=trung-quoc", 1),
+                "Phim mới cập nhật" to newestUrl(o),
+                "Phim bộ mới" to vsApi(o, "danh-sach/phim-bo", 1),
+                "Phim lẻ mới" to vsApi(o, "danh-sach/phim-le", 1),
+                "Phim nhóm sub VSMOV" to vsApi(o, "danh-sach/subteam", 1),
+            )
+        } else if (kk) {
             // KKPhim không có khối thịnh hành / song ngữ: thêm hoạt hình thuyết minh, phim bộ, phim lẻ mới
             listOf(
                 "Hoạt hình Trung Quốc mới cập nhật" to api(o, "category/hoat-hinh?country=trung-quoc", 1),
@@ -110,28 +166,44 @@ object ApiSite {
                 "Song ngữ / Thuyết minh" to "$o/api/movies/song-ngu",
             )
         }
+        val sections = sections(blocks) { parseItems(get(it), o) }
+        val menu = if (vs) {
+            VS_MENU.map { (t, p) -> Category(t, vsApi(o, p, 1)) }
+        } else {
+            (if (kk) KK_MENU else MENU).map { (t, p) -> Category(t, api(o, p, 1)) }
+        }
+        return Home(sections, menu, null)
+    }
+
+    /** Các khối trang chủ tải song song (TV mạng chậm đỡ chờ); khối nào lỗi / rỗng thì bỏ, lỗi hết thì báo lỗi. */
+    fun sections(blocks: List<Pair<String, String>>, load: (String) -> List<Film>): List<Section> {
         val found = arrayOfNulls<Section>(blocks.size)
         var error: Throwable? = null
         blocks.mapIndexed { i, (title, url) ->
             thread {
-                runCatching { parseItems(get(url), o) }
+                runCatching { load(url) }
                     .onSuccess { if (it.isNotEmpty()) found[i] = Section(title, it) }
                     .onFailure { error = it }
             }
         }.forEach { it.join() }
         val sections = found.filterNotNull()
         if (sections.isEmpty()) throw (error as? IOException ?: IOException("Không tải được danh sách phim", error))
-        return Home(sections, (if (kk) KK_MENU else MENU).map { (t, p) -> Category(t, api(o, p, 1)) }, null)
+        return sections
     }
 
-    fun list(url: String): FilmPage = parseList(get(url), url)
+    fun list(url: String): FilmPage = when {
+        NguonC.isSite(url) -> NguonC.list(url)
+        Stremio.isSite(url) -> Stremio.list(url)
+        else -> parseList(get(url), url)
+    }
 
-    /** Danh sách có phân trang (data.params.pagination) → trang sau = page + 1. */
+    /** Danh sách có phân trang (data.params.pagination; VSMOV: pagination ở gốc) → trang sau = page + 1. */
     fun parseList(body: String, url: String): FilmPage {
         val o = origin(url)
         val films = parseItems(body, o)
         val root = JSONObject(body)
         val p = (root.optJSONObject("data") ?: root).optJSONObject("params")?.optJSONObject("pagination")
+            ?: root.optJSONObject("pagination")
         val page = p?.optInt("currentPage") ?: 0
         val pages = p?.optInt("totalPages") ?: 0
         val next = if (films.isNotEmpty() && page in 1 until pages) withPage(url, page + 1) else null
@@ -139,13 +211,31 @@ object ApiSite {
     }
 
     /** Phim mới cập nhật (đo nhanh trang trong Cài đặt). */
-    fun newestUrl(base: String) = "${origin(base)}/api/movies/newest?page=1&limit=$LIMIT"
+    fun newestUrl(base: String) = when {
+        NguonC.isSite(base) -> NguonC.newestUrl(base)
+        Stremio.isSite(base) -> Stremio.newestUrl(base)
+        isVs(base) -> "${origin(base)}/api/danh-sach/phim-moi-cap-nhat?page=1"
+        else -> "${origin(base)}/api/movies/newest?page=1&limit=$LIMIT"
+    }
 
-    fun searchUrl(base: String, query: String) =
-        "${origin(base)}/api/movies/search?keyword=" + URLEncoder.encode(query.trim(), "UTF-8") + "&page=1&limit=$LIMIT"
+    fun searchUrl(base: String, query: String): String {
+        val q = URLEncoder.encode(query.trim(), "UTF-8")
+        return when {
+            NguonC.isSite(base) -> NguonC.searchUrl(base, query)
+            Stremio.isSite(base) -> Stremio.searchUrl(base, query)
+            isVs(base) -> "${origin(base)}/api/tim-kiem?keyword=$q&page=1&limit=$LIMIT"
+            else -> "${origin(base)}/api/movies/search?keyword=$q&page=1&limit=$LIMIT"
+        }
+    }
 
     fun filters(base: String): Pair<List<Category>, List<Category>> {
+        if (NguonC.isSite(base)) return NguonC.filters(base)
+        if (Stremio.isSite(base)) return Stremio.filters(base)
         val o = origin(base)
+        if (isVs(base)) {
+            return VS_GENRES.map { (n, s) -> Category(n, vsApi(o, "the-loai/$s", 1)) } to
+                VS_COUNTRIES.map { (n, s) -> Category(n, vsApi(o, "quoc-gia/$s", 1)) }
+        }
         return GENRES.map { (n, s) -> Category(n, api(o, "the-loai/$s", 1)) } to
             COUNTRIES.map { (n, s) -> Category(n, api(o, "quoc-gia/$s", 1)) }
     }
@@ -168,7 +258,11 @@ object ApiSite {
 
     // ---- Chi tiết phim ----
 
-    fun detail(url: String): FilmDetail = parseDetail(get(detailApi(url)), filmUrl(url))
+    fun detail(url: String): FilmDetail = when {
+        NguonC.isSite(url) -> NguonC.detail(url)
+        Stremio.isSite(url) -> Stremio.detail(url)
+        else -> parseDetail(get(detailApi(url)), filmUrl(url))
+    }
 
     fun parseDetail(body: String, url: String): FilmDetail {
         val root = JSONObject(body)
@@ -196,9 +290,12 @@ object ApiSite {
         )
     }
 
-    /** "Tập 01" → "Tập 1"; "Full" giữ nguyên. */
-    private fun title(name: String): String =
-        Regex("""^(Tập\s*)0+(\d)""", RegexOption.IGNORE_CASE).replace(name.trim()) { it.groupValues[1] + it.groupValues[2] }
+    /** "Tập 01" → "Tập 1", "164" → "Tập 164" (VSMOV ghi số trần); "Full" giữ nguyên. */
+    fun title(name: String): String {
+        val n = name.trim()
+        if (n.matches(Regex("""\d+(\.\d+)?"""))) return "Tập " + n.trimStart('0').ifEmpty { "0" }
+        return Regex("""^(Tập\s*)0+(\d)""", RegexOption.IGNORE_CASE).replace(n) { it.groupValues[1] + it.groupValues[2] }
+    }
 
     // ---- Tập phim ----
 
@@ -207,6 +304,8 @@ object ApiSite {
      * phòng). Link đọc sẵn từ chi tiết phim (đã có trong bộ nhớ đệm của Site khi mở từ trang phim).
      */
     fun source(epUrl: String): EpisodeSource {
+        if (NguonC.isSite(epUrl)) return NguonC.source(epUrl)
+        if (Stremio.isSite(epUrl)) return Stremio.source(epUrl)
         val film = filmUrl(epUrl)
         val body = get(detailApi(film))
         val root = JSONObject(body)
@@ -217,11 +316,37 @@ object ApiSite {
             objects(s.optJSONArray("server_data")).firstOrNull { str(it, "slug") == tap }
         } ?: throw IOException("Không tìm thấy tập này trên trang")
         val links = LinkedHashMap<String, Video>()
-        str(e, "link_m3u8").takeIf { it.startsWith("http") }?.let { links["m3u8"] = Video(it) }
-        str(e, "link_embed").takeIf { it.startsWith("http") }?.let { links["embed"] = Video(it) }
+        val embed = str(e, "link_embed").takeIf { it.startsWith("http") }
+        val vs = isVs(epUrl)
+        (str(e, "link_m3u8").takeIf { it.startsWith("http") } ?: embed?.takeIf { vs }?.let(::vsHls))
+            ?.let { links["m3u8"] = Video(it) }
+        embed?.let { links["embed"] = Video(it) }
         if (links.isEmpty()) throw IOException("Tập này chưa có video")
-        val list = links.keys.map { if (it == "m3u8") Server("HLS (bỏ quảng cáo)", it) else Server("Trình phát KKPhim", it) }
+        val list = links.keys.map {
+            when {
+                it == "embed" -> Server(if (vs) "Trình phát VSMOV" else "Trình phát KKPhim", it)
+                vs -> Server("HLS", it)
+                else -> Server("HLS (bỏ quảng cáo)", it)
+            }
+        }
         return EpisodeSource(epUrl, list, "", tap, sv.toString(), null, null, false, links, next = true)
+    }
+
+    /**
+     * Luồng HLS trong trang trình phát VSMOV (vN.streamvsmov.com/video/<mã>): link có chữ ký (signedMasterUrl, hết hạn sau
+     * khoảng một giờ) hoặc /stream/<mã>/master.m3u8 khi máy chủ đó không ký. Đoạn video ngụy trang ảnh PNG — hls.html cắt
+     * phần ảnh. Không đọc được thì null (vẫn còn trình phát nhúng).
+     */
+    private fun vsHls(embed: String): String? {
+        val body = runCatching { Http.get(embed, mapOf("Referer" to "https://vsmov.com/")).body }.getOrNull() ?: return null
+        return vsHlsFrom(body)
+    }
+
+    fun vsHlsFrom(page: String): String? {
+        Regex("""signedMasterUrl\s*:\s*"(https?://[^"]+)"""").find(page)?.let { return it.groupValues[1] }
+        val base = Regex("""baseUrl\s*=\s*"(https?://[^"]+)"""").find(page)?.groupValues?.get(1) ?: return null
+        val hash = Regex("""videoHash\s*=\s*"([0-9a-zA-Z-]+)"""").find(page)?.groupValues?.get(1) ?: return null
+        return "$base/stream/$hash/master.m3u8"
     }
 
     // ---- Tiện ích ----
@@ -235,14 +360,16 @@ object ApiSite {
         return "${origin(url)}/phim/$slug"
     }
 
-    private fun detailApi(url: String) = "${origin(url)}/api/movies/detail/" + filmUrl(url).substringAfterLast('/')
+    private fun detailApi(url: String) = filmUrl(url).substringAfterLast('/').let {
+        if (isVs(url)) "${origin(url)}/api/phim/$it" else "${origin(url)}/api/movies/detail/$it"
+    }
 
     private fun api(origin: String, path: String, page: Int): String {
         val (p, q) = path.split('?', limit = 2).let { it[0] to it.getOrNull(1) }
         return "$origin/api/movies/$p?" + (q?.let { "$it&" } ?: "") + "page=$page&limit=$LIMIT"
     }
 
-    private fun withPage(url: String, page: Int): String {
+    fun withPage(url: String, page: Int): String {
         val p = Regex("""([?&]page=)\d+""")
         return if (p.containsMatchIn(url)) url.replace(p, "\$1$page") else url + (if ('?' in url) "&" else "?") + "page=$page"
     }
@@ -282,7 +409,7 @@ object ApiSite {
         }
     }
 
-    private fun origin(url: String) = Site.originOf(url) ?: url.trimEnd('/')
+    fun origin(url: String) = Site.originOf(url) ?: url.trimEnd('/')
 
     /** Ảnh: đường dẫn đầy đủ giữ nguyên; "uploads/movies/…" → nối vào máy chủ ảnh (cdn có thể đã có /uploads/movies). */
     private fun image(ref: String, cdn: String): String? {

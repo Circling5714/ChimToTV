@@ -140,6 +140,15 @@ class SettingsActivity : BaseActivity() {
             Prefs.kkBackup = !Prefs.kkBackup
             showKk()
         }
+        val nc = findViewById<TextView>(R.id.btnNcBackup)
+        fun showNc() {
+            nc.text = "Server dự phòng NguonC: ${if (Prefs.ncBackup) "Bật" else "Tắt"}"
+        }
+        showNc()
+        nc.setOnClickListener {
+            Prefs.ncBackup = !Prefs.ncBackup
+            showNc()
+        }
 
         // Thu nhỏ phim: hình trong hình của Android (TV có tính năng này) hoặc cửa sổ nhỏ trong app
         val pipHelp = findViewById<TextView>(R.id.pipHelp)

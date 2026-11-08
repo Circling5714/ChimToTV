@@ -26,7 +26,9 @@ import kotlin.math.max
  * trùng tên ngắn (hoathinh3d.ee / hoathinh3d.pw) thì ghi đủ tên miền cho khỏi lẫn.
  */
 fun siteTag(host: String, sites: List<String>): String {
-    val short = host.substringBefore('.')
+    if (host == Stremio.HOST) return Stremio.NAME
+    // "phim.nguonc.com" → "nguonc" (nhãn đầu chỉ là chữ chung)
+    val short = host.split('.').let { if (it.size > 2 && it[0] in setOf("phim", "www", "m")) it[1] else it[0] }
     val clash = sites.any { s -> Site.hostOf(s).let { it != null && it != host && it.substringBefore('.') == short } }
     return if (clash) host else short
 }
@@ -317,7 +319,7 @@ class MainActivity : BaseActivity() {
 
     /** Tên trang đang dùng, kèm "proxy" khi đang bật proxy SOCKS5 (để nhớ là app đang đi qua proxy). */
     private fun showSiteLabel() {
-        siteLabel.text = Site.hostOf(Prefs.baseUrl) + (if (AppProxy.active) "  ·  proxy" else "") +
+        siteLabel.text = Site.hostOf(Prefs.baseUrl)?.let(Site::displayName) + (if (AppProxy.active) "  ·  proxy" else "") +
             (if (AppProxy.dohActive) "  ·  DoH" else "") +
             if (Prefs.privateMode) "  ·  xem riêng" else ""
         siteTag.text = siteLabel.text
@@ -485,7 +487,7 @@ class MainActivity : BaseActivity() {
             }
         }
         PlayStats.siteSummary(host)?.let { parts += it }
-        return "$host  —  " + parts.joinToString(" · ") + if (fastest) "  ★ nhanh nhất" else ""
+        return Site.displayName(host) + "  —  " + parts.joinToString(" · ") + if (fastest) "  ★ nhanh nhất" else ""
     }
 
     /** Dựng lại menu nếu có mục đổi tên (số phim có tập mới, người xem, phim đang thu nhỏ). */

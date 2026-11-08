@@ -103,7 +103,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…), kiểu PhimMoi (phimmois), mephim.ddns.net và KKPhim (kkphim.com). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật."
+            android:text="Nhập tên miền rồi nhấn Lưu để thêm trang mới hoặc cập nhật khi trang đổi tên miền (vd .ee → .xyz). Hỗ trợ các trang kiểu yanhh3d, theme HaLim (hoathinh3d, hhkungfu…), kiểu PhimMoi (phimmois), mephim.ddns.net, KKPhim (kkphim.com), NguonC (phim.nguonc.com), VSMOV (vsmov.com) và CLB Phim Xưa (sc.k-20.xyz). Nếu tên miền cũ tự chuyển hướng, app tự cập nhật."
             android:textColor="@color/text_dim"
             android:textSize="14sp" />
 
@@ -313,13 +313,17 @@
             <TextView
                 android:id="@+id/btnKkBackup"
                 style="@style/TvButton" />
+
+            <TextView
+                android:id="@+id/btnNcBackup"
+                style="@style/TvButton" />
         </vn.chimto.tv.FlowRow>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Server dự phòng KKPhim: với yanhh3d, hoathinh3d, hhkungfu… (trình phát của trang hay hỏng cùng lúc) app tìm cùng phim, cùng tập trên KKPhim và thêm server «KKPhim Vietsub / Thuyết Minh» vào menu ▼ lúc xem. Trang không vào được mà KKPhim có tập đó thì vẫn xem được."
+            android:text="Server dự phòng KKPhim / NguonC: với yanhh3d, hoathinh3d, hhkungfu… (trình phát của trang hay hỏng cùng lúc) app tìm cùng phim, cùng tập trên KKPhim và NguonC rồi thêm server «KKPhim Vietsub / Thuyết Minh», «NguonC Vietsub…» vào menu ▼ lúc xem (NguonC hay có tập mới sớm, nhưng trình phát của nó chạy quảng cáo trước phim — app tự bỏ qua). Trang không vào được mà nguồn dự phòng có tập đó thì vẫn xem được."
             android:textColor="@color/text_dim"
             android:textSize="14sp" />
 

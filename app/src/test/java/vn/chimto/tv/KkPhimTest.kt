@@ -135,6 +135,24 @@ class KkPhimTest {
     }
 
     @Test
+    fun slowBackupDoesNotHideTheFastOne() {
+        // KKPhim chậm quá thời gian chờ nhưng NguonC đã xong → vẫn có server NguonC; trang lỗi → chỉ còn NguonC
+        val ep = "https://yanhh3d.ee/tu-tien/tien-nghich/tap-164.html"
+        val site = EpisodeSource(ep, listOf(Server("VIETSUB 1080 V1", "tiktik")), "1", "tap-164", "1", "https://yanhh3d.ee/player/player.php", null, false)
+        val kk = KkPhim.pick(detail, 164.0, null)
+        val nc = listOf(Server("NguonC Vietsub", "nc-vs") to Video("https://embed1.streamc.xyz/embed.php?hash=x"))
+        val t0 = System.currentTimeMillis()
+        val s = KkPhim.combineAll(ep, { site }, listOf({ Thread.sleep(3_000); kk }, { nc }), waitMs = 400)
+        assertEquals(listOf("tiktik", "nc-vs"), s.servers.map { it.type })
+        assertTrue(System.currentTimeMillis() - t0 < 2_000)
+        val both = KkPhim.combineAll(ep, { site }, listOf({ kk }, { nc }))
+        assertEquals(listOf("tiktik", "kk-vs", "kk-tm", "kk-tm-ai", "nc-vs"), both.servers.map { it.type })
+        val down = KkPhim.combineAll(ep, { throw java.io.IOException("HTTP 522") }, listOf({ throw java.io.IOException("KK lỗi") }, { nc }))
+        assertEquals(listOf("nc-vs"), down.servers.map { it.type })
+        assertEquals("https://embed1.streamc.xyz/embed.php?hash=x", Site.video(down, down.servers[0]).url)
+    }
+
+    @Test
     fun suggestsKkWhenEveryMirrorStalls() {
         // Server của yanhh3d (streamfree) đều giật / lỗi → gợi ý KKPhim cùng ngôn ngữ, không sang Thuyết Minh
         val v1 = Server("VIETSUB 1080 V1", "tiktik")

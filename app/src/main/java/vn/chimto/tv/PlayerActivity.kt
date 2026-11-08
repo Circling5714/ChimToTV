@@ -685,7 +685,7 @@ class PlayerActivity : BaseActivity() {
                 val url = v.url
                 loadStartedAt = System.currentTimeMillis()
                 session = PlaySession(AppProxy.statsHost(Site.hostOf(src.epUrl)), s?.type ?: "embed", loadStartedAt)
-                if (Uri.parse(url).path.orEmpty().endsWith(".m3u8")) {
+                if (v.file || Uri.parse(url).path.orEmpty().endsWith(".m3u8")) {
                     hlsUrl = url
                     startHint = startFor()
                     val page = hlsHtml.replace("{{SRC}}", JSONObject.quote(url)).replace("{{START}}", startHint.toString())

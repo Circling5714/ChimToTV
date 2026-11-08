@@ -38,8 +38,11 @@ data class FilmDetail(
 
 data class Server(val label: String, val type: String)
 
-/** Link phát của một server: iframe trình phát / trang tập, hoặc luồng .m3u8 (kèm phụ đề rời nếu có). */
-data class Video(val url: String, val subtitle: String? = null)
+/**
+ * Link phát của một server: iframe trình phát / trang tập, hoặc luồng .m3u8 (kèm phụ đề rời nếu có).
+ * file: tệp video phát thẳng bằng <video> (MP4 của CLB Phim Xưa), không phải trang trình phát.
+ */
+data class Video(val url: String, val subtitle: String? = null, val file: Boolean = false)
 
 /**
  * Cách phát một tập.
@@ -442,8 +445,8 @@ object Site {
 
     /** Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server (trang Next.js: link .m3u8 / iframe). */
     fun video(src: EpisodeSource, server: Server?): Video {
-        // Server dự phòng KKPhim: link .m3u8 có sẵn (KkPhim.attach)
-        if (server != null && server.type.startsWith(KkPhim.PREFIX)) src.links[server.type]?.let { return it }
+        // Server dự phòng KKPhim / NguonC: link có sẵn (KkPhim.attach)
+        if (server != null && KkPhim.isBackup(server.type)) src.links[server.type]?.let { return it }
         if (src.next) return NextSite.video(src, server ?: throw IOException("Không có server"))
         val playerUrl = src.playerUrl
         if (server == null || playerUrl == null) return Video(src.directEmbed ?: throw IOException("Không có server"))
@@ -461,6 +464,9 @@ object Site {
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
 
     private fun resolve(base: String, ref: String): String = URL(URL(base), ref).toString()
+
+    /** Tên trang hiện trong app: tên miền, riêng add-on k-20 ghi «CLB Phim Xưa (sc.k-20.xyz)». */
+    fun displayName(host: String): String = if (host == Stremio.HOST) "${Stremio.NAME} ($host)" else host
 
     fun hostOf(url: String): String? = try {
         URL(url).host.lowercase().removePrefix("www.")

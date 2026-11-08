@@ -107,4 +107,42 @@ class ApiSiteTest {
         assertTrue(ApiSite.isKnown("$o/"))
         assertEquals("$o/api/movies/search?keyword=ti%C3%AAn+ngh%E1%BB%8Bch&page=1&limit=24", ApiSite.searchUrl(o, " tiên nghịch "))
     }
+
+    /** VSMOV (2.7): API vsmov.com/api/… — items + pagination ở gốc, tập chỉ có trình phát nhúng. */
+    @Test
+    fun vsmovListsAndUrls() {
+        val vs = "https://vsmov.com"
+        assertTrue(ApiSite.isKnown("$vs/") && ApiSite.isVs("$vs/phim/tien-nghich"))
+        assertEquals("$vs/api/danh-sach/phim-moi-cap-nhat?page=1", ApiSite.newestUrl(vs))
+        assertEquals("$vs/api/tim-kiem?keyword=ti%C3%AAn+ngh%E1%BB%8Bch&page=1&limit=24", ApiSite.searchUrl(vs, "tiên nghịch"))
+        assertEquals("$vs/api/the-loai/kiem-hiep?page=1", ApiSite.filters(vs).first.first { it.title == "Kiếm Hiệp" }.url)
+        val json = """{"status":true,"items":[
+            {"_id":54302,"name":"Túy Linh Lung","origin_name":"Lost Love in Times","slug":"tuy-linh-lung",
+             "poster_url":"https://vsmov.com/storage/images/e6.jpg","thumb_url":"https://vsmov.com/storage/images/zv.jpg","year":2017}],
+            "pathImage":"https://nguon.vsphim.com/storage/images/",
+            "pagination":{"totalItems":2804,"totalItemsPerPage":20,"currentPage":1,"totalPages":141}}"""
+        val p = ApiSite.parseList(json, "$vs/api/the-loai/hoat-hinh?country=trung-quoc&page=1")
+        assertEquals("$vs/phim/tuy-linh-lung", p.films.single().url)
+        assertEquals("https://vsmov.com/storage/images/e6.jpg", p.films.single().poster)
+        assertEquals("$vs/api/the-loai/hoat-hinh?country=trung-quoc&page=2", p.nextUrl)
+        // Chi tiết: tập chỉ có link_embed vẫn được giữ
+        val d = ApiSite.parseDetail("""{"status":true,"movie":{"name":"Túy Linh Lung","lang":"Lồng tiếng"},"episodes":[
+            {"server_name":"Lồng tiếng #1","server_data":[{"name":"1","slug":"tap-1","filename":"1",
+             "link_embed":"https://v15.streamvsmov.com/video/fc1d03d9-0667-4a14-8891-7dee0d362b05"}]}]}""", "$vs/phim/tuy-linh-lung")
+        assertEquals("$vs/phim/tuy-linh-lung/tap-1?sv=0", d.groups.single().episodes.single().url)
+        assertEquals("Tập 1", d.groups.single().episodes.single().title) // VSMOV ghi số trần
+    }
+
+    @Test
+    fun vsmovHlsFromPlayerPage() {
+        val signed = """const playerOptions = { linkVast: "", enableSignedUrl: true,
+            signedMasterUrl: "https://v2.streamvsmov.com/stream/55010e78/master.m3u8?expires=1794131570&signature=ca8c", volume: 100 };
+            const baseUrl = "https://v2.streamvsmov.com"; const videoHash = "55010e78";"""
+        assertEquals("https://v2.streamvsmov.com/stream/55010e78/master.m3u8?expires=1794131570&signature=ca8c", ApiSite.vsHlsFrom(signed))
+        // Máy chủ không ký: link không có chữ ký
+        val plain = """enableSignedUrl: false, signedMasterUrl: "",
+            const baseUrl = "https://v15.streamvsmov.com"; const videoHash = "fc1d03d9-0667-4a14-8891-7dee0d362b05";"""
+        assertEquals("https://v15.streamvsmov.com/stream/fc1d03d9-0667-4a14-8891-7dee0d362b05/master.m3u8", ApiSite.vsHlsFrom(plain))
+        assertNull(ApiSite.vsHlsFrom("<html>lỗi</html>"))
+    }
 }

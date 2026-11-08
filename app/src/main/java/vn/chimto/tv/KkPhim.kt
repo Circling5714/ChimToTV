@@ -40,27 +40,44 @@ object KkPhim {
     fun appliesTo(url: String) = Prefs.kkBackup && !ApiSite.isKnown(url) && !NextSite.isKnown(url) &&
         Site.hostOf(url)?.let { it.endsWith("phimapi.com") || it.endsWith("kkphim.com") } != true
 
-    /**
-     * Trang tập + server KKPhim, tải song song. KKPhim chậm / lỗi thì thôi (chờ thêm tối đa vài giây, không báo lỗi).
-     * Trang tập lỗi mà KKPhim có tập này → chỉ phát bằng KKPhim.
-     */
-    fun source(d: FilmDetail, group: EpisodeGroup?, ep: Episode): EpisodeSource =
-        if (!appliesTo(d.url)) Site.source(ep.url) else combine(ep.url, { Site.source(ep.url) }, { servers(d, group, ep) })
+    /** Server dự phòng (KKPhim "kk-…", NguonC "nc-…"): link có sẵn trong EpisodeSource.links. */
+    fun isBackup(type: String) = type.startsWith(PREFIX) || type.startsWith(NguonC.PREFIX)
 
     /**
-     * Chạy song song trang tập (site) và tìm KKPhim (kk). Trang xong thì chờ KKPhim thêm tới [waitMs] tính từ lúc bắt
-     * đầu; trang lỗi thì chờ tới [failWaitMs] (lúc đó KKPhim là đường duy nhất). KKPhim lỗi = không có server dự phòng.
+     * Trang tập + server dự phòng KKPhim và NguonC, tải song song. Nguồn dự phòng chậm / lỗi thì thôi (chờ thêm tối đa
+     * vài giây, không báo lỗi). Trang tập lỗi mà nguồn dự phòng có tập này → chỉ phát bằng nguồn dự phòng.
      */
+    fun source(d: FilmDetail, group: EpisodeGroup?, ep: Episode): EpisodeSource {
+        val backups = listOfNotNull(
+            if (appliesTo(d.url)) ({ servers(d, group, ep) }) else null,
+            if (NguonC.appliesTo(d.url)) ({ NguonC.servers(d, group, ep) }) else null,
+        )
+        return if (backups.isEmpty()) Site.source(ep.url) else combineAll(ep.url, { Site.source(ep.url) }, backups)
+    }
+
     fun combine(
         epUrl: String, site: () -> EpisodeSource, kk: () -> List<Pair<Server, Video>>,
         waitMs: Long = 6_000, failWaitMs: Long = 15_000,
+    ): EpisodeSource = combineAll(epUrl, site, listOf(kk), waitMs, failWaitMs)
+
+    /**
+     * Chạy song song trang tập (site) và các nguồn dự phòng (mỗi nguồn một luồng). Trang xong thì chờ nguồn dự phòng thêm
+     * tới [waitMs] tính từ lúc bắt đầu; trang lỗi thì chờ tới [failWaitMs] (lúc đó dự phòng là đường duy nhất). Nguồn nào
+     * chưa xong / lỗi thì bỏ, nguồn đã xong vẫn dùng.
+     */
+    fun combineAll(
+        epUrl: String, site: () -> EpisodeSource, backups: List<() -> List<Pair<Server, Video>>>,
+        waitMs: Long = 6_000, failWaitMs: Long = 15_000,
     ): EpisodeSource {
         val start = System.currentTimeMillis()
-        val task = FutureTask { runCatching(kk).getOrDefault(emptyList()) }
-        thread(isDaemon = true, name = "kkphim") { task.run() }
+        val tasks = backups.map { b -> FutureTask { runCatching(b).getOrDefault(emptyList()) } }
+        tasks.forEach { t -> thread(isDaemon = true, name = "backup") { t.run() } }
         val src = runCatching(site)
-        val wait = (if (src.isSuccess) waitMs else failWaitMs) - (System.currentTimeMillis() - start)
-        val extra = runCatching { task.get(wait.coerceAtLeast(1), TimeUnit.MILLISECONDS) }.getOrDefault(emptyList())
+        val deadline = start + if (src.isSuccess) waitMs else failWaitMs
+        val extra = tasks.flatMap { t ->
+            runCatching { t.get((deadline - System.currentTimeMillis()).coerceAtLeast(1), TimeUnit.MILLISECONDS) }
+                .getOrDefault(emptyList())
+        }
         src.onSuccess { return attach(it, extra) }
         if (extra.isEmpty()) throw src.exceptionOrNull()!!
         return EpisodeSource(epUrl, extra.map { it.first }, "", "", "", null, null, false, extra.associate { it.first.type to it.second })
@@ -169,7 +186,9 @@ object KkPhim {
      */
     fun names(m: JSONObject): Set<String> {
         val out = HashSet<String>()
-        for (raw in listOf(str(m, "name"), str(m, "origin_name"))) {
+        // NguonC: original_name có thể gồm nhiều tên cách nhau dấu phẩy ("Mu Shen Ji, Tales of Herding Gods")
+        val others = str(m, "original_name").split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        for (raw in listOf(str(m, "name"), str(m, "origin_name")) + others) {
             out += norm(raw)
             Regex("""^(.+?)\s*\((.+)\)\s*$""").find(raw)?.let { p ->
                 val inner = norm(p.groupValues[2])

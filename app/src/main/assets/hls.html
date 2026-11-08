@@ -68,11 +68,43 @@
     return out.join('\n');
   }
 
-  if (!window.Hls || !Hls.isSupported()) {
-    v.src = SRC; // WebView không có MediaSource: thử để Android tự phát HLS (không bỏ được quảng cáo)
+  // Tệp video thường (MP4 của CLB Phim Xưa, không phải .m3u8): phát thẳng bằng <video>
+  var FILE = !/\.m3u8$/i.test(SRC.split('?')[0].split('#')[0]);
+  if (FILE || !window.Hls || !Hls.isSupported()) {
+    // WebView không có MediaSource: thử để Android tự phát HLS (không bỏ được quảng cáo)
+    v.src = SRC;
+    if (START > 0) v.addEventListener('loadedmetadata', function once() {
+      v.removeEventListener('loadedmetadata', once);
+      if (v.currentTime < 1) v.currentTime = START;
+    });
+    v.addEventListener('error', function () { window.__chimtoErr = 'media-error-' + (v.error ? v.error.code : 0); });
+    var p0 = v.play(); if (p0 && p0.catch) p0.catch(function () {});
     return;
   }
   var Base = Hls.DefaultConfig.loader;
+
+  // Đoạn video ngụy trang ảnh PNG (VSMOV: ảnh nhỏ đứng trước dữ liệu MPEG-TS) → bỏ phần ảnh, giữ từ byte đồng bộ 0x47
+  // đầu tiên mà các gói 188 byte sau cũng bắt đầu bằng 0x47. Đoạn bình thường (bắt đầu bằng 0x47) giữ nguyên.
+  function unwrap(buf) {
+    var b = new Uint8Array(buf);
+    if (b.length < 8 || b[0] !== 0x89 || b[1] !== 0x50 || b[2] !== 0x4E || b[3] !== 0x47) return buf;
+    for (var i = 8, n = Math.min(b.length - 188 * 3, 65536); i < n; i++) {
+      if (b[i] === 0x47 && b[i + 188] === 0x47 && b[i + 376] === 0x47 && b[i + 564] === 0x47) return buf.slice(i);
+    }
+    return buf;
+  }
+  function FragLoader(config) {
+    var l = new Base(config), load = l.load.bind(l);
+    l.load = function (ctx, cfg, cb) {
+      var ok = cb.onSuccess;
+      cb.onSuccess = function (resp, stats, c, nd) {
+        if (resp.data instanceof ArrayBuffer) resp.data = unwrap(resp.data);
+        ok(resp, stats, c, nd);
+      };
+      load(ctx, cfg, cb);
+    };
+    return l;
+  }
   function AdFreeLoader(config) {
     var l = new Base(config), load = l.load.bind(l);
     l.load = function (ctx, cfg, cb) {
@@ -95,7 +127,7 @@
       errorRetry: { maxNumRetry: 3, retryDelayMs: 1000, maxRetryDelayMs: 8000 } } };
   }
   // START > 0: app báo trước chỗ bắt đầu (xem tiếp / hết nhạc mở đầu) → tải thẳng đoạn ở đó
-  var hls = new Hls({ pLoader: AdFreeLoader, maxBufferLength: BUFFER, maxMaxBufferLength: 600, backBufferLength: 30,
+  var hls = new Hls({ pLoader: AdFreeLoader, fLoader: FragLoader, maxBufferLength: BUFFER, maxMaxBufferLength: 600, backBufferLength: 30,
     manifestLoadPolicy: load(Infinity), playlistLoadPolicy: load(10000), startPosition: START > 0 ? START : -1 });
 
   // Phục hồi khi lỗi hẳn: tối đa vài lần trong 2 phút (phim dài, mạng rớt lẻ tẻ cách xa nhau vẫn phục hồi được)
