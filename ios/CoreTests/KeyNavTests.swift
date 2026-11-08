@@ -38,6 +38,21 @@ final class KeyNavTests: XCTestCase {
         XCTAssertEqual(mv("a0", .up), "a0")
     }
 
+    /// Trang chủ tổng hợp trên iPhone dọc: chủ đề (lưới 3 cột) rồi hai dải vuốt ngang.
+    func testStrips() {
+        let g = [["t0", "t1", "t2", "t3"], ["a0", "a1", "a2", "a3", "a4", "a5", "a6"], ["b0", "b1", "b2"]]
+        let s = [false, true, true]
+        func mv(_ from: String, _ d: KeyNav.Dir) -> String? { KeyNav.move(g, cols: 3, from: from, d, strips: s) }
+        XCTAssertEqual(mv("a2", .right), "a3") // cả dải một dòng
+        XCTAssertEqual(mv("a6", .right), "b0")
+        XCTAssertEqual(mv("a5", .down), "b2") // giữ thứ tự ô, dải dưới ngắn thì về ô cuối
+        XCTAssertEqual(mv("b1", .up), "a1")
+        XCTAssertEqual(mv("a5", .up), "t3") // lên lưới: hàng cuối, cột không quá số cột
+        XCTAssertEqual(mv("t1", .down), "t3")
+        XCTAssertEqual(mv("t3", .down), "a0")
+        XCTAssertEqual(mv("b2", .down), "b2")
+    }
+
     func testColumns() {
         XCTAssertEqual(KeyNav.columns(width: 800, minimum: 150, spacing: 16), 4)
         XCTAssertEqual(KeyNav.columns(width: 100, minimum: 150, spacing: 16), 1)

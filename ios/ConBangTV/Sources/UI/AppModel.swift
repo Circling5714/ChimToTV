@@ -28,6 +28,8 @@ struct GridSection: Identifiable, Hashable {
     var items: [GridFilm]
     /// Dòng ghi chú chữ mờ dưới nhóm (vd tìm mọi trang: trang đang tìm / không có phim / không trả lời).
     var note: String? = nil
+    /// Dải vuốt ngang (trang chủ tổng hợp trên iPhone dọc): cả nhóm một dòng, «Xem thêm ›» ở tiêu đề + ô hẹp cuối dải.
+    var strip = false
 }
 
 /// Trạng thái màn chính (bản Android: MainActivity): menu bên trái, lưới phim, tìm kiếm, lịch sử, theo dõi.
@@ -149,6 +151,9 @@ final class AppModel: ObservableObject {
 
     private func begin() {
         started = true
+        // Màn hẹp biết trước khi lưới hiện lần đầu (khỏi vẽ lưới rồi mới đổi sang dải vuốt ngang)
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        stripMode = (scenes.flatMap { $0.windows }.first?.bounds.width ?? UIScreen.main.bounds.width) < Self.stripWidth
         showSiteLabel()
         rebuildMenu()
         select(menu[0])
@@ -529,6 +534,16 @@ final class AppModel: ObservableObject {
         }
         for r in snap.rows {
             let n = r.cards.count
+            if strips {
+                // Dải vuốt ngang: tới stripMax phim; còn nữa (hoặc nguồn có trang sau) thì ô «Xem thêm» cuối dải
+                var items = r.cards.prefix(Self.stripMax).map { GridFilm(film: $0.film, chip: $0.chip, links: $0.links) }
+                if n > Self.stripMax || r.more != nil {
+                    items.append(GridFilm(film: Film(url: "more:\(r.id)", title: r.title, poster: nil, badge: r.more == nil ? "\(n) phim" : nil),
+                                          more: r.id))
+                }
+                out.append(GridSection(id: "feed-\(r.id)", title: r.title, items: items, strip: true))
+                continue
+            }
             var items = (n > cols ? Array(r.cards.prefix(cols - 1)) : r.cards).map { GridFilm(film: $0.film, chip: $0.chip, links: $0.links) }
             if n > cols {
                 // Hàng có danh sách nhiều trang của nguồn: không ghi số phim (mới tải trang đầu)
@@ -539,6 +554,24 @@ final class AppModel: ObservableObject {
         }
         return out
     }
+
+    /// Số phim tối đa một dải vuốt ngang (còn lại xem ở «Xem thêm»).
+    static let stripMax = 12
+    /// Lưới hẹp hơn mức này (pt) thì trang chủ tổng hợp xếp dải vuốt ngang.
+    static let stripWidth: CGFloat = 500
+
+    /// Màn hẹp (iPhone dọc, iPad Slide Over): lưới tự báo. Trang chủ tổng hợp khi đó xếp mỗi hàng thành dải vuốt ngang.
+    var stripMode = false {
+        didSet { if stripMode != oldValue { relayoutFeed() } }
+    }
+
+    /// Trang chủ tổng hợp đang xếp dải vuốt ngang.
+    private var strips: Bool { stripMode && Prefs.homeMixOn }
+
+    /// Quay về từ «Xem thêm» bằng cảm ứng: cuộn tới hàng đó (không tô ô đang chọn như khi dùng bàn phím).
+    @Published var scrollTarget: String?
+    /// «Xem thêm» vừa mở bằng phím Enter (quay về thì chọn lại đúng ô).
+    private var moreByKey = false
 
     /// Số cột đổi (xoay máy, cỡ chữ): xếp lại các hàng một dòng.
     private func relayoutFeed() {
@@ -555,6 +588,7 @@ final class AppModel: ObservableObject {
         guard let row = feedSnap?.rows.first(where: { $0.id == key }) else { return }
         title = row.title
         homeNote = ""
+        moreByKey = keyOpening
         if let u = row.more {
             showList(u)
         } else {
@@ -573,7 +607,13 @@ final class AppModel: ObservableObject {
         title = active?.title ?? "Trang chủ"
         token += 1
         showSnapshot(token, snap, first: true)
-        keySel = "more:\(key)"
+        if strips && !moreByKey {
+            // Cảm ứng (dải vuốt ngang): chỉ cuộn tới hàng, không tô ô «Xem thêm» cuối dải
+            keySel = nil
+            scrollTarget = "feed-\(key)"
+        } else {
+            keySel = "more:\(key)"
+        }
     }
 
     /// Chọn / bỏ một chủ đề (người xem chưa có lịch sử) rồi tải các hàng theo chủ đề.
@@ -646,6 +686,8 @@ final class AppModel: ObservableObject {
 
     /// Ô phim đang chọn bằng phím mũi tên (id của GridFilm); nil = chưa dùng bàn phím.
     @Published var keySel: String?
+    /// Đang mở ô bằng phím Enter / Space (để biết «Xem thêm» mở bằng phím hay cảm ứng).
+    private var keyOpening = false
     /// Số cột lưới phim hiện tại (lưới tự báo theo bề rộng). Trang chủ tổng hợp xếp lại hàng một dòng khi đổi.
     var gridCols = 4 {
         didSet { if gridCols != oldValue { relayoutFeed() } }
@@ -658,7 +700,7 @@ final class AppModel: ObservableObject {
 
     func keyMove(_ d: KeyNav.Dir) {
         guard keysOnGrid else { return }
-        keySel = KeyNav.move(sections.map { $0.items.map { $0.id } }, cols: gridCols, from: keySel, d)
+        keySel = KeyNav.move(sections.map { $0.items.map { $0.id } }, cols: gridCols, from: keySel, d, strips: sections.map { $0.strip })
     }
 
     private var keyItem: GridFilm? {
@@ -673,7 +715,9 @@ final class AppModel: ObservableObject {
             keyMove(.right) // chưa chọn ô nào: chọn ô đầu
             return
         }
+        keyOpening = true
         open(item)
+        keyOpening = false
     }
 
     /// Delete: xoá phim đang chọn khỏi lịch sử / bỏ theo dõi (có hỏi lại).
@@ -822,13 +866,15 @@ final class AppModel: ObservableObject {
         if !fresh.isEmpty || !auto.isEmpty {
             out.append(GridSection(id: "head-new", title: "Có tập mới",
                                    items: fresh.map { GridFilm(film: followFilm($0), removable: true, follow: true) } +
-                                       auto.map { GridFilm(film: $0.card.film, chip: $0.card.chip, links: $0.card.links) }))
+                                       auto.map { GridFilm(film: $0.card.film, chip: $0.card.chip, links: $0.card.links) },
+                                   strip: strips))
         }
         // Trang chủ tổng hợp: mỗi hàng một dòng (như bản TV / Windows); kiểu theo trang giữ 6 phim
-        let items = Prefs.history.prefix(Prefs.homeMixOn ? max(2, gridCols) : Self.headCount)
+        let items = Prefs.history.prefix(strips ? Self.stripMax : Prefs.homeMixOn ? max(2, gridCols) : Self.headCount)
         if !items.isEmpty {
             out.append(GridSection(id: "head-continue", title: "Xem tiếp",
-                                   items: items.map { GridFilm(film: historyFilm($0), resume: true, removable: true) }))
+                                   items: items.map { GridFilm(film: historyFilm($0), resume: true, removable: true) },
+                                   strip: strips))
         }
         return out
     }

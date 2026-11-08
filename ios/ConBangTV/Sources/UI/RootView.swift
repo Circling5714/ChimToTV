@@ -344,9 +344,13 @@ struct FilmGridView: View {
             let pad: CGFloat = geo.size.width < 500 ? 14 : 20
             let cols = [GridItem(.adaptive(minimum: minW, maximum: scale.layout(230)), spacing: spacing, alignment: .top)]
             ScrollViewReader { proxy in
-                grid(cols, pad: pad)
-                    .onAppear { app.gridCols = KeyNav.columns(width: Double(geo.size.width - pad * 2), minimum: Double(minW), spacing: Double(spacing)) }
+                grid(cols, pad: pad, width: geo.size.width, spacing: spacing)
+                    .onAppear {
+                        app.stripMode = geo.size.width < AppModel.stripWidth
+                        app.gridCols = KeyNav.columns(width: Double(geo.size.width - pad * 2), minimum: Double(minW), spacing: Double(spacing))
+                    }
                     .onChange(of: geo.size.width) { w in
+                        app.stripMode = w < AppModel.stripWidth
                         app.gridCols = KeyNav.columns(width: Double(w - pad * 2), minimum: Double(minW), spacing: Double(spacing))
                     }
                     .onChange(of: scale.value) { _ in
@@ -354,29 +358,29 @@ struct FilmGridView: View {
                     }
                     .onChange(of: app.keySel) { id in
                         guard let id = id else { return }
-                        withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(id) }
+                        // Ô trong dải vuốt ngang: cuộn dọc tới cả dải (dải tự cuộn ngang tới ô)
+                        let target = app.sections.first { $0.strip && $0.items.contains { $0.id == id } }?.id ?? id
+                        withAnimation(.easeOut(duration: 0.15)) { proxy.scrollTo(target) }
+                    }
+                    .onChange(of: app.scrollTarget) { id in
+                        guard let id = id else { return }
+                        DispatchQueue.main.async {
+                            proxy.scrollTo(id, anchor: .top)
+                            app.scrollTarget = nil
+                        }
                     }
             }
         }
     }
 
-    private func grid(_ cols: [GridItem], pad: CGFloat) -> some View {
+    private func grid(_ cols: [GridItem], pad: CGFloat, width: CGFloat, spacing: CGFloat) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(app.sections) { s in
-                    if let t = s.title {
-                        Text(t).appFont(21, .semibold).foregroundColor(Theme.text)
-                            .padding(.horizontal, pad)
-                            .padding(.top, 8)
-                    }
-                    LazyVGrid(columns: cols, alignment: .leading, spacing: 20) {
-                        ForEach(s.items) { item in FilmCard(item: item).id(item.id) }
-                    }
-                    .padding(.horizontal, pad)
-                    if let n = s.note {
-                        Text(n).appFont(15).foregroundColor(Theme.dim)
-                            .padding(.horizontal, pad)
-                            .padding(.top, 6)
+                    if s.strip {
+                        strip(s, pad: pad, width: width, spacing: spacing)
+                    } else {
+                        gridSection(s, cols, pad: pad)
                     }
                 }
                 if app.nextUrl != nil {
@@ -390,11 +394,79 @@ struct FilmGridView: View {
             .padding(.vertical, 10)
         }
     }
+
+    @ViewBuilder
+    private func gridSection(_ s: GridSection, _ cols: [GridItem], pad: CGFloat) -> some View {
+        if let t = s.title {
+            Text(t).appFont(21, .semibold).foregroundColor(Theme.text)
+                .padding(.horizontal, pad)
+                .padding(.top, 8)
+        }
+        LazyVGrid(columns: cols, alignment: .leading, spacing: 20) {
+            ForEach(s.items) { item in FilmCard(item: item).id(item.id) }
+        }
+        .padding(.horizontal, pad)
+        if let n = s.note {
+            Text(n).appFont(15).foregroundColor(Theme.dim)
+                .padding(.horizontal, pad)
+                .padding(.top, 6)
+        }
+    }
+
+    /// Dải vuốt ngang (trang chủ tổng hợp trên màn hẹp): thấy trọn n phim và một phần phim kế (biết còn vuốt được);
+    /// «Xem thêm ›» ở bên phải tiêu đề, ô hẹp cuối dải.
+    private func strip(_ s: GridSection, pad: CGFloat, width: CGFloat, spacing: CGFloat) -> some View {
+        let n = CGFloat(max(2, app.gridCols))
+        let cardW = floor((width - pad - n * spacing) / (n + 0.35))
+        let more = s.items.last.flatMap { $0.more != nil ? $0 : nil }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(s.title ?? "").appFont(21, .semibold).foregroundColor(Theme.text).lineLimit(1)
+                Spacer(minLength: 0)
+                if let m = more {
+                    Button { app.open(m) } label: {
+                        Text("Xem thêm ›").appFont(15, .semibold).foregroundColor(Theme.brand)
+                            .padding(.vertical, 6)
+                            .padding(.leading, 8)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Xem thêm: \(s.title ?? "")")
+                }
+            }
+            .padding(.horizontal, pad)
+            .padding(.top, 8)
+            ScrollViewReader { inner in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(alignment: .top, spacing: spacing) {
+                        ForEach(s.items) { item in
+                            FilmCard(item: item, tileHeight: item.more != nil ? cardW * 1.5 : nil)
+                                .frame(width: item.more != nil ? max(70, floor(cardW * 0.62)) : cardW)
+                                .id(item.id)
+                        }
+                    }
+                    .padding(.horizontal, pad)
+                    .padding(.vertical, 4) // viền ô đang chọn (bàn phím) không bị cắt
+                }
+                .onAppear {
+                    // Quay về từ «Xem thêm» bằng bàn phím: dải mới dựng, cuộn tới ô đang chọn
+                    if let id = app.keySel, s.items.contains(where: { $0.id == id }) { inner.scrollTo(id) }
+                }
+                .onChange(of: app.keySel) { id in
+                    guard let id = id, s.items.contains(where: { $0.id == id }) else { return }
+                    withAnimation(.easeOut(duration: 0.15)) { inner.scrollTo(id) }
+                }
+            }
+        }
+        .id(s.id)
+    }
 }
 
 struct FilmCard: View {
     @EnvironmentObject var app: AppModel
     let item: GridFilm
+    /// Ô «Xem thêm» hẹp cuối dải vuốt ngang: cao bằng poster của dải (nil = ô lưới thường, tỉ lệ 2:3).
+    var tileHeight: CGFloat? = nil
 
     var body: some View {
         if item.topic != nil {
@@ -424,7 +496,36 @@ struct FilmCard: View {
     }
 
     /// Ô «Xem thêm ›» cuối hàng (trang chủ tổng hợp).
+    @ViewBuilder
     private var moreTile: some View {
+        if let h = tileHeight {
+            narrowMoreTile(h)
+        } else {
+            gridMoreTile
+        }
+    }
+
+    /// Ô «Xem thêm» hẹp cuối dải vuốt ngang (tên hàng đã có ở tiêu đề dải).
+    private func narrowMoreTile(_ h: CGFloat) -> some View {
+        Button { app.open(item) } label: {
+            VStack(spacing: 8) {
+                Image(systemName: "chevron.right.circle").appFont(30, .regular).foregroundColor(Theme.text)
+                Text("Xem thêm").appFont(14, .semibold).foregroundColor(Theme.text)
+                    .multilineTextAlignment(.center)
+                if let b = item.film.badge { Text(b).appFont(12).foregroundColor(Theme.dim).lineLimit(1).minimumScaleFactor(0.8) }
+            }
+            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity)
+            .frame(height: h)
+            .background(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.dim.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [6])))
+            .overlay { if app.keySel == item.id { RoundedRectangle(cornerRadius: 10).stroke(Theme.focus, lineWidth: 4) } }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScale())
+        .accessibilityLabel("Xem thêm: \(item.film.title)")
+    }
+
+    private var gridMoreTile: some View {
         Button { app.open(item) } label: {
             VStack(alignment: .leading, spacing: 7) {
                 Color.clear
