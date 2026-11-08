@@ -611,6 +611,18 @@ enum DebugRoutes {
     /// Bấm phần tử theo nhãn: khớp đúng nhãn; partial = khớp một phần (dễ trúng nhầm mục khác cùng chữ).
     private static func press(label: String, index: Int, partial: Bool) -> (Bool, String?) {
         guard let w = keyWindow, !label.isEmpty else { return (false, nil) }
+        // Hộp chọn (confirmationDialog / alert): bấm dòng theo tên — gọi khối xử lý của UIAlertAction (KVC, chỉ bản thử)
+        if let alert = Router.topController as? UIAlertController {
+            let acts = alert.actions.filter { $0.title == label || (partial && ($0.title ?? "").localizedCaseInsensitiveContains(label)) }
+            if let act = acts[safe: index] {
+                typealias Handler = @convention(block) (UIAlertAction) -> Void
+                let block = act.value(forKey: "handler")
+                alert.dismiss(animated: true) {
+                    if let b = block { unsafeBitCast(b as AnyObject, to: Handler.self)(act) }
+                }
+                return (true, act.title)
+            }
+        }
         var exact: [NSObject] = [], loose: [NSObject] = []
         var seen = Set<ObjectIdentifier>()
         walk(w, 0) { e in

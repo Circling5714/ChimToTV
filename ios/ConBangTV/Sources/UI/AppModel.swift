@@ -490,6 +490,7 @@ final class AppModel: ObservableObject {
         guard !(body.isEmpty && head.isEmpty) else { return false }
         status = .none
         homeToken = t
+        nextUrl = nil // trang chủ tổng hợp không nối trang (quay về từ «Xem thêm» thì bỏ link trang sau của danh sách đó)
         sections = head + body
         if !snap.fromCache { checkFollows() }
         return true
@@ -823,7 +824,8 @@ final class AppModel: ObservableObject {
                                    items: fresh.map { GridFilm(film: followFilm($0), removable: true, follow: true) } +
                                        auto.map { GridFilm(film: $0.card.film, chip: $0.card.chip, links: $0.card.links) }))
         }
-        let items = Prefs.history.prefix(Self.headCount)
+        // Trang chủ tổng hợp: mỗi hàng một dòng (như bản TV / Windows); kiểu theo trang giữ 6 phim
+        let items = Prefs.history.prefix(Prefs.homeMixOn ? max(2, gridCols) : Self.headCount)
         if !items.isEmpty {
             out.append(GridSection(id: "head-continue", title: "Xem tiếp",
                                    items: items.map { GridFilm(film: historyFilm($0), resume: true, removable: true) }))
