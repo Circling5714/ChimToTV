@@ -10,14 +10,37 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.7`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.7)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.8`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.8)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.4`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.4)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.5`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.5)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
 **Liên hệ**.
+
+## Trang chủ tổng hợp (từ 2.8 / iPad 1.8 / Windows 1.5)
+
+Mặc định trang chủ không chỉ lấy phim của trang đang dùng mà lấy phim mới từ **mọi trang trong danh sách** (KKPhim, NguonC,
+VSMOV, CLB Phim Xưa + trang đang dùng / xem gần đây), gộp phim trùng giữa các trang và xếp hàng theo lịch sử xem của **từng
+người xem**:
+
+- **Có tập mới** — phim theo dõi, và cả phim đang xem dở (xem trong 30 ngày) vừa ra tập mới ở bất kỳ trang nào (nhãn «có ở
+  nguonc» khi tập mới nằm ở trang khác). Mở phim / xem tập mới là thôi báo.
+- **Xem tiếp**, **Giống «phim vừa xem»**, **Vì … hay xem <thể loại>**, **<loại phim hay xem> mới cập nhật · mọi nguồn**,
+  **Thuyết minh mới** (khi từ nửa số lần mở tập gần đây là bản thuyết minh / lồng tiếng), **Mới cập nhật · mọi nguồn**,
+  **Phim lẻ mới**. Người chưa xem gì: chọn vài chủ đề (Hoạt hình Trung Quốc, Kiếm hiệp, Phim Hàn…).
+- Mỗi hàng một dòng, ô cuối **Xem thêm** mở cả hàng (Back / Esc quay lại đúng ô). Phim có ở nhiều trang ghi «N nguồn»; trang
+  phim có nút **Nguồn: … ▾** để mở phim ở trang khác.
+- Trang lỗi / chậm: mỗi trang chờ tối đa 6 giây rồi dùng bản lưu (dưới 24 giờ); trang về muộn thì trang chủ tự cập nhật (giữ ô
+  đang chọn); lỗi 3 lần liền thì tạm nghỉ trang đó 30 phút (rồi 2 giờ, 6 giờ). Dòng nhỏ bên phải tiêu đề ghi «Cập nhật lúc …»,
+  «lỗi: …», «tạm nghỉ: …», «chậm, dùng bản lưu: …». **Cài đặt → Trang chủ → Thử lại ngay** bỏ tạm nghỉ.
+- Mở app là hiện ngay trang chủ lần trước của người xem, rồi mới làm mới.
+- **Cài đặt → Trang chủ** (riêng từng người): **Tổng hợp mọi nguồn** / **Theo trang đang dùng** (kiểu cũ, như trước 2.8).
+- **Hồ sơ trẻ em** (cùng chỗ; tắt cần mã PIN phụ huynh nếu đã đặt): trang chủ luôn kiểu tổng hợp nhưng chỉ có hoạt hình hợp trẻ
+  em — Hoạt hình thiếu nhi, gia đình, lồng tiếng, gợi ý theo lịch sử chỉ lấy hoạt hình; bỏ phim 18+, kinh dị, hình sự, chiến
+  tranh và tên phim ma. Chỉ lọc trang chủ (tìm kiếm, mục của trang vẫn như cũ) — muốn khoá chặt hơn thì dùng
+  [Giới hạn giờ xem](#giới-hạn-giờ-xem-từ-21) và mã PIN người xem.
 
 ## Trang phim hỗ trợ
 
@@ -546,6 +569,15 @@ trình duyệt), VSMOV trong `ApiSite` (`VS_HOST`: `/api/danh-sach|the-loai|quoc
 miền nên `Site` / menu không phải sửa. `Video.file` = tệp MP4 → `hls.html` phát thẳng bằng `<video src>`; `hls.html` có `fLoader`
 bỏ phần ảnh PNG đứng trước dữ liệu MPEG-TS (VSMOV). `KkPhim.combineAll` chạy mọi nguồn dự phòng song song (`KkPhim.isBackup`:
 `kk-…` / `nc-…`).
+
+Trang chủ tổng hợp (từ 2.8 — `Feed.kt` / `HomeFeed.kt`, iPad `Feed.swift` / `HomeFeed.swift`, Windows `Feed.cs` /
+`HomeFeed.cs`, cùng tên hàm): `HomeFeed.plan` chọn danh sách cần tải theo lịch sử người xem (`taste`: thể loại / nước / loại phim
+đã xem, tra KKPhim theo tên qua `FilmTags`); `Feed.load` tải song song (mỗi nguồn 6 s, tổng 15 s; bản lưu trong `feed/`, sức
+khoẻ nguồn trong khoá `feed_health`); `Feed.merge` gộp theo tên chuẩn hoá (`KkPhim.norm`) + năm lệch ≤ 1, cùng địa chỉ là một
+phim; `HomeFeed.buildRows` dựng các hàng; `HomeFeed.late` lấy nguồn về muộn; `saveLast` / `last` lưu trang chủ lần trước. Khoá
+riêng từng người: `home_mix`, `home_topics`, `seen_eps`, `kids`, `watch_langs`. Bản gỡ lỗi giả một nguồn lỗi bằng tệp
+`feed_fail_<tên miền>` (TV: thư mục `files` của app; Windows: thư mục dữ liệu). Trên TV box: không lập kế hoạch / đọc JSON
+trên luồng chính, luồng tải ưu tiên 4 (mức «background» làm API chậm quá 6 s).
 
 Server dự phòng KKPhim (từ 2.6 — `KkPhim.kt` / `KkPhim.swift` / `KkPhim.cs`, cùng tên hàm): `KkPhim.source` chạy song song
 trang tập và tìm KKPhim (`combine`: trang xong thì chờ KKPhim tới 6 s tính từ lúc bắt đầu, trang lỗi thì tới 15 s). Tìm

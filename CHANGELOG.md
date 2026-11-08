@@ -7,6 +7,57 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## Windows 1.5 — 09/11/2026
+
+- **Trang chủ tổng hợp** như TV 2.8 (`Core/Feed.cs`, `Core/HomeFeed.cs` — cùng tên hàm với bản TV): phim mới từ mọi trang trong
+  danh sách, gộp phim trùng, hàng theo lịch sử từng người, «Có tập mới» cả phim đang xem dở ở trang khác, hồ sơ trẻ em, hàng
+  thuyết minh, chọn chủ đề cho người chưa có lịch sử. Mỗi hàng một dòng + «Xem thêm ›» (Esc về đúng ô); nhãn «N nguồn» dưới tên
+  phim; trang phim có nút «⇄ Nguồn: … ▾» (hộp chọn của app, đi bằng phím). Cài đặt → Trang chủ: Tổng hợp / Theo trang đang
+  dùng, Hồ sơ trẻ em, «↻ Thử lại ngay» khi có trang đang tạm nghỉ.
+- **Phím:** ▲ / ▼ trong trang không còn nhảy sang menu bên trái khi hàng dưới cách xa (có tiêu đề hàng); ◄ / ► ưu tiên mục cùng
+  hàng (hàng nút xuống dòng ở trang phim). Đổi nguồn rồi quay lại vẫn về đúng ô ở trang chủ.
+- bản 1.5.0 · tag `win-v1.5` (không phải "latest") · commit `d1e0b8d` · `ConBangTV-Windows-1.5.exe` 72 861 002 byte ·
+  SHA-256 `0781cb21f7c05b7dd905ae30e33081b04640830fb038232adf9dd22230e6daee`
+- 79 test lõi (8 test trang chủ). Thử trên máy Windows 10 (bản gỡ lỗi): các hàng, «Xem thêm» + Esc, đổi nguồn hoathinh3d → kkphim,
+  hồ sơ trẻ em bật / tắt, kiểu theo trang, giả KKPhim lỗi → «lỗi» → 3 lượt → «tạm nghỉ» → «Thử lại ngay». Tệp tải từ link
+  công khai khớp SHA-256. **Tự cập nhật thật 1.4 → 1.5** từ GitHub: hộp thoại «Có bản mới: Côn Bằng TV 1.5» → Cập nhật ngay →
+  mở lại 1.5 với trang chủ tổng hợp.
+
+## iPad 1.8 — 09/11/2026
+
+- **Trang chủ tổng hợp** như TV 2.8 (`Feed.swift`, `HomeFeed.swift`): các hàng theo lịch sử từng người, «Có tập mới» cả phim
+  đang xem dở ở trang khác, hồ sơ trẻ em, hàng thuyết minh, chọn chủ đề; mỗi hàng một dòng + ô «Xem thêm» (nút ‹ / Esc quay lại);
+  nhãn «N nguồn» ở góc ô phim; trang phim có nút «Nguồn: … ▾». Cài đặt → Trang chủ: tổng hợp / theo trang, hồ sơ trẻ em,
+  «Thử lại ngay».
+- bản 1.8 (CFBundleVersion 9) · mã gói `vn.chimto.tv` · tag `ios-v1.8` (không phải "latest") · commit `d1e0b8d` ·
+  `ConBangTV-iPad-1.8.ipa` 4 150 419 byte · SHA-256 `706ed1641b966ff75764aec04b9075bdbbf26267a060978acbee2b264b3b68bf`
+- 98 test lõi trên macOS. Bản thử 59 đã thử thật trên iPad Pro: các hàng, nhãn nguồn, «Xem thêm» + quay lại, đổi nguồn phim 3
+  nguồn (hoathinh3d.pw / yanhh3d / kkphim), hồ sơ trẻ em bật / tắt, kiểu theo trang. Bản chính thức đã cài lên iPad (1.8); chưa
+  mở được vì iPad khoá màn hình ngay sau đó. iPhone mới cài bản thử 59, chưa thử. Tệp tải từ link công khai khớp SHA-256.
+
+## 2.8 — 09/11/2026
+
+- **Trang chủ tổng hợp** (`Feed.kt`, `HomeFeed.kt`) — mặc định cho mọi người xem:
+  - Lấy phim mới từ mọi trang trong danh sách (KKPhim, NguonC, VSMOV, CLB Phim Xưa + trang đang dùng / xem gần đây), gộp phim
+    trùng giữa các trang (tên đã chuẩn hoá, năm lệch ≤ 1).
+  - Hàng theo lịch sử xem của từng người: **Có tập mới** (cả phim đang xem dở có tập mới ở trang khác — «có ở nguonc»), Xem tiếp,
+    Giống «phim vừa xem», Vì … hay xem <thể loại>, <loại phim hay xem> mới cập nhật · mọi nguồn, **Thuyết minh mới** (khi từ nửa
+    số lần mở tập gần đây là bản thuyết minh / lồng tiếng), Mới cập nhật · mọi nguồn, Phim lẻ mới. Người chưa có lịch sử chọn
+    chủ đề.
+  - Mỗi hàng một dòng + ô «Xem thêm»; ô phim ghi «N nguồn»; trang phim có nút «Nguồn: … ▾» để mở ở trang khác.
+  - Trang lỗi / chậm: mỗi trang hạn 6 giây, dùng bản lưu (dưới 24 giờ), về muộn thì trang chủ tự cập nhật (giữ ô đang chọn), lỗi
+    3 lượt liền thì tạm nghỉ 30 phút / 2 giờ / 6 giờ; dòng trạng thái bên phải tiêu đề; Cài đặt → «Thử lại ngay».
+  - Mở app hiện ngay trang chủ lần trước của người xem (~0,8 s trên TV box), rồi làm mới (~5–9 s).
+- **Hồ sơ trẻ em** (Cài đặt → Trang chủ, riêng từng người; tắt cần mã PIN phụ huynh nếu đã đặt): trang chủ chỉ có hoạt hình hợp
+  trẻ em — thiếu nhi, gia đình, lồng tiếng; bỏ phim 18+ / kinh dị / hình sự / chiến tranh và tên phim ma. Chỉ lọc trang chủ.
+- Cài đặt → Trang chủ: «Tổng hợp mọi nguồn» hoặc «Theo trang đang dùng» (như trước 2.8).
+- versionCode 29 · tag `v2.8` · commit `d1e0b8d` · `ChimToTV-2.8.apk` 1 195 968 byte · SHA-256
+  `2f13f8b9573a49cba6e44bb2786e1c8b48207d1b3a9a4ef037992bac688b5cf7`
+- 104 test (17 test trang chủ). Thử bản gỡ lỗi trên TV box: gộp nguồn (Đấu Phá Thương Khung Phần 5 = yanhh3d + hoathinh3d.pw +
+  KKPhim), đổi nguồn, «Xem thêm», giả KKPhim lỗi → bản lưu / «lần kiểm trước» / tạm nghỉ / «Thử lại ngay», kiểu cũ, người xem
+  mới chọn chủ đề, hàng thuyết minh, hồ sơ trẻ em. Bản chính thức thử trên TV box (lịch sử cũ → «Có tập mới» 4 phim). API
+  `releases/latest` trả `v2.8` + `.apk`, tệp tải từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.7 → 2.8** trên TV box.
+
 ## Windows 1.4 — 08/11/2026
 
 - **Thêm 3 trang** như TV 2.7 (`NguonC.cs`, `Stremio.cs`, VSMOV trong `ApiSite.cs`): NguonC, VSMOV, CLB Phim Xưa (qua add-on k-20);
