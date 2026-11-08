@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nhãn nhỏ góc trên poster (số nguồn / tên nguồn) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#CC0A0C10" />
+    <corners android:radius="9dp" />
+</shape>

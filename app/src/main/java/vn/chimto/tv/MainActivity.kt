@@ -61,7 +61,20 @@ class MainActivity : BaseActivity() {
     private var drawerOpen = false
 
     private val menuAdapter = MenuAdapter<Entry>({ it.title }, ::onMenu)
-    private val gridAdapter = FilmGridAdapter(::openFilm, ::loadMore, ::confirmRemove)
+    private val gridAdapter = FilmGridAdapter(::openFilm, ::loadMore, ::confirmRemove, ::openMore, ::toggleTopic)
+    private lateinit var homeNote: TextView
+
+    /**
+     * Trang chủ tổng hợp: lần dựng gần nhất (feedAt = lúc tải xong); autoFresh = phim đang xem dở vừa có tập mới;
+     * moreFrom = đang xem cả một hàng («Xem thêm») — Back quay lại trang chủ đúng ô đó; pendingFocus = ô cần chọn lại sau
+     * khi dựng lại (vd chủ đề vừa bấm).
+     */
+    private var feedSnap: HomeFeed.Snapshot? = null
+    private var feedAt = 0L
+    private var autoFresh: List<FreshCard> = emptyList()
+    private var moreFrom: String? = null
+    private var pendingFocus: String? = null
+    private var loadedMix: Boolean? = null
 
     private var categories: List<Category> = emptyList()
     private var token = 0
@@ -96,6 +109,7 @@ class MainActivity : BaseActivity() {
         scrim = findViewById(R.id.scrim)
         menuBtn = findViewById(R.id.menuBtn)
         siteTag = findViewById(R.id.siteTag)
+        homeNote = findViewById(R.id.homeNote)
         menuBtn.setOnClickListener { openDrawer() }
         scrim.setOnClickListener { closeDrawer() }
 
@@ -188,6 +202,18 @@ class MainActivity : BaseActivity() {
     // Màn chính trên điện thoại cầm dọc: không hiện nút "Thoát" (đã có ☰; Back của điện thoại nhấn 2 lần là thoát)
     override val touchBackHidden get() = Screen.narrow(this)
 
+    /** Đang chạm: nút "Thoát" nổi ở góc phải trên — dòng trạng thái trang chủ chừa chỗ cho khỏi bị che. */
+    override fun onTouchUiChanged(active: Boolean) {
+        if (!::homeNote.isInitialized) return
+        (homeNote.layoutParams as? LinearLayout.LayoutParams)?.let { lp ->
+            val end = if (active && !Screen.narrow(this)) dp(96) else dp(8)
+            if (lp.marginEnd != end) {
+                lp.marginEnd = end
+                homeNote.layoutParams = lp
+            }
+        }
+    }
+
     private fun openDrawer() {
         if (!Screen.narrow(this) || drawerOpen) return
         drawerOpen = true
@@ -267,10 +293,14 @@ class MainActivity : BaseActivity() {
         showSiteLabel()
         val active = menuAdapter.active
         if (loadedProfile != Prefs.profileId ||
-            (loadedBase != null && (loadedBase != Prefs.baseUrl || loadedProxy != Prefs.proxyConfig()))
+            (loadedBase != null && (loadedBase != Prefs.baseUrl || loadedProxy != Prefs.proxyConfig())) ||
+            (loadedMix != null && loadedMix != Prefs.homeMix)
         ) {
-            // Đổi người xem, link trang hoặc proxy trong Cài đặt → tải lại từ đầu
+            // Đổi người xem, link trang, proxy hoặc kiểu trang chủ trong Cài đặt → tải lại từ đầu
             reloadSite()
+        } else if (homeToken == token && moreFrom == null && Prefs.homeMix && System.currentTimeMillis() - feedAt > FEED_REFRESH) {
+            // Trang chủ tổng hợp mở lâu (xem phim xong quay ra sau 20 phút): làm mới
+            showHome()
         } else if (active?.kind == Kind.HISTORY) {
             showHistory(focusFirst = false)
         } else if (active?.kind == Kind.FOLLOWS) {
@@ -587,6 +617,8 @@ class MainActivity : BaseActivity() {
         menuAdapter.active = entry
         titleView.text = entry.title
         search.visibility = if (entry.kind == Kind.SEARCH) View.VISIBLE else View.GONE
+        moreFrom = null
+        homeNote.visibility = View.GONE
         when (entry.kind) {
             Kind.HOME -> showHome()
             Kind.SEARCH -> {
@@ -607,6 +639,13 @@ class MainActivity : BaseActivity() {
     }
 
     private fun showHome() {
+        loadedMix = Prefs.homeMix
+        if (Prefs.homeMix) {
+            showMixHome()
+            return
+        }
+        homeNote.visibility = View.GONE
+        autoFresh = emptyList()
         val t = ++token
         val base = Prefs.baseUrl
         loadedProxy = Prefs.proxyConfig()
@@ -644,6 +683,219 @@ class MainActivity : BaseActivity() {
                 status.message("Không tải được trang chủ.\n${it.friendly()}", ::showHome)
             }
         }
+    }
+
+    /** Một lượt tải trang chủ tổng hợp: t = token; shown = đã hiện gì đó (trang lần trước / bản lưu); fresh = đã có bản mới. */
+    private class FeedRun(val t: Int, val refreshing: Boolean) {
+        val startedAt = System.currentTimeMillis()
+        var shown = refreshing
+        var fresh = false
+    }
+
+    private fun debugFeed(run: FeedRun, step: String) {
+        if (BuildConfig.DEBUG) android.util.Log.d("ChimToFeed", "$step sau ${System.currentTimeMillis() - run.startedAt} ms")
+    }
+
+    /**
+     * Trang chủ tổng hợp: 1) hiện ngay trang chủ lần trước của người xem (một tệp nhỏ), 2) lập kế hoạch ở luồng nền (đọc lịch
+     * sử, tính sở thích — TV yếu đọc JSON chậm), 3) chưa có trang lần trước thì dựng từ bản lưu từng nguồn, 4) tải mới mọi
+     * nguồn (mỗi nguồn tối đa 6 giây) rồi thay vào — ô đang chọn giữ nguyên chỗ. Nguồn lỗi / chậm ghi ở dòng trạng thái bên
+     * phải tiêu đề, không che màn hình.
+     */
+    private fun showMixHome() {
+        // Trang chủ đang hiện (làm mới / vừa chọn chủ đề): giữ nguyên lưới tới khi có bản mới, không vẽ lại bản lưu
+        val refreshing = homeToken == token && feedSnap != null && !gridAdapter.isEmpty
+        val run = FeedRun(++token, refreshing)
+        nextUrl = null
+        loadedBase = Prefs.baseUrl
+        loadedProxy = Prefs.proxyConfig()
+        homeNote.visibility = if (Screen.narrow(this)) View.GONE else View.VISIBLE
+        homeNote.text = "Đang làm mới…"
+        if (run.refreshing) {
+            homeToken = run.t
+        } else {
+            gridAdapter.clear()
+            status.loading("Đang tải trang chủ…")
+        }
+        val pid = Prefs.profileId
+        background({ if (run.refreshing) null else HomeFeed.last(pid) }) { lr ->
+            if (run.t != token) return@background
+            lr.getOrNull()?.let {
+                run.shown = showSnapshot(run.t, it, first = true)
+                debugFeed(run, "trang chủ lần trước")
+            }
+            planFeed(run)
+        }
+    }
+
+    private fun planFeed(run: FeedRun) {
+        background({ HomeFeed.plan() }) { pr ->
+            if (run.t != token) return@background
+            val plan = pr.getOrElse {
+                if (!run.shown) status.message("Không tải được trang chủ.\n${it.friendly()}", ::showHome)
+                return@background
+            }
+            homeNote.text = "Đang làm mới ${plan.src.count} nguồn…"
+            if (!run.shown) {
+                status.loading("Đang tải trang chủ từ ${plan.src.count} nguồn…")
+                background({ HomeFeed.cached(plan) }) { r ->
+                    debugFeed(run, "bản lưu từng nguồn")
+                    if (run.t != token || run.fresh) return@background
+                    r.getOrNull()?.let { run.shown = showSnapshot(run.t, it, first = true) }
+                }
+            }
+            background({ HomeFeed.load(plan) }) { r ->
+                if (run.t != token) return@background
+                run.fresh = true
+                debugFeed(run, "tải xong")
+                r.onSuccess {
+                    feedAt = System.currentTimeMillis()
+                    showSnapshot(run.t, it, first = !run.shown)
+                    followLate(run.t, it, 0)
+                }.onFailure {
+                    if (!run.shown) status.message("Không tải được trang chủ.\n${it.friendly()}", ::showHome)
+                }
+            }
+        }
+    }
+
+    /**
+     * Nguồn chậm (TV yếu đọc trang web mất 10–15 giây) về muộn: cứ 4 giây xem bản lưu của chúng đã mới chưa, có thì dựng lại
+     * trang (ô đang chọn giữ nguyên). Thôi sau 5 lần — dòng trạng thái ghi «chậm, dùng bản lưu».
+     */
+    private fun followLate(t: Int, snap: HomeFeed.Snapshot, tries: Int) {
+        if (!snap.pending) return
+        if (tries >= LATE_TRIES) {
+            if (t == token) homeNote.text = snap.noteGaveUp
+            return
+        }
+        mainHandler.postDelayed({
+            if (t != token || isFinishing || isDestroyed) return@postDelayed
+            background({ HomeFeed.late(snap) }) { r ->
+                if (t != token) return@background
+                val next = r.getOrNull()
+                if (next != null) showSnapshot(t, next, first = false)
+                followLate(t, next ?: snap, tries + 1)
+            }
+        }, LATE_STEP)
+    }
+
+    /** Hiện một lần dựng trang chủ tổng hợp; first = thay cả lưới (chọn ô đầu / pendingFocus). false nếu không có gì. */
+    private fun showSnapshot(t: Int, snap: HomeFeed.Snapshot, first: Boolean): Boolean {
+        feedSnap = snap
+        nextUrl = null // vừa từ «Xem thêm» (danh sách có trang sau) quay lại: trang chủ không tải nối
+        autoFresh = snap.fresh
+        homeNote.text = snap.note
+        snap.movedTo?.let { (old, new) ->
+            if (old == Prefs.baseUrl) {
+                Prefs.replaceSite(old, new)
+                loadedBase = new
+                showSiteLabel()
+                toast("Trang đã chuyển sang ${Site.hostOf(new)} — đã tự cập nhật link.")
+            }
+        }
+        snap.categories?.let {
+            if (it.isNotEmpty() && it != categories) {
+                categories = it
+                rebuildMenu()
+            }
+        }
+        val body = feedRows(snap)
+        val headNow = headRows()
+        if (body.isEmpty() && headNow.isEmpty()) {
+            if (!snap.fromCache) status.message("Không tải được phim từ nguồn nào.\n${snap.note}", ::showHome)
+            return false
+        }
+        status.hide()
+        head = headNow
+        homeToken = t
+        val rows = head + body
+        val focusKey = pendingFocus ?: if (first) null else focusedKey()
+        pendingFocus = null
+        gridAdapter.submit(rows, focusFirst = first && focusKey == null)
+        if (focusKey != null) focusKeyAfterSubmit(focusKey)
+        if (!snap.fromCache) Follows.check(this, done = ::onFollowsChecked)
+        return true
+    }
+
+    /** Khoá của ô đang chọn trong lưới (địa chỉ phim / id hàng «Xem thêm» / id chủ đề). */
+    private fun focusedKey(): String? {
+        val pos = grid.focusedChild?.let { grid.getChildAdapterPosition(it) } ?: return null
+        return keyOf(gridAdapter.items.getOrNull(pos))
+    }
+
+    private fun keyOf(r: GridRow?): String? = when (r) {
+        is FilmRow -> r.film.url
+        is MoreRow -> "more:" + r.key
+        is ChipRow -> "chip:" + r.id
+        else -> null
+    }
+
+    private fun focusKeyAfterSubmit(key: String) {
+        val i = gridAdapter.items.indexOfFirst { keyOf(it) == key }.takeIf { it >= 0 } ?: gridAdapter.firstFilmPosition()
+        if (i < 0) return
+        grid.post {
+            grid.scrollToPosition(i)
+            grid.post { grid.findViewHolderForAdapterPosition(i)?.itemView?.focusForRemote() }
+        }
+    }
+
+    /** Các hàng phim của trang chủ tổng hợp (dưới «Có tập mới» / «Xem tiếp»): mỗi hàng một dòng, ô cuối «Xem thêm». */
+    private fun feedRows(snap: HomeFeed.Snapshot): List<GridRow> {
+        val out = ArrayList<GridRow>()
+        val span = gridAdapter.spanCount
+        if (Prefs.history.isEmpty()) {
+            out += HeaderRow("Chọn vài chủ đề bạn thích — trang chủ sẽ gợi ý theo đó (OK để chọn / bỏ)")
+            val on = Prefs.homeTopics
+            HomeFeed.TOPICS.forEach { (id, label) -> out += ChipRow(id, label, id in on) }
+        }
+        for (row in snap.rows) {
+            out += HeaderRow(row.title)
+            val n = row.cards.size
+            val show = if (n > span) row.cards.take(span - 1) else row.cards
+            show.forEach { c -> out += FilmRow(c.film, chip = c.chip, links = c.links) }
+            // Hàng có danh sách nhiều trang của nguồn: không ghi số phim (mới tải trang đầu)
+            if (n > span) out += MoreRow(row.id, row.title, if (row.more != null) 0 else n)
+        }
+        return out
+    }
+
+    /** «Xem thêm»: cả hàng (danh sách có phân trang của nguồn nếu có, không thì mọi phim đã gộp). Back quay lại trang chủ. */
+    private fun openMore(m: MoreRow) {
+        val row = feedSnap?.rows?.firstOrNull { it.id == m.key } ?: return
+        titleView.text = row.title
+        homeNote.visibility = View.GONE
+        if (row.more != null) {
+            showList(row.more)
+        } else {
+            token++
+            nextUrl = null
+            status.hide()
+            gridAdapter.submit(row.cards.map { FilmRow(it.film, chip = it.chip, links = it.links) }, focusFirst = true)
+        }
+        moreFrom = m.key
+    }
+
+    /** Back từ «Xem thêm»: dựng lại trang chủ từ lần tải gần nhất (không tải lại), chọn đúng ô «Xem thêm» vừa bấm. */
+    private fun backFromMore(): Boolean {
+        val key = moreFrom ?: return false
+        moreFrom = null
+        val snap = feedSnap ?: return false
+        titleView.text = homeEntry().title
+        homeNote.visibility = if (Screen.narrow(this)) View.GONE else View.VISIBLE
+        pendingFocus = "more:$key"
+        showSnapshot(++token, snap, first = true)
+        return true
+    }
+
+    /** Chọn / bỏ một chủ đề (người xem chưa có lịch sử) rồi tải lại trang chủ, giữ ô chủ đề đang chọn. */
+    private fun toggleTopic(c: ChipRow) {
+        val set = Prefs.homeTopics.toMutableSet()
+        if (!set.add(c.id)) set.remove(c.id)
+        Prefs.homeTopics = set
+        pendingFocus = "chip:" + c.id
+        feedSnap?.let { showSnapshot(token, it, first = true) } // chủ đề đổi màu ngay, rồi tải các hàng theo chủ đề
+        showHome()
     }
 
     private fun showList(url: String, loader: () -> FilmPage = { Site.list(url) }) {
@@ -708,6 +960,13 @@ class MainActivity : BaseActivity() {
 
         /** Mỗi trang chờ tối đa 12 giây kể từ lúc bắt đầu hỏi trang đó (không vào được thì thôi, nhường chỗ trang khác). */
         const val SEARCH_TIMEOUT = 12_000L
+
+        /** Trang chủ tổng hợp: quay lại app sau 20 phút thì tải mới. */
+        const val FEED_REFRESH = 20 * 60_000L
+
+        /** Chờ nguồn chậm về muộn: 5 lần, mỗi lần 4 giây. */
+        const val LATE_TRIES = 5
+        const val LATE_STEP = 4_000L
     }
 
     /**
@@ -781,13 +1040,20 @@ class MainActivity : BaseActivity() {
         else gridAdapter.replaceTail(before, added + listOfNotNull(note))
     }
 
-    /** Đầu trang chủ: "Có tập mới" (phim theo dõi vừa ra tập) rồi "Xem tiếp" (phim xem gần nhất, mọi trang). */
+    /**
+     * Đầu trang chủ: "Có tập mới" (phim theo dõi vừa ra tập; trang chủ tổng hợp: cả phim đang xem dở vừa có tập mới ở bất
+     * kỳ nguồn nào) rồi "Xem tiếp" (phim xem gần nhất, mọi trang).
+     */
     private fun headRows(): List<GridRow> {
         val rows = ArrayList<GridRow>()
         val fresh = Prefs.follows.filter { it.newCount > 0 }
-        if (fresh.isNotEmpty()) {
+        val followed = Prefs.follows.map { KkPhim.norm(it.title) }.toSet()
+        // Đã mở phim / xem tập mới từ lúc dựng trang (seenEp tăng) thì thôi báo
+        val auto = if (!Prefs.homeMix) emptyList() else autoFresh.filter { (Prefs.seenEp(it.key) ?: -1.0) < it.ep && it.key !in followed }
+        if (fresh.isNotEmpty() || auto.isNotEmpty()) {
             rows += HeaderRow("Có tập mới")
             fresh.forEach { rows += FilmRow(followFilm(it), removable = true, follow = true) }
+            auto.forEach { rows += FilmRow(it.card.film, chip = it.card.chip, links = it.card.links) }
         }
         val items = Prefs.history.take(gridAdapter.spanCount)
         if (items.isNotEmpty()) {
@@ -914,7 +1180,7 @@ class MainActivity : BaseActivity() {
 
     private fun openFilm(row: FilmRow) {
         val item = if (row.resume) Prefs.historyFor(row.film.url) else null
-        startActivity(if (item != null) PlayerActivity.resume(this, item) else DetailActivity.intent(this, row.film))
+        startActivity(if (item != null) PlayerActivity.resume(this, item) else DetailActivity.intent(this, row.film, row.links))
     }
 
     @Deprecated("Deprecated in Java")
@@ -927,6 +1193,8 @@ class MainActivity : BaseActivity() {
             closeDrawer()
             return
         }
+        // Đang xem cả một hàng («Xem thêm») của trang chủ tổng hợp → quay lại trang chủ
+        if (backFromMore()) return
         // Đang ở lưới / ô tìm kiếm → quay về menu (điện thoại cầm dọc: mở ngăn kéo menu); đang ở menu → nhấn 2 lần để thoát
         if (Screen.narrow(this) && !TouchUi.active && (grid.hasFocus() || search.hasFocus())) {
             openDrawer()

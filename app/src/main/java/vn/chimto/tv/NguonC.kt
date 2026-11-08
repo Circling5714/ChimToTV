@@ -65,8 +65,10 @@ object NguonC {
             "Phim thuyết minh" to api(o, "films/ngon-ngu/thuyet-minh"),
         )
         val sections = ApiSite.sections(blocks) { parseList(get(it), it).films }
-        return Home(sections, MENU.map { (t, p) -> Category(t, api(o, p)) }, null)
+        return Home(sections, menu(base), null)
     }
+
+    fun menu(base: String): List<Category> = ApiSite.origin(base).let { o -> MENU.map { (t, p) -> Category(t, api(o, p)) } }
 
     fun newestUrl(base: String) = api(ApiSite.origin(base), "films/phim-moi-cap-nhat")
 

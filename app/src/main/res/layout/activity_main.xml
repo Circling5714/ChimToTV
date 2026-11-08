@@ -113,6 +113,19 @@
                 android:textSize="24sp"
                 android:textStyle="bold" />
 
+            <!-- Trang chủ tổng hợp: lúc cập nhật, nguồn lỗi / đang làm mới -->
+            <TextView
+                android:id="@+id/homeNote"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:ellipsize="end"
+                android:maxWidth="420dp"
+                android:singleLine="true"
+                android:textColor="@color/text_dim"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
             <!-- Tên trang đang dùng ở góc phải (chỉ điện thoại cầm dọc; TV ghi dưới tên app ở menu) -->
             <TextView
                 android:id="@+id/siteTag"

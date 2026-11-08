@@ -24,8 +24,13 @@ import kotlin.math.max
 
 class DetailActivity : BaseActivity() {
     companion object {
-        fun intent(context: Context, film: Film): Intent = Intent(context, DetailActivity::class.java)
+        /** links: các nguồn có cùng phim (trang chủ tổng hợp) — có từ 2 nguồn thì hiện nút «Nguồn: … ▾» để đổi. */
+        fun intent(context: Context, film: Film, links: List<FeedItem> = emptyList()): Intent = Intent(context, DetailActivity::class.java)
             .putExtra("url", film.url).putExtra("title", film.title).putExtra("poster", film.poster)
+            .putStringArrayListExtra("alt_urls", ArrayList(links.map { it.url }))
+            .putStringArrayListExtra("alt_titles", ArrayList(links.map { it.title }))
+            .putStringArrayListExtra("alt_labels", ArrayList(links.map { it.badge.orEmpty() }))
+            .putStringArrayListExtra("alt_posters", ArrayList(links.map { it.poster.orEmpty() }))
     }
 
     private lateinit var url: String
@@ -87,7 +92,42 @@ class DetailActivity : BaseActivity() {
         }
         btnJump.setOnClickListener { askEpisode() }
         findViewById<View>(R.id.btnWeb).setOnClickListener { startActivity(WebActivity.intent(this, url)) }
+        showSources()
         load()
+    }
+
+    /** Phim có ở nhiều nguồn (mở từ trang chủ tổng hợp): nút «Nguồn: <trang> ▾» → chọn nguồn khác (mở lại trang phim). */
+    private fun showSources() {
+        val urls = intent.getStringArrayListExtra("alt_urls").orEmpty()
+        if (urls.size < 2) return
+        val titles = intent.getStringArrayListExtra("alt_titles").orEmpty()
+        val labels = intent.getStringArrayListExtra("alt_labels").orEmpty()
+        val posters = intent.getStringArrayListExtra("alt_posters").orEmpty()
+        val sites = Prefs.sites
+        fun name(u: String) = Site.hostOf(u)?.let { siteTag(it, sites) } ?: u
+        val btn = findViewById<TextView>(R.id.btnSource)
+        btn.visibility = View.VISIBLE
+        btn.text = "Nguồn: ${name(url)} ▾"
+        btn.setOnClickListener {
+            val items = urls.indices.map { i ->
+                name(urls[i]) + (labels.getOrNull(i)?.takeIf { it.isNotEmpty() }?.let { " — $it" } ?: "") +
+                    if (urls[i] == url) "  ✓" else ""
+            }
+            AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Mở phim ở nguồn khác")
+                .setItems(items.toTypedArray()) { _, i ->
+                    if (urls[i] == url) return@setItems
+                    val links = urls.indices.map { j ->
+                        FeedItem(urls[j], titles.getOrElse(j) { "" }, posters.getOrNull(j)?.ifEmpty { null },
+                            labels.getOrNull(j)?.ifEmpty { null }, emptySet(), null, 0, null, null)
+                    }
+                    val film = Film(urls[i], titles.getOrElse(i) { intent.getStringExtra("title").orEmpty() },
+                        posters.getOrNull(i)?.ifEmpty { null } ?: intent.getStringExtra("poster"), null)
+                    startActivity(intent(this, film, links))
+                    finish()
+                }
+                .show()
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -181,6 +221,7 @@ class DetailActivity : BaseActivity() {
         updateButtons()
         // Đang theo dõi: mở phim là đã thấy các tập mới
         d.latestEpisode?.let { Prefs.updateFollow(d.url, d.episodeCount, it.title, seen = true) }
+        HomeFeed.markSeen(d)
         showFollow(d)
         btnPlay.focusForRemote()
     }

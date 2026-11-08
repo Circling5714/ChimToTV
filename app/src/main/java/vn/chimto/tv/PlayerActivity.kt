@@ -623,6 +623,7 @@ class PlayerActivity : BaseActivity() {
         resumeAt = Prefs.position(ep.url)
         introDone = false
         if (!Prefs.privateMode) Prefs.addHistory(HistoryItem(d.url, d.title, d.poster, ep.title, ep.url, System.currentTimeMillis()))
+        HomeFeed.markSeen(d)
         showLoading("Đang mở ${ep.title}…")
         val g = group
         // Trang tập + server dự phòng KKPhim (tải song song; trang lỗi mà KKPhim có tập này thì vẫn phát được)

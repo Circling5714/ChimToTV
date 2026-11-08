@@ -41,8 +41,10 @@ object Stremio {
         val blocks = listOf("Mới cập nhật", "Kiếm Hiệp", "TV Series", "Thập Niên 90", "Thập Niên 80")
             .map { it to catalog(o, genre = if (it == "Mới cập nhật") null else it) }
         val sections = ApiSite.sections(blocks) { parseList(get(it), it).films }
-        return Home(sections, GENRES.drop(1).map { Category(it, catalog(o, genre = it)) }, null)
+        return Home(sections, menu(base), null)
     }
+
+    fun menu(base: String): List<Category> = ApiSite.origin(base).let { o -> GENRES.drop(1).map { Category(it, catalog(o, genre = it)) } }
 
     fun newestUrl(base: String) = catalog(ApiSite.origin(base))
 

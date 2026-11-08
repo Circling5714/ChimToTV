@@ -126,6 +126,13 @@
                         android:nextFocusUp="@id/btnFirst"
                         android:visibility="gone" />
 
+                    <!-- Trang chủ tổng hợp: phim có ở nhiều nguồn → đổi nguồn (đứng gần nút xem cho dễ thấy) -->
+                    <TextView
+                        android:id="@+id/btnSource"
+                        style="@style/TvButton"
+                        android:nextFocusUp="@id/btnSource"
+                        android:visibility="gone" />
+
                     <TextView
                         android:id="@+id/btnOrder"
                         style="@style/TvButton"

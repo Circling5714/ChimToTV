@@ -10,6 +10,7 @@ class App : Application() {
         Privacy.init(this)
         AppProxy.apply()
         ImageLoader.init(this)
+        Feed.init(this)
         AutoClear.init(this)
         AppUse.init(this)
         SyncNet.init(this) // đồng bộ trong nhà (đã ghép máy thì mở cổng)

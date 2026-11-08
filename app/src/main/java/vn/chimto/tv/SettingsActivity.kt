@@ -173,6 +173,31 @@ class SettingsActivity : BaseActivity() {
 
         // Nhà nhiều người xem: các nút của riêng người đang dùng ghi rõ tên
         val who = if (Prefs.profiles.size >= 2) Prefs.profile.name else null
+
+        // Trang chủ: tổng hợp mọi nguồn / theo trang đang dùng (riêng từng người xem); nguồn đang tạm nghỉ → thử lại ngay
+        val homeBtn = findViewById<TextView>(R.id.btnHomeMix)
+        fun showHomeMix() {
+            homeBtn.text = "Trang chủ${who?.let { " của $it" } ?: ""}: " +
+                if (Prefs.homeMix) "Tổng hợp mọi nguồn" else "Theo trang đang dùng"
+        }
+        showHomeMix()
+        homeBtn.setOnClickListener {
+            Prefs.homeMix = !Prefs.homeMix
+            showHomeMix()
+        }
+        val retryBtn = findViewById<TextView>(R.id.btnFeedRetry)
+        val resting = Feed.restingHosts()
+        if (resting.isNotEmpty()) {
+            val sites = Prefs.sites
+            val until = java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(java.util.Date(resting.values.maxOrNull() ?: 0L))
+            retryBtn.visibility = View.VISIBLE
+            retryBtn.text = "Thử lại ngay: " + resting.keys.joinToString(", ") { siteTag(it, sites) } + " (đang tạm nghỉ tới $until)"
+            retryBtn.setOnClickListener {
+                Feed.clearRest()
+                retryBtn.visibility = View.GONE
+                toast("Trang chủ sẽ hỏi lại các trang này ở lần tải tới.")
+            }
+        }
         findViewById<TextView>(R.id.btnClearHistory).apply {
             text = if (who != null) "Xoá lịch sử xem của $who" else "Xoá lịch sử xem"
             setOnClickListener {

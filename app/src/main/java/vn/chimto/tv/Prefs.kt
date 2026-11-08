@@ -152,11 +152,13 @@ object Prefs {
         "base_url", "seek_step", "auto_next", "video_fill",
         // Giới hạn giờ xem (WatchLimit)
         "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
+        // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy của từng phim
+        "home_mix", "home_topics", "seen_eps",
     )
     private val PROFILE_PREFIXES = listOf("server_type@", "server_label@")
 
     /** Người thêm sau bắt đầu với cài đặt của người đang dùng (lịch sử, theo dõi, Xem riêng thì trống). */
-    private val COPIED_KEYS = setOf("base_url", "seek_step", "auto_next", "video_fill")
+    private val COPIED_KEYS = setOf("base_url", "seek_step", "auto_next", "video_fill", "home_mix")
 
     @Volatile private var pid = ""
 
@@ -621,6 +623,59 @@ object Prefs {
     var lastFollowCheck: Long
         get() = sp.getLong(k("last_follow_check"), 0)
         set(value) = sp.edit().putLong(k("last_follow_check"), value).apply()
+
+    // ---- Trang chủ tổng hợp (HomeFeed, từ 2.8) ----
+
+    /** true: trang chủ gộp phim từ mọi nguồn, xếp theo lịch sử xem; false: trang chủ của trang đang dùng (như trước 2.8). */
+    var homeMix: Boolean
+        get() = sp.getBoolean(k("home_mix"), true)
+        set(value) = sp.edit().putBoolean(k("home_mix"), value).apply()
+
+    /** Chủ đề người xem chưa có lịch sử đã chọn (id trong HomeFeed.TOPICS). */
+    var homeTopics: Set<String>
+        get() = runCatching { JSONArray(sp.getString(k("home_topics"), "[]")) }.getOrDefault(JSONArray())
+            .let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotEmpty() }.toSet() }
+        set(value) = sp.edit().putString(k("home_topics"), JSONArray(value.toList()).toString()).apply()
+
+    /**
+     * Tập mới nhất người xem đã thấy của từng phim (khoá = tên đã chuẩn hoá — chung mọi nguồn), ghi khi mở trang phim /
+     * mở tập: trang chủ chỉ báo «tập mới» khi có tập sau số này.
+     */
+    fun seenEp(key: String): Double? =
+        runCatching { JSONObject(sp.getString(k("seen_eps"), "{}") ?: "{}") }.getOrNull()?.optDouble(key)?.takeIf { !it.isNaN() }
+
+    fun setSeenEp(key: String, ep: Double) {
+        if (key.isEmpty()) return
+        val o = runCatching { JSONObject(sp.getString(k("seen_eps"), "{}") ?: "{}") }.getOrDefault(JSONObject())
+        if (o.optDouble(key, -1.0) >= ep) return
+        o.remove(key)
+        o.put(key, ep)
+        // Giữ 300 phim gần nhất (khoá chèn sau cùng là mới nhất)
+        val keys = o.keys().asSequence().toList()
+        if (keys.size > 300) keys.take(keys.size - 300).forEach { o.remove(it) }
+        sp.edit().putString(k("seen_eps"), o.toString()).apply()
+    }
+
+    /** Số tập đã xem của một phim (theo chỗ đang xem đã lưu) — dùng tính sở thích. */
+    fun watchedCount(filmUrl: String): Int = watchedCounts()[filmUrl] ?: 0
+
+    /** Số tập đã xem của mọi phim (đọc một lần — TV yếu đọc JSON chậm). */
+    fun watchedCounts(): Map<String, Int> {
+        val films = posFilms()
+        val out = HashMap<String, Int>()
+        for (k in films.keys()) films.optString(k).takeIf { it.isNotEmpty() }?.let { out.merge(it, 1, Int::plus) }
+        return out
+    }
+
+    /** Tình trạng nguồn của trang chủ tổng hợp (Feed): lỗi liên tiếp, tạm nghỉ — chung cả nhà. */
+    internal var feedHealth: String
+        get() = sp.getString("feed_health", "{}") ?: "{}"
+        set(value) = sp.edit().putString("feed_health", value).apply()
+
+    /** Thể loại / quốc gia của phim đã xem (FilmTags) — chung cả nhà. */
+    internal var filmTags: String
+        get() = sp.getString("film_tags", "{}") ?: "{}"
+        set(value) = sp.edit().putString("film_tags", value).apply()
 
     // ---- Nhạc mở đầu (mốc riêng từng phim, giây) ----
 

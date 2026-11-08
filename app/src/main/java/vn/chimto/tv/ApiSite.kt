@@ -167,13 +167,31 @@ object ApiSite {
             )
         }
         val sections = sections(blocks) { parseItems(get(it), o) }
-        val menu = if (vs) {
+        return Home(sections, menu(base), null)
+    }
+
+    /** Mục menu của trang (cố định — không cần tải trang chủ; trang chủ tổng hợp dùng). */
+    fun menu(base: String): List<Category> {
+        if (NguonC.isSite(base)) return NguonC.menu(base)
+        if (Stremio.isSite(base)) return Stremio.menu(base)
+        val o = origin(base)
+        return if (isVs(base)) {
             VS_MENU.map { (t, p) -> Category(t, vsApi(o, p, 1)) }
         } else {
-            (if (kk) KK_MENU else MENU).map { (t, p) -> Category(t, api(o, p, 1)) }
+            (if (isKk(base)) KK_MENU else MENU).map { (t, p) -> Category(t, api(o, p, 1)) }
         }
-        return Home(sections, menu, null)
     }
+
+    /** Tên thể loại theo slug ("vo-thuat" → "võ thuật") — tiêu đề hàng gợi ý của trang chủ tổng hợp. */
+    fun genreName(slug: String): String =
+        (GENRES + VS_GENRES).firstOrNull { it.second == slug }?.first?.lowercase() ?: slug.replace('-', ' ')
+
+    /** Tên nước theo slug ("trung-quoc" → "Trung Quốc"). */
+    fun countryName(slug: String): String =
+        (COUNTRIES + VS_COUNTRIES).firstOrNull { it.second == slug }?.first ?: slug.replace('-', ' ')
+
+    /** Nội dung JSON của một API (KKPhim: gọi thẳng phimapi.com; trang lỗi thì phimapi.com) — trang chủ tổng hợp dùng. */
+    fun json(url: String): String = get(url)
 
     /** Các khối trang chủ tải song song (TV mạng chậm đỡ chờ); khối nào lỗi / rỗng thì bỏ, lỗi hết thì báo lỗi. */
     fun sections(blocks: List<Pair<String, String>>, load: (String) -> List<Film>): List<Section> {
@@ -413,7 +431,7 @@ object ApiSite {
     fun origin(url: String) = Site.originOf(url) ?: url.trimEnd('/')
 
     /** Ảnh: đường dẫn đầy đủ giữ nguyên; "uploads/movies/…" → nối vào máy chủ ảnh (cdn có thể đã có /uploads/movies). */
-    private fun image(ref: String, cdn: String): String? {
+    fun image(ref: String, cdn: String): String? {
         if (ref.isEmpty()) return null
         if (ref.startsWith("http")) return ref
         val host = Site.originOf(cdn) ?: CDN

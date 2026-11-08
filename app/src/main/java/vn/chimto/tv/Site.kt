@@ -98,6 +98,9 @@ object Site {
         return home.copy(movedTo = movedTo)
     }
 
+    /** Menu cố định của trang API (không cần tải trang chủ); trang web thì null (menu đọc từ trang chủ). */
+    fun menu(base: String): List<Category>? = if (ApiSite.isKnown(base)) ApiSite.menu(base) else null
+
     /** Trang chỉ có khung rỗng cho ứng dụng JS (vd <div id="root"></div>) — dữ liệu không nằm trong HTML. */
     private fun isAppShell(doc: Document) =
         doc.selectFirst("#root, #app, #__nuxt")?.let { it.childrenSize() == 0 } == true && doc.select("a[href]").size < 5
