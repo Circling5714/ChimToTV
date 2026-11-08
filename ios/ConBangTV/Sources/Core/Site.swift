@@ -472,6 +472,7 @@ enum Site {
     private static let epWord = Rx(#"(?i)t[aậ]p[\s\-_]*(\d+(?:\.\d+)?)"#)
     private static let anyNumber = Rx(#"(\d+(?:\.\d+)?)"#)
 
+    /// Số tập trong tên / đường dẫn tập: "Tập 165" → 165, "tap-08" → 8 (dùng cả để ghép tập với KKPhim).
     static func epNumber(_ s: String) -> Double? {
         (epWord.group(1, in: s) ?? anyNumber.group(1, in: s)).flatMap { Double($0) }
     }
@@ -519,6 +520,8 @@ enum Site {
 
     /// Hỏi player.php địa chỉ trình phát nhúng (iframe) của một server (trang Next.js: link .m3u8 / iframe).
     static func video(_ src: EpisodeSource, _ server: Server?) async throws -> Video {
+        // Server dự phòng KKPhim: link .m3u8 có sẵn (KkPhim.attach)
+        if let s = server, s.type.hasPrefix(KkPhim.prefix), let v = src.links[s.type] { return v }
         if src.next {
             guard let server = server else { throw AppError("Không có server") }
             return try await NextSite.video(src, server)

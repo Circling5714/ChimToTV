@@ -96,6 +96,12 @@ struct EpisodeSource {
     let pageMode: Bool
     var links: [String: Video] = [:]
     var next: Bool = false
+
+    /// Loại server "Trình phát của trang" (mở thẳng trang tập) khi trang pageMode có thêm server dự phòng KKPhim.
+    static let pageServer = "page"
+
+    /// Chỉ có trình phát của trang tập (không có server nào khác để chọn, kể cả server dự phòng KKPhim).
+    var pageOnly: Bool { pageMode && !servers.contains { $0.type == EpisodeSource.pageServer } }
 }
 
 struct HistoryItem: Codable, Hashable {

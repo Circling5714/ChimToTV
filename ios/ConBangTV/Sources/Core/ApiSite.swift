@@ -8,8 +8,12 @@ import SwiftSoup
 /// Địa chỉ trong app theo đường dẫn của chính trang: phim = /phim/<slug>, tập = /phim/<slug>/<tập>?sv=<số thứ tự bản>
 /// (Vietsub / Thuyết Minh cùng tên tập nên phải ghi bản). Danh sách = địa chỉ API.
 enum ApiSite {
+    /// Trang KKPhim (www.kkphim.com, từ 1.6): không có API /api/movies riêng — mọi dữ liệu gọi thẳng API công khai
+    /// phimapi.com (cùng định dạng, qua fallback). Địa chỉ phim / tập trong app vẫn theo tên miền kkphim.com.
+    static let kkHost = "kkphim.com"
+
     private static let lock = NSLock()
-    private static var known: Set<String> = ["mephim.ddns.net"]
+    private static var known: Set<String> = ["mephim.ddns.net", kkHost]
     private static var notApi: Set<String> = []
     private static let cdn = "https://phimimg.com"
     private static let limit = 24
@@ -46,6 +50,13 @@ enum ApiSite {
         ("Thổ Nhĩ Kỳ", "tho-nhi-ky"), ("Úc", "uc"), ("Quốc Gia Khác", "quoc-gia-khac"),
     ]
 
+    /// Trang KKPhim (gọi thẳng phimapi.com) thêm vài mục theo các danh sách riêng của KKPhim.
+    private static let kkMenu: [(String, String)] = Array(menu.prefix(1)) +
+        [("Hoạt hình Trung Quốc thuyết minh", "category/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh")] +
+        Array(menu.dropFirst()) + [("Phim chiếu rạp", "category/phim-chieu-rap")]
+
+    static func isKk(_ url: String) -> Bool { Site.hostOf(url) == kkHost }
+
     static func isKnown(_ url: String) -> Bool {
         guard let h = Site.hostOf(url) else { return false }
         lock.lock()
@@ -73,7 +84,15 @@ enum ApiSite {
     /// Trang chủ: các khối tải song song; khối nào lỗi thì bỏ.
     static func home(_ base: String) async throws -> Home {
         let o = origin(base)
-        let blocks = [
+        let kk = isKk(base)
+        // KKPhim không có khối thịnh hành / song ngữ: thêm hoạt hình thuyết minh, phim bộ, phim lẻ mới
+        let blocks: [(String, String)] = kk ? [
+            ("Hoạt hình Trung Quốc mới cập nhật", api(o, "category/hoat-hinh?country=trung-quoc", 1)),
+            ("Hoạt hình Trung Quốc thuyết minh", api(o, "category/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh", 1)),
+            ("Phim mới cập nhật", newestUrl(o)),
+            ("Phim bộ mới", api(o, "category/phim-bo", 1)),
+            ("Phim lẻ mới", api(o, "category/phim-le", 1)),
+        ] : [
             ("Hoạt hình Trung Quốc mới cập nhật", api(o, "category/hoat-hinh?country=trung-quoc", 1)),
             ("Phim mới cập nhật", newestUrl(o)),
             ("Thịnh hành", "\(o)/api/movies/trending"),
@@ -96,7 +115,8 @@ enum ApiSite {
         }
         let sections = found.compactMap { $0 }
         if sections.isEmpty { throw firstError ?? AppError("Không tải được danh sách phim") }
-        return Home(sections: sections, categories: menu.map { Category(title: $0.0, url: api(o, $0.1, 1)) }, movedTo: nil)
+        return Home(sections: sections, categories: (kk ? kkMenu : menu).map { Category(title: $0.0, url: api(o, $0.1, 1)) },
+                    movedTo: nil)
     }
 
     static func list(_ url: String) async throws -> FilmPage { parseList(try await getJSON(url), url) }
@@ -235,6 +255,8 @@ enum ApiSite {
     /// Gọi API của trang; trang lỗi (máy chủ của trang hay báo 500 «Failed to fetch … from providers») thì gọi thẳng
     /// nguồn KKPhim (phimapi.com — cùng định dạng), như chính trang web làm.
     private static func getJSON(_ url: String, fallback useFallback: Bool = true) async throws -> [String: Any] {
+        // Trang KKPhim: gọi thẳng phimapi.com (kkphim.com không có /api/movies)
+        if isKk(url) { return try await fetchJSON(fallback(url) ?? url) }
         do {
             return try await fetchJSON(url)
         } catch {

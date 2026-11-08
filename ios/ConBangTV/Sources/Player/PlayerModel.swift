@@ -199,13 +199,15 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             Prefs.addHistory(HistoryItem(filmUrl: d.url, title: d.title, poster: d.poster, epTitle: ep.title, epUrl: ep.url, time: nowMs()))
         }
         showLoading("Đang mở \(ep.title)…")
+        let g = group
         Task {
             do {
-                let src = try await Site.source(ep.url)
+                // Trang tập + server dự phòng KKPhim (tải song song; trang lỗi mà KKPhim có tập này thì vẫn phát được)
+                let src = try await KkPhim.source(d, g, ep)
                 guard t == token else { return }
                 source = src
-                servers = src.pageMode ? [] : src.servers
-                if src.pageMode {
+                servers = src.pageOnly ? [] : src.servers
+                if src.pageOnly {
                     playPage(src)
                 } else {
                     let host = Site.hostOf(src.epUrl)
@@ -241,6 +243,12 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
     private func playServer(_ s: Server?) {
         guard let src = source else { return }
         server = s
+        // "Trình phát của trang" (trang mở thẳng trang tập, có thêm server KKPhim)
+        if s?.type == EpisodeSource.pageServer {
+            token += 1
+            playPage(src)
+            return
+        }
         token += 1
         let t = token
         stopVideo()
@@ -370,7 +378,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
             openEpisode(index)
             return
         }
-        if src.pageMode { playPage(src) } else { playServer(server) }
+        if src.pageOnly { playPage(src) } else { playServer(server) }
     }
 
     func openWebPage() {
@@ -383,7 +391,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
 
     private func suggestServer(_ now: Int64) {
         suggested = true // mỗi lần phát chỉ gợi ý một lần
-        guard let src = source, !src.pageMode, let cur = server,
+        guard let src = source, !src.pageOnly, let cur = server,
               let pair = PlayStats.alternative(AppProxy.statsHost(Site.hostOf(src.epUrl)), src.servers, cur) else { return }
         let (alt, score) = pair
         suggestion = alt
@@ -435,7 +443,7 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         if !started && !errShown && !hintShown && !inAd && (embedUrl != nil || hlsUrl != nil || pageMode) && waited > 25_000 {
             hintShown = true
             hideLoading()
-            let other = pageMode ? "Menu → Tải lại / Mở trang web" : "Menu để đổi server"
+            let other = (source?.pageOnly ?? true) ? "Menu → Tải lại / Mở trang web" : "Menu để đổi server"
             showNotice("Video chưa chạy? Chạm ▶ để thử phát, hoặc \(other).", 10)
         }
         guard let o = o else { return }

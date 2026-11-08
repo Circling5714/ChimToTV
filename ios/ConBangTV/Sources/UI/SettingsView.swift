@@ -20,6 +20,7 @@ struct SettingsView: View {
     @State private var dataStatus = ""
     @State private var askProfile = Prefs.askProfile
     @State private var pipOnHome = Prefs.pipOnHome
+    @State private var kkBackup = Prefs.kkBackup
     @State private var profileSheet: ProfileSheet?
     @State private var unlockFor: Profile?
     @State private var limitsShown = false
@@ -125,12 +126,14 @@ struct SettingsView: View {
                         }
                         .disabled(serverLabel == nil)
                     }
+                    Toggle("Server dự phòng KKPhim", isOn: $kkBackup)
+                        .onChange(of: kkBackup) { Prefs.kkBackup = $0 }
                     if PlayerModel.pipSupported {
                         Toggle("Vuốt lên từ mép dưới lúc đang xem: thu nhỏ phim (hình trong hình)", isOn: $pipOnHome)
                             .onChange(of: pipOnHome) { Prefs.pipOnHome = $0 }
                     }
                 } header: { Text("Phát video") } footer: {
-                    Text("Hình trong hình: lúc xem chạm nút thu nhỏ (cạnh nút Menu), hoặc vuốt lên từ mép dưới — phim chạy tiếp ở cửa sổ nổi, vẫn chọn phim khác / dùng app khác được; vuốt lên lần nữa để về màn hình chính. Cửa sổ nhỏ có nút phóng to và nút đóng. Tắt mục này thì vuốt lên về thẳng màn hình chính (phim dừng).")
+                    Text("Server dự phòng KKPhim: với yanhh3d, hoathinh3d, hhkungfu… (trình phát của trang hay hỏng cùng lúc) app tìm cùng phim, cùng tập trên KKPhim và thêm server «KKPhim Vietsub / Thuyết Minh» vào Menu lúc xem; trang không vào được mà KKPhim có tập đó thì vẫn xem được.\n\nHình trong hình: lúc xem chạm nút thu nhỏ (cạnh nút Menu), hoặc vuốt lên từ mép dưới — phim chạy tiếp ở cửa sổ nổi, vẫn chọn phim khác / dùng app khác được; vuốt lên lần nữa để về màn hình chính. Cửa sổ nhỏ có nút phóng to và nút đóng. Tắt mục này thì vuốt lên về thẳng màn hình chính (phim dừng).")
                 }
 
                 Section {
