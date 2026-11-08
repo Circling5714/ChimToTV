@@ -67,6 +67,7 @@ public sealed class PlayerView : UserControl
     private List<Episode> Episodes => _group?.Episodes ?? new();
     private int _index;
     private bool _resumeOpen;
+    private string _openEpUrl = "";
     private int _loadToken;
 
     private bool _pageMode;
@@ -323,8 +324,13 @@ public sealed class PlayerView : UserControl
         Follow();
         _ov.Activate();
         _filmUrl = filmUrl;
+        _openEpUrl = epUrl;
         _resumeOpen = resume;
         _detail = null;
+        // Phim mới chưa tải xong / tải lỗi: bảng ▼ không còn server, bản, tập của phim trước
+        _source = null;
+        _group = null;
+        _index = 0;
         _limitWarned = false;
         _poll.Start();
         ApplyOverlayScale();
@@ -336,6 +342,7 @@ public sealed class PlayerView : UserControl
         }
         ShowLoading("Đang tải thông tin phim…");
         _ov.TitleText.Text = "";
+        _main.Title = "Côn Bằng TV";
         _ = LoadDetail(t, filmUrl, epUrl);
     }
 
@@ -575,7 +582,8 @@ public sealed class PlayerView : UserControl
         HidePanel();
         if (CurrentTime() is { } t) _resumeAt = t;
         var src = _source;
-        if (src == null) OpenEpisode(_index);
+        if (_detail == null) Open(_filmUrl, _openEpUrl, _resumeOpen); // chưa tải được thông tin phim: tải lại
+        else if (src == null) OpenEpisode(_index);
         else if (src.PageOnly) _ = PlayPage(src);
         else _ = PlayServer(_server);
     }

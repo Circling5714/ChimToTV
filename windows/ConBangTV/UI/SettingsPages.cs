@@ -62,11 +62,13 @@ public sealed class SitesPage : Page
         Body.Children.Add(Ui.Header("Thêm trang", new Thickness(0, 22, 0, 12)));
         var add = new WrapPanel();
         _add.Margin = new Thickness(0, 0, 10, 10);
+        // Ô nhập dùng lại qua các lần dựng: gỡ khỏi hàng cũ trước (không thì WPF báo «already the logical child»).
+        (_add.Parent as Panel)?.Children.Remove(_add);
         add.Children.Add(_add);
         add.Children.Add(Ui.Pill("Thêm", Add));
         Body.Children.Add(add);
         Body.Children.Add(Ui.Dim("Gõ tên miền, vd yanhh3d.ee. App đọc được trang kiểu yanhh3d, theme HaLim (hoathinh3d…), kiểu PhimMoi " +
-                                 "(phimmois.fun) và mephim.ddns.net.", 14, new Thickness(0, 0, 0, 10)));
+                                 "(phimmois.fun), mephim.ddns.net và KKPhim (kkphim.com).", 14, new Thickness(0, 0, 0, 10)));
         var missing = Prefs.MissingPresets;
         if (missing.Count > 0)
         {

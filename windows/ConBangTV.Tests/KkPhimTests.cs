@@ -178,4 +178,14 @@ public class KkPhimTests
         Assert.Equal("https://phimimg.com/upload/vod/20240822-1/58a4.jpg", p.Films[0].Poster);
         Assert.Equal($"{kk}/api/movies/category/hoat-hinh?country=trung-quoc&page=2&limit=24", p.NextUrl);
     }
+
+    [Fact]
+    public void BareKkDomainBecomesTheWwwSite()
+    {
+        // kkphim.com trần bị nhà mạng chặn, và trùng với trang mẫu www.kkphim.com trong danh sách
+        Assert.Equal(Prefs.KkSite, Prefs.NormalizeUrl("kkphim.com"));
+        Assert.Equal(Prefs.KkSite, Prefs.NormalizeUrl("https://KKPhim.com/"));
+        Assert.Equal(Prefs.KkSite, Prefs.NormalizeUrl("www.kkphim.com"));
+        Assert.Equal("https://yanhh3d.ee", Prefs.NormalizeUrl("yanhh3d.ee/"));
+    }
 }

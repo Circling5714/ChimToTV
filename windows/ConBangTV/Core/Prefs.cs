@@ -493,6 +493,8 @@ public static class Prefs
         if (!s.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !s.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             s = "https://" + s;
         if (!Uri.TryCreate(s, UriKind.Absolute, out var u) || !u.Host.Contains('.')) return null;
+        // Nhà mạng chặn tên miền trần kkphim.com: gõ «kkphim.com» là trang KKPhim mẫu (www)
+        if (u.Host.Equals(ApiSite.KkHost, StringComparison.OrdinalIgnoreCase)) return KkSite;
         return s;
     }
 
