@@ -75,6 +75,7 @@ class MainActivity : BaseActivity() {
     private var moreFrom: String? = null
     private var pendingFocus: String? = null
     private var loadedMix: Boolean? = null
+    private var loadedKids: Boolean? = null
 
     private var categories: List<Category> = emptyList()
     private var token = 0
@@ -294,11 +295,11 @@ class MainActivity : BaseActivity() {
         val active = menuAdapter.active
         if (loadedProfile != Prefs.profileId ||
             (loadedBase != null && (loadedBase != Prefs.baseUrl || loadedProxy != Prefs.proxyConfig())) ||
-            (loadedMix != null && loadedMix != Prefs.homeMix)
+            (loadedMix != null && loadedMix != Prefs.homeMixOn) || (loadedKids != null && loadedKids != Prefs.kids)
         ) {
             // Đổi người xem, link trang, proxy hoặc kiểu trang chủ trong Cài đặt → tải lại từ đầu
             reloadSite()
-        } else if (homeToken == token && moreFrom == null && Prefs.homeMix && System.currentTimeMillis() - feedAt > FEED_REFRESH) {
+        } else if (homeToken == token && moreFrom == null && Prefs.homeMixOn && System.currentTimeMillis() - feedAt > FEED_REFRESH) {
             // Trang chủ tổng hợp mở lâu (xem phim xong quay ra sau 20 phút): làm mới
             showHome()
         } else if (active?.kind == Kind.HISTORY) {
@@ -639,8 +640,9 @@ class MainActivity : BaseActivity() {
     }
 
     private fun showHome() {
-        loadedMix = Prefs.homeMix
-        if (Prefs.homeMix) {
+        loadedMix = Prefs.homeMixOn
+        loadedKids = Prefs.kids
+        if (Prefs.homeMixOn) {
             showMixHome()
             return
         }
@@ -766,7 +768,7 @@ class MainActivity : BaseActivity() {
     private fun followLate(t: Int, snap: HomeFeed.Snapshot, tries: Int) {
         if (!snap.pending) return
         if (tries >= LATE_TRIES) {
-            if (t == token) homeNote.text = snap.noteGaveUp
+            if (t == token) homeNote.text = kidsNote(snap.noteGaveUp)
             return
         }
         mainHandler.postDelayed({
@@ -785,7 +787,7 @@ class MainActivity : BaseActivity() {
         feedSnap = snap
         nextUrl = null // vừa từ «Xem thêm» (danh sách có trang sau) quay lại: trang chủ không tải nối
         autoFresh = snap.fresh
-        homeNote.text = snap.note
+        homeNote.text = kidsNote(snap.note)
         snap.movedTo?.let { (old, new) ->
             if (old == Prefs.baseUrl) {
                 Prefs.replaceSite(old, new)
@@ -818,6 +820,9 @@ class MainActivity : BaseActivity() {
         return true
     }
 
+    /** Dòng trạng thái trang chủ; hồ sơ trẻ em ghi thêm ở đầu cho người lớn biết đang ở chế độ này. */
+    private fun kidsNote(note: String) = if (Prefs.kids) "Hồ sơ trẻ em · $note" else note
+
     /** Khoá của ô đang chọn trong lưới (địa chỉ phim / id hàng «Xem thêm» / id chủ đề). */
     private fun focusedKey(): String? {
         val pos = grid.focusedChild?.let { grid.getChildAdapterPosition(it) } ?: return null
@@ -844,7 +849,7 @@ class MainActivity : BaseActivity() {
     private fun feedRows(snap: HomeFeed.Snapshot): List<GridRow> {
         val out = ArrayList<GridRow>()
         val span = gridAdapter.spanCount
-        if (Prefs.history.isEmpty()) {
+        if (Prefs.history.isEmpty() && !Prefs.kids) {
             out += HeaderRow("Chọn vài chủ đề bạn thích — trang chủ sẽ gợi ý theo đó (OK để chọn / bỏ)")
             val on = Prefs.homeTopics
             HomeFeed.TOPICS.forEach { (id, label) -> out += ChipRow(id, label, id in on) }
@@ -1049,7 +1054,7 @@ class MainActivity : BaseActivity() {
         val fresh = Prefs.follows.filter { it.newCount > 0 }
         val followed = Prefs.follows.map { KkPhim.norm(it.title) }.toSet()
         // Đã mở phim / xem tập mới từ lúc dựng trang (seenEp tăng) thì thôi báo
-        val auto = if (!Prefs.homeMix) emptyList() else autoFresh.filter { (Prefs.seenEp(it.key) ?: -1.0) < it.ep && it.key !in followed }
+        val auto = if (!Prefs.homeMixOn) emptyList() else autoFresh.filter { (Prefs.seenEp(it.key) ?: -1.0) < it.ep && it.key !in followed }
         if (fresh.isNotEmpty() || auto.isNotEmpty()) {
             rows += HeaderRow("Có tập mới")
             fresh.forEach { rows += FilmRow(followFilm(it), removable = true, follow = true) }

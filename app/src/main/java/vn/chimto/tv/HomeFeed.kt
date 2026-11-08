@@ -32,7 +32,7 @@ object HomeFeed {
     /** Số phim tối đa mỗi hàng (giữ cho «Xem thêm»). */
     private const val ROW_MAX = 40
 
-    enum class Role { WEB, NEW, SIMILAR, INTEREST, DOMINANT, MOVIES, TOPIC, TAGS }
+    enum class Role { WEB, NEW, SIMILAR, INTEREST, DOMINANT, DUB, KIDS, MOVIES, TOPIC, TAGS }
 
     /** Một phần cần tải: vai trò trong trang chủ + tiêu đề hàng / địa chỉ «Xem thêm» (nếu có). */
     class Part(val role: Role, val req: Feed.Req, val title: String? = null, val more: String? = null, val id: String = req.key)
@@ -131,42 +131,52 @@ object HomeFeed {
 
     // ---- Lập danh sách cần tải ----
 
-    /** pid: người xem lúc lập kế hoạch (lưu «trang chủ lần trước» đúng người). */
+    /** Thể loại không hợp trẻ em: hồ sơ trẻ em bỏ các phim này (và mọi phim không phải hoạt hình). */
+    private val ADULT = setOf("phim-18", "kinh-di", "hinh-su", "chien-tranh")
+
+    /** Tên phim ma / kinh dị mà nguồn không gắn thể loại (vd «Horror Collector» trong mục trẻ em của KKPhim). */
+    private val SCARY = Regex("(?i)horror|kinh dị|xác sống|zombie|ma quỷ|quỷ dữ|ác quỷ|kyoufu")
+
+    /** pid: người xem lúc lập kế hoạch (lưu «trang chủ lần trước» đúng người); kids: hồ sơ trẻ em. */
     class Plan(
         val parts: List<Part>, val src: Sources, val similar: HistoryItem?, val similarTags: Tags?,
-        val taste: Taste?, val topics: Set<String>, val pid: String = "",
+        val taste: Taste?, val topics: Set<String>, val pid: String = "", val kids: Boolean = false,
     )
 
-    /** Lập kế hoạch tải cho người xem đang dùng (đọc Prefs — gọi được ở luồng chính, không chạm mạng). */
+    /** Lập kế hoạch tải cho người xem đang dùng (đọc Prefs — chạy ở luồng nền, không chạm mạng). */
     fun plan(tagsKnownOnly: Boolean = false): Plan {
         val s = sources()
+        val kids = Prefs.kids
         val parts = ArrayList<Part>()
         val now = System.currentTimeMillis()
         val history = Prefs.history
         fun host(o: String) = Site.hostOf(o).orEmpty()
         val json = mapOf("Accept" to "application/json")
 
-        // Trang web (trang đang dùng trước): phim mới cập nhật + menu mục của trang
-        val webParts = ArrayList<Part>()
-        for (w in s.web) {
-            webParts += Part(Role.WEB, Feed.Req("web|$w", host(w)) {
-                val h = Site.home(w)
-                Feed.Loaded(Feed.fromFilms(newestOf(h)).take(ROW_MAX), h.categories, h.movedTo)
-            })
-        }
-        // Nguồn API (JSON nhẹ) chạy trước, trang web (đọc HTML nặng) sau, CLB Phim Xưa (máy chủ chậm) cuối
-        s.kk?.let { o ->
-            parts += Part(Role.NEW, Feed.Req("new|$o", host(o)) { Feed.Loaded(Feed.parseKk(ApiSite.json("$o/api/movies/newest?page=1&limit=40"), o)) })
-        }
-        s.nc?.let { o ->
-            parts += Part(Role.NEW, Feed.Req("new|$o", host(o)) { Feed.Loaded(Feed.parseNc(Http.get(NguonC.newestUrl(o), json).body, o)) })
-        }
-        s.vs?.let { o ->
-            parts += Part(Role.NEW, Feed.Req("new|$o", host(o)) { Feed.Loaded(Feed.parseKk(ApiSite.json("$o/api/danh-sach/phim-moi-cap-nhat?page=1"), o)) })
-        }
-        parts += webParts
-        s.k20?.let { o ->
-            parts += Part(Role.NEW, Feed.Req("new|$o", host(o)) { Feed.Loaded(Feed.fromFilms(Stremio.list(Stremio.newestUrl(o)).films)) })
+        // Hồ sơ trẻ em: không lấy danh sách «mới cập nhật» chung (đủ loại phim), chỉ các danh sách hoạt hình bên dưới
+        if (!kids) {
+            // Trang web (trang đang dùng trước): phim mới cập nhật + menu mục của trang
+            val webParts = ArrayList<Part>()
+            for (w in s.web) {
+                webParts += Part(Role.WEB, Feed.Req("web|$w", host(w)) {
+                    val h = Site.home(w)
+                    Feed.Loaded(Feed.fromFilms(newestOf(h)).take(ROW_MAX), h.categories, h.movedTo)
+                })
+            }
+            // Nguồn API (JSON nhẹ) chạy trước, trang web (đọc HTML nặng) sau, CLB Phim Xưa (máy chủ chậm) cuối
+            s.kk?.let { o ->
+                parts += Part(Role.NEW, Feed.Req("new|$o", host(o)) { Feed.Loaded(Feed.parseKk(ApiSite.json("$o/api/movies/newest?page=1&limit=40"), o)) })
+            }
+            s.nc?.let { o ->
+                parts += Part(Role.NEW, Feed.Req("new|$o", host(o)) { Feed.Loaded(Feed.parseNc(Http.get(NguonC.newestUrl(o), json).body, o)) })
+            }
+            s.vs?.let { o ->
+                parts += Part(Role.NEW, Feed.Req("new|$o", host(o)) { Feed.Loaded(Feed.parseKk(ApiSite.json("$o/api/danh-sach/phim-moi-cap-nhat?page=1"), o)) })
+            }
+            parts += webParts
+            s.k20?.let { o ->
+                parts += Part(Role.NEW, Feed.Req("new|$o", host(o)) { Feed.Loaded(Feed.fromFilms(Stremio.list(Stremio.newestUrl(o)).films)) })
+            }
         }
 
         // Thể loại của phim đã xem chưa biết: tra KKPhim (mỗi lượt tối đa 6 phim, phim không có trên KKPhim 3 ngày sau mới tra lại)
@@ -185,13 +195,16 @@ object HomeFeed {
         val topics = Prefs.homeTopics
         var similar: HistoryItem? = null
         var similarTags: Tags? = null
+        var top: Pair<String, String>? = null
         if (taste != null && taste.total > 0) {
-            // Giống «phim vừa xem»: cùng loại phim, nước và thể loại riêng nhất của phim đó
-            similar = history.firstOrNull { FilmTags.of(it.title)?.let { t -> t.type != null && t.countries.isNotEmpty() } == true }
+            // Giống «phim vừa xem»: cùng loại phim, nước và thể loại riêng nhất của phim đó (trẻ em: chỉ phim hoạt hình)
+            similar = history.firstOrNull {
+                FilmTags.of(it.title)?.let { t -> t.type != null && t.countries.isNotEmpty() && (!kids || t.type == "hoathinh") } == true
+            }
             similarTags = similar?.let { FilmTags.of(it.title) }
             val used = HashSet<String>()
             if (similar != null && similarTags != null) {
-                val g = similarTags.genres.filter { it !in GENERIC }.sortedBy { if (it in HALF) 1 else 0 }.firstOrNull()
+                val g = similarTags.genres.filter { it !in GENERIC && !(kids && it in ADULT) }.sortedBy { if (it in HALF) 1 else 0 }.firstOrNull()
                 val c = similarTags.countries.first()
                 val url = filterUrl(s, similarTags.type!!, c, g)
                 if (url != null) {
@@ -206,6 +219,7 @@ object HomeFeed {
                 if (n == 2) break
                 // Thể loại quá chung (chính kịch, tâm lý) chỉ để tính điểm, không thành hàng riêng
                 if (cb.genre in used || cb.genre in HALF) continue
+                if (kids && (cb.type != "hoathinh" || cb.genre in ADULT)) continue
                 val url = filterUrl(s, cb.type, cb.country, cb.genre) ?: continue
                 used += cb.genre
                 n++
@@ -213,29 +227,83 @@ object HomeFeed {
                 parts += Part(Role.INTEREST, req(s, url), title, url, "interest-${cb.genre}")
             }
             // Loại phim + nước xem nhiều nhất (≥ 40%): hàng mới cập nhật riêng, gộp mọi nguồn
-            val top = taste.pair.entries.filter { it.key.first.isNotEmpty() && it.key.second.isNotEmpty() }.maxByOrNull { it.value }
-            if (top != null && top.value >= taste.total * 0.4) {
-                val (type, country) = top.key
+            val best = taste.pair.entries.filter { it.key.first.isNotEmpty() && it.key.second.isNotEmpty() }.maxByOrNull { it.value }
+            if (best != null && best.value >= taste.total * 0.4) top = best.key
+            if (top != null && !kids) {
+                val (type, country) = top
                 val title = "${typeName(type).replaceFirstChar { it.uppercase() }} ${ApiSite.countryName(country)} mới cập nhật · mọi nguồn"
                 // Một danh sách đã lọc (KKPhim / VSMOV); phim cùng tên ở trang web / NguonC / VSMOV (danh sách mới cập nhật)
                 // tự gộp vào nên vẫn ghi đủ nguồn
                 filterUrl(s, type, country, null)?.let { url -> parts += Part(Role.DOMINANT, req(s, url), title, null, "dominant") }
             }
-        } else if (history.isEmpty()) {
+        } else if (history.isEmpty() && !kids) {
             for ((id, label) in TOPICS) {
                 if (id !in topics) continue
                 topicReq(s, id)?.let { (req, more) -> parts += Part(Role.TOPIC, req, "Vì bạn chọn: $label", more, "topic-$id") }
             }
         }
-        // Phim lẻ mới (xếp theo thể loại người xem hay xem)
-        if (s.kk != null) {
-            val u = "${s.kk}/api/movies/category/phim-le?page=1&limit=30"
-            parts += Part(Role.MOVIES, req(s, u), "Phim lẻ mới", u, "movies")
-        } else if (s.vs != null) {
-            val u = "${s.vs}/api/danh-sach/phim-le?page=1"
-            parts += Part(Role.MOVIES, Feed.Req("list|$u", host(s.vs)) { Feed.Loaded(Feed.parseKk(ApiSite.json(u), s.vs)) }, "Phim lẻ mới", u, "movies")
+        if (kids) {
+            parts += kidsParts(s)
+        } else {
+            dubPart(s, top)?.let { parts += it }
+            // Phim lẻ mới (xếp theo thể loại người xem hay xem)
+            if (s.kk != null) {
+                val u = "${s.kk}/api/movies/category/phim-le?page=1&limit=30"
+                parts += Part(Role.MOVIES, req(s, u), "Phim lẻ mới", u, "movies")
+            } else if (s.vs != null) {
+                val u = "${s.vs}/api/danh-sach/phim-le?page=1"
+                parts += Part(Role.MOVIES, Feed.Req("list|$u", host(s.vs)) { Feed.Loaded(Feed.parseKk(ApiSite.json(u), s.vs)) }, "Phim lẻ mới", u, "movies")
+            }
         }
-        return Plan(parts, s, similar, similarTags, taste, topics, Prefs.profileId)
+        return Plan(parts, s, similar, similarTags, taste, topics, Prefs.profileId, kids)
+    }
+
+    /**
+     * Người hay xem bản thuyết minh / lồng tiếng (từ nửa số lần mở tập gần đây, ít nhất 5 lần): hàng «Thuyết minh mới» theo
+     * loại phim + nước hay xem (KKPhim lọc được ngôn ngữ), không có KKPhim thì danh sách ngôn ngữ của NguonC.
+     */
+    private fun dubPart(s: Sources, top: Pair<String, String>?): Part? {
+        val langs = Prefs.watchLangs
+        val tm = langs.count { it == "tm" }
+        val lt = langs.count { it == "lt" }
+        if (langs.size < 5 || (tm + lt) * 2 < langs.size) return null
+        val slug = if (lt > tm) "long-tieng" else "thuyet-minh"
+        val name = if (lt > tm) "Lồng tiếng" else "Thuyết minh"
+        s.kk?.let { o ->
+            val t = top?.first?.let(::typeSlug)
+            val url = if (t != null) "$o/api/movies/category/$t?country=${top.second}&sort_lang=$slug&page=1&limit=30"
+            else "$o/api/movies/category/phim-$slug?page=1&limit=30"
+            val title = if (t != null) "$name mới · ${typeName(top.first)} ${ApiSite.countryName(top.second)}" else "Phim ${name.lowercase()} mới"
+            return Part(Role.DUB, req(s, url), title, url, "dub")
+        }
+        s.nc?.let { o ->
+            val url = "$o/api/films/ngon-ngu/$slug?page=1"
+            return Part(Role.DUB, Feed.Req("list|$url", Site.hostOf(o).orEmpty()) {
+                Feed.Loaded(Feed.parseNc(Http.get(url, mapOf("Accept" to "application/json")).body, o))
+            }, "Phim ${name.lowercase()} mới", url, "dub")
+        }
+        return null
+    }
+
+    /** Hồ sơ trẻ em: hoạt hình thiếu nhi (KKPhim «trẻ em» + VSMOV «thiếu nhi»), hoạt hình gia đình, hoạt hình lồng tiếng. */
+    private fun kidsParts(s: Sources): List<Part> {
+        val out = ArrayList<Part>()
+        s.kk?.let { o ->
+            val u = "$o/api/movies/category/hoat-hinh?category=tre-em&page=1&limit=30"
+            out += Part(Role.KIDS, req(s, u), "Hoạt hình thiếu nhi", u, "kids-young")
+        }
+        s.vs?.let { o ->
+            val u = "$o/api/the-loai/thieu-nhi?page=1"
+            out += Part(Role.KIDS, Feed.Req("list|$u", Site.hostOf(o).orEmpty()) { Feed.Loaded(Feed.parseKk(ApiSite.json(u), o)) },
+                "Hoạt hình thiếu nhi", u, "kids-young")
+        }
+        s.kk?.let { o ->
+            val fam = "$o/api/movies/category/hoat-hinh?category=gia-dinh&page=1&limit=30"
+            out += Part(Role.KIDS, req(s, fam), "Hoạt hình gia đình", fam, "kids-family")
+            val dub = "$o/api/movies/category/hoat-hinh?sort_lang=long-tieng&page=1&limit=30"
+            out += Part(Role.KIDS, req(s, dub), "Hoạt hình lồng tiếng", dub, "kids-dub")
+        }
+        return out
     }
 
     /** Danh sách lọc theo loại phim + nước (+ thể loại) — KKPhim lọc được cả ba; không có KKPhim thì VSMOV (thể loại + nước). */
@@ -513,8 +581,13 @@ object HomeFeed {
         val rows = ArrayList<FeedRow>()
         val claimed = HashSet<FeedFilm>()
         fun films(part: Part, r: Feed.Result) = r.items.mapNotNull { groupOf[it.url] }.distinct()
+        // Hồ sơ trẻ em: chỉ phim hoạt hình, không có thể loại không hợp trẻ em (phim chưa rõ thể loại — vd danh sách «thiếu
+        // nhi» của VSMOV — giữ lại vì đã đến từ danh sách dành cho trẻ em)
+        fun kidsOk(f: FeedFilm): Boolean = !plan.kids || (f.tags.let { t ->
+            t == null || ((t.type == null || t.type == "hoathinh") && t.genres.none { it in ADULT })
+        } && f.items.none { SCARY.containsMatchIn(it.title) })
         fun add(id: String, title: String, list: List<FeedFilm>, more: String?, claim: Boolean, min: Int = 3) {
-            val l = list.filter { it !in claimed }.take(ROW_MAX)
+            val l = list.filter { it !in claimed && kidsOk(it) }.take(ROW_MAX)
             if (l.size < min) return
             if (claim) claimed += l.take(6)
             rows += FeedRow(id, title, l.map(::card), more)
@@ -578,6 +651,17 @@ object HomeFeed {
             val set = LinkedHashSet<FeedFilm>()
             dominant.forEach { (p, r) -> set += films(p, r) }
             add("dominant", dominant.first().first.title!!, set.filterNot(::watched).sortedByDescending { it.updated }, null, claim = true)
+        }
+        // Thuyết minh / lồng tiếng mới (người hay xem bản thuyết minh / lồng tiếng)
+        byRole[Role.DUB]?.forEach { (p, r) ->
+            add(p.id, p.title!!, films(p, r).filterNot(::watched).sortedByDescending { it.updated }, p.more, claim = true)
+        }
+        // Hồ sơ trẻ em: hoạt hình thiếu nhi (KKPhim + VSMOV gộp một hàng), gia đình, lồng tiếng
+        byRole[Role.KIDS]?.groupBy { it.first.id }?.forEach { (id, ps) ->
+            val set = LinkedHashSet<FeedFilm>()
+            ps.forEach { (p, r) -> set += films(p, r) }
+            add(id, ps.first().first.title!!, set.filterNot(::watched).sortedByDescending { it.updated },
+                ps.firstNotNullOfOrNull { it.first.more }, claim = true)
         }
         interestRow(1)
 

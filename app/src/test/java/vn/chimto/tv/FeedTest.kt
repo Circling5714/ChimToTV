@@ -273,6 +273,51 @@ class FeedTest {
     }
 
     @Test
+    fun kidsProfileKeepsOnlyChildFriendlyAnimation() {
+        fun item(slug: String, type: String, vararg genres: String) =
+            """{"name":"$slug","slug":"$slug","type":"$type","modified":{"time":"2026-11-08T10:00:00Z"},
+               "category":[${genres.joinToString(",") { "{\"slug\":\"$it\"}" }}]}"""
+        val body = """{"data":{"items":[${listOf(
+            item("doraemon", "hoathinh", "gia-dinh", "hai-huoc"),
+            item("chiikawa", "hoathinh", "tre-em"),
+            item("conan", "hoathinh", "bi-an"),
+            item("bluey", "hoathinh", "gia-dinh"),
+            item("edgerunners", "hoathinh", "hanh-dong", "hinh-su"), // hình sự: không hợp trẻ em
+            item("phim-ma", "hoathinh", "kinh-di"),
+            item("phim-bo-nguoi-dong", "series", "gia-dinh"), // không phải hoạt hình
+            item("Horror Collector", "hoathinh", "tre-em", "bi-an"), // tên là phim ma, nguồn không gắn thể loại kinh dị
+        ).joinToString(",")}]}}"""
+        val list = Feed.parseKk(body, kk)
+        val vs = Feed.fromFilms(listOf(Film("https://vsmov.com/phim/na-tra", "Na Tra Truyền Kỳ", null, null))) // «thiếu nhi», chưa rõ thể loại
+        val parts = listOf(
+            part(HomeFeed.Role.KIDS, "list|kk-young", "kkphim.com", list).let { (p, r) -> HomeFeed.Part(p.role, p.req, "Hoạt hình thiếu nhi", null, "kids-young") to r },
+            part(HomeFeed.Role.KIDS, "list|vs-young", "vsmov.com", vs).let { (p, r) -> HomeFeed.Part(p.role, p.req, "Hoạt hình thiếu nhi", null, "kids-young") to r },
+        )
+        val plan = HomeFeed.Plan(parts.map { it.first }, HomeFeed.Sources(kk, null, "https://vsmov.com", null, emptyList()), null, null, null,
+            emptySet(), kids = true)
+        val rows = HomeFeed.buildRows(plan, parts, ctx(emptyList())).rows
+        assertEquals(1, rows.size) // KKPhim + VSMOV gộp một hàng
+        assertEquals(setOf("doraemon", "chiikawa", "conan", "bluey", "Na Tra Truyền Kỳ"), rows[0].cards.map { it.film.title }.toSet())
+        // Hồ sơ thường: giữ hết
+        val adult = HomeFeed.buildRows(HomeFeed.Plan(plan.parts, plan.src, null, null, null, emptySet()), parts, ctx(emptyList())).rows
+        assertEquals(9, adult[0].cards.size)
+    }
+
+    @Test
+    fun remembersWatchLanguages() {
+        Prefs.init(MemoryPrefs())
+        repeat(45) { Prefs.recordWatchLang(if (it % 3 == 0) "vs" else "tm") }
+        assertEquals(40, Prefs.watchLangs.size)
+        assertEquals("tm", Prefs.watchLangs.last())
+        assertFalse(Prefs.kids)
+        assertTrue(Prefs.homeMixOn)
+        Prefs.homeMix = false
+        assertFalse(Prefs.homeMixOn)
+        Prefs.kids = true
+        assertTrue(Prefs.homeMixOn) // hồ sơ trẻ em luôn dùng trang chủ tổng hợp
+    }
+
+    @Test
     fun remembersFilmTagsAndSeenEpisodes() {
         Prefs.init(MemoryPrefs())
         assertTrue(FilmTags.needsLookup("Tiên Nghịch"))

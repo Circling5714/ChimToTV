@@ -176,14 +176,36 @@ class SettingsActivity : BaseActivity() {
 
         // Trang chủ: tổng hợp mọi nguồn / theo trang đang dùng (riêng từng người xem); nguồn đang tạm nghỉ → thử lại ngay
         val homeBtn = findViewById<TextView>(R.id.btnHomeMix)
+        val kidsBtn = findViewById<TextView>(R.id.btnKids)
         fun showHomeMix() {
-            homeBtn.text = "Trang chủ${who?.let { " của $it" } ?: ""}: " +
-                if (Prefs.homeMix) "Tổng hợp mọi nguồn" else "Theo trang đang dùng"
+            homeBtn.text = "Trang chủ${who?.let { " của $it" } ?: ""}: " + when {
+                Prefs.kids -> "Tổng hợp (hồ sơ trẻ em)"
+                Prefs.homeMix -> "Tổng hợp mọi nguồn"
+                else -> "Theo trang đang dùng"
+            }
+            kidsBtn.text = "Hồ sơ trẻ em${who?.let { " ($it)" } ?: ""}: ${if (Prefs.kids) "Bật" else "Tắt"}"
         }
         showHomeMix()
         homeBtn.setOnClickListener {
+            if (Prefs.kids) {
+                toast("Hồ sơ trẻ em luôn dùng trang chủ tổng hợp (chỉ phim hoạt hình hợp trẻ em).")
+                return@setOnClickListener
+            }
             Prefs.homeMix = !Prefs.homeMix
             showHomeMix()
+        }
+        // Bật thì không cần mã; tắt phải nhập mã PIN phụ huynh (nếu đã đặt) — trẻ không tự tắt được
+        kidsBtn.setOnClickListener {
+            if (!Prefs.kids) {
+                Prefs.kids = true
+                showHomeMix()
+                toast("Đã bật hồ sơ trẻ em: trang chủ chỉ có phim hoạt hình hợp trẻ em.")
+            } else {
+                ProfileUi.parentUnlock(this, "Mã PIN phụ huynh để tắt hồ sơ trẻ em") {
+                    Prefs.kids = false
+                    showHomeMix()
+                }
+            }
         }
         val retryBtn = findViewById<TextView>(R.id.btnFeedRetry)
         val resting = Feed.restingHosts()

@@ -152,8 +152,9 @@ object Prefs {
         "base_url", "seek_step", "auto_next", "video_fill",
         // Giới hạn giờ xem (WatchLimit)
         "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
-        // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy của từng phim
-        "home_mix", "home_topics", "seen_eps",
+        // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy của từng phim, hồ sơ trẻ em,
+        // ngôn ngữ bản hay xem (Vietsub / Thuyết minh / Lồng tiếng)
+        "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
     )
     private val PROFILE_PREFIXES = listOf("server_type@", "server_label@")
 
@@ -630,6 +631,29 @@ object Prefs {
     var homeMix: Boolean
         get() = sp.getBoolean(k("home_mix"), true)
         set(value) = sp.edit().putBoolean(k("home_mix"), value).apply()
+
+    /**
+     * Hồ sơ trẻ em: trang chủ (luôn kiểu tổng hợp) chỉ có phim hoạt hình hợp trẻ em. Tắt phải nhập mã PIN phụ huynh (nếu đã
+     * đặt). Chỉ lọc trang chủ — tìm kiếm / mục của trang vẫn như cũ.
+     */
+    var kids: Boolean
+        get() = sp.getBoolean(k("kids"), false)
+        set(value) = sp.edit().putBoolean(k("kids"), value).apply()
+
+    /** Trang chủ tổng hợp đang dùng (người xem chọn, hoặc hồ sơ trẻ em). */
+    val homeMixOn: Boolean get() = homeMix || kids
+
+    /** Ghi ngôn ngữ của bản vừa mở ("vs" / "tm" / "lt" — PlayStats.lang), giữ 40 lần gần nhất. */
+    fun recordWatchLang(lang: String) {
+        val a = runCatching { JSONArray(sp.getString(k("watch_langs"), "[]")) }.getOrDefault(JSONArray())
+        val list = (0 until a.length()).map { a.optString(it) } + lang
+        sp.edit().putString(k("watch_langs"), JSONArray(list.takeLast(40)).toString()).apply()
+    }
+
+    /** Ngôn ngữ các bản đã mở gần đây (cũ trước). */
+    val watchLangs: List<String>
+        get() = runCatching { JSONArray(sp.getString(k("watch_langs"), "[]")) }.getOrDefault(JSONArray())
+            .let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotEmpty() } }
 
     /** Chủ đề người xem chưa có lịch sử đã chọn (id trong HomeFeed.TOPICS). */
     var homeTopics: Set<String>
