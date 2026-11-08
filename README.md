@@ -10,10 +10,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.5`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.5)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.6`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.6)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.2`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.2)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.3`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.3)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -32,12 +32,25 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | hoathinh3d.pw | HaLimMovies (Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Đánh Giá Cao đọc qua API JSON của trang, từ 2.2) | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
 | phimmois.fun (trước là phimmoir.fun; từ 06/11/2026 tự chuyển sang phimmoiw.fun — app tự đổi theo) | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
 | mephim.ddns.net (từ 2.5 / iPad 1.5) | ứng dụng React — đọc API JSON `/api/movies/…` của trang (nguồn KKPhim), chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
+| KKPhim — www.kkphim.com (từ 2.6 / iPad 1.6 / Windows 1.3) | không đọc trang: gọi thẳng API công khai `phimapi.com`, chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
 
 **Tìm kiếm** (từ 1.9.1) tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm, trang đang dùng đứng đầu.
 
 mephim.ddns.net (từ 2.5): trang tổng hợp nguồn KKPhim — hoạt hình Trung Quốc, phim bộ / lẻ, TV Shows, thuyết minh / lồng
 tiếng; menu cố định + **Thể loại…** / **Quốc gia…**. Máy chủ của trang hay báo lỗi 500 khi nguồn chậm → app gọi thẳng
 `phimapi.com` (cùng định dạng, như chính trang web làm); riêng khối Thịnh hành / Song ngữ không có nguồn thay thế.
+
+KKPhim (từ 2.6): trang chủ Hoạt hình Trung Quốc mới cập nhật, Hoạt hình Trung Quốc thuyết minh, Phim mới, Phim bộ / lẻ mới;
+menu như mephim thêm «Hoạt hình Trung Quốc thuyết minh» và «Phim chiếu rạp». Nhà mạng chặn tên miền trần `kkphim.com`
+(chỉ `www.kkphim.com` vào được): gõ «kkphim.com» khi thêm trang thì app tự hiểu là trang KKPhim có sẵn.
+
+**Server dự phòng KKPhim** (từ 2.6 / iPad 1.6 / Windows 1.3): yanhh3d, hoathinh3d.ee, hhkungfu nhúng chung một trình phát
+(streamfree.vip) — hỏng là hỏng cả ba. Mở một tập ở các trang này (và hoathinh3d.pw) thì app tìm cùng phim, cùng số tập
+trên KKPhim và thêm **KKPhim Vietsub / Thuyết Minh** vào menu ▼ (luồng HLS, app tự phát, bỏ quảng cáo). Trang chia bản
+Vietsub / Thuyết Minh thì chỉ thêm đúng ngôn ngữ đang xem; hoathinh3d.pw có thêm **Trình phát của trang** để quay lại
+trình phát gốc. KKPhim được tìm song song với trang tập (chậm / lỗi thì bỏ qua); trang lỗi mà KKPhim có tập thì vẫn xem
+được. Tắt / bật: **Cài đặt → Phát video → Server dự phòng KKPhim** (mặc định bật). Lưu ý: bản trên KKPhim có khi dài ngắn
+khác bản của trang (vd cắt đoạn đầu), đổi server giữa chừng giữ số giây nên có thể lệch cảnh.
 
 App không viết riêng cho từng trang mà nhận dạng theo mẫu giao diện, nên trang khác cùng kiểu (yanhh3d / theme HaLim /
 Next.js kiểu PhimMoi) thường cũng chạy: **Đổi trang phim** → **＋ Thêm trang khác…** rồi gõ tên miền (từ 2.1), hoặc nhập
@@ -117,7 +130,8 @@ cả chuột lẫn bàn phím / remote:
 - **Chuột:** rê để hiện thanh điều khiển, bấm vào phim phát / dừng, bấm đúp toàn màn hình, bấm thanh tua nhảy tới chỗ đó,
   Delete hoặc chuột phải trên thẻ phim (Lịch sử / Theo dõi) để xoá; nút lùi của chuột = quay lại.
 - **Cài đặt:** bước tua, tự chuyển tập, **cỡ giao diện** 100–175% (ngồi xa tivi), mở app ở toàn màn hình, **vượt chặn nhà
-  mạng** mức 1 / 2, **proxy SOCKS5** (từ 1.2), tự kiểm tra bản mới, xoá lịch sử / dữ liệu duyệt web.
+  mạng** mức 1 / 2, **proxy SOCKS5** (từ 1.2), **server dự phòng KKPhim** (từ 1.3), tự kiểm tra bản mới, xoá lịch sử / dữ
+  liệu duyệt web.
 - **Người xem** (từ 1.2, như TV 2.0): menu «👤 Người xem» → «Ai đang xem?» / «Quản lý người xem…»: tối đa 8 người, mỗi người
   một lịch sử / Xem tiếp / theo dõi / trang phim / server / cách xem; khoá bằng mã PIN 4 số; hỏi khi mở app (từ 2 người) và
   khi rời app hơn 30 phút; người đang dùng có khoá thì nền đen kín tới khi nhập đúng mã. **Giới hạn giờ xem** + mã PIN phụ
@@ -254,7 +268,8 @@ Lúc xem nhấn ▼ → **Thu nhỏ vào góc** (hoặc phím Window của remot
 
 - **Đổi tên miền**: Cài đặt → nhập tên miền mới → Lưu (nút "Kiểm tra kết nối" cho biết đọc được bao nhiêu phim). Nếu tên miền cũ tự chuyển hướng, app tự thay tên cũ bằng tên mới trong danh sách (từ 2.1). Tên cũ bị nhà mạng chặn thì app không thấy chuyển hướng: bật **Vượt chặn nhà mạng** rồi mở lại trang cũ, hoặc gõ tên mới. Trang đã biết là đổi hẳn tên miền (phimmoir.fun → phimmois.fun, 11/2026) được app tự đổi trong mọi dữ liệu đã lưu khi mở app.
 - **Trang mở mãi không được, dùng VPN thì vào được**: nhà mạng chặn theo tên trang — bật **Cài đặt → Vượt chặn nhà mạng** (từ 2.1).
-- **Video không chạy / hay giật**: trong lúc xem nhấn ▼ → chọn server khác. App nhớ server chọn lần cuối và chấm điểm
+- **Video không chạy / hay giật**: trong lúc xem nhấn ▼ → chọn server khác (từ 2.6 có cả **KKPhim** cho yanhh3d /
+  hoathinh3d / hhkungfu). App nhớ server chọn lần cuối và chấm điểm
   từng server theo những lần xem trên chính TV đó (mở mất bao lâu, giật nhiều hay ít). Server đang giật nhiều thì app
   gợi ý server khác cùng ngôn ngữ, nhấn OK để chuyển. Báo "TV rớt …% khung hình" nghĩa là TV xử lý không kịp, đổi
   server không đỡ.
@@ -501,6 +516,15 @@ Trang API (từ 2.5 — `ApiSite.kt` / `ApiSite.swift`): trang trắng của ứ
 `/phim/<slug>`, tập `/phim/<slug>/<tập>?sv=<thứ tự bản>` (Vietsub / Thuyết Minh trùng tên tập); danh sách = địa chỉ API.
 Tập: `EpisodeSource(next = true)` với `links` sẵn (`m3u8`, `embed`) → `NextSite.video` trả luôn, không tải thêm.
 Dự phòng: `ApiSite.fallback` đổi `/api/movies/newest|category|the-loai|quoc-gia|search|detail` sang `phimapi.com/v1/api/…`.
+Trang KKPhim (từ 2.6, `ApiSite.KK_HOST`): không có `/api/movies` riêng — `ApiSite.get` gọi luôn `fallback` (phimapi.com);
+địa chỉ phim / tập trong app vẫn theo `www.kkphim.com`. Thêm một lần cho người đã cài qua khoá `preset_added@<trang>`.
+
+Server dự phòng KKPhim (từ 2.6 — `KkPhim.kt` / `KkPhim.swift` / `KkPhim.cs`, cùng tên hàm): `KkPhim.source` chạy song song
+trang tập và tìm KKPhim (`combine`: trang xong thì chờ KKPhim tới 6 s tính từ lúc bắt đầu, trang lỗi thì tới 15 s). Tìm
+phim: slug của trang trước (chỉ nhận loại `hoathinh`), không khớp thì `tim-kiem` theo tên; tên phải trùng sau khi bỏ dấu,
+"Phần / Season / SS N" → "N", tính cả tên trong ngoặc. Tập khớp theo số. Loại server `kk-vs` / `kk-tm` (điểm server
+và server quen lưu theo tên này); trang mở thẳng trang tập có server giả `page` («Trình phát của trang»). Bỏ qua trang
+đã có sẵn nguồn KKPhim (mephim, phimmoi, KKPhim). Khoá `kk_backup` (mặc định bật).
 
 Điện thoại (từ 2.4 — `Phone.kt`): `Screen.isTv` (chế độ TV hoặc leanback) giữ `sensorLandscape` của manifest, máy khác
 `BaseActivity.onCreate` đặt `SCREEN_ORIENTATION_FULL_USER` (trừ trình phát). Các màn khai báo `configChanges` nên xoay

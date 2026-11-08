@@ -7,6 +7,54 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## Windows 1.3 — 08/11/2026
+
+- **Server dự phòng KKPhim** như TV 2.6 (`KkPhim.cs`): yanhh3d / hoathinh3d / hhkungfu / hoathinh3d.pw có thêm «KKPhim Vietsub /
+  Thuyết Minh» trong bảng ▼ (HLS, bỏ quảng cáo; đúng ngôn ngữ của bản đang xem; «Trình phát của trang» cho hoathinh3d.pw);
+  trang lỗi mà KKPhim có tập thì vẫn xem được. Cài đặt: «Server dự phòng KKPhim» (mặc định bật).
+- **Thêm trang KKPhim** (www.kkphim.com, gọi thẳng API phimapi.com), có sẵn trong Đổi trang phim (người đã cài được thêm
+  một lần). Gõ «kkphim.com» khi thêm trang là trang KKPhim có sẵn (tên miền trần bị nhà mạng chặn).
+- Sửa lỗi có từ 1.0: trang «Đổi trang phim» bấm Đo / Xoá / Thêm / + trang mẫu một lần là mất ô thêm trang.
+- Sửa: mở phim mới mà trang phim tải lỗi thì bảng ▼ không còn giữ server / bản / tập / tiêu đề của phim trước (bấm vào có thể
+  phát nhầm phim); «Tải lại» lúc đó tải lại thông tin phim.
+- bản 1.3.0 · tag `win-v1.3` (không phải "latest") · commit `b2a92de` · `ConBangTV-Windows-1.3.exe` 72 796 716 byte ·
+  SHA-256 `98950fc9d9c37e69e58a3afc86d87356c03d6f728b923f3b0bfa2a844cbb349d`
+- Đã thử trên máy Windows 10 (bản gỡ lỗi): 63 test lõi; danh sách trang của người dùng 1.2 được thêm KKPhim đúng một lần;
+  Đo tốc độ; trang KKPhim (trang chủ, menu, chi tiết, phát HLS 1080p); server dự phòng không trùng; đổi qua lại trình phát
+  của hoathinh3d.pw ↔ KKPhim giữ chỗ xem; tắt / bật trong Cài đặt. Tệp tải từ link công khai khớp SHA-256.
+
+## iPad 1.6 — 08/11/2026
+
+- **Server dự phòng KKPhim** như TV 2.6 (`KkPhim.swift`): «KKPhim Vietsub / Thuyết Minh» trong Menu của trình phát cho
+  yanhh3d / hoathinh3d / hhkungfu / hoathinh3d.pw; Cài đặt → Phát video: «Server dự phòng KKPhim».
+- **Thêm trang KKPhim** (www.kkphim.com, gọi thẳng phimapi.com), có sẵn trong Đổi trang phim (thêm một lần cho người đã
+  cài); gõ «kkphim.com» khi thêm trang là trang KKPhim có sẵn; gợi ý thêm trang có nhắc KKPhim.
+- bản 1.6 (CFBundleVersion 7) · mã gói `vn.chimto.tv` · tag `ios-v1.6` (không phải "latest") · commit `b2a92de` ·
+  `ConBangTV-iPad-1.6.ipa` 3 853 799 byte · SHA-256 `8d7aaba7fdcdfc2b0e6b11eb1cfc7304a47439a974cb0607f9f3445bfd46c1ac`
+- 81 test lõi trên macOS. Bản thử 50 đã thử trên iPad (server dự phòng, trang KKPhim). **Bản chính thức đã cài thật**: iPad
+  Pro (1.5 → 1.6, danh sách trang được thêm www.kkphim.com đúng một lần) và iPhone 6s Plus (cài mới), app mở và chạy.
+
+## 2.6 — 08/11/2026
+
+- **Server dự phòng KKPhim** (`KkPhim.kt`, API công khai phimapi.com) cho yanhh3d, hoathinh3d.ee, hhkungfu (nhúng chung
+  streamfree.vip — hỏng là hỏng cả ba) và hoathinh3d.pw: mở tập là app tìm cùng phim (slug của trang, không khớp thì theo
+  tên / tên gốc), lấy tập cùng số rồi thêm «KKPhim Vietsub / Thuyết Minh» vào menu ▼ — luồng HLS, app tự phát, bỏ quảng cáo.
+  Trang chia bản thì chỉ thêm đúng ngôn ngữ đang xem; hoathinh3d.pw có thêm «Trình phát của trang». Tải song song với trang
+  tập, KKPhim chậm / lỗi thì bỏ qua; trang lỗi mà KKPhim có tập thì vẫn xem được. Cài đặt → Phát video: «Server dự phòng
+  KKPhim» (mặc định bật).
+- **Thêm trang KKPhim** (www.kkphim.com; mọi dữ liệu gọi thẳng phimapi.com): trang chủ Hoạt hình Trung Quốc mới cập nhật /
+  thuyết minh, Phim mới, Phim bộ / lẻ mới; menu thêm «Hoạt hình Trung Quốc thuyết minh», «Phim chiếu rạp»; Thể loại… /
+  Quốc gia…, tìm kiếm, bản Vietsub / Thuyết Minh, server HLS (bỏ quảng cáo) + trình phát KKPhim. Có sẵn trong ☰ → Đổi
+  trang phim (người đã cài được thêm một lần). Gõ «kkphim.com» khi thêm trang là trang KKPhim có sẵn (tên miền trần bị nhà
+  mạng chặn, trước đây thành dòng trùng).
+- Lưu ý: bản trên KKPhim có khi dài ngắn khác bản của trang (Tiên Nghịch tập 165: yanhh3d 23:41, KKPhim 18:49) — đổi server
+  giữa chừng giữ số giây nên có thể lệch cảnh.
+- versionCode 27 · tag `v2.6` · commit `b2a92de` · `ChimToTV-2.6.apk` 1 149 262 byte · SHA-256
+  `15041c01e996dea66ccb358131d759412aeea26e178b787a579cecc76318928c`
+- Thử bản gỡ lỗi trên Skyworth và TV box (server dự phòng cả 4 trang, Thuyết Minh / Vietsub đúng bản, trang lỗi vẫn phát,
+  trang KKPhim, tắt / bật trong Cài đặt, gõ «kkphim.com»); bản chính thức thử trên TV box trước khi phát hành (yanhh3d phát
+  được, có «KKPhim Vietsub» trong menu ▼). API `releases/latest` trả `v2.6` + tệp `.apk`; tệp tải từ link công khai khớp SHA-256.
+
 ## Windows 1.2 — 06/11/2026
 
 - **Người xem**: mỗi người một lịch sử, Xem tiếp, chỗ đang xem, phim theo dõi, trang phim / server / cách xem riêng; khoá bằng mã
