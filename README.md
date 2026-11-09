@@ -10,7 +10,7 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.8`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.8)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.8.1`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.8.1)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
 **Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.5`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.5)
@@ -32,6 +32,9 @@ người xem**:
   **Phim lẻ mới**. Người chưa xem gì: chọn vài chủ đề (Hoạt hình Trung Quốc, Kiếm hiệp, Phim Hàn…).
 - Mỗi hàng một dòng, ô cuối **Xem thêm** mở cả hàng (Back / Esc quay lại đúng ô). Phim có ở nhiều trang ghi «N nguồn»; trang
   phim có nút **Nguồn: … ▾** để mở phim ở trang khác.
+- **Điện thoại / iPhone cầm dọc** (từ 2.8.1 / iPad 1.8.1): mỗi hàng là một **dải vuốt ngang** — thấy 3 phim và một phần phim
+  kế, tới 12 phim một dải; **Xem thêm ›** nằm bên phải tên hàng, cuối dải có ô «Xem thêm» hẹp (cho remote / bàn phím). Xoay
+  ngang (và trên TV, iPad, Windows) vẫn là lưới.
 - Trang lỗi / chậm: mỗi trang chờ tối đa 6 giây rồi dùng bản lưu (dưới 24 giờ); trang về muộn thì trang chủ tự cập nhật (giữ ô
   đang chọn); lỗi 3 lần liền thì tạm nghỉ trang đó 30 phút (rồi 2 giờ, 6 giờ). Dòng nhỏ bên phải tiêu đề ghi «Cập nhật lúc …»,
   «lỗi: …», «tạm nghỉ: …», «chậm, dùng bản lưu: …». **Cài đặt → Trang chủ → Thử lại ngay** bỏ tạm nghỉ.
@@ -577,7 +580,11 @@ khoẻ nguồn trong khoá `feed_health`); `Feed.merge` gộp theo tên chuẩn 
 phim; `HomeFeed.buildRows` dựng các hàng; `HomeFeed.late` lấy nguồn về muộn; `saveLast` / `last` lưu trang chủ lần trước. Khoá
 riêng từng người: `home_mix`, `home_topics`, `seen_eps`, `kids`, `watch_langs`. Bản gỡ lỗi giả một nguồn lỗi bằng tệp
 `feed_fail_<tên miền>` (TV: thư mục `files` của app; Windows: thư mục dữ liệu). Trên TV box: không lập kế hoạch / đọc JSON
-trên luồng chính, luồng tải ưu tiên 4 (mức «background» làm API chậm quá 6 s).
+trên luồng chính, luồng tải ưu tiên 4 (mức «background» làm API chậm quá 6 s). Màn hẹp (từ 2.8.1 / iPad 1.8.1 — Android
+`Screen.narrow`, iOS lưới < 500 pt): mỗi hàng là `StripRow` (Android: `RecyclerView` ngang `StripList` lồng trong lưới, ◄ / ►
+không thoát ra ngoài dải; chọn lại ô trong dải qua `FilmGridAdapter.stripFocus`) / `GridSection.strip` (iOS; `KeyNav.move(…,
+strips:)` coi dải là một dòng); tiêu đề hàng có «Xem thêm ›» (`HeaderRow.more`). Bản thử iPad / iPhone: `/scroll?dir=end&y=…`
+cuộn dải ngang ở độ cao y.
 
 Server dự phòng KKPhim (từ 2.6 — `KkPhim.kt` / `KkPhim.swift` / `KkPhim.cs`, cùng tên hàm): `KkPhim.source` chạy song song
 trang tập và tìm KKPhim (`combine`: trang xong thì chờ KKPhim tới 6 s tính từ lúc bắt đầu, trang lỗi thì tới 15 s). Tìm

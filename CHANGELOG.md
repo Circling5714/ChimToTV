@@ -7,6 +7,33 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.8.1 — 09/11/2026
+
+- **iPhone cầm dọc:** mỗi hàng của trang chủ tổng hợp là một **dải vuốt ngang** — thấy trọn 3 phim và một phần phim kế, tới 12
+  phim một dải. «Xem thêm ›» nằm bên phải tên hàng (trước đây ô «Xem thêm» chiếm một trong 3 ô của hàng, chỉ còn 2 phim); cuối
+  dải có ô «Xem thêm» hẹp. «Có tập mới» / «Xem tiếp» cũng là dải. Bấm «Xem thêm» rồi quay lại (‹) thì cuộn về đúng hàng đó.
+  Áp dụng khi lưới hẹp hơn 500 pt (iPhone dọc, iPad Slide Over / chia màn hẹp); iPad và iPhone xoay ngang giữ lưới như cũ, xoay
+  qua lại thì tự đổi. Bàn phím: mỗi dải là một dòng (◄ / ► đi trong dải, ▲ / ▼ sang dải khác giữ thứ tự ô).
+- bản 1.8.1 (CFBundleVersion 10) · mã gói `vn.chimto.tv` · tag `ios-v1.8.1` (không phải "latest") · commit `7204ee0` ·
+  `ConBangTV-iPad-1.8.1.ipa` 4 177 680 byte · SHA-256 `df2abda78b92b50a0387d3ace5348538e5880dcb5d086ca0cf930c434f5497f0`
+- 99 test lõi trên macOS (thêm test phím trên dải). Bản thử 64 thử thật trên iPhone 6s Plus: dải, ô «Xem thêm» cuối dải, «Xem thêm»
+  ở tiêu đề và ở cuối dải + quay lại về đúng hàng, xoay ngang ra lưới 5 cột rồi xoay dọc lại. Bản chính thức cài lên iPhone (đè
+  1.7), mở được, tải xong trang chủ. iPad khoá màn hình nên chưa cài. Tệp tải từ link công khai khớp SHA-256.
+
+## 2.8.1 — 09/11/2026
+
+- **Điện thoại cầm dọc:** trang chủ tổng hợp xếp mỗi hàng thành **dải vuốt ngang** như bản iPhone — thấy trọn 3 phim và một phần
+  phim kế, tới 12 phim một dải; «Xem thêm ›» bên phải tên hàng (chạm) + ô «Xem thêm» hẹp cuối dải (remote / bàn phím). «Có tập
+  mới» / «Xem tiếp» cũng là dải. Dải nhớ chỗ đã vuốt tới; ◄ / ► ở đầu / cuối dải đứng yên; quay lại từ «Xem thêm» thì về đúng
+  hàng (dùng remote: chọn lại đúng ô). Xoay máy thì xếp lại trang chủ từ lần tải gần nhất. TV và điện thoại xoay ngang giữ lưới
+  như cũ.
+- versionCode 30 · tag `v2.8.1` · commit `7204ee0` · `ChimToTV-2.8.1.apk` 1 197 959 byte · SHA-256
+  `b50e819ff4130e6092ed2dfcabf823b8f55a73304faa799d39e2623902c42ba9`
+- 104 test. Thử bản gỡ lỗi trên TV box giả điện thoại dọc (720×1280): vuốt dải, ô cuối dải, «Xem thêm» ở tiêu đề + quay lại,
+  remote ▲ ▼ ◄ ► trong / giữa các dải, OK ở ô cuối dải + Back về đúng ô, xoay ngang ↔ dọc; trên TV lưới vẫn như cũ. Bản chính
+  thức thử trên TV box trước khi đăng. API `releases/latest` trả `v2.8.1` + `.apk`, tệp tải từ link công khai khớp SHA-256.
+  **Cập nhật tự động thật 2.8 → 2.8.1** trên TV box.
+
 ## Windows 1.5 — 09/11/2026
 
 - **Trang chủ tổng hợp** như TV 2.8 (`Core/Feed.cs`, `Core/HomeFeed.cs` — cùng tên hàm với bản TV): phim mới từ mọi trang trong
