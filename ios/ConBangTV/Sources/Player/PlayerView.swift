@@ -603,7 +603,7 @@ private struct MenuPanel: View {
                             ChipButton(text: "Tập trước", icon: "backward.end") { m.hidePanel(); m.prev() }
                             ChipButton(text: "Tập sau", icon: "forward.end") { m.hidePanel(); m.next() }
                             ChipButton(text: "Tải lại", icon: "arrow.clockwise") { m.reload() }
-                            ChipButton(text: "Danh sách tập", icon: "square.grid.2x2") { m.close() }
+                            ChipButton(text: "Danh sách tập", icon: "square.grid.2x2") { m.closeToEpisodes() }
                             ChipButton(text: "Mở trang web", icon: "safari") { m.openWebPage() }
                             if PlayerModel.pipSupported {
                                 ChipButton(text: "Thu nhỏ (hình trong hình)", icon: "pip.enter") { m.startPip() }

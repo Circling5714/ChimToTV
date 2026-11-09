@@ -70,6 +70,24 @@ enum AppProxy {
         gen += 1
     }
 
+    /// App quay lại màn hình: cổng nội bộ bị iOS thu hồi lúc nằm nền (bật vượt chặn / proxy, vào lại một lúc sau thì mọi
+    /// trang báo mất kết nối tới khi tắt app) → mở lại, cố giữ đúng số cổng cũ để WebKit / URLSession khỏi đổi gì.
+    static func revive() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let b = bridge, !b.listening else { return }
+        let old = b.port
+        b.close()
+        bridge = try? Socks5Bridge(socks: config, split: split, disorder: disorder, port: old, siteHosts: { AppProxy.siteHosts })
+        if bridge?.port != old { gen += 1 } // cổng khác: Http mở URLSession mới, WebSetup dùng cấu hình mới
+        Log.d("Proxy", "mở lại cổng nội bộ: \(old) → \(bridge.map { String($0.port) } ?? "không mở được")")
+    }
+
+    /// Cổng gỡ lỗi: làm hỏng ổ cắm nghe của cổng nội bộ (như iOS thu hồi lúc app nằm nền) để thử revive.
+    static func debugBreak() {
+        locked { bridge }?.debugBreak()
+    }
+
     /// Cổng gỡ lỗi: bật / tắt cổng nội bộ đi thẳng (khi không bật proxy thật).
     static func setDebugDirect(_ on: Bool) {
         locked { direct = on }

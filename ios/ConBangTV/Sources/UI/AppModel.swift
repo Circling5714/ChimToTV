@@ -190,8 +190,10 @@ final class AppModel: ObservableObject {
     }
 
     func refreshProfiles() {
-        profiles = Prefs.profiles
-        profileId = Prefs.profileId
+        // Chỉ gán khi khác: gán lại giá trị cũ vẫn báo SwiftUI vẽ lại mọi màn đang theo dõi AppModel
+        let p = Prefs.profiles, id = Prefs.profileId
+        if p != profiles { profiles = p }
+        if id != profileId { profileId = id }
     }
 
     func showPicker(gate: Bool) {
@@ -962,7 +964,18 @@ final class AppModel: ObservableObject {
         WidgetFeed.update()
     }
 
+    /// Phim cần mở trang (danh sách tập) khi trình phát đóng xong — menu trình phát → «Danh sách tập».
+    var episodesAfterPlayer: String?
+
     func playerClosed() {
+        if let film = episodesAfterPlayer {
+            episodesAfterPlayer = nil
+            // Đang ở đúng trang phim đó thì thôi (mở trình phát từ trang phim)
+            if detailFilm?.url != film {
+                let h = Prefs.historyFor(film)
+                openDetail(Film(url: film, title: h?.title ?? "", poster: h?.poster, badge: nil), links: [])
+            }
+        }
         historyVersion += 1
         WidgetFeed.update()
         SyncService.shared.syncSoon()

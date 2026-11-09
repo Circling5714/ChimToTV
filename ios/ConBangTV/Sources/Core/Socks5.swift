@@ -324,6 +324,8 @@ final class Socks5Bridge {
     private let lock = NSLock()
     private var open: [ObjectIdentifier: TcpSocket] = [:]
     private var closed = false
+    /// Ổ cắm nghe đã hỏng (app nằm nền lâu: iOS thu hồi ổ cắm — "defunct"); AppProxy.revive mở cổng mới.
+    private var dead = false
 
     /// Lỗi proxy gần nhất và thời điểm (ghép vào thông báo lỗi cho người xem).
     private(set) var lastError: String?
@@ -331,21 +333,28 @@ final class Socks5Bridge {
     /// Số kết nối đã mở theo đích ("host:cổng" → [qua proxy, đi thẳng, lỗi]) — cho cổng gỡ lỗi.
     private(set) var stats: [String: [Int]] = [:]
 
-    init(socks: SocksConfig?, split: Bool = false, disorder: Bool = false, siteHosts: @escaping () -> [String]) throws {
+    /// port = cổng muốn dùng (0 = tuỳ máy chọn); mở lại cổng cũ sau khi iOS thu hồi thì WebKit / URLSession khỏi đổi gì.
+    init(socks: SocksConfig?, split: Bool = false, disorder: Bool = false, port wanted: Int = 0,
+         siteHosts: @escaping () -> [String]) throws {
         self.socks = socks
         self.split = split
         self.disorder = split && disorder
         self.siteHosts = siteHosts
         let fd = socket(AF_INET, SOCK_STREAM, Int32(IPPROTO_TCP))
         guard fd >= 0 else { throw SocksError(code: 1, message: "không mở được cổng nội bộ (\(errno))") }
+        var one: Int32 = 1
+        _ = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, socklen_t(MemoryLayout<Int32>.size))
         var a = sockaddr_in()
         a.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         a.sin_family = sa_family_t(AF_INET)
-        a.sin_port = 0
         a.sin_addr.s_addr = inet_addr("127.0.0.1")
-        let ok = withUnsafePointer(to: &a) {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
-        } == 0 && Darwin.listen(fd, 64) == 0
+        func bindTo(_ p: Int) -> Bool {
+            a.sin_port = UInt16(p).bigEndian
+            return withUnsafePointer(to: &a) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+            } == 0
+        }
+        let ok = (wanted > 0 && bindTo(wanted) || bindTo(0)) && Darwin.listen(fd, 64) == 0
         var len = socklen_t(MemoryLayout<sockaddr_in>.size)
         guard ok, withUnsafeMutablePointer(to: &a, {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.getsockname(fd, $0, &len) }
@@ -376,13 +385,49 @@ final class Socks5Bridge {
         return closed
     }
 
+    /// Cổng gỡ lỗi: ngắt ổ cắm nghe (accept lỗi mãi như ổ cắm bị iOS thu hồi).
+    func debugBreak() {
+        _ = Darwin.shutdown(server, SHUT_RDWR)
+    }
+
+    /// Cổng còn nhận kết nối: chưa đóng, vòng nhận chưa thấy ổ cắm hỏng, và thử kết nối vào chính cổng được (app nằm nền
+    /// lâu thì iOS thu hồi ổ cắm nghe — mọi kết nối của WebKit / URLSession qua cổng báo lỗi).
+    var listening: Bool {
+        lock.lock()
+        let bad = closed || dead
+        lock.unlock()
+        guard !bad, let lo = IPAddr(text: "127.0.0.1"), let s = try? TcpSocket.connect(lo, port: port, timeout: 1) else { return false }
+        s.close()
+        return true
+    }
+
     private func acceptLoop() {
         // Chờ có kết nối tối đa 0,5 s mỗi lượt để biết cổng đã bị tắt (accept() đang chờ không tự thức khi đóng ổ cắm)
+        var fails = 0
         while !isClosed {
             var p = pollfd(fd: server, events: Int16(POLLIN), revents: 0)
             guard poll(&p, 1, 500) > 0 else { continue }
             let c = Darwin.accept(server, nil, nil)
-            if c < 0 { continue }
+            if c < 0 {
+                let e = errno
+                // Ổ cắm nghe hỏng (iOS thu hồi lúc app nằm nền): poll báo có việc mà accept lỗi mãi — thôi, khỏi quay vòng
+                // ăn CPU; AppProxy.revive mở cổng mới khi app quay lại
+                if (p.revents & Int16(POLLERR | POLLHUP | POLLNVAL)) != 0 || e == EBADF || e == EINVAL || e == ENOTSOCK {
+                    fails += 1
+                } else if e != EINTR && e != EAGAIN && e != ECONNABORTED {
+                    fails += 1
+                }
+                if fails >= 20 {
+                    lock.lock()
+                    dead = true
+                    lock.unlock()
+                    Log.d("Proxy", "cổng nội bộ \(port) hỏng (accept lỗi \(e)) — chờ mở lại")
+                    break
+                }
+                usleep(50_000)
+                continue
+            }
+            fails = 0
             let client = TcpSocket(fd: c)
             let t = Thread { [weak self] in self?.handle(client) }
             t.name = "chimto-socks-conn"

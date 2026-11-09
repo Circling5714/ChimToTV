@@ -295,6 +295,8 @@ enum DebugRoutes {
                 if let d = q["direct"] { AppProxy.setDebugDirect(d == "1") }
                 if let p = q["pass"] { Prefs.proxyPass = p }
                 if q["apply"] == "1" { AppProxy.apply() }
+                if q["break"] == "1" { AppProxy.debugBreak() } // giả iOS thu hồi ổ cắm nghe lúc app nằm nền
+                if q["revive"] == "1" { AppProxy.revive() }
                 if q["check"] == "1" {
                     let c = SocksConfig(host: Prefs.proxyHost, port: Prefs.proxyPort, user: Prefs.proxyUser, pass: Prefs.proxyPass,
                                         remoteDns: Prefs.proxyRemoteDns)

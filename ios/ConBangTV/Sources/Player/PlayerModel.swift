@@ -944,6 +944,12 @@ final class PlayerModel: NSObject, ObservableObject, WKNavigationDelegate, WKUID
         if panelShown { hidePanel() } else if suggestion != nil { dismissSuggestion() } else { close() }
     }
 
+    /// Menu → «Danh sách tập»: đóng trình phát rồi mở trang phim (mở từ hàng Xem tiếp thì trước đây chỉ về trang chủ).
+    func closeToEpisodes() {
+        AppModel.shared.episodesAfterPlayer = filmUrl
+        close()
+    }
+
     func close() {
         WatchLimit.flush()
         savePosition()

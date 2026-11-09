@@ -75,7 +75,9 @@ struct RootView: View {
         .overlay(alignment: .bottom) {
             if let t = app.toast { ToastView(text: t).allowsHitTesting(false) }
         }
-        .sheet(item: $app.sheet, onDismiss: { app.settingsClosed() }) { s in
+        // Đóng bảng: chờ bảng đóng hẳn rồi mới cập nhật màn chính — iPadOS 15 văng app (lỗi bố cục của SwiftUI ở nút «Xong»
+        // trên thanh tiêu đề) khi AppModel đổi giữa lúc bảng đang đóng
+        .sheet(item: $app.sheet, onDismiss: { DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { app.settingsClosed() } }) { s in
             Group {
                 switch s {
                 case .sites: SitesView()
