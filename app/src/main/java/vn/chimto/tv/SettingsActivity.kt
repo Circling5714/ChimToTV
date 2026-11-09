@@ -207,6 +207,19 @@ class SettingsActivity : BaseActivity() {
                 }
             }
         }
+        // Các hàng trên trang chủ (riêng từng người xem): bật / tắt, đổi thứ tự. Hồ sơ trẻ em: cần mã PIN phụ huynh
+        findViewById<TextView>(R.id.btnHomeRows).apply {
+            text = "Các hàng trên trang chủ${who?.let { " ($it)" } ?: ""}…"
+            setOnClickListener {
+                if (Prefs.kids) {
+                    ProfileUi.parentUnlock(this@SettingsActivity, "Mã PIN phụ huynh để sửa các hàng trang chủ") {
+                        HomeRowsUi.show(this@SettingsActivity)
+                    }
+                } else {
+                    HomeRowsUi.show(this@SettingsActivity)
+                }
+            }
+        }
         val retryBtn = findViewById<TextView>(R.id.btnFeedRetry)
         val resting = Feed.restingHosts()
         if (resting.isNotEmpty()) {

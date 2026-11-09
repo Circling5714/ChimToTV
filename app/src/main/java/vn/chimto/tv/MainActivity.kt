@@ -76,6 +76,8 @@ class MainActivity : BaseActivity() {
     private var pendingFocus: String? = null
     private var loadedMix: Boolean? = null
     private var loadedKids: Boolean? = null
+    /** Các hàng trang chủ lúc tải (Cài đặt → Trang chủ → Các hàng): đổi thì tải lại trang chủ (hàng vừa bật cần tải). */
+    private var loadedRows: List<String>? = null
 
     /** Bố cục lần trước là cầm dọc (đổi thì trang chủ tổng hợp xếp lại: lưới ↔ dải vuốt ngang). */
     private var layoutNarrow: Boolean? = null
@@ -314,6 +316,9 @@ class MainActivity : BaseActivity() {
         ) {
             // Đổi người xem, link trang, proxy hoặc kiểu trang chủ trong Cài đặt → tải lại từ đầu
             reloadSite()
+        } else if (homeToken == token && moreFrom == null && loadedRows != null && loadedRows != Prefs.homeRows) {
+            // Vừa bật / tắt / đổi thứ tự các hàng trong Cài đặt: hiện ngay theo thứ tự mới (bản lưu), tải thêm hàng vừa bật
+            showHome()
         } else if (homeToken == token && moreFrom == null && Prefs.homeMixOn && System.currentTimeMillis() - feedAt > FEED_REFRESH) {
             // Trang chủ tổng hợp mở lâu (xem phim xong quay ra sau 20 phút): làm mới
             showHome()
@@ -657,6 +662,7 @@ class MainActivity : BaseActivity() {
     private fun showHome() {
         loadedMix = Prefs.homeMixOn
         loadedKids = Prefs.kids
+        loadedRows = Prefs.homeRows
         if (Prefs.homeMixOn) {
             showMixHome()
             return
@@ -899,7 +905,8 @@ class MainActivity : BaseActivity() {
             val on = Prefs.homeTopics
             HomeFeed.TOPICS.forEach { (id, label) -> out += ChipRow(id, label, id in on) }
         }
-        for (row in snap.rows) {
+        // Thứ tự / bật tắt theo cài đặt hiện tại của người xem (bản lưu dựng trước khi đổi cũng xếp đúng ngay)
+        for (row in HomeFeed.arrange(snap.rows)) {
             val n = row.cards.size
             if (strips) {
                 // Dải vuốt ngang: tới STRIP_MAX phim; còn nữa (hoặc nguồn có trang sau) thì «Xem thêm ›» ở tiêu đề + ô cuối dải
@@ -1111,13 +1118,15 @@ class MainActivity : BaseActivity() {
         // Đã mở phim / xem tập mới từ lúc dựng trang (seenEp tăng) thì thôi báo
         val auto = if (!Prefs.homeMixOn) emptyList() else autoFresh.filter { (Prefs.seenEp(it.key) ?: -1.0) < it.ep && it.key !in followed }
         val strips = strips
-        if (fresh.isNotEmpty() || auto.isNotEmpty()) {
+        // «Có tập mới» / «Xem tiếp» người xem tắt được (Cài đặt → Trang chủ → Các hàng)
+        val on = HomeFeed.rowPrefs().filter { it.second }.map { it.first }.toSet()
+        if ((fresh.isNotEmpty() || auto.isNotEmpty()) && "new-eps" in on) {
             rows += HeaderRow("Có tập mới")
             val cells = fresh.map { FilmRow(followFilm(it), removable = true, follow = true) } +
                 auto.map { FilmRow(it.card.film, chip = it.card.chip, links = it.card.links) }
             if (strips) rows += StripRow("head-new", cells) else rows += cells
         }
-        val items = Prefs.history.take(if (strips) STRIP_MAX else gridAdapter.spanCount)
+        val items = if ("continue" in on) Prefs.history.take(if (strips) STRIP_MAX else gridAdapter.spanCount) else emptyList()
         if (items.isNotEmpty()) {
             rows += HeaderRow("Xem tiếp")
             val cells = items.map { FilmRow(historyFilm(it), resume = true, removable = true) }

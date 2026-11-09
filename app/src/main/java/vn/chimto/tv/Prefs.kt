@@ -155,6 +155,8 @@ object Prefs {
         // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy của từng phim, hồ sơ trẻ em,
         // ngôn ngữ bản hay xem (Vietsub / Thuyết minh / Lồng tiếng)
         "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
+        // Các hàng trang chủ người xem bật / tắt, sắp thứ tự (HomeFeed.rowPrefs)
+        "home_rows",
     )
     private val PROFILE_PREFIXES = listOf("server_type@", "server_label@")
 
@@ -654,6 +656,15 @@ object Prefs {
     val watchLangs: List<String>
         get() = runCatching { JSONArray(sp.getString(k("watch_langs"), "[]")) }.getOrDefault(JSONArray())
             .let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotEmpty() } }
+
+    /**
+     * Các hàng trang chủ theo thứ tự người xem chọn (Cài đặt → Trang chủ → Các hàng): "id" = bật, "-id" = tắt; rỗng = mặc
+     * định. Đọc qua HomeFeed.rowPrefs (ghép với các hàng mặc định — hàng mới ở bản sau tự có).
+     */
+    var homeRows: List<String>
+        get() = runCatching { JSONArray(sp.getString(k("home_rows"), "[]")) }.getOrDefault(JSONArray())
+            .let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotEmpty() } }
+        set(value) = sp.edit().putString(k("home_rows"), JSONArray(value).toString()).apply()
 
     /** Chủ đề người xem chưa có lịch sử đã chọn (id trong HomeFeed.TOPICS). */
     var homeTopics: Set<String>

@@ -98,6 +98,10 @@
                 style="@style/TvButton" />
 
             <TextView
+                android:id="@+id/btnHomeRows"
+                style="@style/TvButton" />
+
+            <TextView
                 android:id="@+id/btnFeedRetry"
                 style="@style/TvButton"
                 android:visibility="gone" />
