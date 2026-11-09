@@ -12,6 +12,28 @@ import kotlin.math.pow
 data class Card(val film: Film, val chip: String?, val links: List<FeedItem>)
 
 /** Một hàng. more: địa chỉ danh sách đầy đủ (null = «Xem thêm» hiện mọi phim đã có trong cards). */
+/**
+ * Hàng người xem tự thêm (Cài đặt → Trang chủ → Các hàng): chủ đề có sẵn (topic — HomeFeed.TOPICS) hoặc lọc theo loại phim
+ * (type: hoathinh / series / single / tvshows) + nước + thể loại (slug KKPhim, rỗng = mọi) + ngôn ngữ (thuyet-minh /
+ * long-tieng, rỗng = mọi). Mã trong cài đặt thứ tự: "custom-<id>".
+ */
+data class CustomRow(
+    val id: String, val topic: String? = null, val type: String = "", val country: String = "", val genre: String = "",
+    val lang: String = "",
+) {
+    val key get() = "custom-$id"
+
+    fun json(): JSONObject = JSONObject().put("id", id).put("topic", topic ?: "").put("t", type).put("c", country)
+        .put("g", genre).put("l", lang)
+
+    companion object {
+        fun of(o: JSONObject): CustomRow? {
+            val id = o.optString("id").ifEmpty { return null }
+            return CustomRow(id, o.optString("topic").ifEmpty { null }, o.optString("t"), o.optString("c"), o.optString("g"), o.optString("l"))
+        }
+    }
+}
+
 /** slot = loại hàng trong cài đặt của người xem (HomeFeed.ROWS: "similar", "interest", "newest"…; "topics" = theo chủ đề). */
 data class FeedRow(val id: String, val title: String, val cards: List<Card>, val more: String? = null, val slot: String = "")
 
@@ -33,7 +55,7 @@ object HomeFeed {
     /** Số phim tối đa mỗi hàng (giữ cho «Xem thêm»). */
     private const val ROW_MAX = 40
 
-    enum class Role { WEB, NEW, SIMILAR, INTEREST, DOMINANT, DUB, KIDS, MOVIES, TOPIC, TAGS }
+    enum class Role { WEB, NEW, SIMILAR, INTEREST, DOMINANT, DUB, KIDS, MOVIES, CUSTOM, TAGS }
 
     /** Một phần cần tải: vai trò trong trang chủ + tiêu đề hàng / địa chỉ «Xem thêm» (nếu có). */
     class Part(
@@ -65,6 +87,34 @@ object HomeFeed {
     /** Hàng hồ sơ trẻ em không có (chỉ hoạt hình hợp trẻ em: không lấy danh sách chung / thuyết minh / phim lẻ). */
     val ADULT_ROWS = setOf("dominant", "dub", "newest", "movies")
 
+    /** Tối đa số hàng tự thêm. */
+    const val CUSTOM_MAX = 6
+
+    /** Thể loại không hợp trẻ em (hàng tự thêm của hồ sơ trẻ em không chọn được). */
+    val ADULT_GENRES: Set<String> get() = ADULT
+
+    /** Chủ đề hợp hồ sơ trẻ em (chỉ hoạt hình). */
+    val KIDS_TOPICS = setOf("cn", "jp", "kid")
+
+    /** Loại phim cho hàng tự thêm (type của KKPhim). */
+    val TYPES = listOf("hoathinh" to "Hoạt hình", "series" to "Phim bộ", "single" to "Phim lẻ", "tvshows" to "TV show")
+
+    /** Ngôn ngữ cho hàng tự thêm (sort_lang của KKPhim). */
+    val LANGS = listOf("" to "Mọi bản", "thuyet-minh" to "Thuyết minh", "long-tieng" to "Lồng tiếng")
+
+    /** Tên hàng tự thêm: «Hoạt hình Trung Quốc · phiêu lưu · thuyết minh», chủ đề thì tên chủ đề. */
+    fun customTitle(r: CustomRow): String {
+        r.topic?.let { t -> return TOPICS.firstOrNull { it.first == t }?.second ?: t }
+        val head = (TYPES.firstOrNull { it.first == r.type }?.second ?: "Phim") +
+            (if (r.country.isNotEmpty()) " " + ApiSite.countryName(r.country) else "")
+        return listOfNotNull(head, r.genre.ifEmpty { null }?.let(ApiSite::genreName),
+            LANGS.firstOrNull { it.first == r.lang && r.lang.isNotEmpty() }?.second?.lowercase()).joinToString(" · ")
+    }
+
+    /** Thứ tự mặc định: «Có tập mới», «Xem tiếp», các hàng tự thêm (theo lúc thêm), rồi các hàng app tự chọn. */
+    fun rowDefaults(custom: List<CustomRow> = Prefs.homeCustom): List<String> =
+        ROWS.take(2).map { it.first } + custom.map { it.key } + ROWS.drop(2).map { it.first }
+
     /**
      * Ghép thứ tự đã lưu ("id" bật, "-id" tắt) với các hàng mặc định: bỏ id lạ / trùng, hàng mặc định chưa có (hàng mới ở bản
      * sau) chèn ngay sau hàng đứng trước nó trong thứ tự mặc định.
@@ -85,8 +135,8 @@ object HomeFeed {
         return out
     }
 
-    /** Các hàng của người xem đang dùng (thứ tự, bật / tắt). */
-    fun rowPrefs(): List<Pair<String, Boolean>> = mergeRows(Prefs.homeRows)
+    /** Các hàng của người xem đang dùng (thứ tự, bật / tắt), kể cả hàng tự thêm. */
+    fun rowPrefs(): List<Pair<String, Boolean>> = mergeRows(Prefs.homeRows, rowDefaults())
 
     fun rowOn(id: String): Boolean = rowPrefs().firstOrNull { it.first == id }?.second ?: true
 
@@ -319,11 +369,13 @@ object HomeFeed {
                 // tự gộp vào nên vẫn ghi đủ nguồn
                 filterUrl(s, type, country, null)?.let { url -> parts += Part(Role.DOMINANT, req(s, url), title, null, "dominant", "dominant") }
             }
-        } else if (history.isEmpty() && !kids) {
-            for ((id, label) in TOPICS) {
-                if (id !in topics) continue
-                topicReq(s, id)?.let { (req, more) -> parts += Part(Role.TOPIC, req, "Vì bạn chọn: $label", more, "topic-$id", "topics") }
-            }
+        }
+        // Hàng tự thêm (chủ đề người mới chọn cũng là hàng tự thêm — vẫn còn khi đã có lịch sử). Hồ sơ trẻ em: chỉ hoạt hình
+        for (c in Prefs.homeCustom) {
+            if (c.key in off) continue
+            if (kids && (if (c.topic != null) c.topic !in KIDS_TOPICS else c.type != "hoathinh")) continue
+            val (req, more) = (if (c.topic != null) topicReq(s, c.topic) else customReq(s, c)) ?: continue
+            parts += Part(Role.CUSTOM, req, customTitle(c), more, c.key, c.key)
         }
         if (kids) {
             parts += kidsParts(s).filter { it.slot !in off }
@@ -404,6 +456,33 @@ object HomeFeed {
                 else -> "quoc-gia/$country"
             }
             return page("$o/api/$p")
+        }
+        return null
+    }
+
+    /**
+     * Danh sách của một hàng tự thêm: KKPhim lọc được loại + nước + thể loại + ngôn ngữ; không có KKPhim thì VSMOV (thể loại /
+     * nước / loại, không lọc ngôn ngữ).
+     */
+    private fun customReq(s: Sources, c: CustomRow): Pair<Feed.Req, String>? {
+        val q = listOfNotNull(
+            c.country.ifEmpty { null }?.let { "country=$it" }, c.genre.ifEmpty { null }?.let { "category=$it" },
+            c.lang.ifEmpty { null }?.let { "sort_lang=$it" },
+        )
+        s.kk?.let { o ->
+            val t = typeSlug(c.type) ?: return@let
+            val url = "$o/api/movies/category/$t?" + (q + listOf("page=1", "limit=30")).joinToString("&")
+            return req(s, url) to url
+        }
+        s.vs?.let { o ->
+            val p = when {
+                c.genre.isNotEmpty() -> "the-loai/${c.genre}" + (if (c.country.isNotEmpty()) "?country=${c.country}" else "")
+                c.type == "hoathinh" -> "the-loai/hoat-hinh" + (if (c.country.isNotEmpty()) "?country=${c.country}" else "")
+                c.country.isNotEmpty() -> "quoc-gia/${c.country}"
+                else -> "danh-sach/" + (typeSlug(c.type) ?: return null)
+            }
+            val url = page("$o/api/$p")
+            return req(s, url) to url
         }
         return null
     }
@@ -712,8 +791,10 @@ object HomeFeed {
             fresh += FreshCard(Card(Film(open.url, h.title, h.poster ?: open.poster, badge), chip, links), key, ep)
         }
 
-        // Người xem chưa có lịch sử: hàng theo chủ đề đã chọn
-        byRole[Role.TOPIC]?.forEach { (p, r) -> add("topics", p.id, p.title!!, films(p, r).sortedByDescending { it.updated }, p.more, claim = true) }
+        // Hàng tự thêm (và chủ đề người mới chọn): phim chưa xem, mới cập nhật trước
+        byRole[Role.CUSTOM]?.forEach { (p, r) ->
+            add(p.slot, p.id, p.title!!, films(p, r).filterNot(::watched).sortedByDescending { it.updated }, p.more, claim = true)
+        }
 
         // Giống «phim vừa xem»: xếp theo số thể loại chung
         val simTags = plan.similarTags

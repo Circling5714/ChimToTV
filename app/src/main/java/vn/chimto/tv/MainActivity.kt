@@ -77,7 +77,10 @@ class MainActivity : BaseActivity() {
     private var loadedMix: Boolean? = null
     private var loadedKids: Boolean? = null
     /** Các hàng trang chủ lúc tải (Cài đặt → Trang chủ → Các hàng): đổi thì tải lại trang chủ (hàng vừa bật cần tải). */
-    private var loadedRows: List<String>? = null
+    private var loadedRows: String? = null
+
+    /** Cài đặt các hàng của người xem (thứ tự / bật tắt + hàng tự thêm) — đổi thì tải lại trang chủ. */
+    private fun rowsSignature() = Prefs.homeRows.joinToString(",") + "|" + Prefs.homeCustom.joinToString(",") { it.json().toString() }
 
     /** Bố cục lần trước là cầm dọc (đổi thì trang chủ tổng hợp xếp lại: lưới ↔ dải vuốt ngang). */
     private var layoutNarrow: Boolean? = null
@@ -316,7 +319,7 @@ class MainActivity : BaseActivity() {
         ) {
             // Đổi người xem, link trang, proxy hoặc kiểu trang chủ trong Cài đặt → tải lại từ đầu
             reloadSite()
-        } else if (homeToken == token && moreFrom == null && loadedRows != null && loadedRows != Prefs.homeRows) {
+        } else if (homeToken == token && moreFrom == null && loadedRows != null && loadedRows != rowsSignature()) {
             // Vừa bật / tắt / đổi thứ tự các hàng trong Cài đặt: hiện ngay theo thứ tự mới (bản lưu), tải thêm hàng vừa bật
             showHome()
         } else if (homeToken == token && moreFrom == null && Prefs.homeMixOn && System.currentTimeMillis() - feedAt > FEED_REFRESH) {
@@ -662,7 +665,7 @@ class MainActivity : BaseActivity() {
     private fun showHome() {
         loadedMix = Prefs.homeMixOn
         loadedKids = Prefs.kids
-        loadedRows = Prefs.homeRows
+        loadedRows = rowsSignature()
         if (Prefs.homeMixOn) {
             showMixHome()
             return

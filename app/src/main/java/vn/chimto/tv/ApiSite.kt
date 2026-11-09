@@ -72,6 +72,10 @@ object ApiSite {
     )
     private const val LIMIT = 24
 
+    /** Thể loại / quốc gia (tên, slug KKPhim) — chọn cho hàng tự thêm của trang chủ tổng hợp. */
+    val genreList: List<Pair<String, String>> get() = GENRES.filter { it.second != "phim-18" }
+    val countryList: List<Pair<String, String>> get() = COUNTRIES
+
     /** Trang KKPhim (gọi thẳng phimapi.com) thêm vài mục theo các danh sách riêng của KKPhim. */
     private val KK_MENU = MENU.take(1) + listOf(
         "Hoạt hình Trung Quốc thuyết minh" to "category/hoat-hinh?country=trung-quoc&sort_lang=thuyet-minh",

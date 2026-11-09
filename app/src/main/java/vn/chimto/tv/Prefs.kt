@@ -155,8 +155,8 @@ object Prefs {
         // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy của từng phim, hồ sơ trẻ em,
         // ngôn ngữ bản hay xem (Vietsub / Thuyết minh / Lồng tiếng)
         "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
-        // Các hàng trang chủ người xem bật / tắt, sắp thứ tự (HomeFeed.rowPrefs)
-        "home_rows",
+        // Các hàng trang chủ người xem bật / tắt, sắp thứ tự (HomeFeed.rowPrefs); hàng tự thêm (HomeFeed.CustomRow)
+        "home_rows", "home_custom",
     )
     private val PROFILE_PREFIXES = listOf("server_type@", "server_label@")
 
@@ -666,11 +666,32 @@ object Prefs {
             .let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotEmpty() } }
         set(value) = sp.edit().putString(k("home_rows"), JSONArray(value).toString()).apply()
 
-    /** Chủ đề người xem chưa có lịch sử đã chọn (id trong HomeFeed.TOPICS). */
+    /**
+     * Hàng tự thêm của người xem (Cài đặt → Trang chủ → Các hàng → «＋ Thêm hàng»): chủ đề có sẵn (HomeFeed.TOPICS) hoặc loại
+     * phim + nước + thể loại + ngôn ngữ. Trước 2.9 chủ đề người mới chọn lưu ở "home_topics" — đọc lại thành hàng chủ đề.
+     */
+    var homeCustom: List<CustomRow>
+        get() {
+            val raw = sp.getString(k("home_custom"), null)
+                ?: return legacyTopics().map { CustomRow("t-$it", topic = it) }
+            val a = runCatching { JSONArray(raw) }.getOrDefault(JSONArray())
+            return (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let(CustomRow::of) }
+        }
+        set(value) = sp.edit().putString(k("home_custom"), JSONArray(value.map { it.json() }).toString()).apply()
+
+    private fun legacyTopics(): List<String> =
+        runCatching { JSONArray(sp.getString(k("home_topics"), "[]")) }.getOrDefault(JSONArray())
+            .let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotEmpty() } }
+
+    /** Chủ đề người xem đã chọn (id trong HomeFeed.TOPICS) — các hàng tự thêm loại «chủ đề». */
     var homeTopics: Set<String>
-        get() = runCatching { JSONArray(sp.getString(k("home_topics"), "[]")) }.getOrDefault(JSONArray())
-            .let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotEmpty() }.toSet() }
-        set(value) = sp.edit().putString(k("home_topics"), JSONArray(value.toList()).toString()).apply()
+        get() = homeCustom.mapNotNull { it.topic }.toSet()
+        set(value) {
+            val cur = homeCustom
+            val kept = cur.filter { it.topic == null || it.topic in value }
+            val added = value.filter { t -> cur.none { it.topic == t } }.map { CustomRow("t-$it", topic = it) }
+            homeCustom = kept + added
+        }
 
     /**
      * Tập mới nhất người xem đã thấy của từng phim (khoá = tên đã chuẩn hoá — chung mọi nguồn), ghi khi mở trang phim /

@@ -45,6 +45,25 @@ class HomeRowsTest {
         assertEquals(listOf("topic-cn", "movies", "newest", "interest-a"), HomeFeed.arrange(rows, prefs).map { it.id })
     }
 
+    /** Hàng tự thêm đứng ngay sau «Xem tiếp»; hàng vừa thêm (chưa có trong thứ tự đã lưu) cũng vào đó. */
+    @Test
+    fun customRowsDefaultAfterHead() {
+        val custom = listOf(CustomRow("a", type = "hoathinh"), CustomRow("t-kr", topic = "kr"))
+        val d = HomeFeed.rowDefaults(custom)
+        assertEquals(listOf("new-eps", "continue", "custom-a", "custom-t-kr", "similar"), d.take(5))
+        val m = HomeFeed.mergeRows(listOf("new-eps", "continue", "custom-a", "movies", "similar"), d)
+        assertEquals(listOf("new-eps", "continue", "custom-a", "custom-t-kr", "movies", "similar"), m.take(6).map { it.first })
+    }
+
+    @Test
+    fun customTitles() {
+        assertEquals("Hoạt hình Trung Quốc · phiêu lưu · thuyết minh",
+            HomeFeed.customTitle(CustomRow("x", type = "hoathinh", country = "trung-quoc", genre = "phieu-luu", lang = "thuyet-minh")))
+        assertEquals("Phim bộ Hàn Quốc", HomeFeed.customTitle(CustomRow("y", type = "series", country = "han-quoc")))
+        assertEquals("Phim lẻ · hành động", HomeFeed.customTitle(CustomRow("z", type = "single", genre = "hanh-dong")))
+        assertEquals("Phim Hàn", HomeFeed.customTitle(CustomRow("t-kr", topic = "kr")))
+    }
+
     /** Trang chủ lưu từ bản cũ (chưa ghi slot): đoán theo id — hai hàng «Vì … hay xem» theo thứ tự xuất hiện. */
     @Test
     fun arrangeLegacyRows() {
