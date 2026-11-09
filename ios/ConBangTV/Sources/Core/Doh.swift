@@ -1,24 +1,31 @@
 import Foundation
 import Network
 
-/// DNS mã hoá (từ 1.10.1 bật sẵn; bản TV: Doh.kt, Windows: Doh.cs): hỏi địa chỉ tên miền qua DoH (RFC 8484) rồi DoT
+/// DNS mã hoá (từ 1.11 bật sẵn; bản TV: Doh.kt, Windows: Doh.cs): hỏi địa chỉ tên miền qua DoH (RFC 8484) rồi DoT
 /// (RFC 7858), mỗi giao thức lần lượt NextDNS (hồ sơ riêng của app — mã lấy từ secret NEXTDNS_ID của repo lúc dựng trên
 /// GitHub, ghi vào Info.plist «CBNextDnsId», không có trong code) → Cloudflare → Google; lỗi hết thì cổng nội bộ dùng DNS
-/// của máy — app không bao giờ hỏng vì DNS mã hoá bị chặn. Máy chủ gọi bằng IP cố định, kiểm chứng chỉ theo tên máy chủ, đi
-/// thẳng (Network.framework, không qua proxy / cổng nội bộ). Máy chủ lỗi thì nghỉ 2 phút. Trả lời «không có tên miền»
-/// (NXDOMAIN — vd hồ sơ NextDNS chặn) là trả lời thật: không hỏi máy chủ sau.
+/// của máy — app không bao giờ hỏng vì DNS mã hoá bị chặn. Máy chủ gọi bằng IP, kiểm chứng chỉ theo tên máy chủ, đi thẳng
+/// (Network.framework, không qua proxy / cổng nội bộ). Từ 1.11.1:
+/// - NextDNS dùng máy chủ gần nhất: IP anycast từ mạng Viettel bị đưa sang Hồng Kông → lần đầu hỏi chính NextDNS tên
+///   «dns.nextdns.io» (NextDNS trả máy chủ gần IP của mạng này nhất), không được thì DNS của máy; nhớ 6 giờ; anycast đứng sau.
+/// - Giữ kết nối TLS tới máy chủ DNS để dùng lại (DoT; DoH bằng HTTP/1.1 keep-alive): mở kết nối mới ~140–220 ms, dùng lại
+///   ~20–40 ms. Kết nối nghỉ quá 90 giây thì bỏ; kết nối cũ bị máy chủ đóng thì mở kết nối mới ngay.
+/// Máy chủ lỗi thì nghỉ 2 phút. Trả lời «không có tên miền» (NXDOMAIN — vd hồ sơ NextDNS chặn) là trả lời thật: không hỏi
+/// máy chủ sau.
 ///
 /// Tắt DNS mã hoá mà đang Vượt chặn: DNS của máy không trả lời / trả địa chỉ chặn (0.0.0.0, ::…) thì vẫn hỏi lại qua chuỗi
 /// này (unblocked) — vd ảnh bìa CLB Phim Xưa (clbphimxua.com) bị bộ lọc DNS trong nhà chặn.
 enum Doh {
     enum Kind { case doh, dot }
 
+    /// steer = NextDNS: IP lấy theo máy chủ gần nhất (nextPops) rồi mới tới ips cố định (anycast).
     struct Server {
         let label: String
         let kind: Kind
         let host: String
         let path: String
         let ips: [String]
+        var steer = false
         var port: Int { kind == .dot ? 853 : 443 }
     }
 
@@ -29,10 +36,10 @@ enum Doh {
     static func chain(_ nextId: String) -> [Server] {
         let id = nextId.trimmingCharacters(in: .whitespacesAndNewlines)
         var l: [Server] = []
-        if !id.isEmpty { l.append(Server(label: "DoH NextDNS", kind: .doh, host: "dns.nextdns.io", path: "/\(id)", ips: nextIps)) }
+        if !id.isEmpty { l.append(Server(label: "DoH NextDNS", kind: .doh, host: "dns.nextdns.io", path: "/\(id)", ips: nextIps, steer: true)) }
         l.append(Server(label: "DoH Cloudflare", kind: .doh, host: "dns.cloudflare.com", path: "/dns-query", ips: ["104.16.248.249", "104.16.249.249"]))
         l.append(Server(label: "DoH Google", kind: .doh, host: "dns.google", path: "/dns-query", ips: googleIps))
-        if !id.isEmpty { l.append(Server(label: "DoT NextDNS", kind: .dot, host: "\(id).dns.nextdns.io", path: "", ips: nextIps)) }
+        if !id.isEmpty { l.append(Server(label: "DoT NextDNS", kind: .dot, host: "\(id).dns.nextdns.io", path: "", ips: nextIps, steer: true)) }
         l.append(Server(label: "DoT Cloudflare", kind: .dot, host: "1dot1dot1dot1.cloudflare-dns.com", path: "", ips: ["1.1.1.1", "1.0.0.1"]))
         l.append(Server(label: "DoT Google", kind: .dot, host: "dns.google", path: "", ips: googleIps))
         return l
@@ -53,6 +60,9 @@ enum Doh {
     private static let connectTimeout: TimeInterval = 2.5
     private static let readTimeout: TimeInterval = 3
     private static let downFor: TimeInterval = 120
+    private static let idleFor: TimeInterval = 90
+    private static let maxIdle = 4
+    private static let popsFor: TimeInterval = 6 * 3600
 
     private static let lock = NSLock()
     /// Địa chỉ đã hỏi; addr nil = tên miền không có (NXDOMAIN).
@@ -70,7 +80,8 @@ enum Doh {
 
     /// Kết quả hỏi một máy chủ (máy chủ lỗi thì ném lỗi).
     enum Answer: Equatable {
-        case found(IPAddr, ttl: Int)
+        /// all = mọi bản ghi A (theo thứ tự máy chủ trả); địa chỉ đầu = cái dùng.
+        case found(IPAddr, ttl: Int, all: [IPAddr])
         /// NXDOMAIN: tên miền không có (hoặc hồ sơ DNS chặn) — không hỏi máy chủ khác.
         case noDomain
         /// Có tên miền nhưng không có bản ghi A (vd chỉ có IPv6) — để DNS của máy thử.
@@ -122,27 +133,33 @@ enum Doh {
         for s in servers {
             lock.lock()
             let down = (downUntil[s.label] ?? .distantPast) > Date()
+            let index = nextIp[s.label] ?? 0
             lock.unlock()
             if down { continue }
+            let ips = ipsFor(s)
+            let ip = ips[index % ips.count]
+            let t0 = Date()
             let answer: Answer
             do {
-                answer = try ask(s, name)
+                answer = try ask(s, ip: ip, name)
             } catch {
-                // Máy chủ bị chặn / không trả lời: nghỉ 2 phút, lần sau thử IP còn lại của nó
+                // Máy chủ bị chặn / không trả lời: nghỉ 2 phút, lần sau thử IP kế của nó
                 lock.lock()
                 downUntil[s.label] = Date().addingTimeInterval(downFor)
                 nextIp[s.label, default: 0] += 1
                 lock.unlock()
-                Log.d("dns", "\(s.label) lỗi: \(error.localizedDescription)")
+                Log.d("dns", "\(s.label) · \(ip) lỗi: \(error.localizedDescription)")
                 continue
             }
             switch answer {
-            case let .found(addr, ttl):
+            case let .found(addr, ttl, _):
                 lock.lock()
                 cache[name] = (addr, Date().addingTimeInterval(TimeInterval(min(max(ttl, 30), 600))))
                 lock.unlock()
                 #if DEVTOOLS
-                Log.d("dns", "\(name) → \(addr.text) (\(s.label))")
+                Log.d("dns", "\(name) → \(addr.text) (\(s.label) · \(ip), \(Int(Date().timeIntervalSince(t0) * 1000)) ms)")
+                #else
+                _ = t0
                 #endif
                 return addr
             case .noDomain:
@@ -159,36 +176,121 @@ enum Doh {
         return nil
     }
 
-    /// Hỏi một máy chủ (một trong các IP của nó).
-    static func ask(_ s: Server, _ name: String) throws -> Answer {
-        lock.lock()
+    // MARK: - NextDNS: máy chủ gần nhất
+
+    private static var pops: [String] = []
+    private static var popsUntil = Date.distantPast
+    private static let popsLock = NSLock()
+
+    /// IP để gọi máy chủ s: NextDNS = máy chủ gần nhất rồi anycast; còn lại = IP cố định.
+    static func ipsFor(_ s: Server) -> [String] {
+        guard s.steer else { return s.ips }
+        var out: [String] = []
+        for ip in nextPops() + s.ips where !out.contains(ip) { out.append(ip) }
+        return out
+    }
+
+    private static func nextPops() -> [String] {
+        popsLock.lock()
+        defer { popsLock.unlock() }
+        if Date() < popsUntil { return pops }
+        let found = discoverPops()
+        pops = found
+        popsUntil = Date().addingTimeInterval(found.isEmpty ? 600 : popsFor)
+        Log.d("dns", "NextDNS gần nhất: " + (found.isEmpty ? "(không tìm được — dùng anycast)" : found.joined(separator: ", ")))
+        return found
+    }
+
+    /// Hỏi chính NextDNS (anycast, đã mã hoá) tên «dns.nextdns.io» — NextDNS trả máy chủ gần IP của mạng này; không được thì DNS máy.
+    private static func discoverPops() -> [String] {
+        guard let any = servers.first(where: { $0.steer && $0.kind == .doh }) ?? servers.first(where: { $0.steer }) else { return [] }
+        for ip in any.ips {
+            if case let .found(_, _, all)? = try? ask(any, ip: ip, "dns.nextdns.io") {
+                var out: [String] = []
+                for a in all where a.isV4 && !blocked(a) && !out.contains(a.text) { out.append(a.text) }
+                return out
+            }
+        }
+        var out: [String] = []
+        for a in (try? Socks5.resolveAll("dns.nextdns.io")) ?? [] where a.isV4 && !blocked(a) && !out.contains(a.text) { out.append(a.text) }
+        return out
+    }
+
+    /// Hỏi máy chủ s ở địa chỉ ip.
+    static func ask(_ s: Server, ip: String, _ name: String) throws -> Answer {
         #if DEVTOOLS
+        lock.lock()
         let fake = debugFail.contains(s.label)
-        #else
-        let fake = false
-        #endif
-        let ip = s.ips[(nextIp[s.label] ?? 0) % s.ips.count]
         lock.unlock()
         if fake { throw SocketError(message: "giả bị chặn") }
+        #endif
         let id = s.kind == .dot ? Int.random(in: 0..<0x10000) : 0 // DoH khuyên id 0 (dễ lưu đệm)
         guard let reply = try exchange(s, ip: ip, query: DnsWire.query(name, id: id)) else { return .failed }
         return DnsWire.answer(reply, id: id)
     }
 
+    // MARK: - Kết nối dùng lại
+
+    private static var idle: [String: [TlsLink]] = [:]
+
+    private static func take(_ key: String) -> TlsLink? {
+        lock.lock()
+        defer { lock.unlock() }
+        while var list = idle[key], !list.isEmpty {
+            let l = list.removeLast()
+            idle[key] = list
+            if Date().timeIntervalSince(l.lastUsed) < idleFor && l.usable { return l }
+            l.close()
+        }
+        return nil
+    }
+
+    private static func give(_ l: TlsLink) {
+        l.lastUsed = Date()
+        lock.lock()
+        defer { lock.unlock() }
+        var list = idle[l.key] ?? []
+        if list.count >= maxIdle { l.close() } else { list.append(l); idle[l.key] = list }
+    }
+
+    /// Một lần hỏi: dùng lại kết nối đang nghỉ (hỏng thì mở mới ngay), không có thì mở kết nối mới.
     private static func exchange(_ s: Server, ip: String, query: [UInt8]) throws -> [UInt8]? {
-        let link = TlsLink(ip: ip, port: s.port, serverName: s.host)
-        defer { link.close() }
-        try link.open(timeout: connectTimeout)
-        let deadline = Date().addingTimeInterval(readTimeout)
+        let key = "\(s.label)|\(ip)"
+        if let old = take(key) {
+            do {
+                return try roundTrip(s, old, query)
+            } catch {
+                // máy chủ đã đóng kết nối cũ — không phải máy chủ lỗi, mở kết nối mới bên dưới
+            }
+        }
+        let link = TlsLink(key: key, ip: ip, port: s.port, serverName: s.host)
+        do {
+            try link.open(timeout: connectTimeout)
+        } catch {
+            link.close()
+            throw error
+        }
+        return try roundTrip(s, link, query)
+    }
+
+    /// Gửi một câu hỏi trên kết nối, đọc đúng một trả lời rồi trả kết nối về chỗ nghỉ (lỗi / máy chủ báo đóng thì đóng).
+    private static func roundTrip(_ s: Server, _ link: TlsLink, _ query: [UInt8]) throws -> [UInt8]? {
+        var keep = false
+        defer { if keep { give(link) } else { link.close() } }
+        link.deadline = Date().addingTimeInterval(readTimeout)
         if s.kind == .dot {
-            try link.send([UInt8(query.count >> 8), UInt8(query.count & 0xFF)] + query, deadline: deadline)
-            let len = try link.read(exactly: 2, deadline: deadline)
-            return try link.read(exactly: Int(len[0]) << 8 | Int(len[1]), deadline: deadline)
+            try link.send([UInt8(query.count >> 8), UInt8(query.count & 0xFF)] + query)
+            let len = try link.read(exactly: 2)
+            let reply = try link.read(exactly: Int(len[0]) << 8 | Int(len[1]))
+            keep = true
+            return reply
         }
         let head = "POST \(s.path) HTTP/1.1\r\nHost: \(s.host)\r\nContent-Type: application/dns-message\r\n" +
-            "Accept: application/dns-message\r\nContent-Length: \(query.count)\r\nConnection: close\r\n\r\n"
-        try link.send(Array(head.utf8) + query, deadline: deadline)
-        return DohHttp.body(try link.readAll(limit: 70_000, deadline: deadline))
+            "Accept: application/dns-message\r\nContent-Length: \(query.count)\r\n\r\n"
+        try link.send(Array(head.utf8) + query)
+        let r = try DohHttp.read(link)
+        keep = r.keepAlive
+        return r.status == 200 ? r.body : nil
     }
 
     static func clearCache() {
@@ -252,12 +354,46 @@ enum Doh {
     }
 }
 
-/// Một kết nối TLS tới máy chủ DNS: IP cố định, SNI + kiểm chứng chỉ theo tên máy chủ; dùng đồng bộ ở luồng nền.
-private final class TlsLink {
+/// Nguồn byte để đọc trả lời HTTP (kết nối TLS, hoặc mảng byte khi test).
+protocol ByteSource: AnyObject {
+    func read(exactly n: Int) throws -> [UInt8]
+    func readLine() throws -> String
+    func readToEnd(limit: Int) throws -> [UInt8]
+}
+
+/// Mảng byte đã nhận trọn (test).
+final class ArraySource: ByteSource {
+    private var b: [UInt8]
+    init(_ b: [UInt8]) { self.b = b }
+    func read(exactly n: Int) throws -> [UInt8] {
+        guard b.count >= n else { throw SocketError(message: "hết dữ liệu") }
+        defer { b.removeFirst(n) }
+        return Array(b[0..<n])
+    }
+    func readLine() throws -> String {
+        guard let i = b.firstIndex(of: 10) else { throw SocketError(message: "hết dữ liệu") }
+        defer { b.removeFirst(i + 1) }
+        return String(decoding: b[0..<i], as: UTF8.self).trimmingSuffix("\r")
+    }
+    func readToEnd(limit: Int) throws -> [UInt8] {
+        defer { b = [] }
+        return b
+    }
+}
+
+/// Một kết nối TLS tới máy chủ DNS: IP cố định, SNI + kiểm chứng chỉ theo tên máy chủ; dùng đồng bộ ở luồng nền, giữ
+/// được để dùng lại. deadline = hạn của lần hỏi đang làm.
+final class TlsLink: ByteSource {
+    let key: String
+    var lastUsed = Date()
+    var deadline = Date().addingTimeInterval(3)
     private let conn: NWConnection
     private let queue = DispatchQueue(label: "vn.chimto.doh")
+    private var buf: [UInt8] = []
+    private var ended = false
 
-    init(ip: String, port: Int, serverName: String) {
+    init(key: String, ip: String, port: Int, serverName: String) {
+        self.key = key
         let tls = NWProtocolTLS.Options()
         sec_protocol_options_set_tls_server_name(tls.securityProtocolOptions, serverName)
         let tcp = NWProtocolTCP.Options()
@@ -266,6 +402,9 @@ private final class TlsLink {
         params.preferNoProxies = true
         conn = NWConnection(host: NWEndpoint.Host(ip), port: NWEndpoint.Port(rawValue: UInt16(port))!, using: params)
     }
+
+    /// Còn dùng được (máy chủ chưa đóng, chưa đọc tới hết luồng).
+    var usable: Bool { !ended && conn.state == .ready }
 
     func open(timeout: TimeInterval) throws {
         let done = DispatchSemaphore(value: 0)
@@ -290,7 +429,7 @@ private final class TlsLink {
         if case let .some(.some(e)) = r { throw e }
     }
 
-    func send(_ bytes: [UInt8], deadline: Date) throws {
+    func send(_ bytes: [UInt8]) throws {
         let done = DispatchSemaphore(value: 0)
         var err: Error?
         conn.send(content: Data(bytes), completion: .contentProcessed { e in err = e; done.signal() })
@@ -298,37 +437,47 @@ private final class TlsLink {
         if let e = err { throw e }
     }
 
-    /// Đọc một lần: (dữ liệu, đã hết luồng).
-    private func receive(max: Int, deadline: Date) throws -> ([UInt8], Bool) {
+    /// Nhận thêm vào bộ đệm; false nếu máy chủ đã đóng.
+    private func fill() throws -> Bool {
+        if ended { return false }
         let done = DispatchSemaphore(value: 0)
         var out: ([UInt8], Bool, Error?) = ([], false, nil)
-        conn.receive(minimumIncompleteLength: 1, maximumLength: max) { data, _, complete, error in
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 16_384) { data, _, complete, error in
             out = (data.map { [UInt8]($0) } ?? [], complete, error)
             done.signal()
         }
-        if done.wait(timeout: .now() + Swift.max(0.1, deadline.timeIntervalSinceNow)) == .timedOut { throw SocketError(message: "hết giờ đọc") }
+        if done.wait(timeout: .now() + max(0.1, deadline.timeIntervalSinceNow)) == .timedOut { throw SocketError(message: "hết giờ đọc") }
         if let e = out.2 { throw e }
-        return (out.0, out.1)
+        buf += out.0
+        if out.1 { ended = true }
+        return !out.0.isEmpty || !out.1
     }
 
-    func read(exactly n: Int, deadline: Date) throws -> [UInt8] {
-        var got: [UInt8] = []
-        while got.count < n {
-            let (d, end) = try receive(max: n - got.count, deadline: deadline)
-            got += d
-            if end && got.count < n { throw SocketError(message: "máy chủ ngắt giữa chừng") }
+    func read(exactly n: Int) throws -> [UInt8] {
+        while buf.count < n {
+            if try !fill() { throw SocketError(message: "máy chủ ngắt giữa chừng") }
         }
-        return got
+        defer { buf.removeFirst(n) }
+        return Array(buf[0..<n])
     }
 
-    func readAll(limit: Int, deadline: Date) throws -> [UInt8] {
-        var got: [UInt8] = []
+    func readLine() throws -> String {
         while true {
-            let (d, end) = try receive(max: 16_384, deadline: deadline)
-            got += d
-            if got.count > limit { throw SocketError(message: "trả lời DNS quá dài") }
-            if end { return got }
+            if let i = buf.firstIndex(of: 10) {
+                defer { buf.removeFirst(i + 1) }
+                return String(decoding: buf[0..<i], as: UTF8.self).trimmingSuffix("\r")
+            }
+            if buf.count > 16_384 { throw SocketError(message: "dòng quá dài") }
+            if try !fill() { throw SocketError(message: "máy chủ ngắt giữa chừng") }
         }
+    }
+
+    func readToEnd(limit: Int) throws -> [UInt8] {
+        while try fill() {
+            if buf.count > limit { throw SocketError(message: "trả lời DNS quá dài") }
+        }
+        defer { buf = [] }
+        return buf
     }
 
     func close() { conn.cancel() }
@@ -356,7 +505,7 @@ enum DnsWire {
         guard rcode == 0 else { return .failed }
         var i = 12
         for _ in 0..<u16(4) { i = skipName(b, i) + 4 }
-        var found: IPAddr?
+        var all: [IPAddr] = []
         var ttl = Int.max
         for _ in 0..<u16(6) {
             i = skipName(b, i)
@@ -366,14 +515,14 @@ enum DnsWire {
             let len = u16(i + 8)
             i += 10
             guard i + len <= b.count else { return .failed }
-            if type == 1 && len == 4 {
-                if found == nil { found = IPAddr(Array(b[i..<(i + 4)])) }
+            if type == 1 && len == 4, let a = IPAddr(Array(b[i..<(i + 4)])) {
+                all.append(a)
                 ttl = min(ttl, t)
             }
             i += len
         }
-        guard let f = found else { return .noIpv4 }
-        return .found(f, ttl: ttl == Int.max ? 60 : ttl)
+        guard let f = all.first else { return .noIpv4 }
+        return .found(f, ttl: ttl == Int.max ? 60 : ttl, all: all)
     }
 
     /// Bỏ qua một tên (có thể nén bằng con trỏ 0xC0).
@@ -389,34 +538,52 @@ enum DnsWire {
     }
 }
 
-/// Đọc trả lời HTTP/1.1 đã nhận trọn (Connection: close): thân khi mã 200, nil nếu mã khác.
+/// Trả lời HTTP/1.1 của máy chủ DoH: đọc đúng một trả lời trên kết nối (để dùng lại kết nối).
 enum DohHttp {
-    static func body(_ r: [UInt8]) -> [UInt8]? {
-        guard r.count >= 4, let sep = (0...(r.count - 4)).first(where: { r[$0] == 13 && r[$0 + 1] == 10 && r[$0 + 2] == 13 && r[$0 + 3] == 10 })
-        else { return nil }
-        let head = String(decoding: r[0..<sep], as: UTF8.self)
-        let first = head.components(separatedBy: "\r\n").first ?? ""
-        guard first.split(separator: " ").dropFirst().first == "200" else { return nil }
-        let body = Array(r[(sep + 4)...])
-        let lower = head.lowercased()
-        if lower.range(of: "(?m)^transfer-encoding:\\s*chunked", options: .regularExpression) != nil { return dechunk(body) }
-        if let m = lower.range(of: "(?m)^content-length:\\s*\\d+", options: .regularExpression),
-           let len = Int(lower[m].split(separator: ":").last?.trimmingCharacters(in: .whitespaces) ?? ""), len <= body.count {
-            return Array(body[0..<len])
-        }
-        return body
+    struct Reply {
+        let status: Int
+        let body: [UInt8]
+        let keepAlive: Bool
     }
 
-    private static func dechunk(_ b: [UInt8]) -> [UInt8] {
-        var out: [UInt8] = []
-        var i = 0
-        while i < b.count {
-            guard let eol = (i..<max(i, b.count - 1)).first(where: { b[$0] == 13 && b[$0 + 1] == 10 }) else { break }
-            let size = String(decoding: b[i..<eol], as: UTF8.self).split(separator: ";").first?.trimmingCharacters(in: .whitespaces) ?? ""
-            guard let n = Int(size, radix: 16), n > 0, eol + 2 + n <= b.count else { break }
-            out += b[(eol + 2)..<(eol + 2 + n)]
-            i = eol + 2 + n + 2
+    /// Đọc dòng trạng thái + đầu trả lời rồi thân theo Content-Length / chunked; không có độ dài thì đọc tới khi máy chủ đóng.
+    static func read(_ src: ByteSource) throws -> Reply {
+        let first = try src.readLine()
+        guard let status = Int(first.split(separator: " ").dropFirst().first ?? "") else { throw SocketError(message: "trả lời HTTP sai") }
+        var headers: [String: String] = [:]
+        while true {
+            let l = try src.readLine()
+            if l.isEmpty { break }
+            if let c = l.firstIndex(of: ":") {
+                headers[l[..<c].lowercased()] = l[l.index(after: c)...].trimmingCharacters(in: .whitespaces).lowercased()
+            }
+            if headers.count > 100 { throw SocketError(message: "đầu trả lời quá dài") }
         }
-        return out
+        let keep = headers["connection"] != "close"
+        if headers["transfer-encoding"]?.contains("chunked") == true {
+            var out: [UInt8] = []
+            while true {
+                let size = try src.readLine().split(separator: ";").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+                guard let n = Int(size, radix: 16) else { throw SocketError(message: "chunk sai") }
+                if n == 0 {
+                    while try !src.readLine().isEmpty {} // bỏ phần đuôi (trailer)
+                    return Reply(status: status, body: out, keepAlive: keep)
+                }
+                guard out.count + n <= 70_000 else { throw SocketError(message: "trả lời DNS quá dài") }
+                out += try src.read(exactly: n)
+                _ = try src.readLine() // CRLF sau mỗi khúc
+            }
+        }
+        guard let len = headers["content-length"].flatMap({ Int($0) }) else {
+            return Reply(status: status, body: try src.readToEnd(limit: 70_000), keepAlive: false)
+        }
+        guard len <= 70_000 else { throw SocketError(message: "trả lời DNS quá dài") }
+        return Reply(status: status, body: try src.read(exactly: len), keepAlive: keep)
+    }
+
+    /// Trả lời đã nhận trọn: thân khi mã 200, nil nếu mã khác / hỏng (để test).
+    static func body(_ r: [UInt8]) -> [UInt8]? {
+        guard let reply = try? read(ArraySource(r)), reply.status == 200 else { return nil }
+        return reply.body
     }
 }

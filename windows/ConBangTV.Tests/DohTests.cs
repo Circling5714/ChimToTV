@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net;
 using System.Text;
 using ConBangTV.Core;
@@ -34,6 +35,7 @@ public class DohTests
         var a = Assert.IsType<Doh.Answer.Found>(DnsWire.Answer(reply, 0));
         Assert.Equal(IPAddress.Parse("104.21.35.220"), a.Addr);
         Assert.Equal(60, a.Ttl);
+        Assert.Equal(new[] { "104.21.35.220", "172.67.180.59" }, a.All.Select(x => x.ToString())); // mọi bản ghi A
     }
 
     [Fact]
@@ -73,6 +75,31 @@ public class DohTests
         var dead = new List<Doh.Server> { new("Chết", Doh.Kind.DoT, "dns.test", "", new[] { "127.0.0.1" }) };
         Assert.Null(await Doh.Resolve("phim.test", CancellationToken.None, dead));
         Assert.Null(await Doh.Resolve("localhost", CancellationToken.None, dead)); // IP / localhost: không hỏi
+    }
+
+    [Fact]
+    public async Task KeepAliveReadsOneReplyAtATime()
+    {
+        // Ba trả lời liền nhau trên một kết nối (keep-alive): đọc đúng từng cái; máy chủ báo đóng thì không dùng lại
+        var all = string.Concat("HTTP/1.1 200 OK", RN, "Content-Length: 3", RN, RN, "abc",
+            "HTTP/1.1 200 OK", RN, "Transfer-Encoding: chunked", RN, RN, "2", RN, "de", RN, "0", RN, RN,
+            "HTTP/1.1 200 OK", RN, "Content-Length: 1", RN, "Connection: close", RN, RN, "f");
+        var st = new BufferedStream(new MemoryStream(Encoding.ASCII.GetBytes(all)));
+        var r1 = await DohHttp.ReadAsync(st, CancellationToken.None);
+        var r2 = await DohHttp.ReadAsync(st, CancellationToken.None);
+        var r3 = await DohHttp.ReadAsync(st, CancellationToken.None);
+        Assert.Equal(("abc", true), (Encoding.ASCII.GetString(r1.Body), r1.KeepAlive));
+        Assert.Equal(("de", true), (Encoding.ASCII.GetString(r2.Body), r2.KeepAlive));
+        Assert.Equal(("f", false), (Encoding.ASCII.GetString(r3.Body), r3.KeepAlive));
+    }
+
+    private const string RN = "\r\n";
+
+    [Fact]
+    public async Task OnlyNextDnsIsSteered()
+    {
+        Assert.Equal(new[] { true, false, false, true, false, false }, Doh.Chain("abc123").Select(s => s.Steer));
+        Assert.Equal(new[] { "1.1.1.1", "1.0.0.1" }, await Doh.IpsFor(Doh.Chain("abc123")[4]));
     }
 
     [Fact]

@@ -211,7 +211,9 @@ final class Socks5Tests: XCTestCase {
         let reply = hex("0000 8180 0001 0003 0000 0000" + "03 777777 01 78 02 766e 00 0001 0001" +
                         "c00c 0005 0001 00000e10 0004 c010 c010" + "c010 0001 0001 0000012c 0004 68 15 23 dc" +
                         "c010 0001 0001 0000003c 0004 ac 43 b4 3b")
-        XCTAssertEqual(DnsWire.answer(reply, id: 0), .found(IPAddr(text: "104.21.35.220")!, ttl: 60))
+        // mọi bản ghi A (máy chủ NextDNS gần nhất cần cả danh sách); địa chỉ dùng = cái đầu, TTL nhỏ nhất
+        XCTAssertEqual(DnsWire.answer(reply, id: 0),
+                       .found(IPAddr(text: "104.21.35.220")!, ttl: 60, all: [IPAddr(text: "104.21.35.220")!, IPAddr(text: "172.67.180.59")!]))
     }
 
     func testDnsNoDomainNoIpv4AndWrongId() {
@@ -260,6 +262,21 @@ final class Socks5Tests: XCTestCase {
         Prefs.applyNetDefaults() // máy đang mức 2 thì giữ mức 2
         XCTAssertEqual(Prefs.unblockLevel, 2)
         XCTAssertTrue(Prefs.secureDns)
+    }
+
+    func testDohKeepAliveReadsOneReplyAtATime() throws {
+        // Ba trả lời liền nhau trên một kết nối (keep-alive): đọc đúng từng cái; máy chủ báo đóng thì không dùng lại
+        let src = ArraySource(Array(("HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nabc" +
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nde\r\n0\r\n\r\n" +
+            "HTTP/1.1 200 OK\r\nContent-Length: 1\r\nConnection: close\r\n\r\nf").utf8))
+        let r1 = try DohHttp.read(src), r2 = try DohHttp.read(src), r3 = try DohHttp.read(src)
+        XCTAssertEqual([r1.body, r2.body, r3.body], [Array("abc".utf8), Array("de".utf8), Array("f".utf8)])
+        XCTAssertEqual([r1.keepAlive, r2.keepAlive, r3.keepAlive], [true, true, false])
+    }
+
+    func testDohOnlyNextDnsIsSteered() {
+        XCTAssertEqual(Doh.chain("abc123").map(\.steer), [true, false, false, true, false, false])
+        XCTAssertEqual(Doh.ipsFor(Doh.chain("abc123")[4]), ["1.1.1.1", "1.0.0.1"])
     }
 
     func testDohSkipsIpAndLocalhost() {

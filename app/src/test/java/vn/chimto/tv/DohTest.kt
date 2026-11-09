@@ -30,6 +30,7 @@ class DohTest {
         val a = DnsWire.answer(reply, 0) as Doh.Answer.Found
         assertEquals("104.21.35.220", a.addr.hostAddress)
         assertEquals(60, a.ttl)
+        assertEquals(listOf("104.21.35.220", "172.67.180.59"), a.all.map { it.hostAddress }) // mọi bản ghi A (máy chủ NextDNS gần nhất)
     }
 
     @Test
@@ -89,5 +90,30 @@ class DohTest {
         Prefs.init(lv2)
         Prefs.applyNetDefaults()
         assertTrue(Prefs.unblockLevel == 2 && Prefs.secureDns)
+    }
+
+    @Test
+    fun keepAliveReadsOneReplyAtATime() {
+        // Hai trả lời liền nhau trên một kết nối (keep-alive): đọc đúng từng cái, kết nối còn dùng lại được
+        val two = ("HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\nabc" +
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nde\r\n0\r\n\r\n" +
+            "HTTP/1.1 200 OK\r\nContent-Length: 1\r\nConnection: close\r\n\r\nf").toByteArray()
+        val i = java.io.BufferedInputStream(java.io.ByteArrayInputStream(two))
+        val r1 = DohHttp.read(i)
+        assertEquals("abc", String(r1.body))
+        assertTrue(r1.keepAlive)
+        val r2 = DohHttp.read(i)
+        assertEquals("de", String(r2.body))
+        assertTrue(r2.keepAlive)
+        val r3 = DohHttp.read(i)
+        assertEquals("f", String(r3.body))
+        assertFalse(r3.keepAlive) // máy chủ báo đóng → không dùng lại
+    }
+
+    @Test
+    fun onlyNextDnsIsSteered() {
+        // Chỉ NextDNS lấy IP theo máy chủ gần nhất; Cloudflare / Google dùng IP cố định
+        assertEquals(listOf(true, false, false, true, false, false), Doh.chain("abc123").map { it.steer })
+        assertEquals(listOf("1.1.1.1", "1.0.0.1"), Doh.ipsFor(Doh.chain("abc123")[4]))
     }
 }
