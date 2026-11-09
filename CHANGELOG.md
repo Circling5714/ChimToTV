@@ -18,8 +18,8 @@ Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề
   `ConBangTV-iPad-1.9.ipa` 4 251 574 byte · SHA-256 `48bb2034f25feb39c5527529caa349fa4cc6fc8c51872cc9f3e56992e2dd7cfb`
 - 108 test lõi trên macOS (9 test các hàng). Bản thử 78 thử thật trên iPad: bật / tắt, đổi thứ tự, thêm «Phim Hàn» → đóng Cài
   đặt → trang chủ xếp đúng (sửa lỗi bảng Cài đặt tự mở / đóng liên tục khi đóng lúc đang ở trang các hàng — iOS 15); iPhone: trang
-  các hàng hiện đúng. Bản chính thức cài lên iPad (đè 1.8.2): mở được, không văng; cài lên iPhone (đè 1.8.2) xong nhưng máy đang
-  khoá nên chưa mở. `releases/latest` vẫn `v2.9`; tệp tải từ link công khai khớp SHA-256.
+  các hàng hiện đúng. Bản chính thức cài lên iPad (đè 1.8.2): mở được, không văng; cài lên iPhone (đè 1.8.2): mở được, tải
+  xong trang chủ (ảnh poster mới ghi), không văng. `releases/latest` vẫn `v2.9`; tệp tải từ link công khai khớp SHA-256.
 
 ## Windows 1.6 — 09/11/2026
 
