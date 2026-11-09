@@ -10,10 +10,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.10`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.10)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.11`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.11)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.7`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.7)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.8`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.8)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -170,8 +170,9 @@ Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStor
   [Thu nhỏ phim](#thu-nhỏ-phim--hình-trong-hình-từ-20)): mở app chọn "Ai đang xem?", mã PIN gõ trên bàn phím số của màn
   hình; nút thu nhỏ cạnh nút Menu của trình phát → phim chạy tiếp ở cửa sổ nổi của iPad (cửa sổ có nút phóng to / đóng);
   vuốt về màn hình chính lúc đang xem là tự thu nhỏ (Cài đặt → Phát video).
-- **Khác bản TV:** chưa có DNS mã hoá (cần thì dùng hồ sơ DNS của iPad); không có con trỏ ảo (chạm thẳng vào trang
-  web). Lúc bật proxy / vượt chặn, trên iPadOS 15–16 app không giữ cookie của trang web sau khi tắt app.
+- **DNS mã hoá** (từ 1.11, bật sẵn): như bản TV — xem [DNS mã hoá](#dns-mã-hoá-doh--dot-bật-sẵn-từ-211).
+- **Khác bản TV:** không có con trỏ ảo (chạm thẳng vào trang web). Lúc bật proxy / vượt chặn / DNS mã hoá, trên iPadOS 15–16
+  app không giữ cookie của trang web sau khi tắt app.
 
 ## Bản Windows
 
@@ -206,7 +207,8 @@ cả chuột lẫn bàn phím / remote:
 - **Đồng bộ trong nhà** (từ 1.2): menu «⇄ Đồng bộ trong nhà» — như mục [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22): hiện mã
   ghép của máy tính, tìm máy trong mạng, ghép bằng mã hoặc IP của máy kia. Lần đầu Windows hỏi cho dùng mạng: **Cho phép** (mạng
   riêng) — không thì TV / iPad không gọi sang máy tính được (máy tính vẫn tự gọi sang TV / iPad).
-- **Chưa có:** DNS mã hoá, xem riêng, chấm điểm server.
+- **DNS mã hoá** (từ 1.8, bật sẵn): như bản TV — xem [DNS mã hoá](#dns-mã-hoá-doh--dot-bật-sẵn-từ-211).
+- **Chưa có:** xem riêng, chấm điểm server.
 
 ## Phím điều khiển
 
@@ -341,9 +343,26 @@ Lúc xem nhấn ▼ → **Thu nhỏ vào góc** (hoặc phím Window của remot
   "không đọc được phim" = vào được nhưng không có danh sách phim (có thể là trang chặn của nhà mạng).
 - **Trang đổi giao diện** (app không đọc được danh sách): dùng mục **Duyệt web** để xem bằng con trỏ.
 
+## DNS mã hoá (DoH / DoT, bật sẵn từ 2.11)
+
+**Cài đặt → DNS mã hoá** (TV từ 1.9.1; bật sẵn từ TV 2.11 / iPad 1.11 / Windows 1.8 — máy đang dùng cũng tự bật một lần khi cập
+nhật, sau đó ai tắt thì giữ tắt). App hỏi địa chỉ trang qua DNS mã hoá thay cho DNS nhà mạng / bộ lọc DNS trong nhà, theo thứ tự:
+
+1. DoH (DNS qua HTTPS): NextDNS (hồ sơ riêng của app) → Cloudflare → Google
+2. DoT (DNS qua TLS, cổng 853): NextDNS → Cloudflare → Google
+3. DNS của máy — **app không bao giờ hỏng vì DNS mã hoá bị chặn**
+
+Máy chủ nào bị chặn / không trả lời thì nghỉ 2 phút, app hỏi máy chủ sau. Tên miền không có (hoặc hồ sơ NextDNS chặn) là trả lời
+thật — app không hỏi máy chủ khác để lách. Nhà mạng không đọc / sửa được truy vấn DNS, nhưng vẫn thấy tên trang lúc kết nối (phần
+đó do [Vượt chặn nhà mạng](#vượt-chặn-nhà-mạng-từ-21) lo) và IP đích. Đang bật proxy với «DNS của proxy» thì proxy tự hỏi DNS.
+
+Tắt DNS mã hoá mà vẫn bật Vượt chặn: DNS của máy trả 0.0.0.0 / :: (bị chặn) hoặc không trả lời thì app vẫn hỏi lại qua chuỗi
+trên — vd ảnh bìa CLB Phim Xưa (`clbphimxua.com`) bị bộ lọc DNS trong nhà chặn.
+
 ## Vượt chặn nhà mạng (từ 2.1)
 
-**Cài đặt → Vượt chặn nhà mạng** (iPad từ 1.2, mặc định tắt). Một số nhà mạng chặn trang phim bằng cách đọc **tên trang**
+**Cài đặt → Vượt chặn nhà mạng** (iPad từ 1.2; **bật sẵn mức 1 từ 2.11 / iPad 1.11 / Windows 1.8** — máy đang dùng cũng tự bật
+một lần khi cập nhật, đang mức 2 thì giữ, sau đó ai tắt thì giữ tắt). Một số nhà mạng chặn trang phim bằng cách đọc **tên trang**
 trong gói đầu tiên của kết nối HTTPS (TLS ClientHello, phần SNI): kết nối tới địa chỉ thì được nhưng bắt tay HTTPS treo
 rồi đứt, đổi DNS / DNS mã hoá không đỡ, dùng VPN thì vào được (đo ở mạng nhà 11/2026: phimmoir.fun treo 15 giây rồi lỗi,
 cùng địa chỉ với tên trang khác thì vào ngay). Bật mục này: mọi kết nối của app đi qua cổng nội bộ (như proxy), gói bắt
@@ -395,9 +414,7 @@ vòng ăn CPU. Bản thử: `/proxy?break=1` giả ổ cắm bị thu hồi.
   đang xem các tập của phim đó.
 - Từ 1.8.2 app không cho sao lưu dữ liệu (lịch sử xem, mật khẩu proxy, cookie) lên đám mây, không chuyển sang máy mới
   và không lấy ra được bằng `adb backup`; WebView không gửi số liệu sử dụng / chẩn đoán của app về Google.
-- **DNS mã hoá (DoH)** (Cài đặt, từ 1.9.1): Cloudflare 1.1.1.1 hoặc Google 8.8.8.8 qua HTTPS thay cho DNS nhà mạng —
-  nhà mạng không đọc / chặn được truy vấn DNS, nhưng vẫn thấy tên trang lúc kết nối (TLS SNI) và IP đích. Lỗi thì app
-  báo, không quay về DNS nhà mạng. Bật proxy với "DNS của proxy" thì proxy tự hỏi DNS. Màn hình chính ghi "· DoH".
+- **DNS mã hoá** (Cài đặt, từ 1.9.1; bật sẵn từ 2.11) — xem [DNS mã hoá](#dns-mã-hoá-doh--dot-bật-sẵn-từ-211).
 - Chặn quảng cáo / theo dõi (`AdBlock.kt`): danh sách cũ + những gì đo được trên 5 trang (11/2026): thống kê
   Cloudflare, JW Player, Ahrefs, quảng cáo Adcash, tên miền quảng cáo bật cửa sổ của hoathinh3d. Không chặn thứ trình
   phát cần (JW tải từ `ssl.p.jwpcdn.com`, giấy phép `entitlements.jwplayer.com`, video trên CDN).
@@ -415,7 +432,8 @@ vòng ăn CPU. Bản thử: `/proxy?break=1` giả ổ cắm bị thu hồi.
 ```
 
 Cần JDK 17 (`%USERPROFILE%\.jdks\jdk-17.0.20.1+1`) và Android SDK (`%LOCALAPPDATA%\Android\Sdk`).
-Thư mục `keys\` chứa khoá ký app — **giữ lại**, mất khoá thì bản mới không cài đè lên bản cũ được.
+Thư mục `keys\` chứa khoá ký app — **giữ lại**, mất khoá thì bản mới không cài đè lên bản cũ được. Cũng trong `keys\`: `nextdns.txt` — mã hồ sơ NextDNS của app (một dòng; TV / Windows đóng vào bản dựng, không có thì
+DNS mã hoá bỏ NextDNS; bản iPad lấy mã từ secret `NEXTDNS_ID` của repo).
 
 **Bản gỡ lỗi Android** (`gradlew assembleDebug` → `app-debug.apk`): mã gói `vn.chimto.tv.debug`, tên "Côn Bằng Debug",
 cài song song bản thật (ký bằng khoá debug của máy dựng). Có **cổng gỡ lỗi 8790** trong mạng LAN (`app/src/debug/` —
@@ -677,9 +695,13 @@ vào agent (`window.__chimtoStart`) và `hls.html` (`startPosition`). JW Player 
 `hls.startLoad(0)` → agent bọc `startLoad` của hls.js: lần đầu không có vị trí thì bắt đầu ở chỗ báo trước. Đo trên
 TX3 (yanhh3d): trang tập ~1 s, link trình phát ~1,2 s, còn ~10 s là trình phát streamfree khởi động (~4–6 s chạy JS
 trên TV) và đoạn video đầu tiên (6,6 s trên CDN). Bản debug ghi mốc vào logcat `ChimToOpen`. Tốc độ / khung hình:
-lệnh `rate` / `fit` cho agent, agent đặt lại mỗi giây. DoH: `Doh.kt` (JSON qua HTTPS tới IP của máy chủ DNS, nhớ theo
-TTL ≤ 5 phút, chỉ IPv4); cổng nội bộ chạy cả khi không có proxy (`RouteConfig(socks, doh)`); bản debug ghi tên miền đã
-hỏi vào logcat `ChimToDoh` (cũng là cách đo trang gọi tới những đâu). Mật khẩu proxy: `Secret.kt` (AES-GCM, khoá trong
+lệnh `rate` / `fit` cho agent, agent đặt lại mỗi giây. DNS mã hoá: `Doh.kt` (từ 2.11: gói DNS chuẩn RFC 8484 POST / RFC 7858
+qua TLS tới IP cố định của máy chủ, kiểm chứng chỉ theo tên; chuỗi `Doh.chain(id)`, nhớ theo TTL 30 giây – 10 phút, chỉ IPv4, gộp
+các lần hỏi trùng); cổng nội bộ chạy cả khi không có proxy (`RouteConfig(socks, dns, split, disorder)`, `Socks5Bridge.dns`); bản
+debug ghi tên miền đã hỏi + máy chủ trả lời vào logcat `ChimToDoh` (cũng là cách đo trang gọi tới những đâu), `/dohfail?labels=`
+giả máy chủ bị chặn, `/dnsblock?hosts=` giả DNS máy trả 0.0.0.0. **Mã hồ sơ NextDNS không có trong git:** tệp `keys/nextdns.txt`
+(TV: `BuildConfig.NEXTDNS_ID`; Windows: EmbeddedResource `nextdns.txt`), iPad: secret `NEXTDNS_ID` của repo → Info.plist
+`CBNextDnsId` lúc CI dựng. Không có mã thì chuỗi bỏ NextDNS. Khoá cài đặt `doh` = `AUTO` / `OFF`, `net_defaults_v1` (bật một lần). Mật khẩu proxy: `Secret.kt` (AES-GCM, khoá trong
 AndroidKeyStore).
 
 Bản Windows (`windows/ConBangTV`): `Core/` chuyển từ bản iPad (Site, NextSite, ApiSite, Prefs — cùng tên hàm, cùng bộ

@@ -7,6 +7,55 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.11 — 09/11/2026
+
+- **DNS mã hoá** (mới trên iPad / iPhone, bật sẵn; Cài đặt → mục «DNS mã hoá», ngay trên «Vượt chặn nhà mạng»): như TV 2.11 —
+  DoH rồi DoT, lần lượt NextDNS → Cloudflare → Google; bị chặn hết thì dùng DNS của máy — app không hỏng. Kết nối tới máy chủ DNS
+  bằng Network.framework (IP cố định, kiểm chứng chỉ theo tên máy chủ), đi thẳng không qua cổng nội bộ.
+- **Vượt chặn nhà mạng mức 1 bật sẵn.** Máy đang dùng cũng tự bật cả hai một lần khi cập nhật (đang mức 2 thì giữ), sau đó ai
+  tắt thì giữ tắt. Như trước: trên iOS 15–16, lúc bật app không giữ cookie của trang web sau khi tắt app.
+- **Sửa:** ảnh bìa CLB Phim Xưa không hiện khi DNS trong nhà chặn tên miền ảnh (`clbphimxua.com` — DNS trả 0.0.0.0).
+- bản 1.11 (CFBundleVersion 14) · mã gói `vn.chimto.tv` · tag `ios-v1.11` (không phải "latest") · commit `4908aa4` ·
+  `ConBangTV-iPad-1.11.ipa` 4 311 267 byte · SHA-256 `4ee6ec823ae9ce77f3aafcf44f5ac6a8f580913e8b8402c63e3ca1451aaf7f28`
+- 121 test lõi trên macOS (thêm: gói DNS, trả lời HTTP, thứ tự máy chủ, mặc định mới, máy chủ chết → DNS máy). Bản thử 86–87 thử
+  thật trên iPad và iPhone (mạng có bộ lọc DNS chặn thật): tắt Vượt chặn thì ảnh CLB Phim Xưa trống, bật thì hiện; mọi tên miền
+  qua DoH NextDNS; giả chặn 3 DoH → DoT NextDNS (ảnh vẫn hiện); giả chặn cả 6 → DNS của máy (danh sách vẫn mở); iPad đang mức 2
+  giữ mức 2, iPhone đang tắt tự bật mức 1. Bản chính thức cài lên iPad và iPhone (đè 1.10): chạy, dữ liệu đã ghi mặc định mới
+  (`doh` = AUTO, `net_defaults_v1`). Tệp tải từ link công khai khớp SHA-256; `releases/latest` vẫn `v2.11`.
+
+## Windows 1.8 — 09/11/2026
+
+- **DNS mã hoá bật sẵn** như TV 2.11 (Cài đặt → «DNS mã hoá (DoH / DoT)»: Bật / Tắt): DoH rồi DoT, lần lượt NextDNS → Cloudflare →
+  Google; bị chặn hết thì dùng DNS của máy — app không hỏng. **Vượt chặn nhà mạng mức 1 bật sẵn**; máy đang dùng cũng tự bật cả
+  hai một lần khi cập nhật (đang mức 2 thì giữ), sau đó ai tắt thì giữ tắt.
+- **Sửa:** trang chủ báo «An item with the same key has already been added» (cả trang thành «Không tải được») khi hai hàng cùng
+  một danh sách — vd hàng tự thêm «Hoạt hình Trung Quốc» và hàng «Hoạt hình Trung Quốc mới cập nhật · mọi nguồn». Ảnh bìa CLB
+  Phim Xưa không hiện khi DNS trong nhà chặn tên miền ảnh (`clbphimxua.com` — DNS trả 0.0.0.0).
+- bản 1.8.0 · tag `win-v1.8` (không phải "latest") · commit `4908aa4` · `ConBangTV-Windows-1.8.exe` 72 885 597 byte · SHA-256
+  `9a226978cb863679883bdff8db35a5b487b49e6bc838d391dc38643ca562d2b3`
+- 102 test lõi (thêm 11: gói DNS, trả lời HTTP, thứ tự máy chủ, mặc định mới, hai hàng cùng danh sách…). Thử trên máy Windows 10
+  có bộ lọc DNS chặn thật: ảnh CLB Phim Xưa hiện qua DoH NextDNS; giả chặn 4 máy chủ đầu → DoT Cloudflare; giả chặn cả 6 → DNS
+  của máy (danh sách vẫn mở). Tệp tải từ link công khai khớp SHA-256. **Tự cập nhật thật 1.7 → 1.8** từ GitHub (bản chép riêng,
+  dữ liệu mới): hộp thoại «Có bản mới: Côn Bằng TV 1.8» → Cập nhật ngay → mở lại 1.8, Vượt chặn mức 1 + DNS mã hoá đã bật.
+
+## 2.11 — 09/11/2026
+
+- **DNS mã hoá bật sẵn:** app hỏi địa chỉ trang qua DoH (RFC 8484) rồi DoT (RFC 7858), lần lượt NextDNS (hồ sơ riêng của app) →
+  Cloudflare → Google; bị chặn hết thì dùng DNS của máy — app không bao giờ hỏng vì DNS mã hoá bị chặn. Máy chủ bị chặn nghỉ 2
+  phút; nhiều kết nối cùng hỏi một tên miền thì chỉ hỏi một lần; tên miền không có (hồ sơ DNS chặn) thì không hỏi máy chủ khác.
+  Cài đặt → «DNS mã hoá: Bật (DoH / DoT: NextDNS → Cloudflare → Google)» / Tắt (trước: chọn Cloudflare / Google / Tắt).
+- **Vượt chặn nhà mạng mức 1 bật sẵn.** Máy đang dùng cũng tự bật cả hai một lần khi cập nhật (đang mức 2 thì giữ mức 2); sau đó
+  ai tắt thì giữ tắt.
+- **Sửa:** ảnh bìa CLB Phim Xưa không hiện khi DNS trong nhà chặn tên miền ảnh (`clbphimxua.com` — DNS trả 0.0.0.0): tắt DNS mã
+  hoá mà vẫn bật Vượt chặn thì DNS của máy trả 0.0.0.0 / :: là app tự hỏi lại qua DNS mã hoá.
+- Bỏ chữ «· DoH» cạnh tên trang (nay là mặc định).
+- versionCode 33 · tag `v2.11` · commit `4908aa4` · `ChimToTV-2.11.apk` 1 215 137 byte · SHA-256
+  `d6d2218d3fe067f3df6b237d9c7f9508b61a6facc6fdf9e20708e5fd5f766ea7`
+- 125 test (thêm 9). Thử bản gỡ lỗi trên TV box: mọi tên miền qua DoH NextDNS; giả chặn 3 DoH → DoT NextDNS (phim vẫn phát);
+  giả chặn cả 6 → DNS của máy (trang phim mở đủ ảnh); giả DNS máy trả 0.0.0.0 → ảnh CLB Phim Xưa vẫn hiện. Bản chính thức thử trên
+  TV box trước khi đăng (Cài đặt hiện NextDNS, Vượt chặn mức 1). API `releases/latest` trả `v2.11` + `.apk`, tệp tải từ link công
+  khai khớp SHA-256. **Cập nhật tự động thật 2.10 → 2.11** trên TV box.
+
 ## iPad 1.10 — 09/11/2026
 
 - **Hàng vuốt ngang cả trên iPad và iPhone xoay ngang** (trước chỉ iPhone cầm dọc): «Xem thêm ›» ở tên hàng + ô hẹp cuối dải.
