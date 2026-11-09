@@ -551,6 +551,17 @@ enum DebugRoutes {
 
     // MARK: - Màn hình
 
+    /// Hộp thoại đang hiện ở bất kỳ cửa sổ nào (hộp «Có bản mới» nằm ở cửa sổ riêng, không phải cửa sổ chính).
+    private static var topAlert: UIAlertController? {
+        let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }
+        for w in windows.filter({ !$0.isHidden }).sorted(by: { $0.windowLevel > $1.windowLevel }) {
+            var vc = w.rootViewController
+            while let p = vc?.presentedViewController, !p.isBeingDismissed { vc = p }
+            if let a = vc as? UIAlertController { return a }
+        }
+        return nil
+    }
+
     private static var keyWindow: UIWindow? {
         let windows = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }
         return windows.first { $0.isKeyWindow } ?? windows.first
@@ -619,7 +630,7 @@ enum DebugRoutes {
     private static func press(label: String, index: Int, partial: Bool) -> (Bool, String?) {
         guard let w = keyWindow, !label.isEmpty else { return (false, nil) }
         // Hộp chọn (confirmationDialog / alert): bấm dòng theo tên — gọi khối xử lý của UIAlertAction (KVC, chỉ bản thử)
-        if let alert = Router.topController as? UIAlertController {
+        if let alert = topAlert {
             let acts = alert.actions.filter { $0.title == label || (partial && ($0.title ?? "").localizedCaseInsensitiveContains(label)) }
             if let act = acts[safe: index] {
                 typealias Handler = @convention(block) (UIAlertAction) -> Void

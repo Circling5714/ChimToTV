@@ -121,6 +121,7 @@ struct SyncView: View {
             }
         }
         .navigationTitle("Đồng bộ trong nhà")
+        .navigationBarHidden(false) // trang Cài đặt ẩn thanh tiêu đề (tự vẽ) — trang này cần thanh có nút quay lại
         .onAppear { sync.openPairing() }
         .onDisappear { sync.closePairing() }
     }

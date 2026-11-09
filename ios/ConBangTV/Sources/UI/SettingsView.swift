@@ -104,6 +104,22 @@ struct SettingsView: View {
         }
     }
 
+    private var header: some View {
+        ZStack {
+            Text("Cài đặt").font(.headline).foregroundColor(Theme.text)
+            HStack {
+                Spacer()
+                Button("Xong") { dismiss() }
+                    .font(.body.weight(.semibold))
+                    .keyboardShortcut(.escape, modifiers: [])
+            }
+        }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity)
+        .frame(height: 52)
+        .background(.bar)
+    }
+
     var body: some View {
         NavigationView {
             Form {
@@ -231,7 +247,10 @@ struct SettingsView: View {
             }
             .navigationTitle("Cài đặt")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Xong") { dismiss() } } }
+            // Thanh tiêu đề tự vẽ: nút «Xong» trên thanh tiêu đề của SwiftUI (toolbar) làm iPadOS 15 văng app lúc đóng
+            // bảng (lỗi bố cục của SwiftUI, nhất là sau hộp thoại «Có bản mới»)
+            .navigationBarHidden(true)
+            .safeAreaInset(edge: .top, spacing: 0) { header }
             .alert("Xoá lịch sử xem\(who)?", isPresented: $confirmHistory) {
                 Button("Xoá", role: .destructive) {
                     Prefs.clearHistory()

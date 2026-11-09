@@ -1099,12 +1099,12 @@ final class AppModel: ObservableObject {
         let host = UIViewController()
         host.view.backgroundColor = .clear
         w.rootViewController = host
-        w.makeKeyAndVisible()
+        w.isHidden = false // không giành «cửa sổ chính» (đổi cửa sổ chính làm SwiftUI vẽ lại cả màn đang mở)
         updateWindow = w
         let close: () -> Void = { [weak self] in
             self?.updateWindow?.isHidden = true
             self?.updateWindow = nil
-            main?.makeKey()
+            if main?.isKeyWindow == false { main?.makeKey() }
         }
         let a = UIAlertController(title: "Có bản mới \(rel.version)",
                                   message: "Đang dùng \(UpdateCheck.currentVersion). Cài bằng TrollStore.\n\n" + UpdateCheck.summary(rel.notes),
