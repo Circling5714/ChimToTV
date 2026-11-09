@@ -16,7 +16,11 @@ enum UpdateCheck {
     }
 
     static var currentVersion: String {
-        (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
+        #if DEVTOOLS
+        // Bản thử: giả bản đang dùng (khoá debug_fake_version, đặt qua /prefs) để thử hộp thoại «Có bản mới»
+        if let v = UserDefaults.standard.string(forKey: "debug_fake_version"), !v.isEmpty { return v }
+        #endif
+        return (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
     }
 
     /// Bản iPad mới nhất (bỏ bản nháp / thử nghiệm); nil = chưa có bản nào.
