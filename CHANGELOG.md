@@ -7,6 +7,49 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.9 — 09/11/2026
+
+- **Các hàng trên trang chủ** như TV 2.9: Cài đặt → Trang chủ → «Các hàng trên trang chủ» (riêng từng người xem) — bật / tắt
+  từng hàng (hàng tắt thì không tải), ▲ ▼ đổi thứ tự, «Thêm hàng…» (chủ đề có sẵn, hoặc loại phim + nước + thể loại + ngôn ngữ,
+  tối đa 6 hàng), xoá hàng tự thêm, «Khôi phục mặc định». «Có tập mới» / «Xem tiếp» chỉ bật / tắt, luôn ở đầu trang. Chủ đề
+  người xem mới chọn giờ là hàng tự thêm. Hồ sơ trẻ em: chỉ các hàng hoạt hình, sửa cần mã PIN phụ huynh (hỏi ngay trong trang).
+  Đóng Cài đặt là trang chủ xếp lại, tải hàng mới.
+- bản 1.9 (CFBundleVersion 12) · mã gói `vn.chimto.tv` · tag `ios-v1.9` (không phải "latest") · commit `e139253` ·
+  `ConBangTV-iPad-1.9.ipa` 4 251 574 byte · SHA-256 `48bb2034f25feb39c5527529caa349fa4cc6fc8c51872cc9f3e56992e2dd7cfb`
+- 108 test lõi trên macOS (9 test các hàng). Bản thử 78 thử thật trên iPad: bật / tắt, đổi thứ tự, thêm «Phim Hàn» → đóng Cài
+  đặt → trang chủ xếp đúng (sửa lỗi bảng Cài đặt tự mở / đóng liên tục khi đóng lúc đang ở trang các hàng — iOS 15); iPhone: trang
+  các hàng hiện đúng. Bản chính thức cài lên iPad (đè 1.8.2): mở được, không văng; cài lên iPhone (đè 1.8.2) xong nhưng máy đang
+  khoá nên chưa mở. `releases/latest` vẫn `v2.9`; tệp tải từ link công khai khớp SHA-256.
+
+## Windows 1.6 — 09/11/2026
+
+- **Các hàng trên trang chủ** như TV 2.9: Cài đặt → «☰ Các hàng trên trang chủ…» (riêng từng người xem) — bật / tắt từng hàng
+  (hàng tắt thì không tải), ▲ ▼ đổi thứ tự (đi bằng phím, giữ nguyên ô đang chọn), «＋ Thêm hàng…» (chủ đề có sẵn, hoặc loại phim
+  / nước / thể loại / ngôn ngữ bằng hộp chọn của app, tối đa 6 hàng), ✕ xoá hàng tự thêm, «Khôi phục mặc định». «Có tập mới» /
+  «Xem tiếp» chỉ bật / tắt, luôn ở đầu trang. Hồ sơ trẻ em: chỉ các hàng hoạt hình, sửa cần mã PIN phụ huynh.
+- bản 1.6.0 · tag `win-v1.6` (không phải "latest") · commit `e139253` · `ConBangTV-Windows-1.6.exe` 72 869 613 byte ·
+  SHA-256 `5c558c9c8b9cca70731f04131ccddc380520d2690123be0c242a641fc12b005b`
+- 87 test lõi (8 test các hàng). Thử trên máy Windows 10 (bản gỡ lỗi): bật / tắt, ▲ ▼ bằng phím, thêm «Phim Hàn» → trang chủ
+  hiện ngay sau «Xem tiếp». Tệp tải từ link công khai khớp SHA-256. **Tự cập nhật thật 1.5 → 1.6** từ GitHub: hộp thoại «Có bản
+  mới: Côn Bằng TV 1.6» → Cập nhật ngay → mở lại 1.6.
+
+## 2.9 — 09/11/2026
+
+- **Các hàng trên trang chủ** (Cài đặt → Trang chủ → «Các hàng trên trang chủ…», riêng từng người xem): bật / tắt từng hàng —
+  hàng tắt thì không tải; ▲ ▼ đổi thứ tự; «Mặc định» trả thứ tự cũ và bật lại mọi hàng (giữ hàng tự thêm). «Có tập mới» và «Xem
+  tiếp» chỉ bật / tắt, luôn ở đầu trang.
+- **Hàng tự thêm** («＋ Thêm hàng…», tối đa 6): chủ đề có sẵn (Phim Hàn, Anime Nhật, Kiếm hiệp…) hoặc tự chọn loại phim + nước +
+  thể loại + ngôn ngữ (vd «Hoạt hình Nhật Bản · viễn tưởng»). Phim lấy từ KKPhim (không có thì VSMOV), phim cùng tên ở trang khác
+  tự gộp vào. Hàng mới đứng sau «Xem tiếp», đổi chỗ được như các hàng khác, ✕ để xoá. Chủ đề người xem mới chọn lúc chưa có lịch
+  sử giờ là hàng tự thêm — vẫn còn khi đã xem phim.
+- Hồ sơ trẻ em: chỉ các hàng hoạt hình (chủ đề hợp trẻ em, loại phim hoạt hình, bỏ thể loại người lớn); sửa cần mã PIN phụ huynh.
+- versionCode 31 · tag `v2.9` · commit `e139253` · `ChimToTV-2.9.apk` 1 207 471 byte · SHA-256
+  `471808e304abc2b289dcad514e9da2d6ceda14b5b423460c8e2fc8a22eaccfaf`
+- 112 test (8 test các hàng). Thử bản gỡ lỗi trên TV box bằng remote: bật / tắt, ▲ ▼, «Mặc định», tắt «Xem tiếp», thêm «Phim
+  Hàn» và «Hoạt hình Nhật Bản · viễn tưởng» — tải đúng phim. Bản chính thức thử trên TV box trước khi đăng (trang chủ, hộp các
+  hàng). API `releases/latest` trả `v2.9` + `.apk`, tệp tải từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.8.1 → 2.9**
+  trên TV box.
+
 ## iPad 1.8.2 — 09/11/2026
 
 - **Cập nhật trên iOS / iPadOS 15:** bấm «Kiểm tra cập nhật» trong Cài đặt giờ hiện hộp thoại «Có bản mới … — Cài đặt ngay»

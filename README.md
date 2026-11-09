@@ -10,10 +10,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.8.2`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.8.2)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.9`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.9)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.5`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.5)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.6`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.6)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -29,7 +29,8 @@ người xem**:
   nguonc» khi tập mới nằm ở trang khác). Mở phim / xem tập mới là thôi báo.
 - **Xem tiếp**, **Giống «phim vừa xem»**, **Vì … hay xem <thể loại>**, **<loại phim hay xem> mới cập nhật · mọi nguồn**,
   **Thuyết minh mới** (khi từ nửa số lần mở tập gần đây là bản thuyết minh / lồng tiếng), **Mới cập nhật · mọi nguồn**,
-  **Phim lẻ mới**. Người chưa xem gì: chọn vài chủ đề (Hoạt hình Trung Quốc, Kiếm hiệp, Phim Hàn…).
+  **Phim lẻ mới**. Người chưa xem gì: chọn vài chủ đề (Hoạt hình Trung Quốc, Kiếm hiệp, Phim Hàn…) — từ 2.9 mỗi chủ đề chọn
+  là một hàng tự thêm, vẫn còn sau khi đã có lịch sử.
 - Mỗi hàng một dòng, ô cuối **Xem thêm** mở cả hàng (Back / Esc quay lại đúng ô). Phim có ở nhiều trang ghi «N nguồn»; trang
   phim có nút **Nguồn: … ▾** để mở phim ở trang khác.
 - **Điện thoại / iPhone cầm dọc** (từ 2.8.1 / iPad 1.8.1): mỗi hàng là một **dải vuốt ngang** — thấy 3 phim và một phần phim
@@ -44,6 +45,16 @@ người xem**:
   em — Hoạt hình thiếu nhi, gia đình, lồng tiếng, gợi ý theo lịch sử chỉ lấy hoạt hình; bỏ phim 18+, kinh dị, hình sự, chiến
   tranh và tên phim ma. Chỉ lọc trang chủ (tìm kiếm, mục của trang vẫn như cũ) — muốn khoá chặt hơn thì dùng
   [Giới hạn giờ xem](#giới-hạn-giờ-xem-từ-21) và mã PIN người xem.
+- **Các hàng trên trang chủ** (từ 2.9 / iPad 1.9 / Windows 1.6; Cài đặt → Trang chủ → «Các hàng trên trang chủ…», riêng từng
+  người xem):
+  - bật / tắt từng hàng — hàng tắt thì không tải; **▲ ▼** đổi thứ tự. «Có tập mới» và «Xem tiếp» chỉ bật / tắt, luôn ở đầu
+    trang;
+  - **＋ Thêm hàng…** (tối đa 6): chủ đề có sẵn, hoặc tự chọn **loại phim + nước + thể loại + ngôn ngữ** (vd «Hoạt hình Nhật Bản
+    · viễn tưởng»). Phim lấy từ KKPhim (không có thì VSMOV), phim cùng tên ở trang khác tự gộp vào. Hàng mới đứng sau «Xem
+    tiếp», đổi chỗ được, ✕ để xoá;
+  - **Mặc định** / **Khôi phục mặc định**: trả thứ tự cũ và bật lại mọi hàng, giữ hàng tự thêm;
+  - hồ sơ trẻ em: chỉ các hàng hoạt hình, sửa cần mã PIN phụ huynh (nếu đã đặt). Cài đặt các hàng không đồng bộ giữa TV và
+    iPad / Windows.
 
 ## Trang phim hỗ trợ
 
@@ -585,7 +596,13 @@ Trang chủ tổng hợp (từ 2.8 — `Feed.kt` / `HomeFeed.kt`, iPad `Feed.swi
 đã xem, tra KKPhim theo tên qua `FilmTags`); `Feed.load` tải song song (mỗi nguồn 6 s, tổng 15 s; bản lưu trong `feed/`, sức
 khoẻ nguồn trong khoá `feed_health`); `Feed.merge` gộp theo tên chuẩn hoá (`KkPhim.norm`) + năm lệch ≤ 1, cùng địa chỉ là một
 phim; `HomeFeed.buildRows` dựng các hàng; `HomeFeed.late` lấy nguồn về muộn; `saveLast` / `last` lưu trang chủ lần trước. Khoá
-riêng từng người: `home_mix`, `home_topics`, `seen_eps`, `kids`, `watch_langs`. Bản gỡ lỗi giả một nguồn lỗi bằng tệp
+riêng từng người: `home_mix`, `home_rows`, `home_custom`, `seen_eps`, `kids`, `watch_langs`. Các hàng (từ 2.9): `home_rows` là
+danh sách id hàng theo thứ tự (`"id"` bật, `"-id"` tắt; id trong `HomeFeed.ROWS` hoặc `custom-<id>`), `home_custom` là các hàng
+tự thêm (`CustomRow`: chủ đề `topic` hoặc `type` / `country` / `genre` / `lang`; khoá cũ `home_topics` tự đọc thành hàng chủ đề).
+`HomeFeed.mergeRows` ghép thứ tự đã lưu với `rowDefaults` (bỏ id lạ / trùng, hàng mới chèn sau hàng đứng trước nó trong thứ tự
+mặc định); `plan` bỏ hàng tắt; `arrange` lọc + xếp theo `FeedRow.slot` (lưu cùng trang chủ lần trước, khoá `"s"`); `customReq`
+dựng địa chỉ lọc KKPhim (`/api/movies/category/<loại>?country=&category=&sort_lang=`) hoặc VSMOV. Đổi các hàng thì so chữ ký
+`home_rows` + `home_custom` để tải lại trang chủ. Bản gỡ lỗi giả một nguồn lỗi bằng tệp
 `feed_fail_<tên miền>` (TV: thư mục `files` của app; Windows: thư mục dữ liệu). Trên TV box: không lập kế hoạch / đọc JSON
 trên luồng chính, luồng tải ưu tiên 4 (mức «background» làm API chậm quá 6 s). Màn hẹp (từ 2.8.1 / iPad 1.8.1 — Android
 `Screen.narrow`, iOS lưới < 500 pt): mỗi hàng là `StripRow` (Android: `RecyclerView` ngang `StripList` lồng trong lưới, ◄ / ►
