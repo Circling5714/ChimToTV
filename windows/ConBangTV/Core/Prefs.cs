@@ -650,14 +650,33 @@ public static class Prefs
     }
 
     /// Vượt chặn nhà mạng (xem Unblock): 0 = tắt, 1 = tách gói bắt tay, 2 = tách + gửi đảo thứ tự. Cùng khoá bản TV.
+    /// Từ 1.7.1 bật sẵn (chưa có khoá = bật mức 1).
     public static int UnblockLevel
     {
-        get => Get<bool>("unblock") ? (Get<int>("unblock_level") == 2 ? 2 : 1) : 0;
+        get => (!Has("unblock") || Get<bool>("unblock")) ? (Get<int>("unblock_level") == 2 ? 2 : 1) : 0;
         set
         {
             Set("unblock", value > 0);
             if (value > 0) Set("unblock_level", value);
         }
+    }
+
+    /// DNS mã hoá (xem Doh: DoH rồi DoT, NextDNS → Cloudflare → Google, lỗi hết thì DNS của máy). Từ 1.7.1 bật sẵn: khoá
+    /// "doh" = "AUTO" / "OFF", cùng khoá bản TV.
+    public static bool SecureDns
+    {
+        get => Get<string>("doh") != "OFF";
+        set => Set("doh", value ? "AUTO" : "OFF");
+    }
+
+    /// Mặc định mới về mạng (1.7.1): máy đang dùng khi cập nhật cũng bật Vượt chặn mức 1 (đang mức 2 thì giữ) và DNS mã hoá —
+    /// làm một lần; sau đó người xem tắt thì giữ theo lựa chọn đó. Gọi lúc mở app.
+    public static void ApplyNetDefaults()
+    {
+        if (Get<bool>("net_defaults_v1")) return;
+        UnblockLevel = UnblockLevel == 2 ? 2 : 1;
+        SecureDns = true;
+        Set("net_defaults_v1", true);
     }
 
     // ---- Proxy SOCKS5 (xem Net) — cùng khoá bản TV / iPad ----

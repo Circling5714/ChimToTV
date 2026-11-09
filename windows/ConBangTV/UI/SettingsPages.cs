@@ -182,6 +182,12 @@ public sealed class SettingsPage : Page
         Net.SettingsChanged();
     }
 
+    private static void SetSecureDns(bool on)
+    {
+        Prefs.SecureDns = on;
+        Net.SettingsChanged();
+    }
+
     private void Build()
     {
         Body.Children.Clear();
@@ -297,6 +303,13 @@ public sealed class SettingsPage : Page
             ("Phim chạy tiếp ở cửa sổ nhỏ", Prefs.MiniOnMinimize, (Action)(() => Prefs.MiniOnMinimize = true)),
             ("Dừng theo app", !Prefs.MiniOnMinimize, () => Prefs.MiniOnMinimize = false),
         }, "Lúc xem: nút «▣ Thu nhỏ» (phím W) đưa phim ra cửa sổ nhỏ góc màn hình; bấm đúp thanh dưới cửa sổ nhỏ để phóng to.");
+        Option("DNS mã hoá (DoH / DoT)", new[]
+        {
+            ("Bật", Prefs.SecureDns, (Action)(() => SetSecureDns(true))),
+            ("Tắt", !Prefs.SecureDns, () => SetSecureDns(false)),
+        }, $"Hỏi địa chỉ trang qua DNS mã hoá thay cho DNS nhà mạng: DoH rồi DoT, lần lượt {Doh.Providers}; lỗi hết thì dùng DNS " +
+           "của máy — app không hỏng khi DNS mã hoá bị chặn. Nhà mạng không đọc / sửa được truy vấn DNS (vẫn thấy tên trang lúc kết " +
+           "nối — Vượt chặn lo phần này).");
         Option("Vượt chặn nhà mạng", new[]
         {
             ("Tắt", Prefs.UnblockLevel == 0, (Action)(() => SetUnblock(0))),

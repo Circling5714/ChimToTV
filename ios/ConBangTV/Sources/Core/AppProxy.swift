@@ -20,6 +20,8 @@ enum AppProxy {
     /// Vượt chặn nhà mạng (Cài đặt): cổng nội bộ chạy cả khi không bật proxy, chia nhỏ gói bắt tay HTTPS.
     private static var split = false
     private static var disorder = false
+    /// DNS mã hoá (Cài đặt, bật sẵn): cổng nội bộ chạy cả khi không bật proxy / vượt chặn.
+    private static var dns = false
 
     private static func locked<T>(_ f: () -> T) -> T {
         lock.lock()
@@ -35,7 +37,7 @@ enum AppProxy {
 
     /// Cổng nội bộ; nil = tắt. Bật mà không mở được cổng (rất hiếm) thì trỏ vào cổng 1 (đóng): kết nối báo lỗi chứ không
     /// lén đi thẳng.
-    static var localPort: Int? { locked { bridge?.port ?? (config != nil || split ? 1 : nil) } }
+    static var localPort: Int? { locked { bridge?.port ?? (config != nil || split || dns ? 1 : nil) } }
 
     /// Từ điển proxy CFNetwork (URLSession.connectionProxyDictionary, WebKit); nil = đi thẳng.
     static var cfDictionary: [AnyHashable: Any]? { localPort.map { dictionary(port: $0) } }
@@ -57,16 +59,19 @@ enum AppProxy {
         let h = (Prefs.sites + [Prefs.baseUrl]).compactMap { Site.hostOf($0)?.lowercased() }
         let s = Prefs.unblock
         let d = s && Prefs.unblockLevel >= 2
+        let n = Prefs.secureDns
         lock.lock()
         defer { lock.unlock() }
         hosts = h
-        let want = c != nil || direct || s
-        if c == config && s == split && d == disorder && want == (bridge != nil) { return }
+        let want = c != nil || direct || s || n
+        if c == config && s == split && d == disorder && n == dns && want == (bridge != nil) { return }
         bridge?.close()
-        bridge = want ? try? Socks5Bridge(socks: c, split: s, disorder: d, siteHosts: { AppProxy.siteHosts }) : nil
+        Doh.clearCache()
+        bridge = want ? try? Socks5Bridge(socks: c, split: s, disorder: d, dns: n, siteHosts: { AppProxy.siteHosts }) : nil
         config = c
         split = s
         disorder = d
+        dns = n
         gen += 1
     }
 
@@ -78,7 +83,7 @@ enum AppProxy {
         guard let b = bridge, !b.listening else { return }
         let old = b.port
         b.close()
-        bridge = try? Socks5Bridge(socks: config, split: split, disorder: disorder, port: old, siteHosts: { AppProxy.siteHosts })
+        bridge = try? Socks5Bridge(socks: config, split: split, disorder: disorder, dns: dns, port: old, siteHosts: { AppProxy.siteHosts })
         if bridge?.port != old { gen += 1 } // cổng khác: Http mở URLSession mới, WebSetup dùng cấu hình mới
         Log.d("Proxy", "mở lại cổng nội bộ: \(old) → \(bridge.map { String($0.port) } ?? "không mở được")")
     }
@@ -128,6 +133,7 @@ enum AppProxy {
         o["active"] = config != nil
         o["direct"] = direct
         o["unblock"] = split
+        o["dns"] = dns
         o["port"] = bridge?.port ?? 0
         o["generation"] = gen
         o["proxy"] = config.map { c -> String in "\(c.host):\(c.port)" + (c.user.isEmpty ? "" : " (có đăng nhập)") } ?? ""

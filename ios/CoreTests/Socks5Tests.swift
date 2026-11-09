@@ -197,13 +197,69 @@ final class Socks5Tests: XCTestCase {
         for a in ["104.21.35.220", "2606:4700:3035::6815:23dc", "10.0.0.1"] { XCTAssertFalse(Doh.blocked(IPAddr(text: a)!), a) }
     }
 
-    func testDohParseTakesFirstARecord() {
-        let json = #"{"Status":0,"Answer":[{"name":"www.phim.test","type":5,"TTL":300,"data":"phim.test."},{"name":"phim.test","type":1,"TTL":75,"data":"104.21.35.220"},{"name":"phim.test","type":1,"TTL":75,"data":"172.67.180.59"}]}"#
-        let r = Doh.parse(Data(json.utf8))
-        XCTAssertEqual(r?.0.text, "104.21.35.220")
-        XCTAssertEqual(r?.1, 75)
-        XCTAssertNil(Doh.parse(Data(#"{"Status":3}"#.utf8)))
-        XCTAssertNil(Doh.parse(Data(#"{"Answer":[{"type":1,"TTL":10,"data":"0.0.0.0"}]}"#.utf8)))
+    private func hex(_ s: String) -> [UInt8] {
+        let h = Array(s.replacingOccurrences(of: " ", with: ""))
+        return stride(from: 0, to: h.count, by: 2).map { UInt8(String(h[$0...$0 + 1]), radix: 16)! }
+    }
+
+    /// DNS mã hoá (11/2026): gói DNS, trả lời HTTP, thứ tự máy chủ — cùng ca với DohTest.kt / DohTests.cs.
+    func testDnsQueryForA() {
+        XCTAssertEqual(DnsWire.query("a.bc"), hex("0000 0100 0001 0000 0000 0000 01 61 02 6263 00 0001 0001"))
+    }
+
+    func testDnsAnswerWithCnameAndCompression() {
+        let reply = hex("0000 8180 0001 0003 0000 0000" + "03 777777 01 78 02 766e 00 0001 0001" +
+                        "c00c 0005 0001 00000e10 0004 c010 c010" + "c010 0001 0001 0000012c 0004 68 15 23 dc" +
+                        "c010 0001 0001 0000003c 0004 ac 43 b4 3b")
+        XCTAssertEqual(DnsWire.answer(reply, id: 0), .found(IPAddr(text: "104.21.35.220")!, ttl: 60))
+    }
+
+    func testDnsNoDomainNoIpv4AndWrongId() {
+        XCTAssertEqual(DnsWire.answer(hex("0000 8183 0001 0000 0000 0000 01 78 00 0001 0001"), id: 0), .noDomain)
+        let empty = hex("0000 8180 0001 0000 0000 0000 01 78 00 0001 0001")
+        XCTAssertEqual(DnsWire.answer(empty, id: 0), .noIpv4)
+        XCTAssertEqual(DnsWire.answer(empty, id: 0x1234), .failed) // DoT: id khác → bỏ
+        XCTAssertEqual(DnsWire.answer(hex("0000 8182 0001 0000 0000 0000 01 78 00 0001 0001"), id: 0), .failed)
+    }
+
+    func testDohHttpBodyPlainAndChunked() {
+        XCTAssertEqual(DohHttp.body(Array("HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: 3\r\n\r\nabc".utf8)), Array("abc".utf8))
+        XCTAssertEqual(DohHttp.body(Array("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nab\r\n3;x=1\r\ncde\r\n0\r\n\r\n".utf8)), Array("abcde".utf8))
+        XCTAssertNil(DohHttp.body(Array("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n".utf8)))
+    }
+
+    func testDohChainOrder() {
+        XCTAssertEqual(Doh.chain("abc123").map(\.label), ["DoH NextDNS", "DoH Cloudflare", "DoH Google", "DoT NextDNS", "DoT Cloudflare", "DoT Google"])
+        XCTAssertEqual(Doh.chain("abc123")[0].path, "/abc123")
+        XCTAssertEqual(Doh.chain("abc123")[3].host, "abc123.dns.nextdns.io")
+        XCTAssertEqual(Doh.chain("").map(\.label), ["DoH Cloudflare", "DoH Google", "DoT Cloudflare", "DoT Google"])
+    }
+
+    func testDohDeadServersFallBackToDevice() throws {
+        // Mọi máy chủ không tới được (cổng đóng trên máy) → nil: cổng nội bộ dùng DNS của máy, không ném lỗi
+        let dead = [Doh.Server(label: "Chết", kind: .dot, host: "dns.test", path: "", ips: ["127.0.0.1"])]
+        XCTAssertNil(try Doh.resolve("phim.test", servers: dead))
+        XCTAssertNil(try Doh.resolve("localhost", servers: dead))
+    }
+
+    func testNetDefaults() {
+        let suite = "net-defaults-\(UUID().uuidString)"
+        Prefs.store = UserDefaults(suiteName: suite)!
+        defer { Prefs.store.removePersistentDomain(forName: suite); Prefs.store = .standard }
+        Prefs.applyNetDefaults()
+        XCTAssertTrue(Prefs.unblock && Prefs.unblockLevel == 1 && Prefs.secureDns)
+        Prefs.unblock = false
+        Prefs.secureDns = false
+        Prefs.applyNetDefaults() // làm một lần: người xem tắt thì giữ tắt
+        XCTAssertFalse(Prefs.unblock || Prefs.secureDns)
+        let suite2 = "net-defaults2-\(UUID().uuidString)"
+        Prefs.store = UserDefaults(suiteName: suite2)!
+        defer { Prefs.store.removePersistentDomain(forName: suite2) }
+        Prefs.store.set(true, forKey: "unblock")
+        Prefs.store.set(2, forKey: "unblock_level")
+        Prefs.applyNetDefaults() // máy đang mức 2 thì giữ mức 2
+        XCTAssertEqual(Prefs.unblockLevel, 2)
+        XCTAssertTrue(Prefs.secureDns)
     }
 
     func testDohSkipsIpAndLocalhost() {

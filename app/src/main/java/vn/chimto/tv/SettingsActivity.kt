@@ -259,12 +259,11 @@ class SettingsActivity : BaseActivity() {
         }
         val dohBtn = findViewById<TextView>(R.id.btnDoh)
         fun showDoh() {
-            dohBtn.text = "DNS mã hoá: ${Prefs.dohServer?.label ?: "Tắt"}"
+            dohBtn.text = "DNS mã hoá: ${if (Prefs.secureDns) "Bật (DoH / DoT: ${Doh.providers})" else "Tắt"}"
         }
         showDoh()
         dohBtn.setOnClickListener {
-            val all = listOf(null) + Doh.Server.values()
-            Prefs.dohServer = all[(all.indexOf(Prefs.dohServer) + 1) % all.size]
+            Prefs.secureDns = !Prefs.secureDns
             AppProxy.apply()
             showDoh()
         }

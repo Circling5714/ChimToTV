@@ -53,6 +53,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
         Prefs.migrateMovedHosts()
         Prefs.addNewPresets()
+        Prefs.applyNetDefaults()
         AppProxy.apply()
         WebSetup.prepare()
         #if DEVTOOLS

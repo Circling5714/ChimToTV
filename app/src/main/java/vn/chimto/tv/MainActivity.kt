@@ -379,7 +379,6 @@ class MainActivity : BaseActivity() {
     /** Tên trang đang dùng, kèm "proxy" khi đang bật proxy SOCKS5 (để nhớ là app đang đi qua proxy). */
     private fun showSiteLabel() {
         siteLabel.text = Site.hostOf(Prefs.baseUrl)?.let(Site::displayName) + (if (AppProxy.active) "  ·  proxy" else "") +
-            (if (AppProxy.dohActive) "  ·  DoH" else "") +
             if (Prefs.privateMode) "  ·  xem riêng" else ""
         siteTag.text = siteLabel.text
     }

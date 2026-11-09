@@ -102,6 +102,12 @@ public static class DebugServer
                     Prefs.DebugSet(q["key"]!, q["json"]!);
                     body = Text("ok");
                     break;
+                case "/dohfail":
+                    // Giả máy chủ DNS mã hoá bị chặn: /dohfail?labels=DoH NextDNS,DoT NextDNS (trống = bỏ); trả thứ tự máy chủ
+                    Doh.DebugFail = (q["labels"] ?? "").Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).ToHashSet();
+                    Net.SettingsChanged(); // đóng kết nối đang giữ (HttpClient dùng lại) → kết nối mới phải hỏi DNS lại
+                    body = Text(string.Join(" → ", Doh.Servers.Select(x => x.Label + (Doh.DebugFail.Contains(x.Label) ? " (giả chặn)" : ""))));
+                    break;
                 case "/play":
                     await _w!.Dispatcher.InvokeAsync(() => _w.Play(q["film"]!, q["ep"]!));
                     body = Text("ok");

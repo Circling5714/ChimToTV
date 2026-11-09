@@ -171,7 +171,13 @@ object DebugServer {
                     Doh.clearCache()
                     text(out, 200, Socks5.debugDnsBlock.joinToString(",").ifEmpty { "(trống)" })
                 }
-                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /play /js /dnsblock")
+                "/dohfail" -> {
+                    // Giả máy chủ DNS mã hoá bị chặn: /dohfail?labels=DoH NextDNS,DoT NextDNS (trống = bỏ); trả thứ tự máy chủ
+                    Doh.debugFail = q["labels"].orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                    Doh.clearCache()
+                    text(out, 200, Doh.servers.joinToString(" → ") { it.label + if (it.label in Doh.debugFail) " (giả chặn)" else "" })
+                }
+                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /play /js /dnsblock /dohfail")
             }
         } catch (e: Throwable) {
             runCatching { text(out, 500, e.toString()) }

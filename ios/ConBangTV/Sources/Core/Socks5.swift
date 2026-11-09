@@ -317,6 +317,8 @@ final class Socks5Bridge {
     let port: Int
     let socks: SocksConfig?
     let split: Bool
+    /// DNS mã hoá (Doh: DoH rồi DoT, lỗi hết thì DNS của máy) cho tên miền máy tự phân giải.
+    let dns: Bool
     /// Vượt chặn mức 2: byte đầu của gói bắt tay gửi với TTL 1 (đảo thứ tự) — xem writeHello.
     let disorder: Bool
     private let server: Int32
@@ -334,10 +336,11 @@ final class Socks5Bridge {
     private(set) var stats: [String: [Int]] = [:]
 
     /// port = cổng muốn dùng (0 = tuỳ máy chọn); mở lại cổng cũ sau khi iOS thu hồi thì WebKit / URLSession khỏi đổi gì.
-    init(socks: SocksConfig?, split: Bool = false, disorder: Bool = false, port wanted: Int = 0,
+    init(socks: SocksConfig?, split: Bool = false, disorder: Bool = false, dns: Bool = false, port wanted: Int = 0,
          siteHosts: @escaping () -> [String]) throws {
         self.socks = socks
         self.split = split
+        self.dns = dns
         self.disorder = split && disorder
         self.siteHosts = siteHosts
         let fd = socket(AF_INET, SOCK_STREAM, Int32(IPPROTO_TCP))
@@ -516,15 +519,16 @@ final class Socks5Bridge {
 
     private func route(_ host: String, _ ip: IPAddr?, _ port: Int, viaProxy: Bool) throws -> TcpSocket {
         if viaProxy, let s = socks {
-            // DNS của iPad (không phải của proxy) mà bị chặn → địa chỉ qua DNS mã hoá (Vượt chặn)
-            let real = ip == nil && !s.remoteDns && split ? Doh.unblocked(host) : nil
+            // DNS của iPad (không phải của proxy): DNS mã hoá, hoặc Vượt chặn khi DNS của máy bị chặn
+            let real = try (ip == nil && !s.remoteDns ? Doh.forConnect(host, secure: dns, split: split) : nil)
             return try Socks5.connect(s, host: host, ip: ip ?? real, port: port)
         }
         // Đi thẳng: lỗi DNS / kết nối như kết nối thẳng thường (không phải lỗi proxy)
         do {
             if let ip = ip { return try TcpSocket.connect(ip, port: port) }
-            // Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → kết nối tới địa chỉ hỏi qua DNS mã hoá
-            if split, let real = Doh.unblocked(host) { return try TcpSocket.connect(real, port: port) }
+            // DNS mã hoá (mặc định), hoặc Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → địa chỉ hỏi qua DNS mã hoá;
+            // nil = DNS của máy
+            if let real = try Doh.forConnect(host, secure: dns, split: split) { return try TcpSocket.connect(real, port: port) }
             return try TcpSocket.connect(host: host, port: port)
         } catch let e as SocksError {
             throw SocksError(code: e.code == 4 ? 4 : 5, message: e.message, viaProxy: false)

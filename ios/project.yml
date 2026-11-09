@@ -53,6 +53,9 @@ targets:
       path: ConBangTV/Info.plist
       properties:
         CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        # Mã hồ sơ NextDNS của app (DNS mã hoá, Core/Doh.swift): secret NEXTDNS_ID của repo, CI truyền vào lúc dựng — không ghi
+        # trong code; trống thì chuỗi DNS mã hoá bỏ NextDNS
+        CBNextDnsId: $(NEXTDNS_ID)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSRequiresIPhoneOS: true

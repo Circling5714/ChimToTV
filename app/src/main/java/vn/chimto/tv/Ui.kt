@@ -65,10 +65,6 @@ fun Throwable.friendly(): String {
     if (AppProxy.active && this !is Http.HttpError) {
         AppProxy.recentError()?.let { return "Proxy: $it.\nKiểm tra Cài đặt → Proxy SOCKS5, hoặc tắt proxy." }
     }
-    // DNS mã hoá vừa lỗi (máy chủ DoH bị chặn / không trả lời): nói rõ
-    if (AppProxy.dohActive && !AppProxy.active && this !is Http.HttpError) {
-        AppProxy.recentError()?.let { return "DNS mã hoá: $it.\nThử máy chủ DNS khác hoặc tắt trong Cài đặt → DNS mã hoá." }
-    }
     // Bắt tay HTTPS hỏng / treo: hay là nhà mạng chặn theo tên trang → gợi ý bật Vượt chặn nhà mạng
     val hint = if (!Prefs.unblock && (this is SocketTimeoutException || this is SSLException))
         "\nNếu nhà mạng chặn trang này: bật Cài đặt → Vượt chặn nhà mạng." else ""

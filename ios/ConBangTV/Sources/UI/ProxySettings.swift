@@ -159,6 +159,25 @@ struct ProxySection: View {
     }
 }
 
+/// Cài đặt → DNS mã hoá (dùng chung cả nhà, bật sẵn từ 1.10.1): DoH rồi DoT, NextDNS → Cloudflare → Google (Doh).
+struct SecureDnsSection: View {
+    @EnvironmentObject var app: AppModel
+    @State private var on = Prefs.secureDns
+
+    var body: some View {
+        Section {
+            Toggle("DNS mã hoá (DoH / DoT)", isOn: $on)
+                .onChange(of: on) {
+                    Prefs.secureDns = $0
+                    AppProxy.apply()
+                    app.proxyChanged = true
+                }
+        } header: { Text("DNS mã hoá") } footer: {
+            Text("Hỏi địa chỉ trang qua DNS mã hoá thay cho DNS nhà mạng: DoH rồi DoT, lần lượt \(Doh.providers); lỗi hết thì dùng DNS của máy — app không hỏng khi DNS mã hoá bị chặn. Nhà mạng không đọc / sửa được truy vấn DNS (vẫn thấy tên trang lúc kết nối — Vượt chặn lo phần này). Đang bật proxy với «DNS của proxy» thì proxy tự hỏi DNS.")
+        }
+    }
+}
+
 /// Cài đặt → Vượt chặn nhà mạng (dùng chung cả nhà): chia nhỏ gói bắt tay HTTPS (Socks5Bridge.writeHello).
 struct UnblockSection: View {
     @EnvironmentObject var app: AppModel

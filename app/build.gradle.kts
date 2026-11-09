@@ -26,6 +26,12 @@ android {
 
         // Nơi app hỏi bản phát hành mới nhất (GitHub Releases của repo)
         buildConfigField("String", "UPDATE_URL", "\"https://api.github.com/repos/Circling5714/ChimToTV/releases/latest\"")
+
+        // Mã hồ sơ NextDNS của app (DNS mã hoá, xem Doh.kt): tệp keys/nextdns.txt — không đưa lên git. Không có tệp thì chuỗi
+        // DNS mã hoá bắt đầu từ Cloudflare.
+        val nextDnsId = rootProject.file("keys/nextdns.txt").takeIf { it.exists() }?.readText()?.trim().orEmpty()
+        require(nextDnsId.matches(Regex("[a-z0-9]*"))) { "keys/nextdns.txt: mã NextDNS chỉ gồm chữ thường và số" }
+        buildConfigField("String", "NEXTDNS_ID", "\"$nextDnsId\"")
     }
     signingConfigs {
         if (kyFile.exists()) {

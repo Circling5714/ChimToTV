@@ -26,8 +26,8 @@ object AppProxy {
     /** Đang bật proxy SOCKS5. */
     val active: Boolean get() = bridgeConfig?.socks != null
 
-    /** Đang bật DNS mã hoá (DoH) — cổng nội bộ chạy cả khi không có proxy. */
-    val dohActive: Boolean get() = bridgeConfig?.doh != null
+    /** Đang bật DNS mã hoá (DoH / DoT) — cổng nội bộ chạy cả khi không có proxy. */
+    val dohActive: Boolean get() = bridgeConfig?.dns == true
 
     /**
      * Cổng cho Http.kt / WebView; null = tắt (đi mạng mặc định của máy như trước). Bật mà cổng nội bộ không mở được
@@ -43,8 +43,8 @@ object AppProxy {
      * Http.kt buộc phải kết nối lại theo cài đặt mới ngay (không dùng lại kết nối keep-alive đi theo cài đặt cũ).
      */
     fun apply() {
-        val c = RouteConfig(Prefs.proxyConfig(), Prefs.dohServer, Prefs.unblock, Prefs.unblock && Prefs.unblockLevel >= 2)
-            .takeIf { it.socks != null || it.doh != null || it.split }
+        val c = RouteConfig(Prefs.proxyConfig(), Prefs.secureDns, Prefs.unblock, Prefs.unblock && Prefs.unblockLevel >= 2)
+            .takeIf { it.socks != null || it.dns || it.split }
         if (c == bridgeConfig && (c == null) == (bridge == null)) return
         bridge?.close()
         Doh.clearCache()
@@ -64,8 +64,6 @@ object AppProxy {
     /** Câu nhắc thêm vào thông báo lỗi khi đang bật proxy. */
     fun note(): String = when {
         active -> "\nĐang bật proxy" + (recentError()?.let { ": $it" } ?: "") + " — kiểm tra Cài đặt → Proxy SOCKS5, hoặc tắt proxy."
-        dohActive -> "\nĐang bật DNS mã hoá" + (recentError()?.let { ": $it" } ?: "") +
-            " — thử máy chủ DNS khác hoặc tắt trong Cài đặt → DNS mã hoá."
         else -> ""
     }
 

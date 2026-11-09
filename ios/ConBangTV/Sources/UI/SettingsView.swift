@@ -175,6 +175,7 @@ struct SettingsView: View {
                     }
                 } header: { Text("Danh sách trang phim (chọn để chuyển trang)") }
 
+                SecureDnsSection()
                 UnblockSection()
                 ProxySection()
 

@@ -7,6 +7,7 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
+        Prefs.applyNetDefaults()
         Privacy.init(this)
         AppProxy.apply()
         ImageLoader.init(this)

@@ -63,18 +63,22 @@ jobs:
         run: xcodegen generate
       - name: Dựng bản thử (Beta)
         working-directory: ios
+        env:
+          NEXTDNS_ID: ${{ secrets.NEXTDNS_ID }}
         run: |
           set -o pipefail
           xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Beta -sdk iphoneos \
             -destination 'generic/platform=iOS' -derivedDataPath build CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= | xcbeautify --renderer github-actions
+            NEXTDNS_ID="$NEXTDNS_ID" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= | xcbeautify --renderer github-actions
       - name: Dựng bản chính (Release)
         if: ${{ inputs.release }}
         working-directory: ios
+        env:
+          NEXTDNS_ID: ${{ secrets.NEXTDNS_ID }}
         run: |
           set -o pipefail
           xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Release -sdk iphoneos \
-            -destination 'generic/platform=iOS' -derivedDataPath build \
+            -destination 'generic/platform=iOS' -derivedDataPath build NEXTDNS_ID="$NEXTDNS_ID" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= | xcbeautify --renderer github-actions
       - name: Đóng gói IPA
         run: bash ios/scripts/package.sh

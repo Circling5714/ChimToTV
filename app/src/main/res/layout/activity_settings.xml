@@ -296,7 +296,7 @@
 
         <TextView
             style="@style/SettingsLabel"
-            android:text="DNS mã hoá (DoH)" />
+            android:text="DNS mã hoá (DoH / DoT)" />
 
         <TextView
             android:id="@+id/btnDoh"
@@ -307,7 +307,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Hỏi địa chỉ trang qua HTTPS tới DNS công cộng thay cho DNS nhà mạng: nhà mạng không đọc / chặn được truy vấn DNS (vẫn thấy tên trang lúc kết nối). DNS mã hoá lỗi thì app báo lỗi, không tự quay về DNS nhà mạng. Đang bật proxy với «DNS của proxy» thì proxy tự hỏi DNS."
+            android:text="Hỏi địa chỉ trang qua DNS mã hoá thay cho DNS nhà mạng: DoH rồi DoT, lần lượt NextDNS → Cloudflare → Google; lỗi hết thì dùng DNS của máy — app không hỏng khi DNS mã hoá bị chặn. Nhà mạng không đọc / sửa được truy vấn DNS (vẫn thấy tên trang lúc kết nối — Vượt chặn lo phần này). Đang bật proxy với «DNS của proxy» thì proxy tự hỏi DNS."
             android:textColor="@color/text_dim"
             android:textSize="14sp" />
 

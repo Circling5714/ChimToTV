@@ -117,10 +117,21 @@ object Prefs {
         baseUrl = new
     }
 
-    /** Vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS để nhà mạng không đọc được tên trang (Socks5Bridge.writeHello). */
+    /** Vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS để nhà mạng không đọc được tên trang (Socks5Bridge.writeHello). Từ 2.10.1 bật sẵn. */
     var unblock: Boolean
-        get() = sp.getBoolean("unblock", false)
+        get() = sp.getBoolean("unblock", true)
         set(value) = sp.edit().putBoolean("unblock", value).apply()
+
+    /**
+     * Mặc định mới về mạng (2.10.1): máy đang dùng khi cập nhật cũng bật Vượt chặn mức 1 (đang mức 2 thì giữ) và DNS mã hoá —
+     * làm một lần; sau đó người xem tắt thì giữ theo lựa chọn đó. Gọi lúc mở app, trước AppProxy.apply.
+     */
+    fun applyNetDefaults() {
+        if (sp.getBoolean("net_defaults_v1", false)) return
+        val level = if (sp.getBoolean("unblock", false) && sp.getInt("unblock_level", 1) >= 2) 2 else 1
+        sp.edit().putBoolean("unblock", true).putInt("unblock_level", level).putString("doh", "AUTO")
+            .putBoolean("net_defaults_v1", true).apply()
+    }
 
     /** Mức vượt chặn khi bật: 1 = chia nhỏ gói bắt tay, 2 = chia nhỏ + đảo thứ tự (byte đầu gửi với TTL 1). */
     var unblockLevel: Int
@@ -444,10 +455,13 @@ object Prefs {
             e.apply()
         }
 
-    /** DNS mã hoá (DoH) cho tên miền thiết bị tự phân giải; null = tắt. */
-    var dohServer: Doh.Server?
-        get() = sp.getString("doh", null)?.let { n -> Doh.Server.values().firstOrNull { it.name == n } }
-        set(value) = sp.edit().putString("doh", value?.name).apply()
+    /**
+     * DNS mã hoá cho tên miền thiết bị tự phân giải (Doh: DoH rồi DoT, NextDNS → Cloudflare → Google, lỗi hết thì DNS của
+     * thiết bị). Từ 2.10.1 bật sẵn: khoá "doh" = "AUTO" / "OFF" (bản cũ ghi "CLOUDFLARE" / "GOOGLE" = bật).
+     */
+    var secureDns: Boolean
+        get() = sp.getString("doh", "AUTO") != "OFF"
+        set(value) = sp.edit().putString("doh", if (value) "AUTO" else "OFF").apply()
 
     /** true: DNS của proxy; false: DNS của thiết bị. */
     var proxyRemoteDns: Boolean

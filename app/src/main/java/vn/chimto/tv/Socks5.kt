@@ -26,11 +26,11 @@ data class SocksConfig(
 )
 
 /**
- * Cài đặt của cổng nội bộ: proxy SOCKS5 (null = đi thẳng) và DNS mã hoá cho các tên miền thiết bị tự phân giải
- * (null = DNS của thiết bị / nhà mạng).
+ * Cài đặt của cổng nội bộ: proxy SOCKS5 (null = đi thẳng); dns = DNS mã hoá (Doh: DoH rồi DoT, lỗi hết thì DNS của
+ * thiết bị) cho các tên miền thiết bị tự phân giải, false = DNS của thiết bị / nhà mạng.
+ * split: Vượt chặn nhà mạng (mức 1: chia nhỏ gói bắt tay); disorder: mức 2 — thêm đảo thứ tự (byte đầu gửi với TTL 1).
  */
-/** split: Vượt chặn nhà mạng (mức 1: chia nhỏ gói bắt tay); disorder: mức 2 — thêm đảo thứ tự (byte đầu gửi với TTL 1). */
-data class RouteConfig(val socks: SocksConfig?, val doh: Doh.Server?, val split: Boolean = false, val disorder: Boolean = false)
+data class RouteConfig(val socks: SocksConfig?, val dns: Boolean, val split: Boolean = false, val disorder: Boolean = false)
 
 /** Gói bắt tay sắp gửi: tên trang, có đi qua proxy không, có đảo thứ tự không (Socks5Bridge.writeHello). */
 internal data class Hello(val host: String, val viaProxy: Boolean, val disorder: Boolean)
@@ -261,14 +261,13 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
     }
 
     private fun route(c: RouteConfig, host: String, ip: InetAddress?, port: Int): Socket {
-        val doh = c.doh
         val socks = c.socks
         if (socks != null && (!socks.sitesOnly || isSite(host))) {
-            return Socks5.connect(socks, host, ip, port) { h -> doh?.let { Doh.resolve(it, h) } ?: deviceDns(c, h) }
+            return Socks5.connect(socks, host, ip, port) { h -> dns(c, h) }
         }
-        // Đi thẳng: DNS mã hoá lỗi thì báo (ghi vào lỗi gần nhất); DNS thiết bị lỗi như kết nối thẳng thường
-        val addr = ip ?: doh?.let { Doh.resolve(it, host) } ?: try {
-            deviceDns(c, host)
+        // Đi thẳng: lỗi DNS như kết nối thẳng thường (không phải lỗi proxy)
+        val addr = ip ?: try {
+            dns(c, host)
         } catch (e: SocksError) {
             throw SocksError(e.code, e.message ?: "", viaProxy = false)
         }
@@ -286,21 +285,23 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
     }
 
     /**
-     * DNS của thiết bị (khi không bật DNS mã hoá). Đang Vượt chặn mà DNS thiết bị không trả lời hoặc trả địa chỉ chặn
-     * (0.0.0.0…) thì hỏi lại qua DNS mã hoá — vd ảnh bìa CLB Phim Xưa (clbphimxua.com) bị bộ lọc DNS chặn. Vượt chặn chỉ
-     * chia nhỏ gói bắt tay thì không đủ: không có địa chỉ thật để kết nối.
+     * Địa chỉ cho tên miền thiết bị tự phân giải. DNS mã hoá bật (mặc định): hỏi Doh, lỗi hết thì DNS của thiết bị.
+     * DNS mã hoá tắt mà đang Vượt chặn: DNS của thiết bị không trả lời hoặc trả địa chỉ chặn (0.0.0.0…) thì vẫn hỏi lại qua
+     * DNS mã hoá — vd ảnh bìa CLB Phim Xưa (clbphimxua.com) bị bộ lọc DNS trong nhà chặn; chia nhỏ gói bắt tay thì không đủ.
      */
-    private fun deviceDns(c: RouteConfig, host: String): InetAddress {
+    private fun dns(c: RouteConfig, host: String): InetAddress {
         val name = host.lowercase().trimEnd('.')
-        if (!c.split || name == "localhost") return Socks5.resolve(host)
+        if (name == "localhost") return Socks5.resolve(host)
+        if (c.dns) Doh.resolve(name)?.let { return it }
+        else if (!c.split) return Socks5.resolve(host)
         val device = try {
             if (BuildConfig.DEBUG && name in Socks5.debugDnsBlock) InetAddress.getByAddress(ByteArray(4)) else Socks5.resolve(host)
         } catch (e: SocksError) {
-            Doh.resolveAny(host)?.let { return it }
+            if (!c.dns) Doh.resolve(name)?.let { return it }
             throw e
         }
-        if (!Socks5.blockedAnswer(device)) return device
-        return Doh.resolveAny(host) ?: device
+        if (c.dns || !Socks5.blockedAnswer(device)) return device
+        return Doh.resolve(name) ?: device
     }
 
     private fun isSite(host: String): Boolean {

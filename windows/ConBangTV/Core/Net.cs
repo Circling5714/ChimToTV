@@ -108,8 +108,8 @@ public static class Socks5
             if (b.Length > 255) throw new SocksError(1, "tên miền quá dài");
             return new byte[] { 3, (byte)b.Length }.Concat(b).ToArray();
         }
-        // Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → địa chỉ qua DNS mã hoá
-        if (Unblock.Level > 0 && await Doh.Unblocked(host, ct) is { } real) return Ip(real);
+        // DNS mã hoá (mặc định), hoặc Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → địa chỉ qua DNS mã hoá
+        if (await Doh.ForConnect(host, ct) is { } real) return Ip(real);
         IPAddress[] list;
         try
         {
@@ -178,8 +178,9 @@ public static class Net
                 throw;
             }
         }
-        // Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → kết nối tới địa chỉ hỏi qua DNS mã hoá
-        var real = Unblock.Level > 0 ? await Doh.Unblocked(host, ct) : null;
+        // DNS mã hoá (mặc định), hoặc Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → địa chỉ hỏi qua DNS mã hoá;
+        // null = DNS của máy
+        var real = await Doh.ForConnect(host, ct);
         var s = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
         {
@@ -253,9 +254,10 @@ public static class Net
         return BridgePort;
     }
 
-    /// Đổi cài đặt mạng (proxy / vượt chặn): đóng các kết nối đang mở của trình phát để nó mở lại theo cài đặt mới.
+    /// Đổi cài đặt mạng (proxy / vượt chặn / DNS mã hoá): đóng các kết nối đang mở của trình phát để nó mở lại theo cài đặt mới.
     public static void SettingsChanged()
     {
+        Doh.ClearCache();
         List<Socket> list;
         lock (Open) list = Open.ToList();
         foreach (var s in list)

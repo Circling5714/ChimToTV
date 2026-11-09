@@ -644,7 +644,7 @@ enum Prefs {
 
     /// Vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS để nhà mạng không đọc được tên trang (xem Socks5Bridge.writeHello).
     static var unblock: Bool {
-        get { store.bool(forKey: "unblock") }
+        get { store.object(forKey: "unblock") == nil ? true : store.bool(forKey: "unblock") } // từ 1.10.1 bật sẵn
         set { store.set(newValue, forKey: "unblock") }
     }
 
@@ -652,6 +652,24 @@ enum Prefs {
     static var unblockLevel: Int {
         get { min(2, max(1, store.object(forKey: "unblock_level") as? Int ?? 1)) }
         set { store.set(newValue, forKey: "unblock_level") }
+    }
+
+    /// DNS mã hoá (xem Doh: DoH rồi DoT, NextDNS → Cloudflare → Google, lỗi hết thì DNS của máy). Từ 1.10.1 bật sẵn: khoá
+    /// "doh" = "AUTO" / "OFF", cùng khoá bản TV.
+    static var secureDns: Bool {
+        get { store.string(forKey: "doh") != "OFF" }
+        set { store.set(newValue ? "AUTO" : "OFF", forKey: "doh") }
+    }
+
+    /// Mặc định mới về mạng (1.10.1): máy đang dùng khi cập nhật cũng bật Vượt chặn mức 1 (đang mức 2 thì giữ) và DNS mã hoá —
+    /// làm một lần; sau đó người xem tắt thì giữ theo lựa chọn đó. Gọi lúc mở app, trước AppProxy.apply.
+    static func applyNetDefaults() {
+        guard !store.bool(forKey: "net_defaults_v1") else { return }
+        let level = store.bool(forKey: "unblock") && unblockLevel >= 2 ? 2 : 1
+        unblock = true
+        unblockLevel = level
+        secureDns = true
+        store.set(true, forKey: "net_defaults_v1")
     }
 
     /// Proxy đang dùng; nil = tắt (hoặc chưa nhập máy chủ / cổng hợp lệ).

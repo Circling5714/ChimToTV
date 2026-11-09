@@ -18,6 +18,7 @@ import WebKit
 ///            |rate|fit|sleep|introStart|introEnd|introClear|tap|confirm|double&left=1|escape|accept|bar
 ///   POST /eval?target=player|browser   (thân = mã JS) chạy JS ở khung trên cùng
 ///   GET  /dnsblock?hosts=a.com,b.com   giả DNS của máy chặn các tên miền này (thử Vượt chặn); trống = bỏ
+///   GET  /dohfail?labels=DoH NextDNS,…  giả máy chủ DNS mã hoá bị chặn (thử chuỗi DoH → DoT → DNS máy); trống = bỏ
 ///   GET  /probe?fn=home|list|detail|source|video|search|searchAll|filters&url=…&q=…&server=…   chạy bộ đọc trang
 ///   POST /orient?to=portrait|landscape|landscapeLeft   ép xoay màn hình  ·  POST /textscale?v=1.3   cỡ chữ
 ///   GET  /widget                   ghi lại + đọc dữ liệu widget «Xem tiếp»  ·  GET /sync[?do=open|close|all]  đồng bộ trong nhà
@@ -334,6 +335,11 @@ enum DebugRoutes {
             let hosts = Set((q["hosts"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
             Doh.setDebugBlock(hosts)
             return .json(["hosts": hosts.sorted()])
+        case "/dohfail":
+            // Giả máy chủ DNS mã hoá bị chặn: /dohfail?labels=DoH NextDNS,DoT NextDNS (trống = bỏ); trả thứ tự máy chủ
+            let labels = Set((q["labels"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
+            Doh.setDebugFail(labels)
+            return .json(["servers": Doh.servers.map { $0.label + (labels.contains($0.label) ? " (giả chặn)" : "") }])
         case "/prefs":
             if r.method == "POST", let key = q["key"] {
                 let v = q["value"] ?? ""

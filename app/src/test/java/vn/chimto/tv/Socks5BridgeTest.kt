@@ -95,7 +95,7 @@ class Socks5BridgeTest {
     private fun proxy(login: Pair<String, String>? = null) = FakeProxy(login).also { p -> closers += { p.server.close() } }
 
     private fun bridge(c: SocksConfig, sites: List<String> = emptyList()) =
-        Socks5Bridge({ RouteConfig(c, null) }, { sites }).also { b -> closers += { b.close() } }
+        Socks5Bridge({ RouteConfig(c, false) }, { sites }).also { b -> closers += { b.close() } }
 
     /** Gọi qua cổng nội bộ như Http.kt (Java tự gửi tên miền chưa phân giải), trả lời của máy echo. */
     private fun call(b: Socks5Bridge, host: String): String {
@@ -173,7 +173,7 @@ class Socks5BridgeTest {
     @Test
     fun unblockKeepsLocalhostDirect() {
         // Vượt chặn bật, không proxy: localhost (127.0.0.1) không bị coi là DNS chặn, không hỏi DNS mã hoá
-        val b = Socks5Bridge({ RouteConfig(null, null, split = true) }, { emptyList() }).also { b -> closers += { b.close() } }
+        val b = Socks5Bridge({ RouteConfig(null, false, split = true) }, { emptyList() }).also { b -> closers += { b.close() } }
         assertEquals("echo:hi", call(b, "localhost"))
     }
 }
