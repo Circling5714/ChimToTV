@@ -100,7 +100,6 @@ final class AppModel: ObservableObject {
     @Published var sheet: Sheet?
     @Published var confirmClear = false
     @Published var removeTarget: GridFilm?
-    @Published var update: UpdateCheck.Release?
     @Published var searchText = ""
     @Published var searchFocus = false
     /// Đổi mỗi lần đóng trình phát (trang phim cập nhật "Xem tiếp" / tập đã xem).
@@ -116,6 +115,7 @@ final class AppModel: ObservableObject {
     private var retry: (() -> Void)?
     private var toastTask: Task<Void, Never>?
     private var updateBusy = false
+    private weak var updatePrompt: UIAlertController?
     private var started = false
 
     static let headCount = 6
@@ -1063,15 +1063,37 @@ final class AppModel: ObservableObject {
                 }
                 if !manual && Prefs.isUpdateSnoozed(rel.version) { return }
                 status?("Có bản mới \(rel.version).")
-                update = rel
+                askUpdate(rel)
             } catch {
                 status?("Không kiểm tra được: \(friendly(error))")
             }
         }
     }
 
+    /// Hỏi cài bản mới. Dùng UIAlertController trên lớp trên cùng (bảng Cài đặt, «Ai đang xem?»…): alert SwiftUI gắn ở màn
+    /// chính không hiện trên iOS / iPadOS 15 khi đang mở bảng, và đóng bảng xong thì app văng (UIKit ném lỗi lúc SwiftUI cố
+    /// hiện alert giữa chừng). Lớp trên cùng đang mở / đóng thì chờ chút rồi thử lại.
+    private func askUpdate(_ rel: UpdateCheck.Release, tries: Int = 0) {
+        if let shown = updatePrompt, shown.presentingViewController != nil { return }
+        guard let top = Router.topController else { return }
+        if top.isBeingPresented || top.isBeingDismissed || top.transitionCoordinator != nil {
+            if tries < 10 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.askUpdate(rel, tries: tries + 1) }
+            }
+            return
+        }
+        let a = UIAlertController(title: "Có bản mới \(rel.version)",
+                                  message: "Đang dùng \(UpdateCheck.currentVersion). Cài bằng TrollStore.\n\n" + UpdateCheck.summary(rel.notes),
+                                  preferredStyle: .alert)
+        a.addAction(UIAlertAction(title: "Để sau", style: .cancel) { [weak self] _ in self?.snoozeUpdate(rel) })
+        let install = UIAlertAction(title: "Cài đặt ngay", style: .default) { [weak self] _ in self?.installUpdate(rel) }
+        a.addAction(install)
+        a.preferredAction = install
+        updatePrompt = a
+        top.present(a, animated: true)
+    }
+
     func installUpdate(_ rel: UpdateCheck.Release) {
-        update = nil
         guard let url = UpdateCheck.trollStoreURL(rel.ipaUrl) else { return }
         UIApplication.shared.open(url, options: [:]) { [weak self] ok in
             if !ok {
@@ -1083,7 +1105,6 @@ final class AppModel: ObservableObject {
     }
 
     func snoozeUpdate(_ rel: UpdateCheck.Release) {
-        update = nil
         Prefs.snoozeUpdate(rel.version, until: nowMs() + UpdateCheck.snooze)
     }
 

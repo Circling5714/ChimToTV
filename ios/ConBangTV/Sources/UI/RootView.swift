@@ -109,16 +109,8 @@ struct RootView: View {
                      : "«\(item.film.title)» và chỗ đang xem dở các tập của phim này sẽ bị xoá.")
             }
         )
-        .background(
-            Color.clear.alert("Có bản mới \(app.update?.version ?? "")",
-                              isPresented: Binding(get: { app.update != nil }, set: { if !$0 { app.update = nil } }),
-                              presenting: app.update) { rel in
-                Button("Cài đặt ngay") { app.installUpdate(rel) }
-                Button("Để sau", role: .cancel) { app.snoozeUpdate(rel) }
-            } message: { rel in
-                Text("Đang dùng \(UpdateCheck.currentVersion). Cài bằng TrollStore.\n\n" + UpdateCheck.summary(rel.notes))
-            }
-        )
+        // Hỏi cài bản mới: AppModel.askUpdate (UIAlertController trên lớp trên cùng — alert SwiftUI ở đây văng app trên iOS 15
+        // khi đang mở bảng Cài đặt)
         .onAppear { app.startIfNeeded() }
         .onOpenURL { app.openURL($0) } // chạm phim trên widget «Xem tiếp»
     }
