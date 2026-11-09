@@ -661,14 +661,23 @@ public static class HomeFeed
             var have = results.Select(x => x.a.Key).ToHashSet();
             var extra = again.Parts.Where(x => !have.Contains(x.Key)).ToList();
             if (extra.Count > 0) results.AddRange(extra.Zip(await Feed.Load(extra.Select(x => x.Req).ToList()), (a, b) => (a, b)));
-            var byKey = results.ToDictionary(x => x.a.Key, x => x.b);
-            results = again.Parts.Where(a => byKey.ContainsKey(a.Key)).Select(a => (a, byKey[a.Key]))
-                .Concat(results.Where(x => x.a.Role == Role.Tags)).ToList();
+            results = Regroup(again.Parts, results);
             p = again;
         }
         var snap = Build(p, results.Select(x => (x.a, x.b)).ToList(), false, started);
         SaveLast(p.Pid, snap);
         return snap;
+    }
+
+    /// Kết quả theo kế hoạch mới (thứ tự / tiêu đề mới, phần đã tải thì dùng lại) rồi các phần tra thể loại. Hai hàng có thể
+    /// cùng một danh sách (vd hàng tự thêm «Hoạt hình Trung Quốc» và hàng «xem nhiều nhất · mọi nguồn»): trùng khoá thì lấy
+    /// kết quả sau như bản TV / iPad — ToDictionary báo lỗi «same key» làm hỏng cả trang chủ.
+    public static List<(Part a, Feed.Result b)> Regroup(List<Part> parts, List<(Part a, Feed.Result b)> results)
+    {
+        var byKey = new Dictionary<string, Feed.Result>();
+        foreach (var (a, b) in results) byKey[a.Key] = b;
+        return parts.Where(a => byKey.ContainsKey(a.Key)).Select(a => (a, byKey[a.Key]))
+            .Concat(results.Where(x => x.a.Role == Role.Tags)).ToList();
     }
 
     /// Dữ liệu người xem dùng khi dựng trang (tách khỏi Prefs để test).

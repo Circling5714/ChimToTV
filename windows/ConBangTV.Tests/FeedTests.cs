@@ -223,4 +223,19 @@ public class FeedTests : PrefsTest
         Prefs.HomeTopics = new() { "cn", "kh" };
         Assert.Equal(new HashSet<string> { "cn", "kh" }, Prefs.HomeTopics);
     }
+
+    [Fact]
+    public void RegroupToleratesTwoRowsWithSameList()
+    {
+        // Hàng tự thêm «Hoạt hình Trung Quốc» và hàng «xem nhiều nhất · mọi nguồn» cùng một địa chỉ danh sách (lỗi «same key» 11/2026)
+        const string u = "https://kk.test/api/movies/category/hoat-hinh?country=trung-quoc&page=1&limit=30";
+        Feed.Req Req(string key) => new(key, "kk.test", () => Task.FromResult(new Feed.Loaded(new())));
+        Feed.Result Res(Feed.Req r) => new(r, Feed.State.Ok, new(), null, null, false, 0, 0);
+        var custom = new HomeFeed.Part(HomeFeed.Role.Custom, Req($"list|{u}"), "Hoạt hình Trung Quốc", u, "c1", "c1");
+        var dominant = new HomeFeed.Part(HomeFeed.Role.Dominant, Req($"list|{u}"), "Hoạt hình Trung Quốc mới cập nhật · mọi nguồn", null, "dominant", "dominant");
+        var tags = new HomeFeed.Part(HomeFeed.Role.Tags, Req("tags|phim"));
+        var results = new List<(HomeFeed.Part a, Feed.Result b)> { (custom, Res(custom.Req)), (dominant, Res(dominant.Req)), (tags, Res(tags.Req)) };
+        var got = HomeFeed.Regroup(new List<HomeFeed.Part> { dominant, custom }, results);
+        Assert.Equal(new[] { "dominant", "c1", "" }, got.Select(x => x.a.Slot));
+    }
 }
