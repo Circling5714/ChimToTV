@@ -172,6 +172,8 @@ public static class Prefs
         "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
         // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy, hồ sơ trẻ em, ngôn ngữ bản hay xem
         "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
+        // Các hàng trang chủ (bật / tắt, thứ tự) và hàng tự thêm
+        "home_rows", "home_custom",
     };
 
     private static readonly string[] ProfilePrefixes = { "server_type@", "server_label@" };
@@ -422,11 +424,38 @@ public static class Prefs
     /// Trang chủ tổng hợp đang dùng (người xem chọn, hoặc hồ sơ trẻ em).
     public static bool HomeMixOn => HomeMix || Kids;
 
-    /// Chủ đề người xem chưa có lịch sử đã chọn (id trong HomeFeed.Topics).
+    /// Các hàng trang chủ theo thứ tự người xem chọn (Cài đặt → Trang chủ → Các hàng): "id" = bật, "-id" = tắt; rỗng = mặc
+    /// định. Đọc qua HomeFeed.RowPrefs (ghép với các hàng mặc định).
+    public static List<string> HomeRows
+    {
+        get => Get<List<string>>(K("home_rows")) ?? new();
+        set => Set(K("home_rows"), value);
+    }
+
+    /// Hàng tự thêm của người xem: chủ đề có sẵn (HomeFeed.Topics) hoặc loại phim + nước + thể loại + ngôn ngữ. Trước 1.6
+    /// chủ đề người mới chọn lưu ở "home_topics" — đọc lại thành hàng chủ đề.
+    public static List<CustomRow> HomeCustom
+    {
+        get
+        {
+            if (!Has(K("home_custom")))
+                return (Get<List<string>>(K("home_topics")) ?? new()).Select(t => new CustomRow($"t-{t}", t)).ToList();
+            return (Get<List<CustomRow>>(K("home_custom")) ?? new()).Where(c => !string.IsNullOrEmpty(c.Id)).ToList();
+        }
+        set => Set(K("home_custom"), value);
+    }
+
+    /// Chủ đề người xem đã chọn (id trong HomeFeed.Topics) — các hàng tự thêm loại «chủ đề».
     public static HashSet<string> HomeTopics
     {
-        get => (Get<List<string>>(K("home_topics")) ?? new()).ToHashSet();
-        set => Set(K("home_topics"), value.OrderBy(x => x).ToList());
+        get => HomeCustom.Select(c => c.Topic).OfType<string>().ToHashSet();
+        set
+        {
+            var cur = HomeCustom;
+            var kept = cur.Where(c => c.Topic == null || value.Contains(c.Topic)).ToList();
+            var added = value.OrderBy(x => x).Where(t => cur.All(c => c.Topic != t)).Select(t => new CustomRow($"t-{t}", t));
+            HomeCustom = kept.Concat(added).ToList();
+        }
     }
 
     /// Tập mới nhất người xem đã thấy của từng phim (khoá = tên đã chuẩn hoá — chung mọi nguồn).

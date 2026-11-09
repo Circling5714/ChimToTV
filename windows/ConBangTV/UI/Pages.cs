@@ -15,7 +15,12 @@ public sealed class HomePage : Page
     private string _base = "";
     private bool _mix;
     private bool _kids;
+    /// Cài đặt các hàng lúc tải (thứ tự / bật tắt + hàng tự thêm): đổi thì tải lại.
+    private string _rows = "";
     private HomeFeed.Snapshot? _snap;
+
+    private static string RowsSignature() =>
+        string.Join(",", Prefs.HomeRows) + "|" + string.Join(",", Prefs.HomeCustom.Select(c => $"{c.Id};{c.Topic};{c.Type};{c.Country};{c.Genre};{c.Lang}"));
     private long _feedAt;
     private int _run;
     private int _cols;
@@ -36,6 +41,7 @@ public sealed class HomePage : Page
         _mix = Prefs.HomeMixOn;
         _kids = Prefs.Kids;
         _base = Prefs.BaseUrl;
+        _rows = RowsSignature();
         if (_mix)
         {
             await LoadMix();
@@ -150,13 +156,15 @@ public sealed class HomePage : Page
         var follows = Prefs.Follows.Where(f => f.NewCount > 0).ToList();
         var followed = Prefs.Follows.Select(f => KkPhim.Norm(f.Title)).ToHashSet();
         var auto = s.Fresh.Where(a => (Prefs.SeenEp(a.Key) ?? -1) < a.Ep && !followed.Contains(a.Key)).ToList();
-        if (follows.Count + auto.Count > 0)
+        // «Có tập mới» / «Xem tiếp» người xem tắt được (Cài đặt → Trang chủ → Các hàng)
+        var on = HomeFeed.RowPrefs().Where(x => x.On).Select(x => x.Id).ToHashSet();
+        if (follows.Count + auto.Count > 0 && on.Contains("new-eps"))
         {
             Body.Children.Add(Ui.Section("Có tập mới", follows.Select(f => Tagged(FilmCard(new Film(f.FilmUrl, f.Title, f.Poster, f.Latest.NonEmpty()), fresh: $"+{f.NewCount}"), f.FilmUrl))
                 .Concat(auto.Select(a => CardButton(a.Card)))));
             count++;
         }
-        var history = Prefs.History.Take(_cols).ToList();
+        var history = on.Contains("continue") ? Prefs.History.Take(_cols).ToList() : new();
         if (history.Count > 0)
         {
             Body.Children.Add(Ui.Section("Xem tiếp", history.Select(h =>
@@ -167,16 +175,17 @@ public sealed class HomePage : Page
         // Người xem chưa có lịch sử: chọn chủ đề
         if (Prefs.History.Count == 0 && !_kids)
         {
-            var on = Prefs.HomeTopics;
+            var chosen = Prefs.HomeTopics;
             Body.Children.Add(Ui.Section("Chọn vài chủ đề bạn thích — trang chủ sẽ gợi ý theo đó", HomeFeed.Topics.Select(t =>
             {
-                var b = Ui.Pill((on.Contains(t.Id) ? "✓ " : "") + t.Label, () => ToggleTopic(t.Id), on.Contains(t.Id) ? "active" : null, 200);
+                var b = Ui.Pill((chosen.Contains(t.Id) ? "✓ " : "") + t.Label, () => ToggleTopic(t.Id), chosen.Contains(t.Id) ? "active" : null, 200);
                 b.Margin = new Thickness(0, 0, 12, 12);
                 b.Uid = "chip:" + t.Id;
                 return (UIElement)b;
             })));
         }
-        foreach (var r in s.Rows)
+        // Thứ tự / bật tắt theo cài đặt hiện tại của người xem (bản lưu dựng trước khi đổi cũng xếp đúng ngay)
+        foreach (var r in HomeFeed.Arrange(s.Rows))
         {
             var n = r.Cards.Count;
             var shown = n > _cols ? r.Cards.Take(_cols - 1) : r.Cards;
@@ -228,14 +237,15 @@ public sealed class HomePage : Page
         var home = _home;
         if (home == null) return;
         Body.Children.Clear();
-        var history = Prefs.History.Take(12).ToList();
+        var on = HomeFeed.RowPrefs().Where(x => x.On).Select(x => x.Id).ToHashSet();
+        var history = on.Contains("continue") ? Prefs.History.Take(12).ToList() : new();
         if (history.Count > 0)
         {
             Body.Children.Add(Ui.Section("Xem tiếp", history.Select(h =>
                 (UIElement)FilmCard(new Film(h.FilmUrl, h.Title, h.Poster, null), () => Main.Play(h.FilmUrl, h.EpUrl, true), h.EpTitle)),
                 "Enter: xem tiếp ngay"));
         }
-        var fresh = Prefs.Follows.Where(f => f.NewCount > 0).ToList();
+        var fresh = on.Contains("new-eps") ? Prefs.Follows.Where(f => f.NewCount > 0).ToList() : new();
         if (fresh.Count > 0)
         {
             Body.Children.Add(Ui.Section("Phim theo dõi có tập mới", fresh.Select(f =>
@@ -255,7 +265,7 @@ public sealed class HomePage : Page
     public override void Returned()
     {
         // Đổi kiểu trang chủ / hồ sơ trẻ em / trang phim trong Cài đặt → tải lại
-        if (Prefs.HomeMixOn != _mix || Prefs.Kids != _kids || Prefs.BaseUrl != _base)
+        if (Prefs.HomeMixOn != _mix || Prefs.Kids != _kids || Prefs.BaseUrl != _base || RowsSignature() != _rows)
         {
             _snap = null;
             _ = Start();

@@ -141,6 +141,7 @@ struct HomeRowsView: View {
                     Text((r.id.hasPrefix("custom-") ? "＋ " : "") + label(r.id))
                         .foregroundColor(r.on ? Theme.text : Theme.dim)
                         .lineLimit(2)
+                        .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())

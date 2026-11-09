@@ -11,8 +11,21 @@ using JObj = Dictionary<string, object?>;
 /// Thẻ phim của trang chủ tổng hợp. Links: các nguồn có phim này, nguồn mở trước đứng đầu.
 public sealed record Card(Film Film, string? Chip, List<FeedItem> Links);
 
-/// Một hàng. More: địa chỉ danh sách đầy đủ (null = «Xem thêm» hiện mọi phim đã có trong Cards).
-public sealed record FeedRow(string Id, string Title, List<Card> Cards, string? More = null);
+/// Một hàng. More: địa chỉ danh sách đầy đủ (null = «Xem thêm» hiện mọi phim đã có trong Cards); Slot: loại hàng trong cài
+/// đặt của người xem (HomeFeed.Rows: "similar", "interest", "newest"…; "custom-<id>" = hàng tự thêm; "topics" = bản cũ).
+public sealed record FeedRow(string Id, string Title, List<Card> Cards, string? More = null, string Slot = "");
+
+/// Hàng người xem tự thêm (Cài đặt → Trang chủ → Các hàng): chủ đề có sẵn (Topic — HomeFeed.Topics) hoặc lọc theo loại phim
+/// (hoathinh / series / single / tvshows) + nước + thể loại (slug KKPhim, rỗng = mọi) + ngôn ngữ (thuyet-minh / long-tieng).
+public sealed record CustomRow(string Id, string? Topic = null, string Type = "", string Country = "", string Genre = "", string Lang = "")
+{
+    /// Mã trong cài đặt thứ tự các hàng.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string Key => $"custom-{Id}";
+
+    /// Cùng nội dung (bỏ qua Id) — khỏi thêm trùng.
+    public bool Same(CustomRow o) => this with { Id = "" } == o with { Id = "" };
+}
 
 /// Phim đang xem dở vừa có tập mới (Key: tên đã chuẩn hoá; Ep: số tập mới nhất).
 public sealed record FreshCard(Card Card, string Key, double Ep);
@@ -26,13 +39,118 @@ public static class HomeFeed
     /// Số phim tối đa mỗi hàng (giữ cho «Xem thêm»).
     private const int RowMax = 40;
 
-    public enum Role { Web, New, Similar, Interest, Dominant, Dub, Kids, Movies, Topic, Tags }
+    public enum Role { Web, New, Similar, Interest, Dominant, Dub, Kids, Movies, Custom, Tags }
 
     /// Một phần cần tải: vai trò + tiêu đề hàng / địa chỉ «Xem thêm» (nếu có).
-    public sealed record Part(Role Role, Feed.Req Req, string? Title = null, string? More = null, string Id = "")
+    public sealed record Part(Role Role, Feed.Req Req, string? Title = null, string? More = null, string Id = "", string Slot = "")
     {
         public string Key => Req.Key;
         public string RowId => Id.Length == 0 ? Req.Key : Id;
+    }
+
+    // ---- Các hàng người xem bật / tắt, sắp thứ tự, tự thêm (Cài đặt → Trang chủ → Các hàng) ----
+
+    /// Theo thứ tự mặc định. «Có tập mới» / «Xem tiếp» (HeadRows) chỉ bật / tắt — luôn ở đầu trang; hàng trẻ em (KidsRows)
+    /// chỉ có ở hồ sơ trẻ em.
+    public static readonly (string Id, string Label)[] Rows =
+    {
+        ("new-eps", "Có tập mới"),
+        ("continue", "Xem tiếp"),
+        ("similar", "Giống «phim vừa xem»"),
+        ("interest", "Vì … hay xem <thể loại> (sở thích 1)"),
+        ("dominant", "Loại phim hay xem · mới cập nhật"),
+        ("dub", "Thuyết minh / lồng tiếng mới"),
+        ("kids-young", "Hoạt hình thiếu nhi"),
+        ("kids-family", "Hoạt hình gia đình"),
+        ("kids-dub", "Hoạt hình lồng tiếng"),
+        ("interest2", "Vì … hay xem <thể loại> (sở thích 2)"),
+        ("newest", "Mới cập nhật · mọi nguồn"),
+        ("movies", "Phim lẻ mới"),
+    };
+    public static readonly HashSet<string> HeadRows = new() { "new-eps", "continue" };
+    public static readonly HashSet<string> KidsRows = new() { "kids-young", "kids-family", "kids-dub" };
+    /// Hàng hồ sơ trẻ em không có (chỉ hoạt hình hợp trẻ em).
+    public static readonly HashSet<string> AdultRows = new() { "dominant", "dub", "newest", "movies" };
+    /// Tối đa số hàng tự thêm.
+    public const int CustomMax = 6;
+    /// Chủ đề hợp hồ sơ trẻ em (chỉ hoạt hình).
+    public static readonly HashSet<string> KidsTopics = new() { "cn", "jp", "kid" };
+    /// Loại phim / ngôn ngữ cho hàng tự thêm (type, sort_lang của KKPhim).
+    public static readonly (string Id, string Label)[] Types = { ("hoathinh", "Hoạt hình"), ("series", "Phim bộ"), ("single", "Phim lẻ"), ("tvshows", "TV show") };
+    public static readonly (string Id, string Label)[] Langs = { ("", "Mọi bản"), ("thuyet-minh", "Thuyết minh"), ("long-tieng", "Lồng tiếng") };
+    /// Thể loại không hợp trẻ em (hàng tự thêm của hồ sơ trẻ em không chọn được).
+    public static IReadOnlySet<string> AdultGenres => Adult;
+
+    /// Tên hàng tự thêm: «Hoạt hình Trung Quốc · phiêu lưu · thuyết minh», chủ đề thì tên chủ đề.
+    public static string CustomTitle(CustomRow r)
+    {
+        if (r.Topic is { } t) return Topics.FirstOrDefault(x => x.Id == t).Label ?? t;
+        var head = Types.FirstOrDefault(x => x.Id == r.Type).Label ?? "Phim";
+        if (r.Country.Length > 0) head += " " + ApiSite.CountryName(r.Country);
+        var parts = new List<string> { head };
+        if (r.Genre.Length > 0) parts.Add(ApiSite.GenreName(r.Genre));
+        if (r.Lang.Length > 0 && Langs.FirstOrDefault(x => x.Id == r.Lang).Label is { } l) parts.Add(l.ToLowerInvariant());
+        return string.Join(" · ", parts);
+    }
+
+    /// Thứ tự mặc định: «Có tập mới», «Xem tiếp», các hàng tự thêm (theo lúc thêm), rồi các hàng app tự chọn.
+    public static List<string> RowDefaults(List<CustomRow>? custom = null) =>
+        Rows.Take(2).Select(x => x.Id).Concat((custom ?? Prefs.HomeCustom).Select(c => c.Key)).Concat(Rows.Skip(2).Select(x => x.Id)).ToList();
+
+    /// Ghép thứ tự đã lưu ("id" bật, "-id" tắt) với các hàng mặc định: bỏ id lạ / trùng, hàng mặc định chưa có (hàng mới ở bản
+    /// sau, hàng vừa tự thêm) chèn ngay sau hàng đứng trước nó trong thứ tự mặc định.
+    public static List<(string Id, bool On)> MergeRows(List<string> saved, List<string>? defaults = null)
+    {
+        defaults ??= Rows.Select(x => x.Id).ToList();
+        var o = new List<(string Id, bool On)>();
+        foreach (var s in saved)
+        {
+            var on = !s.StartsWith('-');
+            var id = on ? s : s[1..];
+            if (defaults.Contains(id) && o.All(x => x.Id != id)) o.Add((id, on));
+        }
+        for (var i = 0; i < defaults.Count; i++)
+        {
+            var id = defaults[i];
+            if (o.Any(x => x.Id == id)) continue;
+            var prev = defaults.Take(i).LastOrDefault(p => o.Any(x => x.Id == p));
+            var at = prev == null ? 0 : o.FindIndex(x => x.Id == prev) + 1;
+            o.Insert(at, (id, true));
+        }
+        return o;
+    }
+
+    /// Các hàng của người xem đang dùng (thứ tự, bật / tắt), kể cả hàng tự thêm.
+    public static List<(string Id, bool On)> RowPrefs() => MergeRows(Prefs.HomeRows, RowDefaults());
+
+    public static bool RowOn(string id)
+    {
+        foreach (var p in RowPrefs()) if (p.Id == id) return p.On;
+        return true;
+    }
+
+    /// Loại hàng của một hàng lưu từ bản cũ (chưa ghi Slot): theo id; hai hàng «Vì … hay xem» theo thứ tự xuất hiện.
+    private static string LegacySlot(string id, int interestBefore) =>
+        id.StartsWith("interest-") ? (interestBefore == 0 ? "interest" : "interest2") : id.StartsWith("topic-") ? "topics" : id;
+
+    /// Xếp các hàng theo cài đặt của người xem: bỏ hàng đã tắt, theo thứ tự đã chọn; hàng chủ đề bản cũ ("topics") đầu, hàng
+    /// lạ cuối.
+    public static List<FeedRow> Arrange(List<FeedRow> rows, List<(string Id, bool On)>? prefs = null)
+    {
+        prefs ??= RowPrefs();
+        var pos = new Dictionary<string, int>();
+        for (var i = 0; i < prefs.Count; i++) pos[prefs[i].Id] = prefs[i].On ? i : -1;
+        var interest = 0;
+        var keyed = new List<(FeedRow Row, string Slot, int Index)>();
+        foreach (var r in rows)
+        {
+            var slot = r.Slot.Length == 0 ? LegacySlot(r.Id, interest) : r.Slot;
+            if (slot.StartsWith("interest")) interest++;
+            keyed.Add((r, slot, keyed.Count));
+        }
+        int Rank(string slot) => slot == "topics" ? -1 : pos.TryGetValue(slot, out var p) ? p : int.MaxValue;
+        return keyed.Where(x => !pos.TryGetValue(x.Slot, out var p) || p != -1)
+            .OrderBy(x => Rank(x.Slot)).ThenBy(x => x.Index).Select(x => x.Row).ToList();
     }
 
     /// Chủ đề cho người xem chưa có lịch sử (id lưu trong Prefs.HomeTopics).
@@ -160,6 +278,8 @@ public static class HomeFeed
         var now = Util.NowMs();
         var history = Prefs.History;
         string HostOf(string o) => Site.HostOf(o) ?? "";
+        // Hàng người xem đã tắt: khỏi tải. «Mới cập nhật» vẫn tải danh sách mới của các nguồn — cần để gộp phim, tìm «Có tập mới»
+        var off = RowPrefs().Where(x => !x.On).Select(x => x.Id).ToHashSet();
 
         // Hồ sơ trẻ em: không lấy danh sách «mới cập nhật» chung, chỉ các danh sách hoạt hình
         if (!kids)
@@ -220,7 +340,7 @@ public static class HomeFeed
                 if (FilterUrl(s, similarTags.Type!, similarTags.Countries[0], g) is { } url)
                 {
                     if (g != null) used.Add(g);
-                    parts.Add(new Part(Role.Similar, Req(url), $"Giống «{similar.Title}»", url, "similar"));
+                    if (!off.Contains("similar")) parts.Add(new Part(Role.Similar, Req(url), $"Giống «{similar.Title}»", url, "similar", "similar"));
                 }
             }
             // Vì … hay xem <thể loại>: hai bộ ba điểm cao nhất, khác thể loại với hàng trên
@@ -233,44 +353,51 @@ public static class HomeFeed
                 if (FilterUrl(s, cb.Type, cb.Country, cb.Genre) is not { } url) continue;
                 used.Add(cb.Genre);
                 n++;
+                var slot = n == 1 ? "interest" : "interest2";
+                if (off.Contains(slot)) continue;
                 var title = $"Vì {Prefs.CurrentProfile.Name} hay xem {ApiSite.GenreName(cb.Genre)} · {TypeName(cb.Type)} {ApiSite.CountryName(cb.Country)}";
-                parts.Add(new Part(Role.Interest, Req(url), title, url, $"interest-{cb.Genre}"));
+                parts.Add(new Part(Role.Interest, Req(url), title, url, $"interest-{cb.Genre}", slot));
             }
             // Loại phim + nước xem nhiều nhất (≥ 40%): hàng mới cập nhật riêng, gộp mọi nguồn
             var best = taste.Pair.Where(kv => kv.Key.Type.Length > 0 && kv.Key.Country.Length > 0).OrderByDescending(kv => kv.Value).FirstOrDefault();
             if (best.Key.Type != null && best.Value >= taste.Total * 0.4) top = best.Key;
-            if (top is { } tp && !kids)
+            if (top is { } tp && !kids && !off.Contains("dominant"))
             {
                 var tn = TypeName(tp.Type);
                 var title = $"{char.ToUpper(tn[0])}{tn[1..]} {ApiSite.CountryName(tp.Country)} mới cập nhật · mọi nguồn";
-                if (FilterUrl(s, tp.Type, tp.Country, null) is { } url) parts.Add(new Part(Role.Dominant, Req(url), title, null, "dominant"));
+                if (FilterUrl(s, tp.Type, tp.Country, null) is { } url) parts.Add(new Part(Role.Dominant, Req(url), title, null, "dominant", "dominant"));
             }
         }
-        else if (history.Count == 0 && !kids)
+        // Hàng tự thêm (chủ đề người mới chọn cũng là hàng tự thêm — vẫn còn khi đã có lịch sử). Hồ sơ trẻ em: chỉ hoạt hình
+        foreach (var c in Prefs.HomeCustom)
         {
-            foreach (var (id, label) in Topics)
-            {
-                if (!topics.Contains(id) || TopicReq(s, id) is not { } tr) continue;
-                parts.Add(new Part(Role.Topic, tr.Req, $"Vì bạn chọn: {label}", tr.More, $"topic-{id}"));
-            }
+            if (off.Contains(c.Key)) continue;
+            if (kids && (c.Topic != null ? !KidsTopics.Contains(c.Topic) : c.Type != "hoathinh")) continue;
+            var found = c.Topic != null ? TopicReq(s, c.Topic) : CustomReq(s, c);
+            if (found is not { } tr) continue;
+            parts.Add(new Part(Role.Custom, tr.Req, CustomTitle(c), tr.More, c.Key, c.Key));
         }
         if (kids)
         {
-            parts.AddRange(KidsParts(s));
+            parts.AddRange(KidsParts(s).Where(p => !off.Contains(p.Slot)));
         }
         else
         {
-            if (DubPart(s, top) is { } d) parts.Add(d);
+            if (!off.Contains("dub") && DubPart(s, top) is { } d) parts.Add(d);
             // Phim lẻ mới (xếp theo thể loại người xem hay xem)
-            if (s.Kk != null)
+            if (off.Contains("movies"))
+            {
+                // người xem đã tắt hàng này
+            }
+            else if (s.Kk != null)
             {
                 var u = $"{s.Kk}/api/movies/category/phim-le?page=1&limit=30";
-                parts.Add(new Part(Role.Movies, Req(u), "Phim lẻ mới", u, "movies"));
+                parts.Add(new Part(Role.Movies, Req(u), "Phim lẻ mới", u, "movies", "movies"));
             }
             else if (s.Vs != null)
             {
                 var u = $"{s.Vs}/api/danh-sach/phim-le?page=1";
-                parts.Add(new Part(Role.Movies, Req(u), "Phim lẻ mới", u, "movies"));
+                parts.Add(new Part(Role.Movies, Req(u), "Phim lẻ mới", u, "movies", "movies"));
             }
         }
         return new Plan(parts, s, similar, similarTags, taste, topics, Prefs.ProfileId, kids);
@@ -311,19 +438,19 @@ public static class HomeFeed
         if (s.Kk != null)
         {
             var u = $"{s.Kk}/api/movies/category/hoat-hinh?category=tre-em&page=1&limit=30";
-            o.Add(new Part(Role.Kids, Req(u), "Hoạt hình thiếu nhi", u, "kids-young"));
+            o.Add(new Part(Role.Kids, Req(u), "Hoạt hình thiếu nhi", u, "kids-young", "kids-young"));
         }
         if (s.Vs != null)
         {
             var u = $"{s.Vs}/api/the-loai/thieu-nhi?page=1";
-            o.Add(new Part(Role.Kids, Req(u), "Hoạt hình thiếu nhi", u, "kids-young"));
+            o.Add(new Part(Role.Kids, Req(u), "Hoạt hình thiếu nhi", u, "kids-young", "kids-young"));
         }
         if (s.Kk != null)
         {
             var fam = $"{s.Kk}/api/movies/category/hoat-hinh?category=gia-dinh&page=1&limit=30";
-            o.Add(new Part(Role.Kids, Req(fam), "Hoạt hình gia đình", fam, "kids-family"));
+            o.Add(new Part(Role.Kids, Req(fam), "Hoạt hình gia đình", fam, "kids-family", "kids-family"));
             var dub = $"{s.Kk}/api/movies/category/hoat-hinh?sort_lang=long-tieng&page=1&limit=30";
-            o.Add(new Part(Role.Kids, Req(dub), "Hoạt hình lồng tiếng", dub, "kids-dub"));
+            o.Add(new Part(Role.Kids, Req(dub), "Hoạt hình lồng tiếng", dub, "kids-dub", "kids-dub"));
         }
         return o;
     }
@@ -342,6 +469,33 @@ public static class HomeFeed
     }
 
     private static string Page(string url) => url + (url.Contains('?') ? "&" : "?") + "page=1";
+
+    /// Danh sách của một hàng tự thêm: KKPhim lọc được loại + nước + thể loại + ngôn ngữ; không có KKPhim thì VSMOV (thể loại /
+    /// nước / loại, không lọc ngôn ngữ). (yêu cầu, địa chỉ «Xem thêm»).
+    private static (Feed.Req Req, string More)? CustomReq(Sources s, CustomRow c)
+    {
+        var q = new List<string>();
+        if (c.Country.Length > 0) q.Add($"country={c.Country}");
+        if (c.Genre.Length > 0) q.Add($"category={c.Genre}");
+        if (c.Lang.Length > 0) q.Add($"sort_lang={c.Lang}");
+        if (s.Kk is { } o && TypeSlug(c.Type) is { } t)
+        {
+            var url = $"{o}/api/movies/category/{t}?" + string.Join("&", q.Concat(new[] { "page=1", "limit=30" }));
+            return (Req(url), url);
+        }
+        if (s.Vs is { } v)
+        {
+            var cq = c.Country.Length > 0 ? $"?country={c.Country}" : "";
+            string? p = c.Genre.Length > 0 ? $"the-loai/{c.Genre}{cq}"
+                : c.Type == "hoathinh" ? $"the-loai/hoat-hinh{cq}"
+                : c.Country.Length > 0 ? $"quoc-gia/{c.Country}"
+                : TypeSlug(c.Type) is { } ts ? $"danh-sach/{ts}" : null;
+            if (p == null) return null;
+            var url = Page($"{v}/api/{p}");
+            return (Req(url), url);
+        }
+        return null;
+    }
 
     /// Đọc một danh sách KKPhim / VSMOV theo địa chỉ (định dạng KKPhim).
     private static Feed.Req Req(string url)
@@ -551,12 +705,12 @@ public static class HomeFeed
         var rows = new List<FeedRow>();
         var claimed = new HashSet<FeedFilm>(ReferenceEqualityComparer.Instance);
         List<FeedFilm> Films(Feed.Result r) => r.Items.Select(i => groupOf.GetValueOrDefault(i.Url)).OfType<FeedFilm>().Distinct(ReferenceEqualityComparer.Instance).Cast<FeedFilm>().ToList();
-        void Add(string id, string title, IEnumerable<FeedFilm> list, string? more, bool claim, int min = 3)
+        void Add(string slot, string id, string title, IEnumerable<FeedFilm> list, string? more, bool claim, int min = 3)
         {
             var l = list.Where(f => !claimed.Contains(f) && KidsOk(f)).Take(RowMax).ToList();
             if (l.Count < min) return;
             if (claim) foreach (var f in l.Take(6)) claimed.Add(f);
-            rows.Add(new FeedRow(id, title, l.Select(MakeCard).ToList(), more));
+            rows.Add(new FeedRow(id, title, l.Select(MakeCard).ToList(), more, slot));
         }
         List<(Part Part, Feed.Result Result)> ByRole(Role r) => content.Where(x => x.Part.Role == r).ToList();
         IEnumerable<FeedFilm> NewestFirst(IEnumerable<FeedFilm> l) => l.Select((f, i) => (f, i)).OrderByDescending(x => x.f.Updated).ThenBy(x => x.i).Select(x => x.f);
@@ -589,8 +743,8 @@ public static class HomeFeed
             fresh.Add(new FreshCard(new Card(new Film(open.Url, h.Title, h.Poster ?? open.Poster, badge), chip, links), key, ep));
         }
 
-        // Người xem chưa có lịch sử: hàng theo chủ đề đã chọn
-        foreach (var (p, r) in ByRole(Role.Topic)) Add(p.RowId, p.Title ?? "", NewestFirst(Films(r)), p.More, true);
+        // Hàng tự thêm (và chủ đề người mới chọn): phim chưa xem, mới cập nhật trước
+        foreach (var (p, r) in ByRole(Role.Custom)) Add(p.Slot, p.RowId, p.Title ?? "", NewestFirst(Films(r).Where(f => !Watched(f))), p.More, true);
 
         // Giống «phim vừa xem»: xếp theo số thể loại chung
         var simGenres = (plan.SimilarTags?.Genres ?? new()).ToHashSet();
@@ -599,41 +753,41 @@ public static class HomeFeed
         {
             var list = Films(r).Where(f => !Watched(f) && !f.Matches(me)).Select((f, i) => (f, i))
                 .OrderByDescending(x => x.f.Tags?.Genres.Count(simGenres.Contains) ?? 0).ThenByDescending(x => x.f.Updated).ThenBy(x => x.i).Select(x => x.f);
-            Add(p.RowId, p.Title ?? "", list, p.More, true, 4);
+            Add("similar", p.RowId, p.Title ?? "", list, p.More, true, 4);
         }
         var interest = ByRole(Role.Interest);
-        void InterestRow(int i)
+        void InterestRow(string slot)
         {
-            if (i >= interest.Count) return;
-            var (p, r) = interest[i];
-            Add(p.RowId, p.Title ?? "", ByAffinity(Films(r).Where(f => !Watched(f))), p.More, true);
+            if (interest.FirstOrDefault(x => x.Part.Slot == slot) is not { Part: { } p, Result: { } r }) return;
+            Add(slot, p.RowId, p.Title ?? "", ByAffinity(Films(r).Where(f => !Watched(f))), p.More, true);
         }
-        InterestRow(0);
+        InterestRow("interest");
 
         // Loại phim hay xem, mới cập nhật · mọi nguồn
         var dominant = ByRole(Role.Dominant);
         if (dominant.Count > 0)
         {
             var set = dominant.SelectMany(x => Films(x.Result)).Distinct(ReferenceEqualityComparer.Instance).Cast<FeedFilm>();
-            Add("dominant", dominant[0].Part.Title ?? "", NewestFirst(set.Where(f => !Watched(f))), null, true);
+            Add("dominant", "dominant", dominant[0].Part.Title ?? "", NewestFirst(set.Where(f => !Watched(f))), null, true);
         }
         // Thuyết minh / lồng tiếng mới
-        foreach (var (p, r) in ByRole(Role.Dub)) Add(p.RowId, p.Title ?? "", NewestFirst(Films(r).Where(f => !Watched(f))), p.More, true);
+        foreach (var (p, r) in ByRole(Role.Dub)) Add("dub", p.RowId, p.Title ?? "", NewestFirst(Films(r).Where(f => !Watched(f))), p.More, true);
         // Hồ sơ trẻ em: hoạt hình thiếu nhi (KKPhim + VSMOV gộp một hàng), gia đình, lồng tiếng
         foreach (var g in ByRole(Role.Kids).GroupBy(x => x.Part.RowId))
         {
             var ps = g.ToList();
             var set = ps.SelectMany(x => Films(x.Result)).Distinct(ReferenceEqualityComparer.Instance).Cast<FeedFilm>();
-            Add(g.Key, ps[0].Part.Title ?? "", NewestFirst(set.Where(f => !Watched(f))), ps.Select(x => x.Part.More).FirstOrDefault(m => m != null), true);
+            Add(g.Key, g.Key, ps[0].Part.Title ?? "", NewestFirst(set.Where(f => !Watched(f))), ps.Select(x => x.Part.More).FirstOrDefault(m => m != null), true);
         }
-        InterestRow(1);
+        InterestRow("interest2");
 
         // Mới cập nhật · mọi nguồn
         var newest = ByRole(Role.Web).Concat(ByRole(Role.New)).SelectMany(x => Films(x.Result)).Distinct(ReferenceEqualityComparer.Instance).Cast<FeedFilm>();
-        Add("newest", "Mới cập nhật · mọi nguồn", NewestFirst(newest.Where(f => !Watched(f))), null, false);
+        Add("newest", "newest", "Mới cập nhật · mọi nguồn", NewestFirst(newest.Where(f => !Watched(f))), null, false);
 
-        foreach (var (p, r) in ByRole(Role.Movies)) Add(p.RowId, p.Title ?? "", ByAffinity(Films(r).Where(f => !Watched(f))), p.More, false);
-        return (rows, fresh);
+        foreach (var (p, r) in ByRole(Role.Movies)) Add("movies", p.RowId, p.Title ?? "", ByAffinity(Films(r).Where(f => !Watched(f))), p.More, false);
+        // Thứ tự / bật tắt theo cài đặt của người xem (Cài đặt → Trang chủ → Các hàng)
+        return (Arrange(rows), fresh);
     }
 
     /// Người xem vừa mở trang phim / một tập: ghi tập mới nhất đã thấy (theo tên — chung mọi nguồn).
@@ -656,7 +810,7 @@ public static class HomeFeed
         var o = new JObj
         {
             ["at"] = Util.NowMs(),
-            ["rows"] = s.Rows.Select(r => (object?)new JObj { ["id"] = r.Id, ["t"] = r.Title, ["m"] = r.More ?? "", ["c"] = r.Cards.Select(c => (object?)CardJson(c)).ToList() }).ToList(),
+            ["rows"] = s.Rows.Select(r => (object?)new JObj { ["id"] = r.Id, ["t"] = r.Title, ["m"] = r.More ?? "", ["s"] = r.Slot, ["c"] = r.Cards.Select(c => (object?)CardJson(c)).ToList() }).ToList(),
             ["fresh"] = s.Fresh.Select(f => (object?)new JObj { ["c"] = CardJson(f.Card), ["k"] = f.Key, ["e"] = f.Ep }).ToList(),
         };
         if (s.Categories != null) o["cats"] = s.Categories.Select(c => (object?)new JObj { ["t"] = c.Title, ["u"] = c.Url }).ToList();
@@ -672,7 +826,7 @@ public static class HomeFeed
             var at = Feed.Num64(o.GetValueOrDefault("at"));
             if (Util.NowMs() - at > Feed.CacheMax) return null;
             var rows = J.Objects(J.Arr(o, "rows")).Select(r => new FeedRow(J.Str(r, "id"), J.Str(r, "t"),
-                J.Objects(J.Arr(r, "c")).Select(CardOf).OfType<Card>().ToList(), J.Str(r, "m").NonEmpty())).ToList();
+                J.Objects(J.Arr(r, "c")).Select(CardOf).OfType<Card>().ToList(), J.Str(r, "m").NonEmpty(), J.Str(r, "s"))).ToList();
             var fresh = J.Objects(J.Arr(o, "fresh")).Select(f => J.Obj(f, "c") is { } c && CardOf(c) is { } card
                 ? new FreshCard(card, J.Str(f, "k"), Feed.Dbl(f.GetValueOrDefault("e")) ?? 0) : null).OfType<FreshCard>().ToList();
             var cats = J.Arr(o, "cats") is { } cs ? J.Objects(cs).Select(x => new Category(J.Str(x, "t"), J.Str(x, "u"))).ToList() : null;

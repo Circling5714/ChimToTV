@@ -221,6 +221,15 @@ public sealed class SettingsPage : Page
         Body.Children.Add(kidsRow);
         Body.Children.Add(Ui.Dim("Trang chủ chỉ có phim hoạt hình hợp trẻ em — thiếu nhi, gia đình, lồng tiếng; bỏ phim kinh dị / hình sự / " +
                                  "chiến tranh / 18+. Chỉ lọc trang chủ (tìm kiếm, mục của trang vẫn như cũ).", 13.5, new Thickness(0, 0, 0, 4)));
+        // Các hàng trên trang chủ (riêng từng người xem): bật / tắt, đổi thứ tự, tự thêm. Hồ sơ trẻ em: cần mã PIN phụ huynh
+        var rows = Ui.Pill($"☰  Các hàng trên trang chủ{who}…", async () =>
+        {
+            if (Prefs.Kids && Prefs.HasParentPin && !await Main.CheckParent("Nhập mã PIN phụ huynh để sửa các hàng trang chủ.")) return;
+            Main.Push(new HomeRowsPage());
+        });
+        rows.HorizontalAlignment = HorizontalAlignment.Left;
+        rows.Margin = new Thickness(0, 10, 0, 4);
+        Body.Children.Add(rows);
         var resting = Feed.RestingHosts();
         if (resting.Count > 0)
         {

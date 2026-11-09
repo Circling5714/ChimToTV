@@ -85,6 +85,10 @@ public static class ApiSite
         ("Phim Thái Lan", "quoc-gia/thai-lan"),
     };
 
+    /// Thể loại / quốc gia (tên, slug KKPhim) — chọn cho hàng tự thêm của trang chủ tổng hợp.
+    public static IEnumerable<(string Name, string Slug)> GenreList => Genres.Where(g => g.Item2 != "phim-18");
+    public static IEnumerable<(string Name, string Slug)> CountryList => Countries;
+
     private static readonly (string, string)[] VsGenres =
     {
         ("Hành Động", "hanh-dong"), ("Cổ Trang", "co-trang"), ("Kiếm Hiệp", "kiem-hiep"), ("Tiên Hiệp", "tien-hiep"),
