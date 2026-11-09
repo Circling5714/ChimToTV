@@ -560,20 +560,16 @@ struct FilmCard: View {
                         }
                     }
                     .overlay(alignment: .bottomLeading) {
-                        // Nhãn tập ở góc dưới bên trái như bản TV — ô hẹp (iPhone dọc) không đè nhãn nguồn ở góc trên bên
-                        // phải; hàng Xem tiếp chừa chỗ cho nút ▶ (nhãn dài thì cắt bớt)
+                        // Nhãn tập ở góc dưới bên trái như bản TV — ô hẹp (iPhone dọc) không đè nhãn nguồn ở góc trên bên phải
                         if let b = item.film.badge {
-                            HStack(spacing: 0) {
-                                Text(b)
-                                    .appFont(12, .bold)
-                                    .lineLimit(1)
-                                    .foregroundColor(Theme.onBrand)
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 3)
-                                    .background(Capsule().fill(item.follow ? Theme.focus : Theme.brand))
-                                    .padding(7)
-                                Spacer(minLength: item.resume ? 42 : 0)
-                            }
+                            Text(b)
+                                .appFont(12, .bold)
+                                .lineLimit(1)
+                                .foregroundColor(Theme.onBrand)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(item.follow ? Theme.focus : Theme.brand))
+                                .padding(7)
                         }
                     }
                     .overlay(alignment: .topTrailing) {
@@ -589,13 +585,13 @@ struct FilmCard: View {
                                 .padding(6)
                         }
                     }
-                    .overlay(alignment: .bottomTrailing) {
+                    .overlay {
+                        // Hàng Xem tiếp: nút ▶ giữa poster (góc dưới đã có nhãn tập)
                         if item.resume {
                             Image(systemName: "play.circle.fill")
-                                .appFont(34)
-                                .foregroundColor(.white)
-                                .shadow(radius: 4)
-                                .padding(8)
+                                .appFont(38)
+                                .foregroundColor(.white.opacity(0.95))
+                                .shadow(color: .black.opacity(0.6), radius: 6)
                         }
                     }
                 Text(item.film.title)
