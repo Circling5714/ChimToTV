@@ -88,6 +88,8 @@ struct RootView: View {
                 switch s {
                 case .sites: SitesView()
                 case .settings: SettingsView().id(app.profileVersion) // đổi người xem: cài đặt của người mới
+                case .homeRows: HomeEditSheet(sources: false)
+                case .homeSources: HomeEditSheet(sources: true)
                 case .filter(let title, let items): FilterView(title: title, items: items)
                 }
             }
@@ -399,6 +401,7 @@ struct FilmGridView: View {
     private func gridSection(_ s: GridSection, _ cols: [GridItem], pad: CGFloat) -> some View {
         if let t = s.title {
             Text(t).appFont(21, .semibold).foregroundColor(Theme.text)
+                .contextMenu { if let row = s.row { RowMenuItems(row: row) } }
                 .padding(.horizontal, pad)
                 .padding(.top, 8)
         }
@@ -422,6 +425,7 @@ struct FilmGridView: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(s.title ?? "").appFont(21, .semibold).foregroundColor(Theme.text).lineLimit(1)
+                    .contextMenu { if let row = s.row { RowMenuItems(row: row) } } // giữ tên hàng: sửa nhanh hàng đó
                 Spacer(minLength: 0)
                 if let m = more {
                     Button { app.open(m) } label: {
@@ -523,6 +527,7 @@ struct FilmCard: View {
         }
         .buttonStyle(PressScale())
         .accessibilityLabel("Xem thêm: \(item.film.title)")
+        .contextMenu { if let row = item.more { RowMenuItems(row: row) } }
     }
 
     private var gridMoreTile: some View {
@@ -544,6 +549,7 @@ struct FilmCard: View {
         }
         .buttonStyle(PressScale())
         .accessibilityLabel("Xem thêm: \(item.film.title)")
+        .contextMenu { if let row = item.more { RowMenuItems(row: row) } }
     }
 
     private var filmCard: some View {
@@ -614,6 +620,37 @@ struct FilmCard: View {
             }
             if item.resume {
                 Button { app.detailFilm = item.film } label: { Label("Trang phim", systemImage: "info.circle") }
+            }
+            if let row = item.row {
+                if item.removable || item.resume { Divider() }
+                RowMenuItems(row: row)
+            }
+        }
+    }
+}
+
+/// Sửa nhanh một hàng trang chủ (giữ ô phim / tên hàng / ô «Xem thêm»; chuột: nhấn phải): ẩn, chuyển lên / xuống (qua hàng
+/// đang hiện kề nó), mở bảng «Các hàng» / «Nguồn». Hồ sơ trẻ em có mã PIN phụ huynh: chỉ mở bảng «Các hàng» (hỏi mã).
+struct RowMenuItems: View {
+    @EnvironmentObject var app: AppModel
+    let row: String
+
+    var body: some View {
+        if let info = app.rowInfo(row) {
+            if app.rowsLocked {
+                Button { app.sheet = .homeRows } label: { Label("Sửa các hàng (mã PIN phụ huynh)…", systemImage: "lock") }
+            } else {
+                Button { app.hideRow(row) } label: { Label("Ẩn hàng «\(info.title)»", systemImage: "eye.slash") }
+                if info.up != nil {
+                    Button { app.moveRow(row, up: true) } label: { Label("Chuyển hàng lên", systemImage: "arrow.up") }
+                }
+                if info.down != nil {
+                    Button { app.moveRow(row, up: false) } label: { Label("Chuyển hàng xuống", systemImage: "arrow.down") }
+                }
+                Button { app.sheet = .homeRows } label: { Label("Các hàng trên trang chủ…", systemImage: "list.bullet") }
+                if Prefs.homeMixOn {
+                    Button { app.sheet = .homeSources } label: { Label("Nguồn cho trang chủ…", systemImage: "square.stack.3d.up") }
+                }
             }
         }
     }

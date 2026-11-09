@@ -163,19 +163,51 @@ enum HomeFeed {
     /// Xếp các hàng theo cài đặt của người xem: bỏ hàng đã tắt, theo thứ tự đã chọn; hàng chủ đề bản cũ ("topics") đầu, hàng
     /// lạ cuối.
     static func arrange(_ list: [FeedRow], _ prefs: [(id: String, on: Bool)] = rowPrefs()) -> [FeedRow] {
+        arrangeSlots(list, prefs).map { $0.row }
+    }
+
+    /// Như arrange, kèm loại hàng (id trong cài đặt) của từng hàng — kể cả hàng lưu từ bản cũ (chưa ghi slot).
+    static func arrangeSlots(_ list: [FeedRow], _ prefs: [(id: String, on: Bool)] = rowPrefs()) -> [(row: FeedRow, slot: String)] {
         var pos: [String: Int] = [:]
         for (i, p) in prefs.enumerated() { pos[p.id] = p.on ? i : -1 }
         var interest = 0
-        var keyed: [(FeedRow, String)] = []
+        var keyed: [(row: FeedRow, slot: String)] = []
         for r in list {
             let slot = r.slot.isEmpty ? legacySlot(r.id, interest) : r.slot
             if slot.hasPrefix("interest") { interest += 1 }
             keyed.append((r, slot))
         }
         func rank(_ slot: String) -> Int { slot == "topics" ? -1 : (pos[slot] ?? Int.max) }
-        return keyed.filter { pos[$0.1] != -1 }.enumerated()
-            .sorted { (rank($0.element.1), $0.offset) < (rank($1.element.1), $1.offset) }
-            .map { $0.element.0 }
+        return keyed.filter { pos[$0.slot] != -1 }.enumerated()
+            .sorted { (rank($0.element.slot), $0.offset) < (rank($1.element.slot), $1.offset) }
+            .map { $0.element }
+    }
+
+    /// Lưu cài đặt các hàng ("id" bật, "-id" tắt).
+    static func saveRows(_ prefs: [(id: String, on: Bool)]) {
+        Prefs.homeRows = prefs.map { $0.on ? $0.id : "-\($0.id)" }
+    }
+
+    /// Tắt một hàng (sửa nhanh trên trang chủ: «Ẩn hàng này»).
+    static func hide(_ prefs: [(id: String, on: Bool)], _ slot: String) -> [(id: String, on: Bool)] {
+        prefs.map { $0.id == slot ? (id: slot, on: false) : $0 }
+    }
+
+    /// Sửa nhanh trên trang chủ: chuyển hàng `slot` lên / xuống qua hàng đang hiện kề nó (shown = loại hàng đang hiện, theo
+    /// thứ tự trên trang — hàng tắt / không đủ phim nằm giữa bị vượt qua). nil: không chuyển được (hàng đầu / cuối, «Có tập
+    /// mới» / «Xem tiếp», hàng chủ đề bản cũ).
+    static func moveShown(_ prefs: [(id: String, on: Bool)], _ shown: [String], _ slot: String, up: Bool) -> [(id: String, on: Bool)]? {
+        let fixed = headRows.union(["topics"])
+        guard let i = shown.firstIndex(of: slot), !fixed.contains(slot) else { return nil }
+        let j = up ? i - 1 : i + 1
+        guard j >= 0, j < shown.count, !fixed.contains(shown[j]) else { return nil }
+        let other = shown[j]
+        var out = prefs
+        guard let at = out.firstIndex(where: { $0.id == slot }) else { return nil }
+        let me = out.remove(at: at)
+        guard let k = out.firstIndex(where: { $0.id == other }) else { return nil }
+        out.insert(me, at: up ? k : k + 1)
+        return out
     }
 
     /// Nguồn trong danh sách trang của người xem (gốc địa chỉ); web: trang web đang dùng + trang hay xem gần đây.
@@ -183,9 +215,34 @@ enum HomeFeed {
         let kk: String?, nc: String?, vs: String?, k20: String?
         let web: [String]
         var count: Int { [kk, nc, vs, k20].compactMap { $0 }.count + web.count }
+
+        /// id (trong HomeFeed.sourceNames) của các nguồn có mặt.
+        var ids: [String] {
+            [kk.map { _ in "kk" }, nc.map { _ in "nc" }, vs.map { _ in "vs" }, k20.map { _ in "k20" }, web.first.map { _ in "web" }]
+                .compactMap { $0 }
+        }
     }
 
-    static func sources() -> Sources {
+    /// Nguồn của trang chủ tổng hợp người xem bật / tắt được (Cài đặt → Trang chủ → «Nguồn cho trang chủ», riêng từng người;
+    /// khoá Prefs.homeSrcOff), theo thứ tự hiện. «web» = trang đang dùng + trang xem gần đây.
+    static let sourceNames: [(id: String, label: String)] = [
+        ("kk", "KKPhim"), ("nc", "NguonC"), ("vs", "VSMOV"), ("k20", "CLB Phim Xưa"), ("web", "Trang đang dùng và trang xem gần đây"),
+    ]
+
+    /// Bỏ các nguồn người xem đã tắt. Tắt hết các nguồn đang có (vd nguồn còn bật vừa bị xoá khỏi danh sách trang) thì coi
+    /// như bật hết — trang chủ không bao giờ trống vì cài đặt nguồn.
+    static func withoutOff(_ all: Sources, _ off: Set<String>) -> Sources {
+        if all.ids.allSatisfy({ off.contains($0) }) { return all }
+        return Sources(kk: off.contains("kk") ? nil : all.kk, nc: off.contains("nc") ? nil : all.nc,
+                       vs: off.contains("vs") ? nil : all.vs, k20: off.contains("k20") ? nil : all.k20,
+                       web: off.contains("web") ? [] : all.web)
+    }
+
+    /// Nguồn trang chủ của người xem đang dùng (đã bỏ nguồn tắt).
+    static func sources() -> Sources { withoutOff(allSources(), Prefs.homeSrcOff) }
+
+    /// Mọi nguồn có trong danh sách trang (cả nguồn người xem đã tắt).
+    static func allSources() -> Sources {
         let sites = Prefs.sites
         let base = Prefs.baseUrl
         let kk = sites.first { ApiSite.isKk($0) }.map(ApiSite.origin)

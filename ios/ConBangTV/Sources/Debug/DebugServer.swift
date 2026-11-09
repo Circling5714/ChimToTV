@@ -277,6 +277,21 @@ enum DebugRoutes {
                           "found": s.found.map { ["id": $0.id, "name": $0.name, "platform": $0.platform, "endpoint": "\($0.endpoint)"] }])
         case "/go":
             return go(q)
+        case "/row":
+            // Sửa nhanh hàng trang chủ (như giữ ô phim): /row?id=<id hàng>&do=info|hide|up|down|rows|sources
+            guard let id = q["id"] ?? (q["do"] == "rows" || q["do"] == "sources" ? "" : nil) else { return .text("thiếu id", status: 400) }
+            switch q["do"] ?? "info" {
+            case "hide": app.hideRow(id)
+            case "up": app.moveRow(id, up: true)
+            case "down": app.moveRow(id, up: false)
+            case "rows": app.sheet = .homeRows
+            case "sources": app.sheet = .homeSources
+            default: break
+            }
+            let info = id.isEmpty ? nil : app.rowInfo(id)
+            return .json(["ok": true, "title": info?.title ?? "", "slot": info?.slot ?? "", "up": info?.up != nil, "down": info?.down != nil,
+                          "rows": Prefs.homeRows, "srcOff": Prefs.homeSrcOff.sorted(),
+                          "sections": app.sections.map { $0.title ?? $0.id }])
         case "/player":
             return player(q)
         case "/eval":

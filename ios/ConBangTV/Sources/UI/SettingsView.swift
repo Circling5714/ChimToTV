@@ -98,6 +98,11 @@ struct SettingsView: View {
             } label: {
                 Text("Các hàng trên trang chủ\(who)").foregroundColor(Theme.text)
             }
+            NavigationLink {
+                HomeSourcesView(needPin: kids && Prefs.hasParentPin)
+            } label: {
+                Text("Nguồn cho trang chủ\(who)").foregroundColor(Theme.text)
+            }
             if !resting.isEmpty {
                 let until = Date(timeIntervalSince1970: Double(resting.values.max() ?? 0) / 1000)
                 Button("Thử lại ngay: \(resting.keys.sorted().map { Site.tag($0, Prefs.sites) }.joined(separator: ", ")) (đang tạm nghỉ tới \(until.formatted(date: .omitted, time: .shortened)))") {
@@ -107,7 +112,7 @@ struct SettingsView: View {
                 }
             }
         } header: { Text("Trang chủ") } footer: {
-            Text("Tổng hợp: trang chủ lấy phim mới từ mọi trang trong danh sách (KKPhim, NguonC, VSMOV, CLB Phim Xưa và trang đang dùng), gộp phim trùng giữa các trang («3 nguồn» — trang phim có nút đổi nguồn), xếp hàng theo lịch sử xem của từng người: phim đang xem dở có tập mới ở bất kỳ trang nào, phim giống phim vừa xem, thể loại hay xem. Trang nào lỗi / quá 6 giây thì dùng bản lưu; lỗi 3 lần liên tiếp thì tạm nghỉ 30 phút. Tắt: trang chủ của trang đang dùng như trước.\n\nHồ sơ trẻ em: trang chủ chỉ có phim hoạt hình hợp trẻ em — thiếu nhi, gia đình, lồng tiếng; bỏ phim kinh dị / hình sự / chiến tranh / 18+. Chỉ lọc trang chủ (tìm kiếm, mục của trang vẫn như cũ). Tắt cần mã PIN phụ huynh nếu đã đặt (Giới hạn giờ xem).")
+            Text("Tổng hợp: trang chủ lấy phim mới từ mọi trang trong danh sách (KKPhim, NguonC, VSMOV, CLB Phim Xưa và trang đang dùng), gộp phim trùng giữa các trang («3 nguồn» — trang phim có nút đổi nguồn), xếp hàng theo lịch sử xem của từng người: phim đang xem dở có tập mới ở bất kỳ trang nào, phim giống phim vừa xem, thể loại hay xem. Trang nào lỗi / quá 6 giây thì dùng bản lưu; lỗi 3 lần liên tiếp thì tạm nghỉ 30 phút. Tắt: trang chủ của trang đang dùng như trước.\n\nHồ sơ trẻ em: trang chủ chỉ có phim hoạt hình hợp trẻ em — thiếu nhi, gia đình, lồng tiếng; bỏ phim kinh dị / hình sự / chiến tranh / 18+. Chỉ lọc trang chủ (tìm kiếm, mục của trang vẫn như cũ). Tắt cần mã PIN phụ huynh nếu đã đặt (Giới hạn giờ xem).\n\nCác hàng: bật / tắt, đổi thứ tự, thêm hàng của mình — trên trang chủ giữ một phim của hàng (hoặc tên hàng) để ẩn / chuyển nhanh hàng đó. Nguồn: chọn trang chủ lấy phim từ những nguồn nào.")
         }
     }
 

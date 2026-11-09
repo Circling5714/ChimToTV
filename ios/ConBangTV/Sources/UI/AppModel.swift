@@ -4,7 +4,8 @@ import WebKit
 
 /// Một ô phim trên lưới (kèm cách mở: resume = phát tiếp luôn; removable = giữ để xoá khỏi lịch sử / bỏ theo dõi).
 /// Trang chủ tổng hợp: chip = nhãn góc ("3 nguồn", tên nguồn, "bản lưu"); links = các nguồn có phim (trang phim đổi nguồn
-/// được); more = ô «Xem thêm» cuối hàng (id hàng); topic = ô chọn chủ đề (topicOn = đã chọn).
+/// được); more = ô «Xem thêm» cuối hàng (id hàng); topic = ô chọn chủ đề (topicOn = đã chọn); row = id hàng của trang chủ
+/// (giữ ô → sửa nhanh hàng đó).
 struct GridFilm: Identifiable, Hashable {
     let film: Film
     var resume = false
@@ -15,6 +16,7 @@ struct GridFilm: Identifiable, Hashable {
     var more: String? = nil
     var topic: String? = nil
     var topicOn = false
+    var row: String? = nil
     var id: String {
         if let m = more { return "more:\(m)" }
         if let t = topic { return "chip:\(t)" }
@@ -28,8 +30,10 @@ struct GridSection: Identifiable, Hashable {
     var items: [GridFilm]
     /// Dòng ghi chú chữ mờ dưới nhóm (vd tìm mọi trang: trang đang tìm / không có phim / không trả lời).
     var note: String? = nil
-    /// Dải vuốt ngang (trang chủ tổng hợp trên iPhone dọc): cả nhóm một dòng, «Xem thêm ›» ở tiêu đề + ô hẹp cuối dải.
+    /// Dải vuốt ngang (trang chủ tổng hợp): cả nhóm một dòng, «Xem thêm ›» ở tiêu đề + ô hẹp cuối dải.
     var strip = false
+    /// id hàng của trang chủ (giữ tên hàng → sửa nhanh hàng đó).
+    var row: String? = nil
 }
 
 /// Trạng thái màn chính (bản Android: MainActivity): menu bên trái, lưới phim, tìm kiếm, lịch sử, theo dõi.
@@ -69,11 +73,15 @@ final class AppModel: ObservableObject {
 
     enum Sheet: Identifiable {
         case sites, settings
+        /// Sửa nhanh từ trang chủ: «Các hàng trên trang chủ» / «Nguồn cho trang chủ» (bảng riêng, không qua Cài đặt).
+        case homeRows, homeSources
         case filter(title: String, items: [Category])
         var id: String {
             switch self {
             case .sites: return "sites"
             case .settings: return "settings"
+            case .homeRows: return "homeRows"
+            case .homeSources: return "homeSources"
             case .filter(let t, _): return "filter|\(t)"
             }
         }
@@ -97,11 +105,11 @@ final class AppModel: ObservableObject {
     private var autoFresh: [FreshCard] = []
     private var loadedMix: Bool?
     private var loadedKids: Bool?
-    /// Cài đặt các hàng lúc tải trang chủ (thứ tự / bật tắt + hàng tự thêm): đổi thì tải lại trang chủ.
+    /// Cài đặt các hàng lúc tải trang chủ (thứ tự / bật tắt + hàng tự thêm + nguồn tắt): đổi thì tải lại trang chủ.
     private var loadedRows: String?
     private func rowsSignature() -> String {
         let custom = Prefs.homeCustom.map { c -> String in [c.id, c.topic ?? "", c.type, c.country, c.genre, c.lang].joined(separator: ";") }
-        return Prefs.homeRows.joined(separator: ",") + "|" + custom.joined(separator: ",")
+        return Prefs.homeRows.joined(separator: ",") + "|" + custom.joined(separator: ",") + "|" + Prefs.homeSrcOff.sorted().joined(separator: ",")
     }
     @Published var sheet: Sheet?
     @Published var confirmClear = false
@@ -553,21 +561,21 @@ final class AppModel: ObservableObject {
             let n = r.cards.count
             if strips {
                 // Dải vuốt ngang: tới stripMax phim; còn nữa (hoặc nguồn có trang sau) thì ô «Xem thêm» cuối dải
-                var items = r.cards.prefix(Self.stripMax).map { GridFilm(film: $0.film, chip: $0.chip, links: $0.links) }
+                var items = r.cards.prefix(Self.stripMax).map { GridFilm(film: $0.film, chip: $0.chip, links: $0.links, row: r.id) }
                 if n > Self.stripMax || r.more != nil {
                     items.append(GridFilm(film: Film(url: "more:\(r.id)", title: r.title, poster: nil, badge: r.more == nil ? "\(n) phim" : nil),
                                           more: r.id))
                 }
-                out.append(GridSection(id: "feed-\(r.id)", title: r.title, items: items, strip: true))
+                out.append(GridSection(id: "feed-\(r.id)", title: r.title, items: items, strip: true, row: r.id))
                 continue
             }
-            var items = (n > cols ? Array(r.cards.prefix(cols - 1)) : r.cards).map { GridFilm(film: $0.film, chip: $0.chip, links: $0.links) }
+            var items = (n > cols ? Array(r.cards.prefix(cols - 1)) : r.cards).map { GridFilm(film: $0.film, chip: $0.chip, links: $0.links, row: r.id) }
             if n > cols {
                 // Hàng có danh sách nhiều trang của nguồn: không ghi số phim (mới tải trang đầu)
                 items.append(GridFilm(film: Film(url: "more:\(r.id)", title: r.title, poster: nil, badge: r.more == nil ? "\(n) phim" : nil),
                                       more: r.id))
             }
-            out.append(GridSection(id: "feed-\(r.id)", title: r.title, items: items))
+            out.append(GridSection(id: "feed-\(r.id)", title: r.title, items: items, row: r.id))
         }
         return out
     }
@@ -577,13 +585,13 @@ final class AppModel: ObservableObject {
     /// Lưới hẹp hơn mức này (pt) thì trang chủ tổng hợp xếp dải vuốt ngang.
     static let stripWidth: CGFloat = 500
 
-    /// Màn hẹp (iPhone dọc, iPad Slide Over): lưới tự báo. Trang chủ tổng hợp khi đó xếp mỗi hàng thành dải vuốt ngang.
+    /// Màn hẹp (iPhone dọc, iPad Slide Over): lưới tự báo (cuộn / chọn ô bằng cảm ứng khác đi một chút).
     var stripMode = false {
         didSet { if stripMode != oldValue { relayoutFeed() } }
     }
 
-    /// Trang chủ tổng hợp đang xếp dải vuốt ngang.
-    private var strips: Bool { stripMode && Prefs.homeMixOn }
+    /// Trang chủ tổng hợp xếp mỗi hàng thành dải vuốt ngang — mọi màn (iPhone từ 1.8.1; iPad / iPhone ngang từ bản sau 1.9).
+    private var strips: Bool { Prefs.homeMixOn }
 
     /// Quay về từ «Xem thêm» bằng cảm ứng: cuộn tới hàng đó (không tô ô đang chọn như khi dùng bàn phím).
     @Published var scrollTarget: String?
@@ -884,21 +892,72 @@ final class AppModel: ObservableObject {
         let on = Set(HomeFeed.rowPrefs().filter { $0.on }.map { $0.id })
         if (!fresh.isEmpty || !auto.isEmpty) && on.contains("new-eps") {
             out.append(GridSection(id: "head-new", title: "Có tập mới",
-                                   items: fresh.map { GridFilm(film: followFilm($0), removable: true, follow: true) } +
-                                       auto.map { GridFilm(film: $0.card.film, chip: $0.card.chip, links: $0.card.links) },
-                                   strip: strips))
+                                   items: fresh.map { GridFilm(film: followFilm($0), removable: true, follow: true, row: "new-eps") } +
+                                       auto.map { GridFilm(film: $0.card.film, chip: $0.card.chip, links: $0.card.links, row: "new-eps") },
+                                   strip: strips, row: "new-eps"))
         }
         // Trang chủ tổng hợp: mỗi hàng một dòng (như bản TV / Windows); kiểu theo trang giữ 6 phim
         let items = on.contains("continue") ? Prefs.history.prefix(strips ? Self.stripMax : Prefs.homeMixOn ? max(2, gridCols) : Self.headCount) : []
         if !items.isEmpty {
             out.append(GridSection(id: "head-continue", title: "Xem tiếp",
-                                   items: items.map { GridFilm(film: historyFilm($0), resume: true, removable: true) },
-                                   strip: strips))
+                                   items: items.map { GridFilm(film: historyFilm($0), resume: true, removable: true, row: "continue") },
+                                   strip: strips, row: "continue"))
         }
         return out
     }
 
     /// Cập nhật hàng đầu trang chủ (xem xong quay ra / vừa xoá / có tập mới).
+    // MARK: - Sửa nhanh hàng trang chủ (giữ ô phim / tên hàng / ô «Xem thêm»; chuột: nhấn phải)
+
+    /// Một hàng đang hiện trên trang chủ: tiêu đề, loại hàng (id trong cài đặt), chuyển lên / xuống được không.
+    struct RowInfo {
+        let title: String
+        let slot: String
+        let up: [(id: String, on: Bool)]?
+        let down: [(id: String, on: Bool)]?
+    }
+
+    func rowInfo(_ rowId: String) -> RowInfo? {
+        guard homeToken == token, active?.kind == .home, moreFrom == nil else { return nil }
+        if HomeFeed.headRows.contains(rowId) {
+            return RowInfo(title: rowId == "new-eps" ? "Có tập mới" : "Xem tiếp", slot: rowId, up: nil, down: nil)
+        }
+        guard Prefs.homeMixOn, let snap = feedSnap else { return nil }
+        let arranged = HomeFeed.arrangeSlots(snap.rows)
+        guard let r = arranged.first(where: { $0.row.id == rowId }), r.slot != "topics" else { return nil }
+        let shown = arranged.map { $0.slot }
+        let prefs = HomeFeed.rowPrefs()
+        return RowInfo(title: r.row.title, slot: r.slot,
+                       up: HomeFeed.moveShown(prefs, shown, r.slot, up: true), down: HomeFeed.moveShown(prefs, shown, r.slot, up: false))
+    }
+
+    /// Hồ sơ trẻ em có mã PIN phụ huynh: sửa trang chủ phải qua bảng «Các hàng» (hỏi mã PIN).
+    var rowsLocked: Bool { Prefs.kids && Prefs.hasParentPin }
+
+    func hideRow(_ rowId: String) {
+        guard !rowsLocked, let info = rowInfo(rowId) else { return }
+        applyRows(HomeFeed.hide(HomeFeed.rowPrefs(), info.slot))
+        showToast("Đã ẩn hàng «\(info.title)» — bật lại trong Cài đặt → Trang chủ → Các hàng trên trang chủ.")
+    }
+
+    func moveRow(_ rowId: String, up: Bool) {
+        guard !rowsLocked, let info = rowInfo(rowId), let p = up ? info.up : info.down else { return }
+        applyRows(p)
+    }
+
+    /// Lưu cài đặt các hàng rồi xếp lại trang chủ từ lần tải gần nhất (không tải lại).
+    private func applyRows(_ p: [(id: String, on: Bool)]) {
+        HomeFeed.saveRows(p)
+        loadedRows = rowsSignature()
+        if Prefs.homeMixOn, let snap = feedSnap {
+            let next = headSections() + feedSections(snap)
+            if next != sections { sections = next }
+        } else {
+            refreshHead()
+        }
+        if let k = keySel, !sections.contains(where: { $0.items.contains { $0.id == k } }) { keySel = nil }
+    }
+
     func refreshHead() {
         guard homeToken == token, active?.kind == .home else { return }
         let body = sections.filter { !$0.id.hasPrefix("head-") }

@@ -90,7 +90,7 @@ struct HomeRowsView: View {
             } header: {
                 Text("Các hàng")
             } footer: {
-                Text("Hàng tắt thì không tải; hàng nào không đủ phim thì tự ẩn." + (kids ? " Hồ sơ trẻ em: chỉ các hàng hoạt hình hợp trẻ em." : ""))
+                Text("Hàng tắt thì không tải; hàng nào không đủ phim thì tự ẩn. Trên trang chủ: giữ một phim của hàng (hoặc tên hàng) để ẩn / chuyển nhanh." + (kids ? " Hồ sơ trẻ em: chỉ các hàng hoạt hình hợp trẻ em." : ""))
             }
             Section {
                 if custom.count < HomeFeed.customMax {
@@ -230,5 +230,102 @@ struct AddHomeRowView: View {
         .navigationTitle("Thêm hàng")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarHidden(false)
+    }
+}
+
+/// Cài đặt → Trang chủ → «Nguồn cho trang chủ» (riêng từng người xem; bản Android: HomeRowsUi.sources): bật / tắt từng nguồn
+/// của trang chủ tổng hợp (HomeFeed.sourceNames; chỉ nguồn có trong danh sách trang). Còn một nguồn thì không tắt được.
+struct HomeSourcesView: View {
+    @EnvironmentObject var app: AppModel
+    @Environment(\.dismiss) private var dismiss
+    var needPin = false
+    @State private var unlocked = false
+    @State private var off: Set<String> = Prefs.homeSrcOff
+    private let all = HomeFeed.allSources()
+
+    private func label(_ id: String, _ name: String) -> String {
+        id == "web" ? name + ": " + all.web.compactMap { Site.hostOf($0) }.joined(separator: ", ") : name
+    }
+
+    private func toggle(_ id: String) {
+        var cur = Prefs.homeSrcOff
+        if cur.contains(id) {
+            cur.remove(id)
+        } else {
+            guard all.ids.filter({ !cur.contains($0) }).count > 1 else {
+                app.showToast("Cần ít nhất một nguồn cho trang chủ.")
+                return
+            }
+            cur.insert(id)
+        }
+        Prefs.homeSrcOff = cur
+        off = cur
+    }
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(HomeFeed.sourceNames.filter { all.ids.contains($0.id) }, id: \.id) { s in
+                    Button { toggle(s.id) } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: off.contains(s.id) ? "circle" : "checkmark.circle.fill")
+                                .foregroundColor(off.contains(s.id) ? Theme.dim : Theme.brand)
+                            Text(label(s.id, s.label))
+                                .foregroundColor(off.contains(s.id) ? Theme.dim : Theme.text)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel((off.contains(s.id) ? "Đang tắt: " : "Đang bật: ") + label(s.id, s.label))
+                }
+            } footer: {
+                Text("Nguồn tắt thì trang chủ không tải phim của nguồn đó. Hàng lọc theo thể loại / nước lấy từ KKPhim — tắt KKPhim thì lấy VSMOV. Phim theo dõi vẫn báo tập mới. Cần ít nhất một nguồn; nguồn không có trong danh sách trang thì không hiện ở đây." + (Prefs.homeMixOn ? "" : "\n\nTrang chủ đang theo trang đang dùng — cài đặt này dùng khi bật «tổng hợp mọi nguồn»."))
+            }
+        }
+        .navigationTitle("Nguồn cho trang chủ")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarHidden(false)
+        .overlay {
+            if needPin && !unlocked {
+                ParentPinView(title: "Mã PIN phụ huynh để sửa trang chủ", onCancel: { dismiss() }) { unlocked = true }
+            }
+        }
+    }
+}
+
+/// Bảng mở từ trang chủ (giữ ô phim → «Các hàng…» / «Nguồn…»): thanh tiêu đề tự vẽ (nút «Xong», Esc — iPadOS 15 văng app
+/// khi đóng bảng có nút trên thanh tiêu đề của SwiftUI) + trang các hàng / nguồn. Đóng bảng: AppModel.settingsClosed xếp lại /
+/// tải lại trang chủ nếu cài đặt đổi.
+struct HomeEditSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let sources: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Text("Trang chủ").font(.headline).foregroundColor(Theme.text)
+                HStack {
+                    Spacer()
+                    Button("Xong") { dismiss() }
+                        .font(.body.weight(.semibold))
+                        .keyboardShortcut(.escape, modifiers: [])
+                }
+            }
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(.bar)
+            NavigationView {
+                if sources {
+                    HomeSourcesView(needPin: Prefs.kids && Prefs.hasParentPin)
+                } else {
+                    HomeRowsView(needPin: Prefs.kids && Prefs.hasParentPin)
+                }
+            }
+            .navigationViewStyle(.stack)
+        }
     }
 }

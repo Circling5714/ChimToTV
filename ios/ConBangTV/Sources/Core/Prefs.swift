@@ -115,7 +115,7 @@ enum Prefs {
         // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy, hồ sơ trẻ em, ngôn ngữ bản hay xem
         "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
         // Các hàng trang chủ (bật / tắt, thứ tự) và hàng tự thêm
-        "home_rows", "home_custom",
+        "home_rows", "home_custom", "home_src_off",
     ]
     private static let profilePrefixes = ["server_type@", "server_label@"]
     /// Người thêm sau bắt đầu với trang phim / server ưu tiên / cách xem của người đang dùng.
@@ -830,6 +830,12 @@ enum Prefs {
             return a.compactMap { item -> CustomRow? in (item as? [String: String]).flatMap { CustomRow($0) } }
         }
         set { store.set(newValue.map { $0.dict }, forKey: k("home_custom")) }
+    }
+
+    /// Nguồn trang chủ tổng hợp người xem đã tắt (id trong HomeFeed.sourceNames: kk, nc, vs, k20, web); rỗng = mọi nguồn.
+    static var homeSrcOff: Set<String> {
+        get { Set(store.stringArray(forKey: k("home_src_off")) ?? []) }
+        set { store.set(newValue.sorted(), forKey: k("home_src_off")) }
     }
 
     /// Chủ đề người xem đã chọn (id trong HomeFeed.topics) — các hàng tự thêm loại «chủ đề».
