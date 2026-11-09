@@ -12,6 +12,10 @@ private struct RowItem: Identifiable, Hashable {
 /// Không dùng nút trên thanh tiêu đề (iPadOS 15 văng app lúc đóng bảng có nút toolbar).
 struct HomeRowsView: View {
     @EnvironmentObject var app: AppModel
+    @Environment(\.dismiss) private var dismiss
+    /// Hồ sơ trẻ em có mã PIN phụ huynh: hỏi mã trước khi cho sửa (huỷ thì quay lại Cài đặt).
+    var needPin = false
+    @State private var unlocked = false
     @State private var prefs: [RowItem] = HomeRowsView.load()
     @State private var custom: [CustomRow] = Prefs.homeCustom
     @State private var confirmDelete: CustomRow?
@@ -110,6 +114,11 @@ struct HomeRowsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarHidden(false)
         .onAppear { reload() }
+        .overlay {
+            if needPin && !unlocked {
+                ParentPinView(title: "Mã PIN phụ huynh để sửa các hàng trang chủ", onCancel: { dismiss() }) { unlocked = true }
+            }
+        }
         .alert("Xoá hàng tự thêm?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
                presenting: confirmDelete) { c in
             Button("Xoá", role: .destructive) { remove(c) }

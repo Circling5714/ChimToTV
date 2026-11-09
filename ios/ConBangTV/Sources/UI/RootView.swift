@@ -34,11 +34,17 @@ enum Router {
 
     /// Đóng lớp trên cùng (trình phát / trình duyệt / bảng) — cho cổng gỡ lỗi.
     static func back() {
+        let app = AppModel.shared
+        // Bảng của SwiftUI (Cài đặt, Đổi trang phim…): đóng qua trạng thái như nút «Xong» — đóng bằng UIKit lúc đang ở trang con
+        // của bảng làm SwiftUI mở / đóng bảng liên tục (iOS 15)
+        if app.sheet != nil, !(topController is PlayerController), !(topController is BrowserController) {
+            app.sheet = nil
+            return
+        }
         if let top = topController, top.presentingViewController != nil {
             if let p = top as? PlayerController { p.model.close() } else { top.dismiss(animated: true) }
             return
         }
-        let app = AppModel.shared
         if app.sheet != nil { app.sheet = nil } else if app.detailFilm != nil { app.detailFilm = nil }
     }
 }
