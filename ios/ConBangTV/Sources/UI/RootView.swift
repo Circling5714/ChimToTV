@@ -559,16 +559,21 @@ struct FilmCard: View {
                             RoundedRectangle(cornerRadius: 10).stroke(Theme.focus, lineWidth: 4)
                         }
                     }
-                    .overlay(alignment: .topLeading) {
+                    .overlay(alignment: .bottomLeading) {
+                        // Nhãn tập ở góc dưới bên trái như bản TV — ô hẹp (iPhone dọc) không đè nhãn nguồn ở góc trên bên
+                        // phải; hàng Xem tiếp chừa chỗ cho nút ▶ (nhãn dài thì cắt bớt)
                         if let b = item.film.badge {
-                            Text(b)
-                                .appFont(12, .bold)
-                                .lineLimit(1)
-                                .foregroundColor(Theme.onBrand)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(item.follow ? Theme.focus : Theme.brand))
-                                .padding(7)
+                            HStack(spacing: 0) {
+                                Text(b)
+                                    .appFont(12, .bold)
+                                    .lineLimit(1)
+                                    .foregroundColor(Theme.onBrand)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 3)
+                                    .background(Capsule().fill(item.follow ? Theme.focus : Theme.brand))
+                                    .padding(7)
+                                Spacer(minLength: item.resume ? 42 : 0)
+                            }
                         }
                     }
                     .overlay(alignment: .topTrailing) {
