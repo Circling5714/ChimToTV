@@ -226,8 +226,13 @@ enum DebugRoutes {
             let (ok, hit) = press(label: label, index: Int(q["i"] ?? "0") ?? 0, partial: q["partial"] == "1")
             return .json(["ok": ok, "label": label, "hit": hit ?? ""])
         case "/scroll":
-            // Cuộn khung cuộn lớn nhất đang hiện: dir=top|bottom|up|down
-            return .json(["ok": scroll(q["dir"] ?? "down")])
+            // Cuộn khung cuộn lớn nhất đang hiện: dir=top|bottom|up|down. Dải vuốt ngang ở độ cao y (điểm trên màn hình):
+            // dir=left|right|start|end&y=…
+            let dir = q["dir"] ?? "down"
+            if ["left", "right", "start", "end"].contains(dir) {
+                return .json(["ok": scrollX(dir, y: CGFloat(Double(q["y"] ?? "0") ?? 0))])
+            }
+            return .json(["ok": scroll(dir)])
         case "/type":
             let text = q["text"] ?? r.text
             let ok = UIApplication.shared.sendAction(#selector(UIKeyInput.insertText(_:)), to: nil, from: text, for: nil)
@@ -662,6 +667,32 @@ enum DebugRoutes {
         default: y += page
         }
         s.setContentOffset(CGPoint(x: s.contentOffset.x, y: min(maxY, max(-s.adjustedContentInset.top, y))), animated: false)
+        return true
+    }
+
+    /// Cuộn ngang khung cuộn ngang đang hiện có chứa độ cao y (toạ độ cửa sổ).
+    private static func scrollX(_ dir: String, y: CGFloat) -> Bool {
+        guard let w = keyWindow else { return false }
+        var hit: UIScrollView?
+        func find(_ v: UIView) {
+            if v.isHidden || v.alpha < 0.02 || hit != nil { return }
+            if let s = v as? UIScrollView, s.contentSize.width > s.bounds.width + 1 {
+                let f = s.convert(s.bounds, to: w)
+                if f.minY <= y && y <= f.maxY { hit = s; return }
+            }
+            v.subviews.forEach(find)
+        }
+        find(w)
+        guard let s = hit else { return false }
+        let maxX = max(0, s.contentSize.width - s.bounds.width)
+        var x = s.contentOffset.x
+        switch dir {
+        case "start": x = 0
+        case "end": x = maxX
+        case "left": x -= s.bounds.width * 0.8
+        default: x += s.bounds.width * 0.8
+        }
+        s.setContentOffset(CGPoint(x: min(maxX, max(0, x)), y: s.contentOffset.y), animated: false)
         return true
     }
 }

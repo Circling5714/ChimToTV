@@ -77,6 +77,12 @@ class MainActivity : BaseActivity() {
     private var loadedMix: Boolean? = null
     private var loadedKids: Boolean? = null
 
+    /** Bố cục lần trước là cầm dọc (đổi thì trang chủ tổng hợp xếp lại: lưới ↔ dải vuốt ngang). */
+    private var layoutNarrow: Boolean? = null
+
+    /** Trang chủ tổng hợp trên điện thoại cầm dọc: mỗi hàng là một dải vuốt ngang (như bản iPhone). */
+    private val strips get() = Screen.narrow(this) && Prefs.homeMixOn
+
     private var categories: List<Category> = emptyList()
     private var token = 0
     private var nextUrl: String? = null
@@ -191,10 +197,19 @@ class MainActivity : BaseActivity() {
         val widthDp = resources.configuration.screenWidthDp.takeIf { it > 0 }
             ?: (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
         val span = max(3, (widthDp - if (narrow) 16 else 240) / 135)
-        if (span != gridAdapter.spanCount || (grid.layoutManager as GridLayoutManager).spanCount != span) {
+        // Dải vuốt ngang (trang chủ tổng hợp, cầm dọc): thấy trọn span phim và một phần phim kế
+        val stripW = (dp(widthDp - 16) / (span + 0.35f)).toInt()
+        val changed = span != gridAdapter.spanCount || (grid.layoutManager as GridLayoutManager).spanCount != span ||
+            narrow != layoutNarrow || stripW != gridAdapter.stripCellWidth
+        layoutNarrow = narrow
+        gridAdapter.stripCellWidth = stripW
+        if (changed) {
             gridAdapter.spanCount = span
             (grid.layoutManager as GridLayoutManager).spanCount = span
-            if (mainStarted && homeToken == token) refreshHead() // hàng Xem tiếp lấy đúng số phim một hàng
+            // Hàng Xem tiếp lấy đúng số phim một hàng; trang chủ tổng hợp xếp lại các hàng (lưới ↔ dải vuốt ngang)
+            if (mainStarted && homeToken == token) {
+                if (Prefs.homeMixOn && moreFrom == null && feedSnap != null) relayoutFeed() else refreshHead()
+            }
         }
         // Giữ sẵn nhiều ô để cuộn qua lại không phải dựng lại
         grid.setItemViewCacheSize(gridAdapter.spanCount * 3)
@@ -825,8 +840,15 @@ class MainActivity : BaseActivity() {
 
     /** Khoá của ô đang chọn trong lưới (địa chỉ phim / id hàng «Xem thêm» / id chủ đề). */
     private fun focusedKey(): String? {
-        val pos = grid.focusedChild?.let { grid.getChildAdapterPosition(it) } ?: return null
-        return keyOf(gridAdapter.items.getOrNull(pos))
+        val child = grid.focusedChild ?: return null
+        val row = gridAdapter.items.getOrNull(grid.getChildAdapterPosition(child))
+        if (row is StripRow) {
+            // Ô đang chọn nằm trong một dải vuốt ngang
+            val list = child as? RecyclerView ?: return null
+            val i = list.focusedChild?.let { list.getChildAdapterPosition(it) } ?: return null
+            return keyOf(row.cells.getOrNull(i))
+        }
+        return keyOf(row)
     }
 
     private fun keyOf(r: GridRow?): String? = when (r) {
@@ -837,12 +859,35 @@ class MainActivity : BaseActivity() {
     }
 
     private fun focusKeyAfterSubmit(key: String) {
-        val i = gridAdapter.items.indexOfFirst { keyOf(it) == key }.takeIf { it >= 0 } ?: gridAdapter.firstFilmPosition()
+        val rows = gridAdapter.items
+        var i = rows.indexOfFirst { keyOf(it) == key }
+        var j = -1 // vị trí trong dải vuốt ngang
+        if (i < 0) {
+            i = rows.indexOfFirst { r -> r is StripRow && r.cells.any { keyOf(it) == key } }
+            if (i >= 0) j = (rows[i] as StripRow).cells.indexOfFirst { keyOf(it) == key }
+        }
+        if (i < 0) i = gridAdapter.firstFilmPosition()
         if (i < 0) return
+        if (j >= 0) {
+            // Ô trong dải vuốt ngang. Cảm ứng: chỉ cuộn tới hàng (tiêu đề + dải), dải giữ chỗ đã vuốt tới. Remote / bàn
+            // phím: dải gắn vào lưới (ngay sau submit) thì tự cuộn tới ô và chọn ô đó
+            if (!TouchUi.active) gridAdapter.stripFocus = (gridAdapter.items[i] as StripRow).key to j
+            grid.post { (grid.layoutManager as GridLayoutManager).scrollToPositionWithOffset(max(0, i - 1), 0) }
+            return
+        }
         grid.post {
             grid.scrollToPosition(i)
             grid.post { grid.findViewHolderForAdapterPosition(i)?.itemView?.focusForRemote() }
         }
+    }
+
+    /** Xoay máy (cầm dọc ↔ ngang): xếp lại trang chủ tổng hợp từ lần tải gần nhất, giữ ô đang chọn. */
+    private fun relayoutFeed() {
+        val snap = feedSnap ?: return
+        val focusKey = focusedKey()
+        head = headRows()
+        gridAdapter.submit(head + feedRows(snap), focusFirst = false)
+        if (focusKey != null) focusKeyAfterSubmit(focusKey)
     }
 
     /** Các hàng phim của trang chủ tổng hợp (dưới «Có tập mới» / «Xem tiếp»): mỗi hàng một dòng, ô cuối «Xem thêm». */
@@ -855,8 +900,15 @@ class MainActivity : BaseActivity() {
             HomeFeed.TOPICS.forEach { (id, label) -> out += ChipRow(id, label, id in on) }
         }
         for (row in snap.rows) {
-            out += HeaderRow(row.title)
             val n = row.cards.size
+            if (strips) {
+                // Dải vuốt ngang: tới STRIP_MAX phim; còn nữa (hoặc nguồn có trang sau) thì «Xem thêm ›» ở tiêu đề + ô cuối dải
+                val more = if (n > STRIP_MAX || row.more != null) MoreRow(row.id, row.title, if (row.more != null) 0 else n) else null
+                out += HeaderRow(row.title, more)
+                out += StripRow(row.id, row.cards.take(STRIP_MAX).map { FilmRow(it.film, chip = it.chip, links = it.links) } + listOfNotNull(more))
+                continue
+            }
+            out += HeaderRow(row.title)
             val show = if (n > span) row.cards.take(span - 1) else row.cards
             show.forEach { c -> out += FilmRow(c.film, chip = c.chip, links = c.links) }
             // Hàng có danh sách nhiều trang của nguồn: không ghi số phim (mới tải trang đầu)
@@ -972,6 +1024,9 @@ class MainActivity : BaseActivity() {
         /** Chờ nguồn chậm về muộn: 5 lần, mỗi lần 4 giây. */
         const val LATE_TRIES = 5
         const val LATE_STEP = 4_000L
+
+        /** Số phim tối đa một dải vuốt ngang (còn lại xem ở «Xem thêm»). */
+        const val STRIP_MAX = 12
     }
 
     /**
@@ -1055,15 +1110,18 @@ class MainActivity : BaseActivity() {
         val followed = Prefs.follows.map { KkPhim.norm(it.title) }.toSet()
         // Đã mở phim / xem tập mới từ lúc dựng trang (seenEp tăng) thì thôi báo
         val auto = if (!Prefs.homeMixOn) emptyList() else autoFresh.filter { (Prefs.seenEp(it.key) ?: -1.0) < it.ep && it.key !in followed }
+        val strips = strips
         if (fresh.isNotEmpty() || auto.isNotEmpty()) {
             rows += HeaderRow("Có tập mới")
-            fresh.forEach { rows += FilmRow(followFilm(it), removable = true, follow = true) }
-            auto.forEach { rows += FilmRow(it.card.film, chip = it.card.chip, links = it.card.links) }
+            val cells = fresh.map { FilmRow(followFilm(it), removable = true, follow = true) } +
+                auto.map { FilmRow(it.card.film, chip = it.card.chip, links = it.card.links) }
+            if (strips) rows += StripRow("head-new", cells) else rows += cells
         }
-        val items = Prefs.history.take(gridAdapter.spanCount)
+        val items = Prefs.history.take(if (strips) STRIP_MAX else gridAdapter.spanCount)
         if (items.isNotEmpty()) {
             rows += HeaderRow("Xem tiếp")
-            items.forEach { rows += FilmRow(historyFilm(it), resume = true, removable = true) }
+            val cells = items.map { FilmRow(historyFilm(it), resume = true, removable = true) }
+            if (strips) rows += StripRow("head-continue", cells) else rows += cells
         }
         return rows
     }
