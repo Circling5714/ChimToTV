@@ -279,6 +279,7 @@ enum DebugRoutes {
             return go(q)
         case "/row":
             // Sửa nhanh hàng trang chủ (như giữ ô phim): /row?id=<id hàng>&do=info|hide|up|down|rows|sources
+            let app = AppModel.shared
             guard let id = q["id"] ?? (q["do"] == "rows" || q["do"] == "sources" ? "" : nil) else { return .text("thiếu id", status: 400) }
             switch q["do"] ?? "info" {
             case "hide": app.hideRow(id)
