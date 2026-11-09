@@ -55,16 +55,37 @@ public static class KeyNav
         }
     }
 
-    /// Mục kế tiếp theo hướng (null = không còn mục nào theo hướng đó).
+    /// Dải vuốt ngang chứa e (null: không nằm trong dải).
+    private static StripScroller? StripOf(DependencyObject e)
+    {
+        for (var d = VisualTreeHelper.GetParent(e); d != null; d = VisualTreeHelper.GetParent(d))
+            if (d is StripScroller s) return s;
+        return null;
+    }
+
+    /// Ô đang thấy (cả một phần) trong dải.
+    private static bool InView(FrameworkElement t, StripScroller s)
+    {
+        var r = Bounds(t, s);
+        return !r.IsEmpty && r.Right > 12 && r.Left < s.ViewportWidth - 12;
+    }
+
+    /// Mục kế tiếp theo hướng (null = không còn mục nào theo hướng đó). Ô của dải vuốt ngang đang khuất chỉ chọn được bằng
+    /// ◄ ► trong chính dải đó (▲ ▼ chọn ô đang thấy của dải kia).
     public static FrameworkElement? Next(Visual root, FrameworkElement current, Dir dir)
     {
         var cur = Bounds(current, root);
         if (cur.IsEmpty) return null;
+        var curStrip = StripOf(current);
         FrameworkElement? best = null, bestRow = null;
         double bestScore = double.MaxValue, bestRowScore = double.MaxValue;
         foreach (var t in Targets(root))
         {
             if (ReferenceEquals(t, current)) continue;
+            var ts = StripOf(t);
+            // ◄ ► trong dải: chỉ đi trong chính dải (cuối dải thì đứng yên; ◄ ở đầu dải ra được menu bên trái — ngoài dải)
+            if (curStrip != null && dir is Dir.Left or Dir.Right && ts != null && !ReferenceEquals(ts, curStrip)) continue;
+            if (ts != null && !(dir is Dir.Left or Dir.Right && ReferenceEquals(ts, curStrip)) && !InView(t, ts)) continue;
             var r = Bounds(t, root);
             if (r.IsEmpty) continue;
             double major, minor;

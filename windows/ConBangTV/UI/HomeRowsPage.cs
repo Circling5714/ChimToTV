@@ -252,3 +252,69 @@ public sealed class AddHomeRowPage : Page
         Main.Back();
     }
 }
+
+/// Cài đặt → «Nguồn cho trang chủ…» (riêng từng người xem; bản Android: HomeRowsUi.sources, iPad: HomeSourcesView): bật / tắt
+/// từng nguồn của trang chủ tổng hợp (HomeFeed.SourceNames; chỉ nguồn có trong danh sách trang). Còn một nguồn thì không tắt
+/// được. Quay về trang chủ thì tải lại.
+public sealed class HomeSourcesPage : Page
+{
+    public HomeSourcesPage()
+    {
+        MenuKey = "settings";
+    }
+
+    protected override Task Load()
+    {
+        Build();
+        return Task.CompletedTask;
+    }
+
+    private void Toggle(string id, List<string> ids)
+    {
+        var off = Prefs.HomeSrcOff;
+        if (!off.Remove(id))
+        {
+            if (ids.Count(x => !off.Contains(x)) <= 1)
+            {
+                Main.Toast("Cần ít nhất một nguồn cho trang chủ.");
+                return;
+            }
+            off.Add(id);
+        }
+        Prefs.HomeSrcOff = off;
+        Build(id);
+    }
+
+    private void Build(string? focus = null)
+    {
+        Body.Children.Clear();
+        var who = Prefs.Profiles.Count >= 2 ? $" — {Prefs.CurrentProfile.Name}" : "";
+        Body.Children.Add(Ui.Header($"Nguồn cho trang chủ{who}"));
+        Body.Children.Add(Ui.Dim("Nguồn tắt thì trang chủ không tải phim của nguồn đó. Hàng lọc theo thể loại / nước lấy từ KKPhim — tắt KKPhim thì " +
+                                 "lấy VSMOV. Phim theo dõi vẫn báo tập mới. Cần ít nhất một nguồn; nguồn không có trong danh sách trang thì không " +
+                                 "hiện ở đây." + (Prefs.HomeMixOn ? "" : "\nTrang chủ đang theo trang đang dùng — cài đặt này dùng khi chọn «Tổng hợp mọi nguồn»."),
+            13.5, new Thickness(0, 0, 0, 14)));
+        var all = HomeFeed.AllSources();
+        var ids = all.Ids;
+        var off = Prefs.HomeSrcOff;
+        foreach (var (id, name) in HomeFeed.SourceNames)
+        {
+            if (!ids.Contains(id)) continue;
+            var on = !off.Contains(id);
+            var label = id == "web" ? name + ": " + string.Join(", ", all.Web.Select(Site.HostOf).OfType<string>()) : name;
+            var b = Ui.Pill((on ? "✓  " : "✗  ") + label + (on ? "" : "  (tắt)"), () => Toggle(id, ids));
+            b.Uid = id;
+            b.HorizontalAlignment = HorizontalAlignment.Left;
+            b.HorizontalContentAlignment = HorizontalAlignment.Left;
+            b.MinWidth = 560;
+            b.Opacity = on ? 1 : 0.6;
+            b.Margin = new Thickness(0, 0, 0, 8);
+            Body.Children.Add(b);
+        }
+        Dispatcher.BeginInvoke(() =>
+        {
+            var targets = KeyNav.Targets(Body).ToList();
+            if (((focus != null ? targets.FirstOrDefault(x => x.Uid == focus) : null) ?? targets.FirstOrDefault()) is { } el) KeyNav.FocusAndShow(el);
+        }, DispatcherPriority.Loaded);
+    }
+}

@@ -173,7 +173,7 @@ public static class Prefs
         // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy, hồ sơ trẻ em, ngôn ngữ bản hay xem
         "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
         // Các hàng trang chủ (bật / tắt, thứ tự) và hàng tự thêm
-        "home_rows", "home_custom",
+        "home_rows", "home_custom", "home_src_off",
     };
 
     private static readonly string[] ProfilePrefixes = { "server_type@", "server_label@" };
@@ -423,6 +423,13 @@ public static class Prefs
 
     /// Trang chủ tổng hợp đang dùng (người xem chọn, hoặc hồ sơ trẻ em).
     public static bool HomeMixOn => HomeMix || Kids;
+
+    /// Nguồn trang chủ tổng hợp người xem đã tắt (id trong HomeFeed.SourceNames: kk, nc, vs, k20, web); rỗng = mọi nguồn.
+    public static HashSet<string> HomeSrcOff
+    {
+        get => (Get<List<string>>(K("home_src_off")) ?? new()).ToHashSet();
+        set => Set(K("home_src_off"), value.OrderBy(x => x).ToList());
+    }
 
     /// Các hàng trang chủ theo thứ tự người xem chọn (Cài đặt → Trang chủ → Các hàng): "id" = bật, "-id" = tắt; rỗng = mặc
     /// định. Đọc qua HomeFeed.RowPrefs (ghép với các hàng mặc định).

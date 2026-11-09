@@ -41,6 +41,10 @@ public partial class App : Application
         Log.D("app", $"Mở bản {UpdateCheck.CurrentVersion} ({string.Join(' ', e.Args)})");
         UpdateCheck.Cleanup();
         DispatcherUnhandledException += OnUnhandled;
+        // Máy có card đồ hoạ / trình điều khiển lỗi (cửa sổ chỉ vẽ một phần, còn lại trắng): CONBANG_SOFTWARE_RENDER=1 thì vẽ
+        // bằng CPU
+        if (Environment.GetEnvironmentVariable("CONBANG_SOFTWARE_RENDER") == "1")
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         TaskScheduler.UnobservedTaskException += (_, ev) =>
         {
             Log.D("lỗi", ev.Exception.ToString());

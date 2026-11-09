@@ -130,13 +130,15 @@ public partial class MainWindow : Window
     {
         var b = Prefs.WindowBounds;
         if (b is not { Length: 5 }) return;
-        var area = SystemParameters.VirtualScreenWidth;
-        if (b[0] < SystemParameters.VirtualScreenLeft - 50 || b[0] > SystemParameters.VirtualScreenLeft + area - 100) return;
+        // Kéo cửa sổ về trong màn hình (lần trước nằm sát mép dưới / màn hình phụ đã rút ra / đổi độ phân giải: phần ngoài màn
+        // hình không vẽ — trông như cửa sổ trắng một nửa)
+        double vl = SystemParameters.VirtualScreenLeft, vt = SystemParameters.VirtualScreenTop;
+        double vw = SystemParameters.VirtualScreenWidth, vh = SystemParameters.VirtualScreenHeight;
         WindowStartupLocation = WindowStartupLocation.Manual;
-        Left = b[0];
-        Top = b[1];
-        Width = Math.Max(MinWidth, b[2]);
-        Height = Math.Max(MinHeight, b[3]);
+        Width = Math.Min(Math.Max(MinWidth, b[2]), vw);
+        Height = Math.Min(Math.Max(MinHeight, b[3]), vh);
+        Left = Math.Clamp(b[0], vl, Math.Max(vl, vl + vw - Width));
+        Top = Math.Clamp(b[1], vt, Math.Max(vt, vt + vh - Height));
         if (b[4] > 0) WindowState = WindowState.Maximized;
     }
 

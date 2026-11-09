@@ -227,9 +227,19 @@ public sealed class SettingsPage : Page
             if (Prefs.Kids && Prefs.HasParentPin && !await Main.CheckParent("Nhập mã PIN phụ huynh để sửa các hàng trang chủ.")) return;
             Main.Push(new HomeRowsPage());
         });
-        rows.HorizontalAlignment = HorizontalAlignment.Left;
-        rows.Margin = new Thickness(0, 10, 0, 4);
-        Body.Children.Add(rows);
+        // Nguồn cho trang chủ tổng hợp (riêng từng người xem): bật / tắt KKPhim, NguonC, VSMOV, CLB Phim Xưa, trang web
+        var ids = HomeFeed.AllSources().Ids;
+        var onCount = ids.Count(x => !Prefs.HomeSrcOff.Contains(x));
+        var sources = Ui.Pill($"Nguồn cho trang chủ: {(onCount > 0 ? onCount : ids.Count)} / {ids.Count}…", async () =>
+        {
+            if (Prefs.Kids && Prefs.HasParentPin && !await Main.CheckParent("Nhập mã PIN phụ huynh để sửa trang chủ.")) return;
+            Main.Push(new HomeSourcesPage());
+        });
+        var homeRow = Ui.Row(rows, sources);
+        homeRow.Margin = new Thickness(0, 10, 0, 4);
+        Body.Children.Add(homeRow);
+        Body.Children.Add(Ui.Dim("Trên trang chủ: nhấn phải (hoặc phím Menu / M) trên một phim của hàng để ẩn / chuyển nhanh hàng đó.", 13.5,
+            new Thickness(0, 0, 0, 4)));
         var resting = Feed.RestingHosts();
         if (resting.Count > 0)
         {

@@ -82,4 +82,53 @@ public class HomeRowsTests
         var prefs = new List<(string Id, bool On)> { ("interest2", true), ("similar", true), ("interest", false), ("dominant", true), ("newest", true) };
         Assert.Equal(new[] { "interest-tien-hiep", "similar", "dominant", "newest" }, HomeFeed.Arrange(rows, prefs).Select(r => r.Id));
     }
+
+    /// Sửa nhanh trên trang chủ: chuyển qua hàng đang hiện kề nó (hàng tắt / không hiện nằm giữa bị vượt qua).
+    [Fact]
+    public void MoveShownSkipsHiddenRows()
+    {
+        var prefs = new List<(string Id, bool On)> { ("new-eps", true), ("continue", true), ("similar", true), ("interest", false), ("dominant", true),
+            ("newest", true), ("movies", true) };
+        var shown = new List<string> { "similar", "dominant", "movies" }; // «Mới cập nhật» không đủ phim nên không hiện
+        Assert.Equal(new[] { "new-eps", "continue", "dominant", "similar", "interest", "newest", "movies" },
+            Ids(HomeFeed.MoveShown(prefs, shown, "dominant", true)!));
+        var down = HomeFeed.MoveShown(prefs, shown, "dominant", false)!;
+        Assert.Equal(new[] { "new-eps", "continue", "similar", "interest", "newest", "movies", "dominant" }, Ids(down));
+        Assert.False(down.First(x => x.Id == "interest").On);
+        Assert.Null(HomeFeed.MoveShown(prefs, shown, "similar", true));
+        Assert.Null(HomeFeed.MoveShown(prefs, shown, "movies", false));
+        Assert.Null(HomeFeed.MoveShown(prefs, new List<string> { "continue", "similar" }, "continue", false));
+        Assert.Null(HomeFeed.MoveShown(prefs, shown, "newest", true));
+    }
+
+    [Fact]
+    public void HideTurnsOffOnlyThatRow()
+    {
+        var h = HomeFeed.Hide(new List<(string Id, bool On)> { ("similar", true), ("custom-a", true), ("movies", false) }, "custom-a");
+        Assert.Equal(new[] { "similar=True", "custom-a=False", "movies=False" }, h.Select(x => $"{x.Id}={x.On}"));
+    }
+
+    [Fact]
+    public void ArrangeSlotsKeepsSlotOfLegacyRows()
+    {
+        static FeedRow Row(string id, string slot = "") => new(id, id, new(), null, slot);
+        var rows = new List<FeedRow> { Row("interest-a"), Row("custom-x", "custom-x"), Row("interest-b") };
+        var prefs = new List<(string Id, bool On)> { ("custom-x", true), ("interest2", true), ("interest", true) };
+        Assert.Equal(new[] { "custom-x=custom-x", "interest-b=interest2", "interest-a=interest" },
+            HomeFeed.ArrangeSlots(rows, prefs).Select(x => $"{x.Row.Id}={x.Slot}"));
+    }
+
+    /// Nguồn tắt thì bỏ; tắt hết nguồn đang có thì coi như bật hết (trang chủ không trống).
+    [Fact]
+    public void SourcesOff()
+    {
+        var all = new HomeFeed.Sources("https://kk", "https://nc", null, "https://k20", new() { "https://web1", "https://web2" });
+        Assert.Equal(new[] { "kk", "nc", "k20", "web" }, all.Ids);
+        var s = HomeFeed.WithoutOff(all, new HashSet<string> { "kk", "web", "vs" });
+        Assert.Equal(new[] { "nc", "k20" }, s.Ids);
+        Assert.Null(s.Kk);
+        Assert.Empty(s.Web);
+        Assert.Equal(all.Ids, HomeFeed.WithoutOff(all, new HashSet<string> { "kk", "nc", "k20", "web" }).Ids);
+        Assert.Equal(new[] { "nc" }, HomeFeed.WithoutOff(new HomeFeed.Sources(null, "https://nc", null, null, new()), new HashSet<string> { "kk" }).Ids);
+    }
 }

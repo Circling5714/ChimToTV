@@ -135,7 +135,11 @@ public static class HomeFeed
 
     /// Xếp các hàng theo cài đặt của người xem: bỏ hàng đã tắt, theo thứ tự đã chọn; hàng chủ đề bản cũ ("topics") đầu, hàng
     /// lạ cuối.
-    public static List<FeedRow> Arrange(List<FeedRow> rows, List<(string Id, bool On)>? prefs = null)
+    public static List<FeedRow> Arrange(List<FeedRow> rows, List<(string Id, bool On)>? prefs = null) =>
+        ArrangeSlots(rows, prefs).Select(x => x.Row).ToList();
+
+    /// Như Arrange, kèm loại hàng (id trong cài đặt) của từng hàng — kể cả hàng lưu từ bản cũ (chưa ghi Slot).
+    public static List<(FeedRow Row, string Slot)> ArrangeSlots(List<FeedRow> rows, List<(string Id, bool On)>? prefs = null)
     {
         prefs ??= RowPrefs();
         var pos = new Dictionary<string, int>();
@@ -150,7 +154,37 @@ public static class HomeFeed
         }
         int Rank(string slot) => slot == "topics" ? -1 : pos.TryGetValue(slot, out var p) ? p : int.MaxValue;
         return keyed.Where(x => !pos.TryGetValue(x.Slot, out var p) || p != -1)
-            .OrderBy(x => Rank(x.Slot)).ThenBy(x => x.Index).Select(x => x.Row).ToList();
+            .OrderBy(x => Rank(x.Slot)).ThenBy(x => x.Index).Select(x => (x.Row, x.Slot)).ToList();
+    }
+
+    /// Lưu cài đặt các hàng ("id" bật, "-id" tắt).
+    public static void SaveRows(List<(string Id, bool On)> prefs) =>
+        Prefs.HomeRows = prefs.Select(p => p.On ? p.Id : "-" + p.Id).ToList();
+
+    /// Tắt một hàng (sửa nhanh trên trang chủ: «Ẩn hàng này»).
+    public static List<(string Id, bool On)> Hide(List<(string Id, bool On)> prefs, string slot) =>
+        prefs.Select(p => p.Id == slot ? (slot, false) : p).ToList();
+
+    /// Sửa nhanh trên trang chủ: chuyển hàng slot lên / xuống qua hàng đang hiện kề nó (shown = loại hàng đang hiện, theo thứ
+    /// tự trên trang — hàng tắt / không đủ phim nằm giữa bị vượt qua). null: không chuyển được (hàng đầu / cuối, «Có tập
+    /// mới» / «Xem tiếp», hàng chủ đề bản cũ).
+    public static List<(string Id, bool On)>? MoveShown(List<(string Id, bool On)> prefs, List<string> shown, string slot, bool up)
+    {
+        bool Fixed(string s) => HeadRows.Contains(s) || s == "topics";
+        var i = shown.IndexOf(slot);
+        if (i < 0 || Fixed(slot)) return null;
+        var j = up ? i - 1 : i + 1;
+        if (j < 0 || j >= shown.Count || Fixed(shown[j])) return null;
+        var other = shown[j];
+        var output = prefs.ToList();
+        var at = output.FindIndex(p => p.Id == slot);
+        if (at < 0) return null;
+        var me = output[at];
+        output.RemoveAt(at);
+        var k = output.FindIndex(p => p.Id == other);
+        if (k < 0) return null;
+        output.Insert(up ? k : k + 1, me);
+        return output;
     }
 
     /// Chủ đề cho người xem chưa có lịch sử (id lưu trong Prefs.HomeTopics).
@@ -164,9 +198,34 @@ public static class HomeFeed
     public sealed record Sources(string? Kk, string? Nc, string? Vs, string? K20, List<string> Web)
     {
         public int Count => new[] { Kk, Nc, Vs, K20 }.Count(x => x != null) + Web.Count;
+
+        /// id (trong HomeFeed.SourceNames) của các nguồn có mặt.
+        public List<string> Ids =>
+            new[] { Kk != null ? "kk" : null, Nc != null ? "nc" : null, Vs != null ? "vs" : null, K20 != null ? "k20" : null, Web.Count > 0 ? "web" : null }
+                .OfType<string>().ToList();
     }
 
-    public static Sources GetSources()
+    /// Nguồn của trang chủ tổng hợp người xem bật / tắt được (Cài đặt → «Nguồn cho trang chủ…», riêng từng người; khoá
+    /// Prefs.HomeSrcOff), theo thứ tự hiện. «web» = trang đang dùng + trang xem gần đây.
+    public static readonly (string Id, string Label)[] SourceNames =
+    {
+        ("kk", "KKPhim"), ("nc", "NguonC"), ("vs", "VSMOV"), ("k20", "CLB Phim Xưa"), ("web", "Trang đang dùng và trang xem gần đây"),
+    };
+
+    /// Bỏ các nguồn người xem đã tắt. Tắt hết các nguồn đang có (vd nguồn còn bật vừa bị xoá khỏi danh sách trang) thì coi như
+    /// bật hết — trang chủ không bao giờ trống vì cài đặt nguồn.
+    public static Sources WithoutOff(Sources all, ICollection<string> off)
+    {
+        if (all.Ids.All(off.Contains)) return all;
+        return new Sources(off.Contains("kk") ? null : all.Kk, off.Contains("nc") ? null : all.Nc, off.Contains("vs") ? null : all.Vs,
+            off.Contains("k20") ? null : all.K20, off.Contains("web") ? new() : all.Web);
+    }
+
+    /// Nguồn trang chủ của người xem đang dùng (đã bỏ nguồn tắt).
+    public static Sources GetSources() => WithoutOff(AllSources(), Prefs.HomeSrcOff);
+
+    /// Mọi nguồn có trong danh sách trang (cả nguồn người xem đã tắt).
+    public static Sources AllSources()
     {
         var sites = Prefs.Sites;
         var baseUrl = Prefs.BaseUrl;

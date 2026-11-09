@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using ConBangTV.Core;
 
@@ -100,6 +102,88 @@ public static class Ui
         return p;
     }
 
+    /// <summary>
+    /// Hàng vuốt ngang của trang chủ tổng hợp: tiêu đề (+ «Xem thêm ›» bên phải cho chuột), dải cuộn ngang các thẻ (phím ◄ ►
+    /// cuộn theo ô đang chọn; chuột: nút ‹ › hiện khi rê chuột, Shift + lăn chuột). title: tiêu đề (nhấn phải để sửa nhanh hàng).
+    /// </summary>
+    public static StackPanel Strip(TextBlock title, IEnumerable<UIElement> cards, Action? more = null)
+    {
+        var p = new StackPanel { Margin = new Thickness(0, 0, 0, 2) };
+        var head = new DockPanel { Margin = new Thickness(0, 6, 0, 10), LastChildFill = true };
+        if (more != null)
+        {
+            var link = new Button
+            {
+                Content = "Xem thêm ›", Focusable = false, Background = Brushes.Transparent, Foreground = Res("Brand"),
+                Padding = new Thickness(8, 2, 4, 2), Margin = new Thickness(12, 0, 0, 0), FontSize = 15, FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Bottom,
+            };
+            link.Click += (_, _) => more();
+            DockPanel.SetDock(link, Dock.Right);
+            head.Children.Add(link); // chỉ để bấm chuột — phím đã có ô «Xem thêm» cuối dải
+        }
+        head.Children.Add(title);
+        p.Children.Add(head);
+
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 10, 10, 0) };
+        foreach (var c in cards) row.Children.Add(c);
+        // Lề âm: thẻ phóng to khi chọn không bị cắt ở mép dải mà vẫn thẳng hàng với tiêu đề
+        var sv = new StripScroller
+        {
+            Content = row, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Focusable = false, PanningMode = PanningMode.HorizontalOnly, Margin = new Thickness(-10, -10, -10, 0),
+        };
+        Button Arrow(string text, HorizontalAlignment side, int dir)
+        {
+            var b = new Button
+            {
+                Content = text, Focusable = false, Width = 46, Height = 72, FontSize = 30, Padding = new Thickness(0, -6, 0, 0),
+                HorizontalAlignment = side, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 100, 0, 0),
+                Background = new SolidColorBrush(Color.FromArgb(0xE0, 0x17, 0x1A, 0x21)), Visibility = Visibility.Collapsed,
+            };
+            b.Click += (_, _) => sv.ScrollToHorizontalOffset(sv.HorizontalOffset + dir * Math.Max(200, sv.ViewportWidth * 0.8));
+            return b;
+        }
+        var left = Arrow("‹", HorizontalAlignment.Left, -1);
+        var right = Arrow("›", HorizontalAlignment.Right, 1);
+        var box = new Grid();
+        box.Children.Add(sv);
+        box.Children.Add(left);
+        box.Children.Add(right);
+        void Arrows()
+        {
+            var hover = box.IsMouseOver;
+            left.Visibility = hover && sv.HorizontalOffset > 1 ? Visibility.Visible : Visibility.Collapsed;
+            right.Visibility = hover && sv.HorizontalOffset < sv.ScrollableWidth - 1 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        box.MouseEnter += (_, _) => Arrows();
+        box.MouseLeave += (_, _) => Arrows();
+        sv.ScrollChanged += (_, _) => Arrows();
+        p.Children.Add(box);
+        return p;
+    }
+
+    /// Ô «Xem thêm» hẹp cuối dải vuốt ngang (cao bằng poster); count: số phim (null = không ghi).
+    public static Button MoreTile(Action onClick, string? count)
+    {
+        var text = new TextBlock { TextAlignment = TextAlignment.Center, FontSize = 15, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+        text.Inlines.Add(new Run("›") { FontSize = 34 });
+        text.Inlines.Add(new LineBreak());
+        text.Inlines.Add(new Run("Xem thêm"));
+        if (count != null)
+        {
+            text.Inlines.Add(new LineBreak());
+            text.Inlines.Add(new Run(count) { FontSize = 13, FontWeight = FontWeights.Normal });
+        }
+        var b = new Button
+        {
+            Content = text, Width = 112, Height = 248, Padding = new Thickness(6), Margin = new Thickness(0, 0, 18, 22),
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        b.Click += (_, _) => onClick();
+        return b;
+    }
+
     public static ScrollViewer Scroll(UIElement content) => new()
     {
         Content = content,
@@ -123,4 +207,16 @@ public static class Ui
 
     /// "12:30 / 23:00" → phần đã xem.
     public static double Progress(int pos, double duration) => duration > 0 ? pos / duration : -1;
+}
+
+/// Dải vuốt ngang (Ui.Strip): lăn chuột dọc để trang cuộn (ScrollViewer mặc định nuốt mất), Shift + lăn chuột cuộn dải. KeyNav
+/// nhận ra dải để ▲ ▼ chỉ chọn ô đang thấy.
+public sealed class StripScroller : ScrollViewer
+{
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) == 0) return;
+        ScrollToHorizontalOffset(HorizontalOffset - e.Delta);
+        e.Handled = true;
+    }
 }

@@ -15,25 +15,23 @@ public sealed class HomePage : Page
     private string _base = "";
     private bool _mix;
     private bool _kids;
-    /// Cài đặt các hàng lúc tải (thứ tự / bật tắt + hàng tự thêm): đổi thì tải lại.
+    /// Cài đặt các hàng lúc tải (thứ tự / bật tắt + hàng tự thêm + nguồn tắt): đổi thì tải lại.
     private string _rows = "";
     private HomeFeed.Snapshot? _snap;
 
+    /// Số phim tối đa một dải vuốt ngang (còn lại xem ở «Xem thêm»).
+    private const int StripMax = 12;
+
     private static string RowsSignature() =>
-        string.Join(",", Prefs.HomeRows) + "|" + string.Join(",", Prefs.HomeCustom.Select(c => $"{c.Id};{c.Topic};{c.Type};{c.Country};{c.Genre};{c.Lang}"));
+        string.Join(",", Prefs.HomeRows) + "|" + string.Join(",", Prefs.HomeCustom.Select(c => $"{c.Id};{c.Topic};{c.Type};{c.Country};{c.Genre};{c.Lang}")) +
+        "|" + string.Join(",", Prefs.HomeSrcOff.OrderBy(x => x));
     private long _feedAt;
     private int _run;
-    private int _cols;
     private TextBlock? _note;
 
     public HomePage()
     {
         MenuKey = "home";
-        // Đổi cỡ cửa sổ: xếp lại các hàng một dòng
-        Scroller.SizeChanged += (_, _) =>
-        {
-            if (_mix && _snap != null && Columns() != _cols) BuildMix();
-        };
     }
 
     protected override async Task Load()
@@ -133,20 +131,97 @@ public sealed class HomePage : Page
             if (KeyNav.Targets(Body).FirstOrDefault(x => x.Uid == uid) is { } el) KeyNav.FocusAndShow(el);
         }, DispatcherPriority.Loaded);
 
-    /// Số ô một dòng theo bề rộng (thẻ phim 168 + lề 18).
-    private int Columns()
+
+    /// Một hàng vuốt ngang của trang chủ tổng hợp; rowId: id hàng (nhấn phải / phím Menu / M trên phim hoặc tên hàng → sửa nhanh).
+    private UIElement Strip(string title, string rowId, List<UIElement> cards, Action? more = null)
     {
-        var w = Scroller.ViewportWidth > 0 ? Scroller.ViewportWidth : Scroller.ActualWidth;
-        if (w <= 0) return 6;
-        return Math.Max(2, (int)((w - Body.Margin.Left - Body.Margin.Right + 18) / 186));
+        var t = Ui.Text(title, 21, weight: FontWeights.SemiBold, wrap: false);
+        t.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _ = RowMenu(rowId);
+        };
+        foreach (var c in cards.OfType<Button>()) MenuOn(c, rowId);
+        return Ui.Strip(t, cards, more);
     }
 
-    /// Dựng trang chủ tổng hợp từ lần tải gần nhất: Có tập mới, Xem tiếp, (chọn chủ đề), các hàng một dòng + «Xem thêm ›».
+    /// Nhấn phải / phím Menu (Apps) / Shift + F10 / M trên ô → sửa nhanh hàng.
+    private void MenuOn(Button b, string rowId)
+    {
+        b.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _ = RowMenu(rowId);
+        };
+        b.PreviewKeyDown += (_, e) =>
+        {
+            var k = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (k is not (Key.Apps or Key.M) && !(k == Key.F10 && Keyboard.Modifiers == ModifierKeys.Shift)) return;
+            e.Handled = true;
+            _ = RowMenu(rowId);
+        };
+    }
+
+    /// <summary>
+    /// Sửa nhanh một hàng trang chủ: ẩn, ▲ chuyển lên / ▼ chuyển xuống (qua hàng đang hiện kề nó), «Các hàng…», «Nguồn…».
+    /// Hồ sơ trẻ em: hỏi mã PIN phụ huynh trước (nếu đã đặt).
+    /// </summary>
+    private async Task RowMenu(string rowId)
+    {
+        if (Prefs.Kids && Prefs.HasParentPin && !await Main.CheckParent("Nhập mã PIN phụ huynh để sửa trang chủ.")) return;
+        var arranged = _snap != null && _mix ? HomeFeed.ArrangeSlots(_snap.Rows) : new();
+        string title, slot;
+        if (rowId == "new-eps") (title, slot) = ("Có tập mới", rowId);
+        else if (rowId == "continue") (title, slot) = ("Xem tiếp", rowId);
+        else
+        {
+            var r = arranged.FirstOrDefault(x => x.Row.Id == rowId);
+            if (r.Row == null || r.Slot == "topics") return;
+            (title, slot) = (r.Row.Title, r.Slot);
+        }
+        var shown = arranged.Select(x => x.Slot).ToList();
+        var prefs = HomeFeed.RowPrefs();
+        var at = arranged.FindIndex(x => x.Row.Id == rowId);
+        var next = at < 0 ? null : (at + 1 < arranged.Count ? arranged[at + 1] : at > 0 ? arranged[at - 1] : default).Row;
+        var opts = new List<(string Label, Action Run)>
+        {
+            ("Ẩn hàng này", () =>
+            {
+                Apply(HomeFeed.Hide(prefs, slot), next?.Cards.FirstOrDefault()?.Film.Url);
+                Main.Toast($"Đã ẩn hàng «{title}» — bật lại trong Cài đặt → Các hàng trên trang chủ.");
+            }),
+        };
+        if (HomeFeed.MoveShown(prefs, shown, slot, true) is { } up) opts.Add(("▲  Chuyển lên", () => Apply(up, null)));
+        if (HomeFeed.MoveShown(prefs, shown, slot, false) is { } down) opts.Add(("▼  Chuyển xuống", () => Apply(down, null)));
+        opts.Add(("☰  Các hàng…", () => Main.Push(new HomeRowsPage())));
+        if (_mix) opts.Add(("Nguồn…", () => Main.Push(new HomeSourcesPage())));
+        var focus = (Keyboard.FocusedElement as UIElement)?.Uid;
+        var i = await Main.Ask($"Hàng «{title}»", "", opts.Select(o => o.Label).Append("Huỷ").ToArray());
+        if (i < 0 || i >= opts.Count) return;
+        _pendingFocus = focus;
+        opts[i].Run();
+    }
+
+    /// Ô cần chọn lại sau khi sửa nhanh (uid ô đang chọn lúc mở bảng).
+    private string? _pendingFocus;
+
+    /// Lưu cài đặt các hàng rồi xếp lại từ lần tải gần nhất (không tải lại); focus: ô cần chọn (null = ô đang chọn).
+    private void Apply(List<(string Id, bool On)> prefs, string? focus)
+    {
+        HomeFeed.SaveRows(prefs);
+        _rows = RowsSignature();
+        var uid = focus ?? _pendingFocus;
+        if (_mix) BuildMix(); else Build();
+        if (!string.IsNullOrEmpty(uid)) FocusUid(uid);
+        else Dispatcher.BeginInvoke(() => FocusFirst(), DispatcherPriority.Loaded);
+    }
+
+    /// Dựng trang chủ tổng hợp từ lần tải gần nhất: Có tập mới, Xem tiếp, (chọn chủ đề), mỗi hàng một dải vuốt ngang (tới
+    /// StripMax phim, «Xem thêm» hẹp cuối dải nếu còn).
     private bool BuildMix()
     {
         var s = _snap;
         if (s == null) return false;
-        _cols = Columns();
         Body.Children.Clear();
         _note = Ui.Dim((_kids ? "Hồ sơ trẻ em · " : "") + s.Note, 13.5, new Thickness(0, 0, 0, 10));
         Body.Children.Add(_note);
@@ -160,16 +235,15 @@ public sealed class HomePage : Page
         var on = HomeFeed.RowPrefs().Where(x => x.On).Select(x => x.Id).ToHashSet();
         if (follows.Count + auto.Count > 0 && on.Contains("new-eps"))
         {
-            Body.Children.Add(Ui.Section("Có tập mới", follows.Select(f => Tagged(FilmCard(new Film(f.FilmUrl, f.Title, f.Poster, f.Latest.NonEmpty()), fresh: $"+{f.NewCount}"), f.FilmUrl))
-                .Concat(auto.Select(a => CardButton(a.Card)))));
+            Body.Children.Add(Strip("Có tập mới", "new-eps", follows.Select(f => (UIElement)Tagged(FilmCard(new Film(f.FilmUrl, f.Title, f.Poster, f.Latest.NonEmpty()), fresh: $"+{f.NewCount}"), f.FilmUrl))
+                .Concat(auto.Select(a => (UIElement)CardButton(a.Card))).ToList()));
             count++;
         }
-        var history = on.Contains("continue") ? Prefs.History.Take(_cols).ToList() : new();
+        var history = on.Contains("continue") ? Prefs.History.Take(StripMax).ToList() : new();
         if (history.Count > 0)
         {
-            Body.Children.Add(Ui.Section("Xem tiếp", history.Select(h =>
-                Tagged(FilmCard(new Film(h.FilmUrl, h.Title, h.Poster, null), () => Main.Play(h.FilmUrl, h.EpUrl, true), h.EpTitle), "resume:" + h.FilmUrl)),
-                "Enter: xem tiếp ngay"));
+            Body.Children.Add(Strip("Xem tiếp", "continue", history.Select(h =>
+                (UIElement)Tagged(FilmCard(new Film(h.FilmUrl, h.Title, h.Poster, null), () => Main.Play(h.FilmUrl, h.EpUrl, true), h.EpTitle), "resume:" + h.FilmUrl)).ToList()));
             count++;
         }
         // Người xem chưa có lịch sử: chọn chủ đề
@@ -188,16 +262,18 @@ public sealed class HomePage : Page
         foreach (var r in HomeFeed.Arrange(s.Rows))
         {
             var n = r.Cards.Count;
-            var shown = n > _cols ? r.Cards.Take(_cols - 1) : r.Cards;
-            var cards = shown.Select(CardButton).ToList();
-            if (n > _cols)
+            var cards = r.Cards.Take(StripMax).Select(c => (UIElement)CardButton(c)).ToList();
+            Action? more = null;
+            if (n > StripMax || r.More != null)
             {
                 var row = r;
-                var more = Ui.Card(new Film("more:" + r.Id, "Xem thêm ›", null, r.More == null ? $"{n} phim" : null), () => OpenMore(row), r.Title);
-                more.Uid = "more:" + r.Id;
-                cards.Add(more);
+                more = () => OpenMore(row);
+                // Hàng có danh sách nhiều trang của nguồn: không ghi số phim (mới tải trang đầu)
+                var tile = Ui.MoreTile(more, r.More == null ? $"{n} phim" : null);
+                tile.Uid = "more:" + r.Id;
+                cards.Add(tile);
             }
-            Body.Children.Add(Ui.Section(r.Title, cards));
+            Body.Children.Add(Strip(r.Title, r.Id, cards, more));
             count++;
         }
         return count > 0;
