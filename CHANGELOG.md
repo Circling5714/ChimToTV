@@ -7,6 +7,58 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.10 — 09/11/2026
+
+- **Hàng vuốt ngang cả trên iPad và iPhone xoay ngang** (trước chỉ iPhone cầm dọc): «Xem thêm ›» ở tên hàng + ô hẹp cuối dải.
+- **Sửa nhanh ngay trên trang chủ:** giữ ngón trên một phim, tên hàng hoặc ô «Xem thêm» (chuột: nhấn phải) → ẩn hàng, chuyển
+  hàng lên / xuống (qua hàng đang hiện kề nó), «Các hàng trên trang chủ…», «Nguồn cho trang chủ…» (bảng riêng mở từ trang chủ,
+  thanh tiêu đề tự vẽ; đóng bảng là trang chủ xếp lại / tải lại). Hồ sơ trẻ em có mã PIN phụ huynh: chỉ mở bảng các hàng (hỏi mã).
+- **Nguồn cho trang chủ** (Cài đặt → Trang chủ, riêng từng người xem): bật / tắt KKPhim, NguonC, VSMOV, CLB Phim Xưa, trang đang
+  dùng + trang xem gần đây; còn một nguồn thì không tắt được; tắt hết (nguồn còn bật bị xoá khỏi danh sách trang) thì coi như
+  bật hết. Tắt KKPhim thì hàng lọc theo thể loại / nước lấy từ VSMOV.
+- bản 1.10 (CFBundleVersion 13) · mã gói `vn.chimto.tv` · tag `ios-v1.10` (không phải "latest") · commit `947c004` ·
+  `ConBangTV-iPad-1.10.ipa` 4 284 165 byte · SHA-256 `38735a306dc8decf5860684846ca5d836af0ff3476d7df533864224b737026d8`
+- 112 test lõi trên macOS (thêm 4 test: chuyển qua hàng đang hiện, ẩn hàng, loại hàng bản cũ, nguồn tắt). Bản thử 83 thử thật:
+  iPad — dải, ẩn / chuyển hàng, bảng «Nguồn» mở từ trang chủ (tắt VSMOV → đóng bảng → trang chủ tải lại, «2 nguồn» thành
+  «kkphim»), không còn lỗi bảng mở / đóng liên tục; iPhone — dải dọc / ngang, bảng «Các hàng» trên màn hẹp, bật lại hàng → đóng
+  bảng tải lại. Bản chính thức cài lên iPad và iPhone (đè 1.9): chạy, tải trang chủ, không văng. Tệp tải từ link công khai khớp
+  SHA-256; `releases/latest` vẫn `v2.10`.
+
+## Windows 1.7 — 09/11/2026
+
+- **Hàng vuốt ngang** như TV 2.10: tới 12 phim một dải, ô «Xem thêm» hẹp cuối dải, «Xem thêm ›» ở tên hàng (chuột), nút ‹ ›
+  khi rê chuột, Shift + lăn chuột cuộn dải (lăn chuột thường vẫn cuộn trang). Phím: ◄ ► chỉ đi trong dải (cuối dải đứng yên, ◄
+  ở phim đầu ra menu bên trái), ▲ ▼ sang phim đang thấy của dải kia.
+- **Sửa nhanh ngay trên trang chủ:** nhấn phải / phím Menu / Shift + F10 / M trên phim của một hàng hoặc tên hàng → «Hàng
+  «…»»: ẩn hàng này, ▲ / ▼ chuyển (giữ ô đang chọn), «Các hàng…», «Nguồn…». Hồ sơ trẻ em: mã PIN phụ huynh.
+- **Nguồn cho trang chủ** (Cài đặt → «Nguồn cho trang chủ: n / m…», riêng từng người xem) như bản TV.
+- **Sửa:** mở lại cửa sổ luôn kéo về trong màn hình (trước chỉ kiểm chiều ngang — lưu sát mép dưới / màn hình phụ đã rút thì lần
+  sau cửa sổ gần như nằm ngoài màn hình, trông như trắng một nửa). Biến môi trường `CONBANG_SOFTWARE_RENDER=1`: vẽ bằng CPU.
+- bản 1.7.0 · tag `win-v1.7` (không phải "latest") · commit `947c004` · `ConBangTV-Windows-1.7.exe` 72 876 194 byte · SHA-256
+  `fa5db5b359bbb8877b57bf42cb76160c1b49f90798c6af27fee6d44feb4771ef`
+- 91 test lõi (thêm 4). Thử trên máy Windows 10 (bản gỡ lỗi): dải + phím mũi tên, phím M / Menu → bảng, chuyển xuống (giữ ô),
+  ẩn hàng (chọn sang phim đầu hàng kế), trang «Nguồn» (tắt / bật NguonC). Tệp tải từ link công khai khớp SHA-256. **Tự cập nhật
+  thật 1.6 → 1.7** từ GitHub (bản chép riêng, dữ liệu mới): hộp thoại «Có bản mới: Côn Bằng TV 1.7» → Cập nhật ngay → mở lại 1.7
+  với trang chủ dải vuốt ngang.
+
+## 2.10 — 09/11/2026
+
+- **Trang chủ dạng hàng vuốt ngang trên TV / màn ngang** (như điện thoại cầm dọc từ 2.8.1): thấy 5 phim và một phần phim kế, ◄ ►
+  cuộn trong hàng (tới 12 phim; ◄ ở phim đầu ra menu bên trái), ô «Xem thêm» hẹp ở cuối hàng; Back từ «Xem thêm» về đúng ô.
+- **Sửa nhanh ngay trên trang chủ:** nhấn Menu hoặc giữ OK trên phim của một hàng / ô «Xem thêm» (cảm ứng: giữ tên hàng) →
+  «Hàng «…»»: ẩn hàng này, ▲ chuyển lên / ▼ chuyển xuống (qua hàng đang hiện kề nó), «Các hàng trên trang chủ…», «Nguồn cho
+  trang chủ…». Hộp xoá phim ở «Xem tiếp» / bỏ theo dõi ở «Có tập mới» có nút «Ẩn hàng này». Hồ sơ trẻ em: mã PIN phụ huynh.
+- **Nguồn cho trang chủ** (Cài đặt → Trang chủ → «Nguồn cho trang chủ: n / m…», riêng từng người xem): bật / tắt KKPhim, NguonC,
+  VSMOV, CLB Phim Xưa, trang đang dùng + trang xem gần đây; còn một nguồn thì không tắt được; tắt hết thì coi như bật hết. Tắt
+  KKPhim thì hàng lọc theo thể loại / nước lấy từ VSMOV. Đổi nguồn là tải lại trang chủ.
+- TV box: dải không vẽ vệt cuộn quá đầu / cuối; vẽ lại khung lưới sau hiệu ứng phóng to ô (trước còn vệt viền cam ở mép lưới).
+- versionCode 32 · tag `v2.10` · commit `947c004` · `ChimToTV-2.10.apk` 1 212 683 byte · SHA-256
+  `b777935cd2928bdd66fa0838b12daed5a11eb0e547eacbaf58ed73fed5086411`
+- 116 test (thêm 4). Thử bản gỡ lỗi trên TV box bằng remote: Menu → bảng, ▲ chuyển (giữ ô), ẩn hàng (chọn sang hàng kế), tắt
+  KKPhim (hàng lọc lấy VSMOV, không còn nhãn «kkphim»), dải: ► tới ô «Xem thêm», ◄ ra menu, ▼ sang dải dưới, Back từ «Xem thêm» về
+  đúng ô. Bản chính thức thử trên TV box trước khi đăng (dải, bảng sửa nhanh). API `releases/latest` trả `v2.10` + `.apk`, tệp tải từ
+  link công khai khớp SHA-256. **Cập nhật tự động thật 2.9 → 2.10** trên TV box.
+
 ## iPad 1.9 — 09/11/2026
 
 - **Các hàng trên trang chủ** như TV 2.9: Cài đặt → Trang chủ → «Các hàng trên trang chủ» (riêng từng người xem) — bật / tắt

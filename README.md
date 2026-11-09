@@ -10,10 +10,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.9`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.9)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.10`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.10)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.6`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.6)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.7`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.7)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -33,9 +33,14 @@ người xem**:
   là một hàng tự thêm, vẫn còn sau khi đã có lịch sử.
 - Mỗi hàng một dòng, ô cuối **Xem thêm** mở cả hàng (Back / Esc quay lại đúng ô). Phim có ở nhiều trang ghi «N nguồn»; trang
   phim có nút **Nguồn: … ▾** để mở phim ở trang khác.
-- **Điện thoại / iPhone cầm dọc** (từ 2.8.1 / iPad 1.8.1): mỗi hàng là một **dải vuốt ngang** — thấy 3 phim và một phần phim
-  kế, tới 12 phim một dải; **Xem thêm ›** nằm bên phải tên hàng, cuối dải có ô «Xem thêm» hẹp (cho remote / bàn phím). Xoay
-  ngang (và trên TV, iPad, Windows) vẫn là lưới.
+- **Hàng vuốt ngang** (điện thoại / iPhone cầm dọc từ 2.8.1 / iPad 1.8.1; TV, màn ngang, iPad, Windows từ 2.10 / iPad 1.10 /
+  Windows 1.7): mỗi hàng là một dải — thấy trọn vài phim và một phần phim kế, tới 12 phim một dải; cuối dải có ô «Xem thêm» hẹp
+  (remote / bàn phím), **Xem thêm ›** bên phải tên hàng (chạm / chuột; TV không có). Remote / bàn phím: ◄ ► đi trong dải (cuối
+  dải đứng yên, ◄ ở phim đầu ra menu bên trái), ▲ ▼ sang dải khác. Windows: nút ‹ › khi rê chuột, Shift + lăn chuột cuộn dải.
+- **Sửa nhanh ngay trên trang chủ** (từ 2.10 / iPad 1.10 / Windows 1.7): TV nhấn **Menu** (hoặc giữ OK) trên một phim của hàng
+  / ô «Xem thêm»; iPad / iPhone giữ ngón trên phim, tên hàng hoặc ô «Xem thêm»; Windows nhấn phải / phím Menu / M → **Ẩn hàng
+  này**, **▲ chuyển lên / ▼ chuyển xuống** (qua hàng đang hiện kề nó), «Các hàng trên trang chủ…», «Nguồn cho trang chủ…». Hộp xoá
+  phim ở «Xem tiếp» trên TV có nút «Ẩn hàng này». Hồ sơ trẻ em cần mã PIN phụ huynh.
 - Trang lỗi / chậm: mỗi trang chờ tối đa 6 giây rồi dùng bản lưu (dưới 24 giờ); trang về muộn thì trang chủ tự cập nhật (giữ ô
   đang chọn); lỗi 3 lần liền thì tạm nghỉ trang đó 30 phút (rồi 2 giờ, 6 giờ). Dòng nhỏ bên phải tiêu đề ghi «Cập nhật lúc …»,
   «lỗi: …», «tạm nghỉ: …», «chậm, dùng bản lưu: …». **Cài đặt → Trang chủ → Thử lại ngay** bỏ tạm nghỉ.
@@ -55,6 +60,10 @@ người xem**:
   - **Mặc định** / **Khôi phục mặc định**: trả thứ tự cũ và bật lại mọi hàng, giữ hàng tự thêm;
   - hồ sơ trẻ em: chỉ các hàng hoạt hình, sửa cần mã PIN phụ huynh (nếu đã đặt). Cài đặt các hàng không đồng bộ giữa TV và
     iPad / Windows.
+- **Nguồn cho trang chủ** (từ 2.10 / iPad 1.10 / Windows 1.7; Cài đặt → Trang chủ → «Nguồn cho trang chủ…», riêng từng người
+  xem): bật / tắt KKPhim, NguonC, VSMOV, CLB Phim Xưa và «trang đang dùng + trang xem gần đây». Còn một nguồn thì không tắt được;
+  tắt hết (vd nguồn còn bật bị xoá khỏi danh sách trang) thì coi như bật hết. Tắt KKPhim thì các hàng lọc theo thể loại / nước lấy
+  từ VSMOV. Phim theo dõi vẫn báo tập mới.
 
 ## Trang phim hỗ trợ
 
@@ -602,7 +611,13 @@ tự thêm (`CustomRow`: chủ đề `topic` hoặc `type` / `country` / `genre`
 `HomeFeed.mergeRows` ghép thứ tự đã lưu với `rowDefaults` (bỏ id lạ / trùng, hàng mới chèn sau hàng đứng trước nó trong thứ tự
 mặc định); `plan` bỏ hàng tắt; `arrange` lọc + xếp theo `FeedRow.slot` (lưu cùng trang chủ lần trước, khoá `"s"`); `customReq`
 dựng địa chỉ lọc KKPhim (`/api/movies/category/<loại>?country=&category=&sort_lang=`) hoặc VSMOV. Đổi các hàng thì so chữ ký
-`home_rows` + `home_custom` để tải lại trang chủ. Bản gỡ lỗi giả một nguồn lỗi bằng tệp
+`home_rows` + `home_custom` + `home_src_off` để tải lại trang chủ. Nguồn (từ 2.10): `home_src_off` = id nguồn đã tắt (`kk`,
+`nc`, `vs`, `k20`, `web`); `HomeFeed.sources()` = `withoutOff(allSources(), …)` (tắt hết thì coi như bật hết). Sửa nhanh: `arrangeSlots`
+cho loại hàng của hàng đang hiện, `moveShown` chuyển qua hàng đang hiện kề nó, `hide`, `saveRows` (TV `HomeRowsUi.rowMenu`, iPad
+`RowMenuItems` + `AppModel.rowInfo` / `hideRow` / `moveRow`, Windows `HomePage.RowMenu`). Dải trên TV: `StripList` (◄ ở đầu dải ra
+được menu ngoài lưới; không vệt cuộn quá; vẽ lại khung lưới sau hiệu ứng phóng to ô), `ensureStripFocus` chọn lại ô sau Back;
+Windows `Ui.Strip` / `StripScroller` + `KeyNav` (◄ ► trong dải, ▲ ▼ chỉ ô đang thấy). Bản thử iPad: `/row?id=&do=info|hide|up|
+down|rows|sources`. Bản gỡ lỗi giả một nguồn lỗi bằng tệp
 `feed_fail_<tên miền>` (TV: thư mục `files` của app; Windows: thư mục dữ liệu). Trên TV box: không lập kế hoạch / đọc JSON
 trên luồng chính, luồng tải ưu tiên 4 (mức «background» làm API chậm quá 6 s). Màn hẹp (từ 2.8.1 / iPad 1.8.1 — Android
 `Screen.narrow`, iOS lưới < 500 pt): mỗi hàng là `StripRow` (Android: `RecyclerView` ngang `StripList` lồng trong lưới, ◄ / ►
