@@ -387,7 +387,11 @@ final class Socks5Bridge {
 
     /// Cổng gỡ lỗi: ngắt ổ cắm nghe (accept lỗi mãi như ổ cắm bị iOS thu hồi).
     func debugBreak() {
-        _ = Darwin.shutdown(server, SHUT_RDWR)
+        // Thay ổ cắm nghe bằng /dev/null: cổng thôi nhận kết nối, accept báo ENOTSOCK — như ổ cắm bị thu hồi
+        let null = Darwin.open("/dev/null", O_RDONLY)
+        guard null >= 0 else { return }
+        _ = Darwin.dup2(null, server)
+        Darwin.close(null)
     }
 
     /// Cổng còn nhận kết nối: chưa đóng, vòng nhận chưa thấy ổ cắm hỏng, và thử kết nối vào chính cổng được (app nằm nền
@@ -410,13 +414,15 @@ final class Socks5Bridge {
             let c = Darwin.accept(server, nil, nil)
             if c < 0 {
                 let e = errno
-                // Ổ cắm nghe hỏng (iOS thu hồi lúc app nằm nền): poll báo có việc mà accept lỗi mãi — thôi, khỏi quay vòng
-                // ăn CPU; AppProxy.revive mở cổng mới khi app quay lại
-                if (p.revents & Int16(POLLERR | POLLHUP | POLLNVAL)) != 0 || e == EBADF || e == EINVAL || e == ENOTSOCK {
-                    fails += 1
-                } else if e != EINTR && e != EAGAIN && e != ECONNABORTED {
-                    fails += 1
+                // Lỗi tạm (hết tài nguyên, bị ngắt): nghỉ chút rồi nhận tiếp
+                if e == EINTR || e == EAGAIN || e == EMFILE || e == ENFILE || e == ENOBUFS || e == ENOMEM {
+                    fails = 0
+                    usleep(20_000)
+                    continue
                 }
+                // Ổ cắm nghe hỏng (iOS thu hồi lúc app nằm nền): poll báo có việc mà accept lỗi liền 20 lần — thôi, khỏi
+                // quay vòng ăn CPU; AppProxy.revive mở lại cổng khi app quay lại màn hình
+                fails += 1
                 if fails >= 20 {
                     lock.lock()
                     dead = true
