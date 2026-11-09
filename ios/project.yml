@@ -14,8 +14,8 @@ configs:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.11"
-    CURRENT_PROJECT_VERSION: "14"
+    MARKETING_VERSION: "1.11.1"
+    CURRENT_PROJECT_VERSION: "15"
     DEVELOPMENT_TEAM: ""
   # Nhóm App Group (app ghi dữ liệu cho widget) và lược đồ URL mở app — bản thử khác bản chính để cài song song
   configs:
