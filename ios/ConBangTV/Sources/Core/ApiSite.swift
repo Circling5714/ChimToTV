@@ -160,6 +160,10 @@ enum ApiSite {
             : (isKk(base) ? kkMenu : menu).map { Category(title: $0.0, url: api(o, $0.1, 1)) }
     }
 
+    /// Thể loại / quốc gia (tên, slug KKPhim) — chọn cho hàng tự thêm của trang chủ tổng hợp.
+    static var genreList: [(String, String)] { genres.filter { $0.1 != "phim-18" } }
+    static var countryList: [(String, String)] { countries }
+
     /// Tên thể loại theo slug ("vo-thuat" → "võ thuật") — tiêu đề hàng gợi ý của trang chủ tổng hợp.
     static func genreName(_ slug: String) -> String {
         (genres + vsGenres).first { $0.1 == slug }?.0.lowercased() ?? slug.replacingOccurrences(of: "-", with: " ")

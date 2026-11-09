@@ -31,6 +31,9 @@ struct SettingsView: View {
     @State private var kids = Prefs.kids
     /// Tắt hồ sơ trẻ em: hỏi mã PIN phụ huynh (nếu đã đặt).
     @State private var parentForKids = false
+    /// Các hàng trên trang chủ (hồ sơ trẻ em: mở cần mã PIN phụ huynh nếu đã đặt).
+    @State private var rowsOpen = false
+    @State private var parentForRows = false
     @State private var resting = Feed.restingHosts()
     @ObservedObject private var textScale = TextScale.shared
 
@@ -91,6 +94,16 @@ struct SettingsView: View {
                     Prefs.kids = false
                 }
             }))
+            Button {
+                if kids && Prefs.hasParentPin { parentForRows = true } else { rowsOpen = true }
+            } label: {
+                HStack {
+                    Text("Các hàng trên trang chủ\(who)").foregroundColor(Theme.text)
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundColor(Theme.dim)
+                }
+                .contentShape(Rectangle())
+            }
             if !resting.isEmpty {
                 let until = Date(timeIntervalSince1970: Double(resting.values.max() ?? 0) / 1000)
                 Button("Thử lại ngay: \(resting.keys.sorted().map { Site.tag($0, Prefs.sites) }.joined(separator: ", ")) (đang tạm nghỉ tới \(until.formatted(date: .omitted, time: .shortened)))") {
@@ -251,6 +264,9 @@ struct SettingsView: View {
             // bảng (lỗi bố cục của SwiftUI, nhất là sau hộp thoại «Có bản mới»)
             .navigationBarHidden(true)
             .safeAreaInset(edge: .top, spacing: 0) { header }
+            .background(
+                NavigationLink(isActive: $rowsOpen) { HomeRowsView().environmentObject(app) } label: { EmptyView() }.hidden()
+            )
             .alert("Xoá lịch sử xem\(who)?", isPresented: $confirmHistory) {
                 Button("Xoá", role: .destructive) {
                     Prefs.clearHistory()
@@ -272,6 +288,12 @@ struct SettingsView: View {
         }
         .navigationViewStyle(.stack)
         .overlay {
+            if parentForRows {
+                ParentPinView(title: "Mã PIN phụ huynh để sửa các hàng trang chủ", onCancel: { parentForRows = false }) {
+                    parentForRows = false
+                    rowsOpen = true
+                }
+            }
             if parentForKids {
                 ParentPinView(title: "Mã PIN phụ huynh để tắt hồ sơ trẻ em", onCancel: { parentForKids = false }) {
                     parentForKids = false

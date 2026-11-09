@@ -114,6 +114,8 @@ enum Prefs {
         "limit_min", "bedtime", "watch_day", "watch_sec", "watch_extra", "unblock_until",
         // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy, hồ sơ trẻ em, ngôn ngữ bản hay xem
         "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
+        // Các hàng trang chủ (bật / tắt, thứ tự) và hàng tự thêm
+        "home_rows", "home_custom",
     ]
     private static let profilePrefixes = ["server_type@", "server_label@"]
     /// Người thêm sau bắt đầu với trang phim / server ưu tiên / cách xem của người đang dùng.
@@ -811,10 +813,34 @@ enum Prefs {
     /// Trang chủ tổng hợp đang dùng (người xem chọn, hoặc hồ sơ trẻ em).
     static var homeMixOn: Bool { homeMix || kids }
 
-    /// Chủ đề người xem chưa có lịch sử đã chọn (id trong HomeFeed.topics).
+    /// Các hàng trang chủ theo thứ tự người xem chọn (Cài đặt → Trang chủ → Các hàng): "id" = bật, "-id" = tắt; rỗng = mặc
+    /// định. Đọc qua HomeFeed.rowPrefs (ghép với các hàng mặc định).
+    static var homeRows: [String] {
+        get { store.stringArray(forKey: k("home_rows")) ?? [] }
+        set { store.set(newValue, forKey: k("home_rows")) }
+    }
+
+    /// Hàng tự thêm của người xem: chủ đề có sẵn (HomeFeed.topics) hoặc loại phim + nước + thể loại + ngôn ngữ. Trước 1.9
+    /// chủ đề người mới chọn lưu ở "home_topics" — đọc lại thành hàng chủ đề.
+    static var homeCustom: [CustomRow] {
+        get {
+            guard let a = store.array(forKey: k("home_custom")) else {
+                return (store.stringArray(forKey: k("home_topics")) ?? []).map { CustomRow(id: "t-\($0)", topic: $0) }
+            }
+            return a.compactMap { item -> CustomRow? in (item as? [String: String]).flatMap { CustomRow($0) } }
+        }
+        set { store.set(newValue.map { $0.dict }, forKey: k("home_custom")) }
+    }
+
+    /// Chủ đề người xem đã chọn (id trong HomeFeed.topics) — các hàng tự thêm loại «chủ đề».
     static var homeTopics: Set<String> {
-        get { Set(store.stringArray(forKey: k("home_topics")) ?? []) }
-        set { store.set(Array(newValue).sorted(), forKey: k("home_topics")) }
+        get { Set(homeCustom.compactMap { $0.topic }) }
+        set {
+            let cur = homeCustom
+            let kept = cur.filter { $0.topic == nil || newValue.contains($0.topic!) }
+            let added = newValue.sorted().filter { t in !cur.contains { $0.topic == t } }.map { CustomRow(id: "t-\($0)", topic: $0) }
+            homeCustom = kept + added
+        }
     }
 
     /// Tập mới nhất người xem đã thấy của từng phim (khoá = tên đã chuẩn hoá — chung mọi nguồn).

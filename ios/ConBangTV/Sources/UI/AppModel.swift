@@ -97,6 +97,12 @@ final class AppModel: ObservableObject {
     private var autoFresh: [FreshCard] = []
     private var loadedMix: Bool?
     private var loadedKids: Bool?
+    /// Cài đặt các hàng lúc tải trang chủ (thứ tự / bật tắt + hàng tự thêm): đổi thì tải lại trang chủ.
+    private var loadedRows: String?
+    private func rowsSignature() -> String {
+        let custom = Prefs.homeCustom.map { c -> String in [c.id, c.topic ?? "", c.type, c.country, c.genre, c.lang].joined(separator: ";") }
+        return Prefs.homeRows.joined(separator: ",") + "|" + custom.joined(separator: ",")
+    }
     @Published var sheet: Sheet?
     @Published var confirmClear = false
     @Published var removeTarget: GridFilm?
@@ -369,7 +375,13 @@ final class AppModel: ObservableObject {
         proxyChanged = false
         // Đổi trang, proxy, kiểu trang chủ hoặc hồ sơ trẻ em → tải lại
         let homeChanged = (loadedMix != nil && loadedMix != Prefs.homeMixOn) || (loadedKids != nil && loadedKids != Prefs.kids)
-        if (loadedBase != nil && (loadedBase != Prefs.baseUrl || proxy)) || homeChanged { reloadSite() } else { rebuildMenu() }
+        if (loadedBase != nil && (loadedBase != Prefs.baseUrl || proxy)) || homeChanged {
+            reloadSite()
+        } else {
+            rebuildMenu()
+            // Vừa sửa các hàng trang chủ: hiện ngay theo thứ tự mới (bản lưu), tải thêm hàng vừa bật / vừa thêm
+            if loadedRows != nil && loadedRows != rowsSignature() && active?.kind == .home && moreFrom == nil { showHome() }
+        }
     }
 
     func selectSite(_ url: String) {
@@ -385,6 +397,7 @@ final class AppModel: ObservableObject {
     func showHome() {
         loadedMix = Prefs.homeMixOn
         loadedKids = Prefs.kids
+        loadedRows = rowsSignature()
         if Prefs.homeMixOn {
             showMixHome()
             return
@@ -535,7 +548,8 @@ final class AppModel: ObservableObject {
                                                 topic: $0.id, topicOn: on.contains($0.id))
                                    }))
         }
-        for r in snap.rows {
+        // Thứ tự / bật tắt theo cài đặt hiện tại của người xem (bản lưu dựng trước khi đổi cũng xếp đúng ngay)
+        for r in HomeFeed.arrange(snap.rows) {
             let n = r.cards.count
             if strips {
                 // Dải vuốt ngang: tới stripMax phim; còn nữa (hoặc nguồn có trang sau) thì ô «Xem thêm» cuối dải
@@ -866,14 +880,16 @@ final class AppModel: ObservableObject {
         // Trang chủ tổng hợp: cả phim đang xem dở vừa có tập mới ở bất kỳ nguồn nào (đã mở phim từ lúc dựng trang thì thôi)
         let followed = Set(Prefs.follows.map { KkPhim.norm($0.title) })
         let auto = Prefs.homeMixOn ? autoFresh.filter { (Prefs.seenEp($0.key) ?? -1) < $0.ep && !followed.contains($0.key) } : []
-        if !fresh.isEmpty || !auto.isEmpty {
+        // «Có tập mới» / «Xem tiếp» người xem tắt được (Cài đặt → Trang chủ → Các hàng)
+        let on = Set(HomeFeed.rowPrefs().filter { $0.on }.map { $0.id })
+        if (!fresh.isEmpty || !auto.isEmpty) && on.contains("new-eps") {
             out.append(GridSection(id: "head-new", title: "Có tập mới",
                                    items: fresh.map { GridFilm(film: followFilm($0), removable: true, follow: true) } +
                                        auto.map { GridFilm(film: $0.card.film, chip: $0.card.chip, links: $0.card.links) },
                                    strip: strips))
         }
         // Trang chủ tổng hợp: mỗi hàng một dòng (như bản TV / Windows); kiểu theo trang giữ 6 phim
-        let items = Prefs.history.prefix(strips ? Self.stripMax : Prefs.homeMixOn ? max(2, gridCols) : Self.headCount)
+        let items = on.contains("continue") ? Prefs.history.prefix(strips ? Self.stripMax : Prefs.homeMixOn ? max(2, gridCols) : Self.headCount) : []
         if !items.isEmpty {
             out.append(GridSection(id: "head-continue", title: "Xem tiếp",
                                    items: items.map { GridFilm(film: historyFilm($0), resume: true, removable: true) },

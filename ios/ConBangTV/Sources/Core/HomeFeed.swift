@@ -9,12 +9,42 @@ struct Card: Hashable {
     let links: [FeedItem]
 }
 
-/// Một hàng. more: địa chỉ danh sách đầy đủ (nil = «Xem thêm» hiện mọi phim đã có trong cards).
+/// Một hàng. more: địa chỉ danh sách đầy đủ (nil = «Xem thêm» hiện mọi phim đã có trong cards); slot: loại hàng trong cài đặt
+/// của người xem (HomeFeed.rows: "similar", "interest", "newest"…; "custom-<id>" = hàng tự thêm; "topics" = bản cũ).
 struct FeedRow: Hashable {
     let id: String
     let title: String
     let cards: [Card]
     var more: String? = nil
+    var slot: String = ""
+}
+
+/// Hàng người xem tự thêm (Cài đặt → Trang chủ → Các hàng): chủ đề có sẵn (topic — HomeFeed.topics) hoặc lọc theo loại phim
+/// (hoathinh / series / single / tvshows) + nước + thể loại (slug KKPhim, rỗng = mọi) + ngôn ngữ (thuyet-minh / long-tieng).
+struct CustomRow: Hashable {
+    let id: String
+    var topic: String? = nil
+    var type = ""
+    var country = ""
+    var genre = ""
+    var lang = ""
+
+    /// Mã trong cài đặt thứ tự các hàng.
+    var key: String { "custom-\(id)" }
+    var dict: [String: String] { ["id": id, "topic": topic ?? "", "t": type, "c": country, "g": genre, "l": lang] }
+
+    /// Cùng nội dung (bỏ qua id) — khỏi thêm trùng.
+    func same(_ o: CustomRow) -> Bool {
+        topic == o.topic && type == o.type && country == o.country && genre == o.genre && lang == o.lang
+    }
+}
+
+extension CustomRow {
+    init?(_ d: [String: String]) {
+        guard let id = d["id"], !id.isEmpty else { return nil }
+        self.init(id: id, topic: d["topic"].flatMap { $0.isEmpty ? nil : $0 }, type: d["t"] ?? "", country: d["c"] ?? "",
+                  genre: d["g"] ?? "", lang: d["l"] ?? "")
+    }
 }
 
 /// Phim đang xem dở vừa có tập mới (key: tên đã chuẩn hoá; ep: số tập mới nhất).
@@ -32,7 +62,7 @@ enum HomeFeed {
     /// Số phim tối đa mỗi hàng (giữ cho «Xem thêm»).
     private static let rowMax = 40
 
-    enum Role: Int { case web, new, similar, interest, dominant, dub, kids, movies, topic, tags }
+    enum Role: Int { case web, new, similar, interest, dominant, dub, kids, movies, custom, tags }
 
     /// Một phần cần tải: vai trò + tiêu đề hàng / địa chỉ «Xem thêm» (nếu có).
     struct Part {
@@ -41,6 +71,7 @@ enum HomeFeed {
         var title: String? = nil
         var more: String? = nil
         var id: String = ""
+        var slot: String = ""
         var key: String { req.key }
         var rowId: String { id.isEmpty ? req.key : id }
     }
@@ -50,6 +81,102 @@ enum HomeFeed {
         ("cn", "Hoạt hình Trung Quốc"), ("kh", "Kiếm hiệp"), ("kr", "Phim Hàn"), ("mv", "Phim lẻ Âu Mỹ"),
         ("hk", "Phim xưa Hồng Kông"), ("kid", "Hoạt hình cho bé"), ("jp", "Anime Nhật"), ("tm", "Thuyết minh / lồng tiếng"),
     ]
+
+    // MARK: - Các hàng người xem bật / tắt, sắp thứ tự, tự thêm (Cài đặt → Trang chủ → Các hàng)
+
+    /// Theo thứ tự mặc định. «Có tập mới» / «Xem tiếp» (headRows) chỉ bật / tắt — luôn ở đầu trang; hàng trẻ em (kidsRows)
+    /// chỉ có ở hồ sơ trẻ em.
+    static let rows: [(id: String, label: String)] = [
+        ("new-eps", "Có tập mới"),
+        ("continue", "Xem tiếp"),
+        ("similar", "Giống «phim vừa xem»"),
+        ("interest", "Vì … hay xem <thể loại> (sở thích 1)"),
+        ("dominant", "Loại phim hay xem · mới cập nhật"),
+        ("dub", "Thuyết minh / lồng tiếng mới"),
+        ("kids-young", "Hoạt hình thiếu nhi"),
+        ("kids-family", "Hoạt hình gia đình"),
+        ("kids-dub", "Hoạt hình lồng tiếng"),
+        ("interest2", "Vì … hay xem <thể loại> (sở thích 2)"),
+        ("newest", "Mới cập nhật · mọi nguồn"),
+        ("movies", "Phim lẻ mới"),
+    ]
+    static let headRows: Set<String> = ["new-eps", "continue"]
+    static let kidsRows: Set<String> = ["kids-young", "kids-family", "kids-dub"]
+    /// Hàng hồ sơ trẻ em không có (chỉ hoạt hình hợp trẻ em).
+    static let adultRows: Set<String> = ["dominant", "dub", "newest", "movies"]
+    /// Tối đa số hàng tự thêm.
+    static let customMax = 6
+    /// Chủ đề hợp hồ sơ trẻ em (chỉ hoạt hình).
+    static let kidsTopics: Set<String> = ["cn", "jp", "kid"]
+    /// Loại phim / ngôn ngữ cho hàng tự thêm (type, sort_lang của KKPhim).
+    static let types: [(id: String, label: String)] = [("hoathinh", "Hoạt hình"), ("series", "Phim bộ"), ("single", "Phim lẻ"),
+                                                       ("tvshows", "TV show")]
+    static let langs: [(id: String, label: String)] = [("", "Mọi bản"), ("thuyet-minh", "Thuyết minh"), ("long-tieng", "Lồng tiếng")]
+    /// Thể loại không hợp trẻ em (hàng tự thêm của hồ sơ trẻ em không chọn được).
+    static var adultGenres: Set<String> { adult }
+
+    /// Tên hàng tự thêm: «Hoạt hình Trung Quốc · phiêu lưu · thuyết minh», chủ đề thì tên chủ đề.
+    static func customTitle(_ r: CustomRow) -> String {
+        if let t = r.topic { return topics.first { $0.id == t }?.label ?? t }
+        var head = types.first { $0.id == r.type }?.label ?? "Phim"
+        if !r.country.isEmpty { head += " " + ApiSite.countryName(r.country) }
+        var parts = [head]
+        if !r.genre.isEmpty { parts.append(ApiSite.genreName(r.genre)) }
+        if !r.lang.isEmpty, let l = langs.first(where: { $0.id == r.lang }) { parts.append(l.label.lowercased()) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Thứ tự mặc định: «Có tập mới», «Xem tiếp», các hàng tự thêm (theo lúc thêm), rồi các hàng app tự chọn.
+    static func rowDefaults(_ custom: [CustomRow] = Prefs.homeCustom) -> [String] {
+        rows.prefix(2).map { $0.id } + custom.map { $0.key } + rows.dropFirst(2).map { $0.id }
+    }
+
+    /// Ghép thứ tự đã lưu ("id" bật, "-id" tắt) với các hàng mặc định: bỏ id lạ / trùng, hàng mặc định chưa có (hàng mới ở bản
+    /// sau, hàng vừa tự thêm) chèn ngay sau hàng đứng trước nó trong thứ tự mặc định.
+    static func mergeRows(_ saved: [String], _ defaults: [String] = rows.map { $0.id }) -> [(id: String, on: Bool)] {
+        var out: [(id: String, on: Bool)] = []
+        for s in saved {
+            let on = !s.hasPrefix("-")
+            let id = on ? s : String(s.dropFirst())
+            if defaults.contains(id) && !out.contains(where: { $0.id == id }) { out.append((id, on)) }
+        }
+        for (i, id) in defaults.enumerated() where !out.contains(where: { $0.id == id }) {
+            let prev = defaults[..<i].last(where: { p in out.contains { $0.id == p } })
+            let at = prev.flatMap { p in out.firstIndex { $0.id == p } }.map { $0 + 1 } ?? 0
+            out.insert((id, true), at: at)
+        }
+        return out
+    }
+
+    /// Các hàng của người xem đang dùng (thứ tự, bật / tắt), kể cả hàng tự thêm.
+    static func rowPrefs() -> [(id: String, on: Bool)] { mergeRows(Prefs.homeRows, rowDefaults()) }
+
+    static func rowOn(_ id: String) -> Bool { rowPrefs().first { $0.id == id }?.on ?? true }
+
+    /// Loại hàng của một hàng lưu từ bản cũ (chưa ghi slot): theo id; hai hàng «Vì … hay xem» theo thứ tự xuất hiện.
+    private static func legacySlot(_ id: String, _ interestBefore: Int) -> String {
+        if id.hasPrefix("interest-") { return interestBefore == 0 ? "interest" : "interest2" }
+        if id.hasPrefix("topic-") { return "topics" }
+        return id
+    }
+
+    /// Xếp các hàng theo cài đặt của người xem: bỏ hàng đã tắt, theo thứ tự đã chọn; hàng chủ đề bản cũ ("topics") đầu, hàng
+    /// lạ cuối.
+    static func arrange(_ list: [FeedRow], _ prefs: [(id: String, on: Bool)] = rowPrefs()) -> [FeedRow] {
+        var pos: [String: Int] = [:]
+        for (i, p) in prefs.enumerated() { pos[p.id] = p.on ? i : -1 }
+        var interest = 0
+        var keyed: [(FeedRow, String)] = []
+        for r in list {
+            let slot = r.slot.isEmpty ? legacySlot(r.id, interest) : r.slot
+            if slot.hasPrefix("interest") { interest += 1 }
+            keyed.append((r, slot))
+        }
+        func rank(_ slot: String) -> Int { slot == "topics" ? -1 : (pos[slot] ?? Int.max) }
+        return keyed.filter { pos[$0.1] != -1 }.enumerated()
+            .sorted { (rank($0.element.1), $0.offset) < (rank($1.element.1), $1.offset) }
+            .map { $0.element.0 }
+    }
 
     /// Nguồn trong danh sách trang của người xem (gốc địa chỉ); web: trang web đang dùng + trang hay xem gần đây.
     struct Sources {
@@ -173,6 +300,8 @@ enum HomeFeed {
     static func plan(tagsKnownOnly: Bool = false) -> Plan {
         let s = sources()
         let kids = Prefs.kids
+        // Hàng người xem đã tắt: khỏi tải. «Mới cập nhật» vẫn tải danh sách mới của các nguồn — cần để gộp phim, tìm «Có tập mới»
+        let off = Set(rowPrefs().filter { !$0.on }.map { $0.id })
         var parts: [Part] = []
         let now = nowMs()
         let history = Prefs.history
@@ -241,7 +370,9 @@ enum HomeFeed {
                     .first?.element
                 if let url = filterUrl(s, st.type!, st.countries[0], g) {
                     if let g = g { used.insert(g) }
-                    parts.append(Part(role: .similar, req: req(url), title: "Giống «\(sim.title)»", more: url, id: "similar"))
+                    if !off.contains("similar") {
+                        parts.append(Part(role: .similar, req: req(url), title: "Giống «\(sim.title)»", more: url, id: "similar", slot: "similar"))
+                    }
                 }
             }
             // Vì … hay xem <thể loại>: hai bộ ba điểm cao nhất, khác thể loại với hàng trên
@@ -252,39 +383,44 @@ enum HomeFeed {
                 guard let url = filterUrl(s, cb.type, cb.country, cb.genre) else { continue }
                 used.insert(cb.genre)
                 n += 1
+                let slot = n == 1 ? "interest" : "interest2"
+                if off.contains(slot) { continue }
                 let title = "Vì \(Prefs.profile.name) hay xem \(ApiSite.genreName(cb.genre)) · \(typeName(cb.type)) \(ApiSite.countryName(cb.country))"
-                parts.append(Part(role: .interest, req: req(url), title: title, more: url, id: "interest-\(cb.genre)"))
+                parts.append(Part(role: .interest, req: req(url), title: title, more: url, id: "interest-\(cb.genre)", slot: slot))
             }
             // Loại phim + nước xem nhiều nhất (≥ 40%): hàng mới cập nhật riêng, gộp mọi nguồn
             if let best = taste.pair.filter({ !$0.key.type.isEmpty && !$0.key.country.isEmpty }).max(by: { $0.value < $1.value }),
                best.value >= taste.total * 0.4 {
                 top = best.key
             }
-            if let top = top, !kids {
+            if let top = top, !kids, !off.contains("dominant") {
                 let t = typeName(top.type)
                 let title = "\(t.prefix(1).uppercased() + t.dropFirst()) \(ApiSite.countryName(top.country)) mới cập nhật · mọi nguồn"
                 if let url = filterUrl(s, top.type, top.country, nil) {
-                    parts.append(Part(role: .dominant, req: req(url), title: title, more: nil, id: "dominant"))
-                }
-            }
-        } else if history.isEmpty && !kids {
-            for (id, label) in Self.topics where topics.contains(id) {
-                if let tr = topicReq(s, id) {
-                    parts.append(Part(role: .topic, req: tr.0, title: "Vì bạn chọn: \(label)", more: tr.1, id: "topic-\(id)"))
+                    parts.append(Part(role: .dominant, req: req(url), title: title, more: nil, id: "dominant", slot: "dominant"))
                 }
             }
         }
+        // Hàng tự thêm (chủ đề người mới chọn cũng là hàng tự thêm — vẫn còn khi đã có lịch sử). Hồ sơ trẻ em: chỉ hoạt hình
+        for c in Prefs.homeCustom where !off.contains(c.key) {
+            if kids && (c.topic.map { !kidsTopics.contains($0) } ?? (c.type != "hoathinh")) { continue }
+            let found: (Feed.Req, String?)? = c.topic != nil ? topicReq(s, c.topic!) : customReq(s, c)
+            guard let tr = found else { continue }
+            parts.append(Part(role: .custom, req: tr.0, title: customTitle(c), more: tr.1, id: c.key, slot: c.key))
+        }
         if kids {
-            parts += kidsParts(s)
+            parts += kidsParts(s).filter { !off.contains($0.slot) }
         } else {
-            if let d = dubPart(s, top) { parts.append(d) }
+            if !off.contains("dub"), let d = dubPart(s, top) { parts.append(d) }
             // Phim lẻ mới (xếp theo thể loại người xem hay xem)
-            if let o = s.kk {
+            if off.contains("movies") {
+                // người xem đã tắt hàng này
+            } else if let o = s.kk {
                 let u = "\(o)/api/movies/category/phim-le?page=1&limit=30"
-                parts.append(Part(role: .movies, req: req(u), title: "Phim lẻ mới", more: u, id: "movies"))
+                parts.append(Part(role: .movies, req: req(u), title: "Phim lẻ mới", more: u, id: "movies", slot: "movies"))
             } else if let o = s.vs {
                 let u = "\(o)/api/danh-sach/phim-le?page=1"
-                parts.append(Part(role: .movies, req: req(u), title: "Phim lẻ mới", more: u, id: "movies"))
+                parts.append(Part(role: .movies, req: req(u), title: "Phim lẻ mới", more: u, id: "movies", slot: "movies"))
             }
         }
         return Plan(parts: parts, src: s, similar: similar, similarTags: similarTags, taste: taste, topics: topics,
@@ -321,17 +457,17 @@ enum HomeFeed {
         var out: [Part] = []
         if let o = s.kk {
             let u = "\(o)/api/movies/category/hoat-hinh?category=tre-em&page=1&limit=30"
-            out.append(Part(role: .kids, req: req(u), title: "Hoạt hình thiếu nhi", more: u, id: "kids-young"))
+            out.append(Part(role: .kids, req: req(u), title: "Hoạt hình thiếu nhi", more: u, id: "kids-young", slot: "kids-young"))
         }
         if let o = s.vs {
             let u = "\(o)/api/the-loai/thieu-nhi?page=1"
-            out.append(Part(role: .kids, req: req(u), title: "Hoạt hình thiếu nhi", more: u, id: "kids-young"))
+            out.append(Part(role: .kids, req: req(u), title: "Hoạt hình thiếu nhi", more: u, id: "kids-young", slot: "kids-young"))
         }
         if let o = s.kk {
             let fam = "\(o)/api/movies/category/hoat-hinh?category=gia-dinh&page=1&limit=30"
-            out.append(Part(role: .kids, req: req(fam), title: "Hoạt hình gia đình", more: fam, id: "kids-family"))
+            out.append(Part(role: .kids, req: req(fam), title: "Hoạt hình gia đình", more: fam, id: "kids-family", slot: "kids-family"))
             let dub = "\(o)/api/movies/category/hoat-hinh?sort_lang=long-tieng&page=1&limit=30"
-            out.append(Part(role: .kids, req: req(dub), title: "Hoạt hình lồng tiếng", more: dub, id: "kids-dub"))
+            out.append(Part(role: .kids, req: req(dub), title: "Hoạt hình lồng tiếng", more: dub, id: "kids-dub", slot: "kids-dub"))
         }
         return out
     }
@@ -349,6 +485,37 @@ enum HomeFeed {
     }
 
     private static func page(_ url: String) -> String { url + (url.contains("?") ? "&" : "?") + "page=1" }
+
+    /// Danh sách của một hàng tự thêm: KKPhim lọc được loại + nước + thể loại + ngôn ngữ; không có KKPhim thì VSMOV (thể loại /
+    /// nước / loại, không lọc ngôn ngữ). (yêu cầu, địa chỉ «Xem thêm»).
+    private static func customReq(_ s: Sources, _ c: CustomRow) -> (Feed.Req, String?)? {
+        var q: [String] = []
+        if !c.country.isEmpty { q.append("country=\(c.country)") }
+        if !c.genre.isEmpty { q.append("category=\(c.genre)") }
+        if !c.lang.isEmpty { q.append("sort_lang=\(c.lang)") }
+        if let o = s.kk, let t = typeSlug(c.type) {
+            let url = "\(o)/api/movies/category/\(t)?" + (q + ["page=1", "limit=30"]).joined(separator: "&")
+            return (req(url), url)
+        }
+        if let o = s.vs {
+            let cq = c.country.isEmpty ? "" : "?country=\(c.country)"
+            let p: String
+            if !c.genre.isEmpty {
+                p = "the-loai/\(c.genre)" + cq
+            } else if c.type == "hoathinh" {
+                p = "the-loai/hoat-hinh" + cq
+            } else if !c.country.isEmpty {
+                p = "quoc-gia/\(c.country)"
+            } else if let t = typeSlug(c.type) {
+                p = "danh-sach/\(t)"
+            } else {
+                return nil
+            }
+            let url = page("\(o)/api/\(p)")
+            return (req(url), url)
+        }
+        return nil
+    }
 
     /// Đọc một danh sách KKPhim / VSMOV theo địa chỉ (định dạng KKPhim).
     private static func req(_ url: String) -> Feed.Req {
@@ -566,11 +733,11 @@ enum HomeFeed {
         var rows: [FeedRow] = []
         var claimed = Set<FeedFilm>()
         func films(_ r: Feed.Result) -> [FeedFilm] { r.items.compactMap { groupOf[$0.url] }.distinct { ObjectIdentifier($0) } }
-        func add(_ id: String, _ title: String, _ list: [FeedFilm], _ more: String?, claim: Bool, min: Int = 3) {
+        func add(_ slot: String, _ id: String, _ title: String, _ list: [FeedFilm], _ more: String?, claim: Bool, min: Int = 3) {
             let l = Array(list.filter { !claimed.contains($0) && kidsOk($0) }.prefix(rowMax))
             guard l.count >= min else { return }
             if claim { l.prefix(6).forEach { claimed.insert($0) } }
-            rows.append(FeedRow(id: id, title: title, cards: l.map(card), more: more))
+            rows.append(FeedRow(id: id, title: title, cards: l.map(card), more: more, slot: slot))
         }
         func byRole(_ r: Role) -> [(Part, Feed.Result)] { content.filter { $0.0.role == r } }
         func newestFirst(_ l: [FeedFilm]) -> [FeedFilm] {
@@ -615,8 +782,8 @@ enum HomeFeed {
                                               chip: chip, links: links), key: key, ep: ep))
         }
 
-        // Người xem chưa có lịch sử: hàng theo chủ đề đã chọn
-        for (p, r) in byRole(.topic) { add(p.rowId, p.title ?? "", newestFirst(films(r)), p.more, claim: true) }
+        // Hàng tự thêm (và chủ đề người mới chọn): phim chưa xem, mới cập nhật trước
+        for (p, r) in byRole(.custom) { add(p.slot, p.rowId, p.title ?? "", newestFirst(films(r).filter { !watched($0) }), p.more, claim: true) }
 
         // Giống «phim vừa xem»: xếp theo số thể loại chung
         let simGenres = Set(plan.similarTags?.genres ?? [])
@@ -626,25 +793,25 @@ enum HomeFeed {
                 ($0.element.tags?.genres.filter { simGenres.contains($0) }.count ?? 0, $0.element.updated, -$0.offset) >
                     ($1.element.tags?.genres.filter { simGenres.contains($0) }.count ?? 0, $1.element.updated, -$1.offset)
             }.map { $0.element }
-            add(p.rowId, p.title ?? "", list, p.more, claim: true, min: 4)
+            add("similar", p.rowId, p.title ?? "", list, p.more, claim: true, min: 4)
         }
         let interest = byRole(.interest)
-        func interestRow(_ i: Int) {
-            guard i < interest.count else { return }
-            let (p, r) = interest[i]
-            add(p.rowId, p.title ?? "", byAffinity(films(r).filter { !watched($0) }), p.more, claim: true)
+        func interestRow(_ slot: String) {
+            guard let pr = interest.first(where: { $0.0.slot == slot }) else { return }
+            let (p, r) = pr
+            add(slot, p.rowId, p.title ?? "", byAffinity(films(r).filter { !watched($0) }), p.more, claim: true)
         }
-        interestRow(0)
+        interestRow("interest")
 
         // Loại phim hay xem, mới cập nhật · mọi nguồn
         let dominant = byRole(.dominant)
         if !dominant.isEmpty {
             var set: [FeedFilm] = []
             for (_, r) in dominant { set += films(r) }
-            add("dominant", dominant[0].0.title ?? "", newestFirst(set.distinct { ObjectIdentifier($0) }.filter { !watched($0) }), nil, claim: true)
+            add("dominant", "dominant", dominant[0].0.title ?? "", newestFirst(set.distinct { ObjectIdentifier($0) }.filter { !watched($0) }), nil, claim: true)
         }
         // Thuyết minh / lồng tiếng mới
-        for (p, r) in byRole(.dub) { add(p.rowId, p.title ?? "", newestFirst(films(r).filter { !watched($0) }), p.more, claim: true) }
+        for (p, r) in byRole(.dub) { add("dub", p.rowId, p.title ?? "", newestFirst(films(r).filter { !watched($0) }), p.more, claim: true) }
         // Hồ sơ trẻ em: hoạt hình thiếu nhi (KKPhim + VSMOV gộp một hàng), gia đình, lồng tiếng
         var kidIds: [String] = []
         var kidParts: [String: [(Part, Feed.Result)]] = [:]
@@ -655,16 +822,17 @@ enum HomeFeed {
         for id in kidIds {
             let ps = kidParts[id]!
             let set = ps.flatMap { films($0.1) }.distinct { ObjectIdentifier($0) }
-            add(id, ps[0].0.title ?? "", newestFirst(set.filter { !watched($0) }), ps.lazy.compactMap { $0.0.more }.first, claim: true)
+            add(id, id, ps[0].0.title ?? "", newestFirst(set.filter { !watched($0) }), ps.lazy.compactMap { $0.0.more }.first, claim: true)
         }
-        interestRow(1)
+        interestRow("interest2")
 
         // Mới cập nhật · mọi nguồn
         let newest = (byRole(.web) + byRole(.new)).flatMap { films($0.1) }.distinct { ObjectIdentifier($0) }
-        add("newest", "Mới cập nhật · mọi nguồn", newestFirst(newest.filter { !watched($0) }), nil, claim: false)
+        add("newest", "newest", "Mới cập nhật · mọi nguồn", newestFirst(newest.filter { !watched($0) }), nil, claim: false)
 
-        for (p, r) in byRole(.movies) { add(p.rowId, p.title ?? "", byAffinity(films(r).filter { !watched($0) }), p.more, claim: false) }
-        return (rows, fresh)
+        for (p, r) in byRole(.movies) { add("movies", p.rowId, p.title ?? "", byAffinity(films(r).filter { !watched($0) }), p.more, claim: false) }
+        // Thứ tự / bật tắt theo cài đặt của người xem (Cài đặt → Trang chủ → Các hàng)
+        return (arrange(rows), fresh)
     }
 
     /// Người xem vừa mở trang phim / một tập: ghi tập mới nhất đã thấy (theo tên — chung mọi nguồn). Xem riêng thì không ghi.
@@ -685,7 +853,7 @@ enum HomeFeed {
         guard !s.fromCache, !s.empty else { return }
         var o: [String: Any] = [
             "at": nowMs(),
-            "rows": s.rows.map { r in ["id": r.id, "t": r.title, "m": r.more ?? "", "c": r.cards.map(cardJson)] as [String: Any] },
+            "rows": s.rows.map { r in ["id": r.id, "t": r.title, "m": r.more ?? "", "s": r.slot, "c": r.cards.map(cardJson)] as [String: Any] },
             "fresh": s.fresh.map { ["c": cardJson($0.card), "k": $0.key, "e": $0.ep] as [String: Any] },
         ]
         if let cats = s.categories { o["cats"] = cats.map { ["t": $0.title, "u": $0.url] } }
@@ -701,7 +869,8 @@ enum HomeFeed {
         let at = num64(o["at"])
         guard nowMs() - at <= Feed.cacheMax else { return nil }
         let rows = J.objects(J.arr(o, "rows")).map { r in
-            FeedRow(id: J.str(r, "id"), title: J.str(r, "t"), cards: J.objects(J.arr(r, "c")).compactMap(cardOf), more: J.str(r, "m").nonEmpty)
+            FeedRow(id: J.str(r, "id"), title: J.str(r, "t"), cards: J.objects(J.arr(r, "c")).compactMap(cardOf), more: J.str(r, "m").nonEmpty,
+                    slot: J.str(r, "s"))
         }
         let fresh = J.objects(J.arr(o, "fresh")).compactMap { f -> FreshCard? in
             guard let c = J.obj(f, "c").flatMap(cardOf) else { return nil }
