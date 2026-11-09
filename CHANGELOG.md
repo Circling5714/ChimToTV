@@ -7,6 +7,27 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.8.2 — 09/11/2026
+
+- **Cập nhật trên iOS / iPadOS 15:** bấm «Kiểm tra cập nhật» trong Cài đặt giờ hiện hộp thoại «Có bản mới … — Cài đặt ngay»
+  → TrollStore tự tải và hỏi Install (trước đây trên iOS 15 hộp thoại SwiftUI bị bảng Cài đặt che, chỉ thấy dòng «Có bản
+  mới …» nên phải tải tay; đóng bảng thì app văng). Hộp thoại giờ hiện trong cửa sổ riêng, đè lên mọi màn. Bản 1.8.1 trở về
+  trước trên iOS 15 cần tải tay một lần lên 1.8.2.
+- **Vượt chặn nhà mạng / proxy:** app nằm nền lâu thì iOS thu hồi cổng nội bộ — vào lại mọi trang báo mất kết nối tới khi tắt
+  app. Giờ quay lại app là tự mở lại cổng (đúng số cổng cũ); vòng nhận kết nối thấy cổng hỏng thì dừng, không quay vòng ăn CPU.
+- **iPad không còn văng app khi đóng Cài đặt** (lỗi bố cục SwiftUI trên iPadOS 15 ở nút «Xong» của thanh tiêu đề): thanh tiêu
+  đề Cài đặt tự vẽ (Xong / Esc); cập nhật màn chính sau khi bảng đóng hẳn.
+- **Trình phát → Menu → «Danh sách tập»** mở trang phim, cuộn tới tập đang xem (mở từ hàng Xem tiếp trước đây chỉ về trang chủ).
+- **Ô phim:** nhãn tập ở góc dưới bên trái như bản TV — trên iPhone dọc không còn đè nhãn «N nguồn»; hàng Xem tiếp có nút ▶
+  giữa poster.
+- bản 1.8.2 (CFBundleVersion 11) · mã gói `vn.chimto.tv` · tag `ios-v1.8.2` (không phải "latest") · commit `d6010ea` ·
+  `ConBangTV-iPad-1.8.2.ipa` 4 186 872 byte · SHA-256 `9b583a21a9b1f3957e9cc305ceaf682c86e0b3f11ec99a68595f973f275ef36f`
+- 99 test lõi trên macOS. Bản thử thử thật: iPad (iPadOS 15.4.1) — hộp thoại cập nhật hiện đè bảng Cài đặt → «Cài đặt ngay» →
+  TrollStore tự tải đủ 1.8.1; «Để sau» rồi đóng Cài đặt 3 lần không văng; «Danh sách tập» mở đúng trang phim. iPhone 6s Plus
+  (iOS 15.8.3) — gọi TrollStore bằng `apple-magnifier://install` mở được; giả cổng nội bộ hỏng → ra nền → vào lại: «mở lại
+  cổng nội bộ: 54733 → 54733», trang tải qua cổng bình thường. Bản chính thức cài lên iPad (đè 1.8) và iPhone (đè 1.8.1), mở
+  được, không văng. Tệp tải từ link công khai khớp SHA-256.
+
 ## iPad 1.8.1 — 09/11/2026
 
 - **iPhone cầm dọc:** mỗi hàng của trang chủ tổng hợp là một **dải vuốt ngang** — thấy trọn 3 phim và một phần phim kế, tới 12

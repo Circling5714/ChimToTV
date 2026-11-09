@@ -10,7 +10,7 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.8.1`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.8.1)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.8.2`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.8.2)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
 **Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.5`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.5)
@@ -117,7 +117,9 @@ Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStor
 `ios/`), đủ các tính năng chính của bản TV, điều khiển bằng chạm:
 
 - **Cài:** cần TrollStore. Tải `ConBangTV-iPad-<bản>.ipa` ở release `ios-v<bản>` (một tệp cho cả iPad và iPhone) → mở
-  bằng TrollStore → Install. Bản sau app tự tìm trên GitHub (release `ios-v…`) và mở TrollStore để cài đè, giữ lịch sử xem.
+  bằng TrollStore → Install. Bản sau app tự tìm trên GitHub (release `ios-v…`) và mở TrollStore để cài đè, giữ lịch sử xem:
+  hộp thoại «Có bản mới» → **Cài đặt ngay** → TrollStore tự tải rồi hỏi Install (cả iOS / iPadOS 15 từ 1.8.2; bản 1.8.1 trở
+  về trước trên iOS 15 bấm «Kiểm tra cập nhật» trong Cài đặt không hiện hộp thoại — tải tay một lần lên 1.8.2).
 - **iPhone** (từ 1.3): màn chính dọc hoặc ngang (menu ẩn vào nút ☰), trình phát luôn xem ngang, thanh nút gọn (chạm đúp hai
   bên để lùi / tới 10 giây).
 - **Widget «Xem tiếp»** (từ 1.3): giữ ngón tay trên màn hình chính → **＋** → Côn Bằng TV; cỡ nhỏ / vừa / lớn = 1 / 3 / 6
@@ -128,7 +130,7 @@ Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStor
   phim (đo tốc độ), Duyệt web, Cài đặt.
 - **Xem phim:** chạm vào phim để hiện / ẩn thanh nút (Thoát, tập trước / sau, lùi / tới 10 giây, dừng / phát, Menu) và
   thanh thời gian kéo để tua; chạm đúp nửa trái / phải: lùi / tới 10 giây. Menu: đổi server (kèm điểm), đổi bản, nhạc mở
-  đầu, tốc độ, khung hình, hẹn giờ tắt, mở trang web của tập.
+  đầu, tốc độ, khung hình, hẹn giờ tắt, mở trang web của tập; **Danh sách tập** mở trang phim, cuộn tới tập đang xem.
 - **Bàn phím rời:** Space / K dừng–phát, ◀ ▶ (J / L) tua (giữ để tua nhanh), ▲ hiện thanh, ▼ / M menu, N / P tập
   sau / trước, số 0–9 nhảy tới 0–90%, F vừa / lấp đầy, S tốc độ, W thu nhỏ, Esc / ⌘W thoát; trong Duyệt web Esc = lùi trang.
   Từ 1.3 ở màn chính: mũi tên chọn phim, Enter / Space mở, Delete xoá khỏi lịch sử, ⌘F tìm, ⌘1 / ⌘2 / ⌘3 Trang chủ /
@@ -335,6 +337,11 @@ ngay ở router trong nhà, không tới nhà mạng; phần sau đi trước, t
 xác nhận thì tự gửi lại với TTL bình thường → byte đầu tới sau. Máy soi thấy gói bắt tay thiếu đầu, sai thứ tự. Chậm thêm
 khoảng 10–40 ms mỗi kết nối. Không cần root / VPN. Qua proxy thì dùng cách mức 1 (proxy nhận đủ theo thứ tự rồi mới gửi
 tiếp). Máy soi nào ghép đủ cả luồng theo thứ tự rồi mới đọc thì vẫn có thể thấy tên trang.
+
+iPad / iPhone: app nằm nền lâu thì iOS có thể thu hồi cổng nội bộ (vượt chặn / proxy) — từ 1.8.2 quay lại app là tự mở lại
+cổng, đúng số cổng cũ (trước đó phải tắt app mở lại mới vào được trang). Code: `AppProxy.revive` (lúc app `active`),
+`Socks5Bridge.listening` (thử kết nối vào chính cổng); vòng `acceptLoop` thấy accept lỗi liền 20 lần thì thôi, khỏi quay
+vòng ăn CPU. Bản thử: `/proxy?break=1` giả ổ cắm bị thu hồi.
 
 ## Proxy SOCKS5
 
