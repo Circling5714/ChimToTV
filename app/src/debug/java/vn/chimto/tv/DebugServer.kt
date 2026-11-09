@@ -165,7 +165,13 @@ object DebugServer {
                     }
                     text(out, 200, "ok")
                 }
-                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /play /js")
+                "/dnsblock" -> {
+                    // Giả DNS thiết bị chặn (trả 0.0.0.0) để thử Vượt chặn: /dnsblock?hosts=a.com,b.com (trống = bỏ)
+                    Socks5.debugDnsBlock = q["hosts"].orEmpty().split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+                    Doh.clearCache()
+                    text(out, 200, Socks5.debugDnsBlock.joinToString(",").ifEmpty { "(trống)" })
+                }
+                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /play /js /dnsblock")
             }
         } catch (e: Throwable) {
             runCatching { text(out, 500, e.toString()) }

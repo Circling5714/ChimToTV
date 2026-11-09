@@ -2,6 +2,7 @@ package vn.chimto.tv
 
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -160,5 +161,19 @@ class Socks5BridgeTest {
         assertEquals("echo:hi", call(b, "www.phim.test"))
         assertEquals("echo:hi", call(b, "localhost"))
         assertEquals(listOf("name:www.phim.test:${echo.localPort}"), p.asked)
+    }
+
+    @Test
+    fun blockedDnsAnswers() {
+        // DNS chặn trả địa chỉ của chính máy → Vượt chặn hỏi lại qua DNS mã hoá
+        for (a in listOf("0.0.0.0", "::", "127.0.0.1", "::1")) assertTrue(a, Socks5.blockedAnswer(InetAddress.getByName(a)))
+        for (a in listOf("104.21.35.220", "2606:4700:3035::6815:23dc", "10.0.0.1")) assertFalse(a, Socks5.blockedAnswer(InetAddress.getByName(a)))
+    }
+
+    @Test
+    fun unblockKeepsLocalhostDirect() {
+        // Vượt chặn bật, không proxy: localhost (127.0.0.1) không bị coi là DNS chặn, không hỏi DNS mã hoá
+        val b = Socks5Bridge({ RouteConfig(null, null, split = true) }, { emptyList() }).also { b -> closers += { b.close() } }
+        assertEquals("echo:hi", call(b, "localhost"))
     }
 }

@@ -108,6 +108,8 @@ public static class Socks5
             if (b.Length > 255) throw new SocksError(1, "tên miền quá dài");
             return new byte[] { 3, (byte)b.Length }.Concat(b).ToArray();
         }
+        // Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → địa chỉ qua DNS mã hoá
+        if (Unblock.Level > 0 && await Doh.Unblocked(host, ct) is { } real) return Ip(real);
         IPAddress[] list;
         try
         {
@@ -176,10 +178,12 @@ public static class Net
                 throw;
             }
         }
+        // Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → kết nối tới địa chỉ hỏi qua DNS mã hoá
+        var real = Unblock.Level > 0 ? await Doh.Unblocked(host, ct) : null;
         var s = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
         try
         {
-            await s.ConnectAsync(new DnsEndPoint(host, port), ct);
+            await s.ConnectAsync(real != null ? new IPEndPoint(real, port) : new DnsEndPoint(host, port), ct);
             return (s, false);
         }
         catch

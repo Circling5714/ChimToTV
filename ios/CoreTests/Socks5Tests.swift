@@ -190,4 +190,25 @@ final class Socks5Tests: XCTestCase {
         let at = bytes.withUnsafeMutableBufferPointer { Socks5Bridge.find(Array("phimmoir.fun".utf8), in: $0.baseAddress!, from: 1, to: $0.count) }
         XCTAssertEqual(at, 2)
     }
+
+    /// Vượt chặn bằng DNS (11/2026): DNS chặn trả 0.0.0.0 / :: → hỏi lại qua DNS mã hoá — cùng ca với Socks5BridgeTest.kt / DohTests.cs.
+    func testDohBlockedAnswers() {
+        for a in ["0.0.0.0", "::", "127.0.0.1", "::1"] { XCTAssertTrue(Doh.blocked(IPAddr(text: a)!), a) }
+        for a in ["104.21.35.220", "2606:4700:3035::6815:23dc", "10.0.0.1"] { XCTAssertFalse(Doh.blocked(IPAddr(text: a)!), a) }
+    }
+
+    func testDohParseTakesFirstARecord() {
+        let json = #"{"Status":0,"Answer":[{"name":"www.phim.test","type":5,"TTL":300,"data":"phim.test."},{"name":"phim.test","type":1,"TTL":75,"data":"104.21.35.220"},{"name":"phim.test","type":1,"TTL":75,"data":"172.67.180.59"}]}"#
+        let r = Doh.parse(Data(json.utf8))
+        XCTAssertEqual(r?.0.text, "104.21.35.220")
+        XCTAssertEqual(r?.1, 75)
+        XCTAssertNil(Doh.parse(Data(#"{"Status":3}"#.utf8)))
+        XCTAssertNil(Doh.parse(Data(#"{"Answer":[{"type":1,"TTL":10,"data":"0.0.0.0"}]}"#.utf8)))
+    }
+
+    func testDohSkipsIpAndLocalhost() {
+        XCTAssertNil(Doh.unblocked("127.0.0.1"))
+        XCTAssertNil(Doh.unblocked("LocalHost"))
+        XCTAssertNil(Doh.unblocked("[::1]"))
+    }
 }

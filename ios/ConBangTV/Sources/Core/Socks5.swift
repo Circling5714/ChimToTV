@@ -515,10 +515,16 @@ final class Socks5Bridge {
     }
 
     private func route(_ host: String, _ ip: IPAddr?, _ port: Int, viaProxy: Bool) throws -> TcpSocket {
-        if viaProxy, let s = socks { return try Socks5.connect(s, host: host, ip: ip, port: port) }
+        if viaProxy, let s = socks {
+            // DNS của iPad (không phải của proxy) mà bị chặn → địa chỉ qua DNS mã hoá (Vượt chặn)
+            let real = ip == nil && !s.remoteDns && split ? Doh.unblocked(host) : nil
+            return try Socks5.connect(s, host: host, ip: ip ?? real, port: port)
+        }
         // Đi thẳng: lỗi DNS / kết nối như kết nối thẳng thường (không phải lỗi proxy)
         do {
             if let ip = ip { return try TcpSocket.connect(ip, port: port) }
+            // Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → kết nối tới địa chỉ hỏi qua DNS mã hoá
+            if split, let real = Doh.unblocked(host) { return try TcpSocket.connect(real, port: port) }
             return try TcpSocket.connect(host: host, port: port)
         } catch let e as SocksError {
             throw SocksError(code: e.code == 4 ? 4 : 5, message: e.message, viaProxy: false)

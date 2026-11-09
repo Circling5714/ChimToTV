@@ -303,7 +303,8 @@ public sealed class SettingsPage : Page
             ("Mức 1", Prefs.UnblockLevel == 1, () => SetUnblock(1)),
             ("Mức 2", Prefs.UnblockLevel == 2, () => SetUnblock(2)),
         }, "Trang không vào được / quá thời gian chờ (nhà mạng chặn theo tên trang, vd phimmois.fun): bật Mức 1. " +
-           "Vẫn bị chặn thì thử Mức 2. Không đổi DNS, không cần VPN.");
+           "Vẫn bị chặn thì thử Mức 2. Trang / ảnh bìa bị chặn bằng DNS (DNS trả 0.0.0.0) thì app tự hỏi lại địa chỉ qua DNS mã hoá. " +
+           "Không cần VPN.");
         Body.Children.Add(Ui.Row(Ui.Pill(Prefs.ProxyConfig() is { } pc ? $"Proxy SOCKS5: {pc.Host}:{pc.Port}" : "Proxy SOCKS5: tắt",
             () => Main.Push(new ProxyPage()))));
         Option("Tự kiểm tra bản mới", new[]

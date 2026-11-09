@@ -132,6 +132,15 @@ object Socks5 {
         }
     }
 
+    /**
+     * DNS chặn trang (của nhà mạng, hay bộ lọc quảng cáo trong mạng nhà) thường trả 0.0.0.0 / :: (có nơi 127.x / ::1):
+     * địa chỉ trỏ về chính máy chứ không phải trang thật — kết nối bị từ chối ngay.
+     */
+    fun blockedAnswer(a: InetAddress) = a.isAnyLocalAddress || a.isLoopbackAddress
+
+    /** Chỉ bản debug (cổng 8790 /dnsblock): coi DNS thiết bị trả 0.0.0.0 cho các tên miền này, để thử Vượt chặn. */
+    @Volatile var debugDnsBlock: Set<String> = emptySet()
+
     /** DNS của thiết bị; ưu tiên IPv4 (nhiều mạng / TV box không có IPv6). */
     fun resolve(host: String): InetAddress = try {
         InetAddress.getAllByName(host).let { all -> all.firstOrNull { it is Inet4Address } ?: all.first() }
@@ -255,11 +264,11 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
         val doh = c.doh
         val socks = c.socks
         if (socks != null && (!socks.sitesOnly || isSite(host))) {
-            return Socks5.connect(socks, host, ip, port) { h -> doh?.let { Doh.resolve(it, h) } ?: Socks5.resolve(h) }
+            return Socks5.connect(socks, host, ip, port) { h -> doh?.let { Doh.resolve(it, h) } ?: deviceDns(c, h) }
         }
         // Đi thẳng: DNS mã hoá lỗi thì báo (ghi vào lỗi gần nhất); DNS thiết bị lỗi như kết nối thẳng thường
         val addr = ip ?: doh?.let { Doh.resolve(it, host) } ?: try {
-            Socks5.resolve(host)
+            deviceDns(c, host)
         } catch (e: SocksError) {
             throw SocksError(e.code, e.message ?: "", viaProxy = false)
         }
@@ -274,6 +283,24 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
         s.tcpNoDelay = true
         s.keepAlive = true
         return s
+    }
+
+    /**
+     * DNS của thiết bị (khi không bật DNS mã hoá). Đang Vượt chặn mà DNS thiết bị không trả lời hoặc trả địa chỉ chặn
+     * (0.0.0.0…) thì hỏi lại qua DNS mã hoá — vd ảnh bìa CLB Phim Xưa (clbphimxua.com) bị bộ lọc DNS chặn. Vượt chặn chỉ
+     * chia nhỏ gói bắt tay thì không đủ: không có địa chỉ thật để kết nối.
+     */
+    private fun deviceDns(c: RouteConfig, host: String): InetAddress {
+        val name = host.lowercase().trimEnd('.')
+        if (!c.split || name == "localhost") return Socks5.resolve(host)
+        val device = try {
+            if (BuildConfig.DEBUG && name in Socks5.debugDnsBlock) InetAddress.getByAddress(ByteArray(4)) else Socks5.resolve(host)
+        } catch (e: SocksError) {
+            Doh.resolveAny(host)?.let { return it }
+            throw e
+        }
+        if (!Socks5.blockedAnswer(device)) return device
+        return Doh.resolveAny(host) ?: device
     }
 
     private fun isSite(host: String): Boolean {

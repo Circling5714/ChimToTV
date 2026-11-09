@@ -59,5 +59,17 @@ object Doh {
         throw SocksError(4, "DNS mã hoá không tìm thấy $host")
     }
 
+    /** Vượt chặn: hỏi Cloudflare, lỗi thì Google; null nếu cả hai đều lỗi (bên gọi báo lỗi của DNS thiết bị như cũ). */
+    fun resolveAny(host: String): InetAddress? {
+        for (s in Server.values()) {
+            try {
+                return resolve(s, host)
+            } catch (e: IOException) {
+                // thử máy chủ sau
+            }
+        }
+        return null
+    }
+
     fun clearCache() = cache.clear()
 }

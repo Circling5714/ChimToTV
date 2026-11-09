@@ -17,6 +17,7 @@ import WebKit
 ///   POST /player?do=toggle|play|pause|seek&s=|seekTo&s=|next|prev|menu|hide|close|reload|server&type=|group&name=
 ///            |rate|fit|sleep|introStart|introEnd|introClear|tap|confirm|double&left=1|escape|accept|bar
 ///   POST /eval?target=player|browser   (thân = mã JS) chạy JS ở khung trên cùng
+///   GET  /dnsblock?hosts=a.com,b.com   giả DNS của máy chặn các tên miền này (thử Vượt chặn); trống = bỏ
 ///   GET  /probe?fn=home|list|detail|source|video|search|searchAll|filters&url=…&q=…&server=…   chạy bộ đọc trang
 ///   POST /orient?to=portrait|landscape|landscapeLeft   ép xoay màn hình  ·  POST /textscale?v=1.3   cỡ chữ
 ///   GET  /widget                   ghi lại + đọc dữ liệu widget «Xem tiếp»  ·  GET /sync[?do=open|close|all]  đồng bộ trong nhà
@@ -328,6 +329,11 @@ enum DebugRoutes {
             o["disorderCount"] = Socks5Bridge.disorderCount
             o["savedPassword"] = !Prefs.proxyPass.isEmpty // mật khẩu proxy đã lưu còn đọc được (đổi quyền Keychain)
             return .json(o)
+        case "/dnsblock":
+            // Giả DNS của máy chặn (trả 0.0.0.0) để thử Vượt chặn: /dnsblock?hosts=a.com,b.com (trống = bỏ)
+            let hosts = Set((q["hosts"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
+            Doh.setDebugBlock(hosts)
+            return .json(["hosts": hosts.sorted()])
         case "/prefs":
             if r.method == "POST", let key = q["key"] {
                 let v = q["value"] ?? ""
