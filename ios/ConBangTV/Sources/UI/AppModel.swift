@@ -115,7 +115,8 @@ final class AppModel: ObservableObject {
     private var retry: (() -> Void)?
     private var toastTask: Task<Void, Never>?
     private var updateBusy = false
-    private weak var updatePrompt: UIAlertController?
+    /// Cửa sổ riêng của hộp thoại «Có bản mới» (askUpdate).
+    private var updateWindow: UIWindow?
     private var started = false
 
     static let headCount = 6
@@ -1070,32 +1071,51 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Hỏi cài bản mới. Dùng UIAlertController trên lớp trên cùng (bảng Cài đặt, «Ai đang xem?»…): alert SwiftUI gắn ở màn
-    /// chính không hiện trên iOS / iPadOS 15 khi đang mở bảng, và đóng bảng xong thì app văng (UIKit ném lỗi lúc SwiftUI cố
-    /// hiện alert giữa chừng). Lớp trên cùng đang mở / đóng thì chờ chút rồi thử lại.
-    private func askUpdate(_ rel: UpdateCheck.Release, tries: Int = 0) {
-        if let shown = updatePrompt, shown.presentingViewController != nil { return }
-        guard let top = Router.topController else { return }
-        if top.isBeingPresented || top.isBeingDismissed || top.transitionCoordinator != nil {
-            if tries < 10 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.askUpdate(rel, tries: tries + 1) }
-            }
-            return
+    /// Hỏi cài bản mới trong một cửa sổ riêng nằm trên mọi thứ (bảng Cài đặt, «Ai đang xem?», trình phát…). Alert SwiftUI gắn ở
+    /// màn chính không hiện trên iOS / iPadOS 15 khi đang mở bảng, và đóng bảng xong thì app văng (UIKit ném lỗi lúc SwiftUI cố
+    /// hiện alert giữa chừng); UIAlertController mở thẳng trên bảng của SwiftUI thì bị SwiftUI đóng mất. Cửa sổ riêng thì
+    /// SwiftUI không đụng tới.
+    private func askUpdate(_ rel: UpdateCheck.Release) {
+        guard updateWindow == nil else { return }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
+        let main = scene.windows.first { $0.isKeyWindow } ?? scene.windows.first
+        let w = UIWindow(windowScene: scene)
+        w.windowLevel = .alert
+        w.backgroundColor = .clear
+        let host = UIViewController()
+        host.view.backgroundColor = .clear
+        w.rootViewController = host
+        w.makeKeyAndVisible()
+        updateWindow = w
+        let close: () -> Void = { [weak self] in
+            self?.updateWindow?.isHidden = true
+            self?.updateWindow = nil
+            main?.makeKey()
         }
         let a = UIAlertController(title: "Có bản mới \(rel.version)",
                                   message: "Đang dùng \(UpdateCheck.currentVersion). Cài bằng TrollStore.\n\n" + UpdateCheck.summary(rel.notes),
                                   preferredStyle: .alert)
-        a.addAction(UIAlertAction(title: "Để sau", style: .cancel) { [weak self] _ in self?.snoozeUpdate(rel) })
-        let install = UIAlertAction(title: "Cài đặt ngay", style: .default) { [weak self] _ in self?.installUpdate(rel) }
+        a.addAction(UIAlertAction(title: "Để sau", style: .cancel) { [weak self] _ in
+            close()
+            self?.snoozeUpdate(rel)
+        })
+        let install = UIAlertAction(title: "Cài đặt ngay", style: .default) { [weak self] _ in
+            close()
+            self?.installUpdate(rel)
+        }
         a.addAction(install)
         a.preferredAction = install
-        updatePrompt = a
-        top.present(a, animated: true)
+        Log.d("Update", "hỏi cài \(rel.version)")
+        DispatchQueue.main.async {
+            host.present(a, animated: true) { Log.d("Update", "đã hiện hộp thoại cài \(rel.version)") }
+        }
     }
 
     func installUpdate(_ rel: UpdateCheck.Release) {
         guard let url = UpdateCheck.trollStoreURL(rel.ipaUrl) else { return }
         UIApplication.shared.open(url, options: [:]) { [weak self] ok in
+            Log.d("Update", "mở TrollStore: \(ok)")
             if !ok {
                 // Không có TrollStore: mở link tải trong Safari
                 if let u = URL(string: rel.ipaUrl) { UIApplication.shared.open(u) }
