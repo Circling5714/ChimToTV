@@ -352,7 +352,9 @@ nhật, sau đó ai tắt thì giữ tắt). App hỏi địa chỉ trang qua DN
 2. DoT (DNS qua TLS, cổng 853): NextDNS → Cloudflare → Google
 3. DNS của máy — **app không bao giờ hỏng vì DNS mã hoá bị chặn**
 
-Máy chủ nào bị chặn / không trả lời thì nghỉ 2 phút, app hỏi máy chủ sau. Tên miền không có (hoặc hồ sơ NextDNS chặn) là trả lời
+Máy chủ nào bị chặn / không trả lời thì nghỉ 2 phút, app hỏi máy chủ sau. **Từ 2.11.1 / iPad 1.11.1 / Windows 1.8.1:** NextDNS dùng máy chủ gần mạng nhà nhất (đo 11/2026 từ mạng Viettel: IP anycast bị đưa sang Hồng Kông, NextDNS có máy
+chủ Hà Nội nhanh gần gấp đôi) và app giữ kết nối tới máy chủ DNS để dùng lại — mỗi lần tìm địa chỉ trang còn ~20–100 ms
+thay vì ~200 ms trở lên. Tên miền không có (hoặc hồ sơ NextDNS chặn) là trả lời
 thật — app không hỏi máy chủ khác để lách. Nhà mạng không đọc / sửa được truy vấn DNS, nhưng vẫn thấy tên trang lúc kết nối (phần
 đó do [Vượt chặn nhà mạng](#vượt-chặn-nhà-mạng-từ-21) lo) và IP đích. Đang bật proxy với «DNS của proxy» thì proxy tự hỏi DNS.
 
@@ -699,7 +701,11 @@ lệnh `rate` / `fit` cho agent, agent đặt lại mỗi giây. DNS mã hoá: `
 qua TLS tới IP cố định của máy chủ, kiểm chứng chỉ theo tên; chuỗi `Doh.chain(id)`, nhớ theo TTL 30 giây – 10 phút, chỉ IPv4, gộp
 các lần hỏi trùng); cổng nội bộ chạy cả khi không có proxy (`RouteConfig(socks, dns, split, disorder)`, `Socks5Bridge.dns`); bản
 debug ghi tên miền đã hỏi + máy chủ trả lời vào logcat `ChimToDoh` (cũng là cách đo trang gọi tới những đâu), `/dohfail?labels=`
-giả máy chủ bị chặn, `/dnsblock?hosts=` giả DNS máy trả 0.0.0.0. **Mã hồ sơ NextDNS không có trong git:** tệp `keys/nextdns.txt`
+giả máy chủ bị chặn, `/dnsblock?hosts=` giả DNS máy trả 0.0.0.0. Từ 2.11.1: `Server.steer` (NextDNS) — `ipsFor` = máy chủ gần nhất
+(`nextPops`: hỏi chính NextDNS tên `dns.nextdns.io` qua anycast, không được thì DNS máy; nhớ 6 giờ) rồi anycast; nhóm kết nối
+nghỉ theo máy chủ + IP (tối đa 4, bỏ sau 90 giây — đo: NextDNS / Cloudflare DoH / Google DoH giữ ≥ 100 giây, Cloudflare
+DoT đóng < 20 giây, Google DoT ~45–70 giây), DoH đọc đúng một trả lời HTTP/1.1 (`DohHttp.read`: Content-Length / chunked).
+Nhật ký bản debug / thử ghi máy chủ, IP và thời gian mỗi lần hỏi. **Mã hồ sơ NextDNS không có trong git:** tệp `keys/nextdns.txt`
 (TV: `BuildConfig.NEXTDNS_ID`; Windows: EmbeddedResource `nextdns.txt`), iPad: secret `NEXTDNS_ID` của repo → Info.plist
 `CBNextDnsId` lúc CI dựng. Không có mã thì chuỗi bỏ NextDNS. Khoá cài đặt `doh` = `AUTO` / `OFF`, `net_defaults_v1` (bật một lần). Mật khẩu proxy: `Secret.kt` (AES-GCM, khoá trong
 AndroidKeyStore).

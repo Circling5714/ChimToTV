@@ -7,6 +7,45 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.11.1 — 09/11/2026
+
+- **DNS mã hoá nhanh hơn** như TV 2.11.1: NextDNS dùng máy chủ gần nhất (Hà Nội) thay cho máy chủ Hồng Kông, giữ kết nối tới
+  máy chủ DNS để dùng lại (Network.framework, tối đa 90 giây).
+- bản 1.11.1 (CFBundleVersion 15) · mã gói `vn.chimto.tv` · tag `ios-v1.11.1` (không phải "latest") · commit `a775794` ·
+  `ConBangTV-iPad-1.11.1.ipa` 4 316 750 byte · SHA-256 `64547dce3321e7b7ff75728e101efc9b698302a48bb7d7d380a46b7175f14147`
+- 123 test lõi trên macOS (thêm 2). Bản thử 90 thử thật trên iPhone: «NextDNS gần nhất: 38.54.31.178, 171.244.57.202»; 9/9 tập
+  phát (NguonC, VSMOV, yanhh3d, mephim, hoathinh3d, KKPhim); 28 lần hỏi DNS trung vị 108 ms, dùng lại kết nối 19–22 ms, không lần
+  nào > 300 ms, không lỗi. Bản chính thức cài lên iPhone (đè 1.11): chạy, dữ liệu giữ nguyên. Chưa cài lên iPad (anh đang dùng).
+  Tệp tải từ link công khai khớp SHA-256; `releases/latest` vẫn `v2.11.1`.
+
+## Windows 1.8.1 — 09/11/2026
+
+- **DNS mã hoá nhanh hơn** như TV 2.11.1: NextDNS dùng máy chủ gần nhất (Hà Nội) thay cho máy chủ Hồng Kông, giữ kết nối tới
+  máy chủ DNS để dùng lại (tối đa 90 giây).
+- bản 1.8.1 · tag `win-v1.8.1` (không phải "latest") · commit `a775794` · `ConBangTV-Windows-1.8.1.exe` 72 890 281 byte ·
+  SHA-256 `e4d15cdd92c3b11299c87c9ac85a3099b447fb8fe1ea7bfd78cc997822b4fdab`
+- 104 test lõi (thêm: mọi bản ghi A, đọc ba trả lời keep-alive liên tiếp, chỉ NextDNS lấy máy chủ gần nhất). Thử bản gỡ lỗi
+  trên máy Windows: «NextDNS gần nhất: 38.54.31.178, 171.244.57.202» (Hà Nội), hỏi dùng lại kết nối 70–260 ms lúc mở app. Tệp tải
+  từ link công khai khớp SHA-256. **Tự cập nhật thật 1.8 → 1.8.1** (bản chép riêng): mở lại 1.8.1, tìm được NextDNS Hà Nội ngay.
+
+## 2.11.1 — 09/11/2026
+
+- **DNS mã hoá nhanh hơn:** NextDNS dùng máy chủ gần mạng nhà nhất thay cho IP anycast (từ mạng Viettel bị đưa sang Hồng Kông):
+  lần đầu app hỏi chính NextDNS tên `dns.nextdns.io` (đã mã hoá; NextDNS trả máy chủ gần IP của mạng này), không được thì DNS của
+  máy; nhớ 6 giờ; anycast vẫn đứng sau để dự phòng. Giữ kết nối TLS tới máy chủ DNS để dùng lại (DoT; DoH bằng HTTP/1.1
+  keep-alive), tối đa 4 kết nối nghỉ mỗi máy chủ, bỏ sau 90 giây; máy chủ đóng kết nối thì mở mới ngay (không tính là máy chủ lỗi).
+- Đo từ mạng nhà (máy tính cùng mạng TV): NextDNS Hà Nội hỏi «lạnh» ~140–160 ms / «ấm» ~18 ms, anycast Hồng Kông ~210 / ~40 ms,
+  Cloudflare ~200 / ~35–41 ms, Google ~174 / ~30–37 ms; mở kết nối TLS mới chiếm phần lớn thời gian.
+- versionCode 34 · tag `v2.11.1` · commit `a775794` · `ChimToTV-2.11.1.apk` 1 216 343 byte · SHA-256
+  `0ba4163740303b5e6ec2a83a7578f7195139c8b12447a481a8cb1e065ef95f24`
+- 127 test (thêm 2). Thử bản gỡ lỗi trên TV box: «NextDNS gần nhất: 38.54.31.178, 171.244.57.202»; 6 tập (yanhh3d, VSMOV, mephim,
+  hoathinh3d, KKPhim, NguonC) đều phát, 23 lần hỏi DNS trung vị 109 ms (dùng lại kết nối 39–140 ms; >300 ms chỉ lúc mở app — TV box
+  bắt tay TLS ~400–750 ms), không lỗi. Bản chính thức thử trên TV box trước khi đăng (phát yanhh3d). API `releases/latest` trả
+  `v2.11.1` + `.apk`, tệp tải từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.11 → 2.11.1** trên TV box.
+- Sau 2.11 (không phải lỗi app): hồ sơ NextDNS của app đang chặn một số tên miền app cần (yanhh3d.ee, máy chủ video KKPhim
+  `*.phim1280.tv` / `kvp726.com` / `kkphimplayer1–7.com`, ảnh `clbphimxua.com` / `img.ophim.live`, `imasdk.googleapis.com`) →
+  video lỗi; đã thêm vào danh sách cho phép của hồ sơ, kiểm lại 290 tên miền không còn bị chặn.
+
 ## iPad 1.11 — 09/11/2026
 
 - **DNS mã hoá** (mới trên iPad / iPhone, bật sẵn; Cài đặt → mục «DNS mã hoá», ngay trên «Vượt chặn nhà mạng»): như TV 2.11 —
