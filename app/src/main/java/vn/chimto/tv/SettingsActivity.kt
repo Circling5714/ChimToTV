@@ -220,6 +220,19 @@ class SettingsActivity : BaseActivity() {
                 }
             }
         }
+        // Nguồn cho trang chủ tổng hợp (riêng từng người xem): bật / tắt KKPhim, NguonC, VSMOV, CLB Phim Xưa, trang web
+        findViewById<TextView>(R.id.btnHomeSources).apply {
+            fun label() {
+                val ids = HomeFeed.allSources().ids
+                val on = ids.count { it !in Prefs.homeSrcOff }.takeIf { it > 0 } ?: ids.size
+                text = "Nguồn cho trang chủ: $on / ${ids.size}…"
+            }
+            label()
+            setOnClickListener {
+                val open = { HomeRowsUi.sources(this@SettingsActivity) { label() } }
+                if (Prefs.kids) ProfileUi.parentUnlock(this@SettingsActivity, "Mã PIN phụ huynh để sửa trang chủ") { open() } else open()
+            }
+        }
         val retryBtn = findViewById<TextView>(R.id.btnFeedRetry)
         val resting = Feed.restingHosts()
         if (resting.isNotEmpty()) {

@@ -72,4 +72,51 @@ class HomeRowsTest {
         val prefs = listOf("interest2" to true, "similar" to true, "interest" to false, "dominant" to true, "newest" to true)
         assertEquals(listOf("interest-tien-hiep", "similar", "dominant", "newest"), HomeFeed.arrange(rows, prefs).map { it.id })
     }
+
+    /** Sửa nhanh trên trang chủ: chuyển qua hàng đang hiện kề nó (hàng tắt / không hiện nằm giữa bị vượt qua). */
+    @Test
+    fun moveShownSkipsHiddenRows() {
+        val prefs = listOf("new-eps" to true, "continue" to true, "similar" to true, "interest" to false, "dominant" to true,
+            "newest" to true, "movies" to true)
+        val shown = listOf("similar", "dominant", "movies") // «Mới cập nhật» không đủ phim nên không hiện
+        val up = HomeFeed.moveShown(prefs, shown, "dominant", up = true)!!
+        assertEquals(listOf("new-eps", "continue", "dominant", "similar", "interest", "newest", "movies"), up.map { it.first })
+        val down = HomeFeed.moveShown(prefs, shown, "dominant", up = false)!!
+        assertEquals(listOf("new-eps", "continue", "similar", "interest", "newest", "movies", "dominant"), down.map { it.first })
+        assertEquals(false, down.first { it.first == "interest" }.second)
+        // Hàng đầu không lên được, hàng cuối không xuống được; «Xem tiếp» không chuyển
+        assertEquals(null, HomeFeed.moveShown(prefs, shown, "similar", up = true))
+        assertEquals(null, HomeFeed.moveShown(prefs, shown, "movies", up = false))
+        assertEquals(null, HomeFeed.moveShown(prefs, listOf("continue", "similar"), "continue", up = false))
+        assertEquals(null, HomeFeed.moveShown(prefs, shown, "newest", up = true))
+    }
+
+    @Test
+    fun hideTurnsOffOnlyThatRow() {
+        val prefs = listOf("similar" to true, "custom-a" to true, "movies" to false)
+        assertEquals(listOf("similar" to true, "custom-a" to false, "movies" to false), HomeFeed.hide(prefs, "custom-a"))
+    }
+
+    @Test
+    fun arrangeSlotsKeepsSlotOfLegacyRows() {
+        fun row(id: String, slot: String = "") = FeedRow(id, id, emptyList(), slot = slot)
+        val rows = listOf(row("interest-a"), row("custom-x", "custom-x"), row("interest-b"))
+        val prefs = listOf("custom-x" to true, "interest2" to true, "interest" to true)
+        assertEquals(listOf("custom-x" to "custom-x", "interest-b" to "interest2", "interest-a" to "interest"),
+            HomeFeed.arrangeSlots(rows, prefs).map { it.first.id to it.second })
+    }
+
+    /** Nguồn tắt thì bỏ; tắt hết nguồn đang có thì coi như bật hết (trang chủ không trống). */
+    @Test
+    fun sourcesOff() {
+        val all = HomeFeed.Sources("https://kk", "https://nc", null, "https://k20", listOf("https://web1", "https://web2"))
+        assertEquals(listOf("kk", "nc", "k20", "web"), all.ids)
+        val s = HomeFeed.withoutOff(all, setOf("kk", "web", "vs"))
+        assertEquals(listOf("nc", "k20"), s.ids)
+        assertEquals(null, s.kk)
+        assertEquals(emptyList<String>(), s.web)
+        assertEquals(all.ids, HomeFeed.withoutOff(all, setOf("kk", "nc", "k20", "web")).ids)
+        // Nguồn đã tắt không còn trong danh sách trang: nguồn còn lại vẫn dùng
+        assertEquals(listOf("nc"), HomeFeed.withoutOff(HomeFeed.Sources(null, "https://nc", null, null, emptyList()), setOf("kk")).ids)
+    }
 }

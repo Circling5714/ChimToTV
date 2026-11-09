@@ -77,19 +77,22 @@ class MenuAdapter<T>(
 
 sealed interface GridRow
 
-/** Tiêu đề nhóm; more ≠ null: có chữ «Xem thêm ›» ở bên phải (dải vuốt ngang trên điện thoại cầm dọc). */
-data class HeaderRow(val title: String, val more: MoreRow? = null) : GridRow
+/**
+ * Tiêu đề nhóm; more ≠ null: có chữ «Xem thêm ›» ở bên phải (dải vuốt ngang trên điện thoại cầm dọc). row: id hàng của trang
+ * chủ (giữ tên hàng — cảm ứng — để sửa nhanh hàng đó).
+ */
+data class HeaderRow(val title: String, val more: MoreRow? = null, val row: String? = null) : GridRow
 
 /** Dòng ghi chú chữ mờ chiếm cả hàng (vd tìm mọi trang: trang đang tìm / không có phim / không trả lời). */
 data class NoteRow(val text: String) : GridRow
 /**
  * resume: bấm là xem tiếp luôn (hàng "Xem tiếp"); removable: giữ OK / nhấn Menu để xoá (khỏi lịch sử, hoặc bỏ theo dõi
  * nếu follow). Trang chủ tổng hợp: chip = nhãn góc trên ("3 nguồn", tên nguồn, "bản lưu"); links = các nguồn có phim này
- * (nguồn mở trước đứng đầu) — trang phim có nút đổi nguồn.
+ * (nguồn mở trước đứng đầu) — trang phim có nút đổi nguồn. row: id hàng của trang chủ (Menu / giữ OK → sửa nhanh hàng đó).
  */
 data class FilmRow(
     val film: Film, val resume: Boolean = false, val removable: Boolean = false, val follow: Boolean = false,
-    val chip: String? = null, val links: List<FeedItem> = emptyList(),
+    val chip: String? = null, val links: List<FeedItem> = emptyList(), val row: String? = null,
 ) : GridRow
 
 /** Ô cuối hàng của trang chủ tổng hợp: mở cả danh sách của hàng (key = id hàng; count = số phim, 0 = không ghi). */
@@ -104,20 +107,54 @@ data class ChipRow(val id: String, val label: String, val on: Boolean) : GridRow
  */
 data class StripRow(val key: String, val cells: List<GridRow>) : GridRow
 
-/** Dải vuốt ngang: ◄ / ► ở đầu / cuối dải đứng yên (mặc định Android nhảy sang ô gần nhất của dải khác). */
+/**
+ * Dải vuốt ngang: ◄ / ► ở đầu / cuối dải không nhảy sang ô gần nhất của dải khác (mặc định Android) — đứng yên; riêng ◄ ở
+ * đầu dải ra được menu bên trái (TV, màn ngang: menu nằm ngoài lưới).
+ */
 class StripList(context: android.content.Context) : RecyclerView(context) {
+    private fun inside(v: View?, root: View): Boolean {
+        var p: View? = v
+        while (p != null && p !== root) p = p.parent as? View
+        return p === root
+    }
+
     override fun focusSearch(focused: View?, direction: Int): View? {
         val found = super.focusSearch(focused, direction)
         if (direction != View.FOCUS_LEFT && direction != View.FOCUS_RIGHT) return found
-        var v: View? = found
-        while (v != null && v !== this) v = v.parent as? View
-        return if (v === this) found else focused
+        if (found == null || inside(found, this)) return found
+        val grid = parent as? View
+        return if (direction == View.FOCUS_LEFT && grid != null && !inside(found, grid)) found else focused
+    }
+
+    /**
+     * Ô phóng to khi chọn (focusZoom) vẽ tràn ra ngoài dải; thu nhỏ lại thì phần tràn (trong khung lưới) có khi không được
+     * vẽ lại — còn vệt viền cam (TV box GPU yếu). Tiêu điểm vào / ra / đổi ô trong dải: vẽ lại cả khung lưới khi hết hiệu ứng.
+     */
+    private fun redrawFrame() {
+        val frame = (parent as? View)?.parent as? View ?: return
+        frame.postInvalidateDelayed(ZOOM_MS)
+    }
+
+    override fun requestChildFocus(child: View?, focused: View?) {
+        super.requestChildFocus(child, focused)
+        redrawFrame()
+    }
+
+    override fun clearChildFocus(child: View?) {
+        super.clearChildFocus(child)
+        redrawFrame()
+    }
+
+    private companion object {
+        /** Thời gian hiệu ứng phóng to ô (focusZoom 120 ms) + một khung hình. */
+        const val ZOOM_MS = 150L
     }
 }
 
 /**
  * Lưới poster; tiêu đề nhóm chiếm cả hàng. onNearEnd: gọi khi duyệt gần cuối để tải trang tiếp. onRemove: giữ OK /
- * nhấn Menu trên phim xoá được (lịch sử, phim theo dõi).
+ * nhấn Menu trên phim xoá được (lịch sử, phim theo dõi). onRowMenu: giữ OK / nhấn Menu trên phim của một hàng trang chủ, ô
+ * «Xem thêm» (cảm ứng: cả tên hàng) — sửa nhanh hàng đó (id hàng).
  */
 class FilmGridAdapter(
     private val onClick: (FilmRow) -> Unit,
@@ -125,6 +162,7 @@ class FilmGridAdapter(
     private val onRemove: (FilmRow) -> Unit,
     private val onMore: (MoreRow) -> Unit = {},
     private val onChip: (ChipRow) -> Unit = {},
+    private val onRowMenu: (String) -> Unit = {},
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     private val rows = ArrayList<GridRow>()
     private var focusPosition = -1
@@ -264,7 +302,7 @@ class FilmGridAdapter(
             )
             5 -> {
                 val ctx = parent.context
-                val inner = FilmGridAdapter(onClick, {}, onRemove, onMore, onChip)
+                val inner = FilmGridAdapter(onClick, {}, onRemove, onMore, onChip, onRowMenu)
                 val list = StripList(ctx).apply {
                     layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                     layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
@@ -275,6 +313,8 @@ class FilmGridAdapter(
                     clipToPadding = false
                     clipChildren = false
                     setPadding(0, ctx.dp(4), 0, ctx.dp(2))
+                    // Không vẽ vệt sáng khi cuộn quá đầu / cuối dải (TV: ◄ ở ô đầu ra menu để lại vệt cam ở mép lưới)
+                    overScrollMode = View.OVER_SCROLL_NEVER
                     isFocusable = false
                     descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
                 }
@@ -324,6 +364,25 @@ class FilmGridAdapter(
         }
     }
 
+    /** Giữ OK / chạm giữ hoặc nhấn Menu trên ô → action; null: bỏ. */
+    private fun menuOn(v: View, action: (() -> Unit)?) {
+        if (action == null) {
+            v.setOnLongClickListener(null)
+            v.isLongClickable = false
+            v.setOnKeyListener(null)
+            return
+        }
+        v.setOnLongClickListener {
+            action()
+            true
+        }
+        v.setOnKeyListener { _, code, e ->
+            if (code != KeyEvent.KEYCODE_MENU) return@setOnKeyListener false
+            if (e.action == KeyEvent.ACTION_UP) action()
+            true
+        }
+    }
+
     /** Ô của dải vuốt ngang: bề ngang cố định; ô «Xem thêm» hẹp, cao bằng poster (ô phim: viền 6dp, đệm 5dp, tỉ lệ 2:3). */
     private fun sizeCell(v: View, row: GridRow) {
         if (cellWidth <= 0) return
@@ -331,7 +390,7 @@ class FilmGridAdapter(
         val m = v.context.dp(6)
         if (row is MoreRow) {
             val poster = (cellWidth - 2 * m - 2 * v.context.dp(5)) * 3 / 2
-            lp.width = (cellWidth * 0.62f).toInt() - 2 * m
+            lp.width = maxOf((cellWidth * 0.62f).toInt(), v.context.dp(96)) - 2 * m // đủ chỗ chữ «Xem thêm»
             lp.height = poster + 2 * v.context.dp(5)
         } else {
             lp.width = cellWidth - 2 * m
@@ -342,11 +401,26 @@ class FilmGridAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val row = rows[position]) {
-            is HeaderRow -> if (holder is HeaderMoreHolder) {
-                holder.text.text = row.title
-                holder.link.setOnClickListener { row.more?.let(onMore) }
-            } else {
-                (holder as HeaderHolder).text.text = row.title
+            is HeaderRow -> {
+                val text = if (holder is HeaderMoreHolder) {
+                    holder.link.setOnClickListener { row.more?.let(onMore) }
+                    holder.link.visibility = if (Screen.isTv(holder.link.context)) View.GONE else View.VISIBLE
+                    holder.text
+                } else {
+                    (holder as HeaderHolder).text
+                }
+                text.text = row.title
+                // Cảm ứng: giữ tên hàng để sửa nhanh (remote / bàn phím: Menu trên phim của hàng)
+                val id = row.row
+                if (id != null) {
+                    text.setOnLongClickListener {
+                        onRowMenu(id)
+                        true
+                    }
+                } else {
+                    text.setOnLongClickListener(null)
+                    text.isLongClickable = false
+                }
             }
             is StripRow -> {
                 val h = holder as StripHolder
@@ -377,6 +451,7 @@ class FilmGridAdapter(
                     setSpan(android.text.style.RelativeSizeSpan(2.2f), 0, 1, 0) // dấu › to
                 }
                 holder.text.setOnClickListener { onMore(row) }
+                menuOn(holder.text) { onRowMenu(row.key) }
             } else {
                 val h = holder as CardHolder
                 h.name.text = row.title
@@ -386,9 +461,7 @@ class FilmGridAdapter(
                 h.more.text = if (row.count > 0) "Xem thêm ›\n${row.count} phim" else "Xem thêm ›"
                 ImageLoader.load(h.poster, null)
                 h.itemView.setOnClickListener { onMore(row) }
-                h.itemView.setOnLongClickListener(null)
-                h.itemView.isLongClickable = false
-                h.itemView.setOnKeyListener(null)
+                menuOn(h.itemView) { onRowMenu(row.key) }
             }
             is FilmRow -> {
                 val h = holder as CardHolder
@@ -402,21 +475,12 @@ class FilmGridAdapter(
                 h.more.visibility = View.GONE
                 ImageLoader.load(h.poster, f.poster)
                 h.itemView.setOnClickListener { onClick(row) }
-                if (row.removable) {
-                    h.itemView.setOnLongClickListener {
-                        onRemove(row)
-                        true
-                    }
-                    h.itemView.setOnKeyListener { _, code, e ->
-                        if (code != KeyEvent.KEYCODE_MENU) return@setOnKeyListener false
-                        if (e.action == KeyEvent.ACTION_UP) onRemove(row)
-                        true
-                    }
-                } else {
-                    h.itemView.setOnLongClickListener(null)
-                    h.itemView.isLongClickable = false
-                    h.itemView.setOnKeyListener(null)
-                }
+                val id = row.row
+                menuOn(h.itemView, when {
+                    row.removable -> ({ onRemove(row) })
+                    id != null -> ({ onRowMenu(id) })
+                    else -> null
+                })
             }
         }
         if (position == focusPosition) {

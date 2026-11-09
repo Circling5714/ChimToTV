@@ -102,6 +102,10 @@
                 style="@style/TvButton" />
 
             <TextView
+                android:id="@+id/btnHomeSources"
+                style="@style/TvButton" />
+
+            <TextView
                 android:id="@+id/btnFeedRetry"
                 style="@style/TvButton"
                 android:visibility="gone" />
@@ -111,7 +115,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="Tổng hợp: trang chủ lấy phim mới từ mọi trang trong danh sách (KKPhim, NguonC, VSMOV, CLB Phim Xưa và trang đang dùng), gộp phim trùng giữa các trang («3 nguồn» — trang phim có nút đổi nguồn), xếp hàng theo lịch sử xem của từng người: phim đang xem dở có tập mới ở bất kỳ trang nào, phim giống phim vừa xem, thể loại hay xem. Trang nào lỗi / quá 6 giây thì dùng bản lưu; lỗi 3 lần liên tiếp thì tạm nghỉ 30 phút. Theo trang đang dùng: trang chủ của một trang như trước. Riêng từng người xem. Hồ sơ trẻ em: trang chủ (luôn kiểu tổng hợp) chỉ có phim hoạt hình hợp trẻ em — thiếu nhi, gia đình, lồng tiếng, bỏ phim kinh dị / hình sự / chiến tranh / 18+; chỉ lọc trang chủ, tìm kiếm và mục của trang vẫn như cũ. Tắt cần mã PIN phụ huynh (nếu đã đặt trong Giới hạn giờ xem)."
+            android:text="Tổng hợp: trang chủ lấy phim mới từ mọi trang trong danh sách (KKPhim, NguonC, VSMOV, CLB Phim Xưa và trang đang dùng), gộp phim trùng giữa các trang («3 nguồn» — trang phim có nút đổi nguồn), xếp hàng theo lịch sử xem của từng người: phim đang xem dở có tập mới ở bất kỳ trang nào, phim giống phim vừa xem, thể loại hay xem. Trang nào lỗi / quá 6 giây thì dùng bản lưu; lỗi 3 lần liên tiếp thì tạm nghỉ 30 phút. Theo trang đang dùng: trang chủ của một trang như trước. Riêng từng người xem. Hồ sơ trẻ em: trang chủ (luôn kiểu tổng hợp) chỉ có phim hoạt hình hợp trẻ em — thiếu nhi, gia đình, lồng tiếng, bỏ phim kinh dị / hình sự / chiến tranh / 18+; chỉ lọc trang chủ, tìm kiếm và mục của trang vẫn như cũ. Tắt cần mã PIN phụ huynh (nếu đã đặt trong Giới hạn giờ xem). Các hàng: bật / tắt, đổi thứ tự, thêm hàng của mình — trên trang chủ nhấn Menu (hoặc giữ OK) trên một phim của hàng để ẩn / chuyển nhanh hàng đó. Nguồn: chọn trang chủ lấy phim từ những nguồn nào."
             android:textColor="@color/text_dim"
             android:textSize="14sp" />
 

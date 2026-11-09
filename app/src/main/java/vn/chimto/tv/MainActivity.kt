@@ -61,7 +61,7 @@ class MainActivity : BaseActivity() {
     private var drawerOpen = false
 
     private val menuAdapter = MenuAdapter<Entry>({ it.title }, ::onMenu)
-    private val gridAdapter = FilmGridAdapter(::openFilm, ::loadMore, ::confirmRemove, ::openMore, ::toggleTopic)
+    private val gridAdapter = FilmGridAdapter(::openFilm, ::loadMore, ::confirmRemove, ::openMore, ::toggleTopic, ::rowMenu)
     private lateinit var homeNote: TextView
 
     /**
@@ -79,14 +79,18 @@ class MainActivity : BaseActivity() {
     /** Các hàng trang chủ lúc tải (Cài đặt → Trang chủ → Các hàng): đổi thì tải lại trang chủ (hàng vừa bật cần tải). */
     private var loadedRows: String? = null
 
-    /** Cài đặt các hàng của người xem (thứ tự / bật tắt + hàng tự thêm) — đổi thì tải lại trang chủ. */
-    private fun rowsSignature() = Prefs.homeRows.joinToString(",") + "|" + Prefs.homeCustom.joinToString(",") { it.json().toString() }
+    /** Cài đặt các hàng của người xem (thứ tự / bật tắt + hàng tự thêm + nguồn tắt) — đổi thì tải lại trang chủ. */
+    private fun rowsSignature() = Prefs.homeRows.joinToString(",") + "|" + Prefs.homeCustom.joinToString(",") { it.json().toString() } +
+        "|" + Prefs.homeSrcOff.sorted().joinToString(",")
 
     /** Bố cục lần trước là cầm dọc (đổi thì trang chủ tổng hợp xếp lại: lưới ↔ dải vuốt ngang). */
     private var layoutNarrow: Boolean? = null
 
-    /** Trang chủ tổng hợp trên điện thoại cầm dọc: mỗi hàng là một dải vuốt ngang (như bản iPhone). */
-    private val strips get() = Screen.narrow(this) && Prefs.homeMixOn
+    /**
+     * Trang chủ tổng hợp: mỗi hàng là một dải vuốt ngang (◄ ► cuộn trong hàng, tới STRIP_MAX phim; ô «Xem thêm» hẹp ở cuối
+     * dải) — mọi màn (TV, điện thoại cầm dọc / ngang). Trang chủ theo trang: lưới như cũ.
+     */
+    private val strips get() = Prefs.homeMixOn
 
     private var categories: List<Category> = emptyList()
     private var token = 0
@@ -202,8 +206,9 @@ class MainActivity : BaseActivity() {
         val widthDp = resources.configuration.screenWidthDp.takeIf { it > 0 }
             ?: (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
         val span = max(3, (widthDp - if (narrow) 16 else 240) / 135)
-        // Dải vuốt ngang (trang chủ tổng hợp, cầm dọc): thấy trọn span phim và một phần phim kế
-        val stripW = (dp(widthDp - 16) / (span + 0.35f)).toInt()
+        // Dải vuốt ngang (trang chủ tổng hợp): thấy trọn span phim và một phần phim kế (bề ngang lưới: trừ lề, màn ngang
+        // trừ cả menu bên trái 200dp)
+        val stripW = (dp(widthDp - if (narrow) 16 else 240) / (span + 0.35f)).toInt()
         val changed = span != gridAdapter.spanCount || (grid.layoutManager as GridLayoutManager).spanCount != span ||
             narrow != layoutNarrow || stripW != gridAdapter.stripCellWidth
         layoutNarrow = narrow
@@ -882,6 +887,8 @@ class MainActivity : BaseActivity() {
             // phím: dải gắn vào lưới (ngay sau submit) thì tự cuộn tới ô và chọn ô đó
             if (!TouchUi.active) gridAdapter.stripFocus = (gridAdapter.items[i] as StripRow).key to j
             grid.post { (grid.layoutManager as GridLayoutManager).scrollToPositionWithOffset(max(0, i - 1), 0) }
+            // TV (menu bên trái nhận tiêu điểm khi ô cũ bị gỡ khỏi lưới): ô chưa nhận thì tìm lại tới khi được
+            if (!TouchUi.active) grid.postDelayed({ ensureStripFocus(i, j, 0) }, STRIP_FOCUS_STEP)
             return
         }
         grid.post {
@@ -890,13 +897,89 @@ class MainActivity : BaseActivity() {
         }
     }
 
-    /** Xoay máy (cầm dọc ↔ ngang): xếp lại trang chủ tổng hợp từ lần tải gần nhất, giữ ô đang chọn. */
-    private fun relayoutFeed() {
-        val snap = feedSnap ?: return
-        val focusKey = focusedKey()
+    /**
+     * Chọn ô thứ j của dải ở vị trí i (remote / bàn phím): ô đã gắn vào dải thì chọn; chưa thì cuộn dải tới ô đó rồi thử lại
+     * (tối đa STRIP_FOCUS_TRIES lần). Bỏ nếu người dùng đã bấm sang chỗ khác trong lưới.
+     */
+    private fun ensureStripFocus(i: Int, j: Int, tries: Int) {
+        val holder = grid.findViewHolderForAdapterPosition(i) as? FilmGridAdapter.StripHolder
+        val cell = holder?.list?.findViewHolderForAdapterPosition(j)?.itemView
+        if (cell != null && cell.hasFocus()) return
+        if (tries > 0 && grid.hasFocus()) return // đã có ô khác của lưới được chọn (người dùng bấm phím)
+        if (cell != null && cell.isLaidOut) {
+            cell.focusForRemote()
+            return
+        }
+        if (tries >= STRIP_FOCUS_TRIES) return
+        holder?.list?.scrollToPosition(j)
+        grid.postDelayed({ ensureStripFocus(i, j, tries + 1) }, STRIP_FOCUS_STEP)
+    }
+
+    /**
+     * Xoay máy (cầm dọc ↔ ngang), sửa nhanh các hàng: xếp lại trang chủ tổng hợp từ lần tải gần nhất (trang chủ theo trang:
+     * chỉ đầu trang), giữ ô đang chọn (focusKey).
+     */
+    private fun relayoutFeed(focusKey: String? = focusedKey()) {
+        val snap = feedSnap
+        if (snap == null || !Prefs.homeMixOn) {
+            refreshHead()
+            return
+        }
         head = headRows()
         gridAdapter.submit(head + feedRows(snap), focusFirst = false)
         if (focusKey != null) focusKeyAfterSubmit(focusKey)
+    }
+
+    /** Đang ở trang chủ (không phải «Xem thêm», mục khác, kết quả tìm). */
+    private fun onHome() = homeToken == token && moreFrom == null
+
+    /**
+     * Sửa nhanh một hàng trang chủ (Menu / giữ OK trên phim của hàng hoặc ô «Xem thêm»; cảm ứng: giữ tên hàng): ẩn, chuyển
+     * lên / xuống, mở «Các hàng…» / «Nguồn…». Hồ sơ trẻ em: hỏi mã PIN phụ huynh trước (nếu đã đặt).
+     */
+    private fun rowMenu(rowId: String) {
+        if (!onHome()) return
+        if (Prefs.kids) ProfileUi.parentUnlock(this, "Mã PIN phụ huynh để sửa trang chủ") { showRowMenu(rowId) } else showRowMenu(rowId)
+    }
+
+    private fun showRowMenu(rowId: String) {
+        val arranged = feedSnap?.takeIf { Prefs.homeMixOn }?.let { HomeFeed.arrangeSlots(it.rows) } ?: emptyList()
+        val (title, slot) = when (rowId) {
+            "new-eps" -> "Có tập mới" to rowId
+            "continue" -> "Xem tiếp" to rowId
+            else -> arranged.firstOrNull { it.first.id == rowId }?.let { it.first.title to it.second } ?: return
+        }
+        if (slot == "topics") return
+        val shown = arranged.map { it.second }
+        // Ô cần chọn sau khi ẩn hàng: phim đầu của hàng kế (hàng cuối: hàng trên)
+        val at = arranged.indexOfFirst { it.first.id == rowId }
+        val next = if (at < 0) null else (arranged.getOrNull(at + 1) ?: arranged.getOrNull(at - 1))?.first
+        HomeRowsUi.rowMenu(this, title, slot, shown,
+            changed = { hidden ->
+                loadedRows = rowsSignature() // chỉ xếp lại, không cần tải lại
+                if (hidden) relayoutFeed(next?.cards?.firstOrNull()?.film?.url ?: "") else relayoutFeed()
+            },
+            closed = ::afterHomeSettings,
+        )
+    }
+
+    /** Đóng hộp «Các hàng…» / «Nguồn…» mở từ trang chủ: cài đặt đổi thì xếp lại / tải hàng mới (giữ ô đang chọn). */
+    private fun afterHomeSettings() {
+        if (onHome() && loadedRows != rowsSignature()) showHome()
+    }
+
+    /** Hộp xoá phim / bỏ theo dõi mở từ đầu trang chủ: thêm nút «Ẩn hàng này» (hồ sơ trẻ em: cần mã PIN phụ huynh). */
+    private fun hideHeadButton(b: AlertDialog.Builder, slot: String, title: String): AlertDialog.Builder {
+        if (!onHome()) return b
+        return b.setNeutralButton("Ẩn hàng này") { _, _ ->
+            val hide = {
+                HomeFeed.saveRows(HomeFeed.hide(HomeFeed.rowPrefs(), slot))
+                loadedRows = rowsSignature()
+                relayoutFeed("") // "": chọn phim đầu trang
+                toast("Đã ẩn hàng «$title» — bật lại trong Cài đặt → Trang chủ → Các hàng trên trang chủ.")
+            }
+            if (Prefs.kids) ProfileUi.parentUnlock(this, "Mã PIN phụ huynh để sửa trang chủ") { hide() } else hide()
+        }
     }
 
     /** Các hàng phim của trang chủ tổng hợp (dưới «Có tập mới» / «Xem tiếp»): mỗi hàng một dòng, ô cuối «Xem thêm». */
@@ -914,13 +997,13 @@ class MainActivity : BaseActivity() {
             if (strips) {
                 // Dải vuốt ngang: tới STRIP_MAX phim; còn nữa (hoặc nguồn có trang sau) thì «Xem thêm ›» ở tiêu đề + ô cuối dải
                 val more = if (n > STRIP_MAX || row.more != null) MoreRow(row.id, row.title, if (row.more != null) 0 else n) else null
-                out += HeaderRow(row.title, more)
-                out += StripRow(row.id, row.cards.take(STRIP_MAX).map { FilmRow(it.film, chip = it.chip, links = it.links) } + listOfNotNull(more))
+                out += HeaderRow(row.title, more, row = row.id)
+                out += StripRow(row.id, row.cards.take(STRIP_MAX).map { FilmRow(it.film, chip = it.chip, links = it.links, row = row.id) } + listOfNotNull(more))
                 continue
             }
-            out += HeaderRow(row.title)
+            out += HeaderRow(row.title, row = row.id)
             val show = if (n > span) row.cards.take(span - 1) else row.cards
-            show.forEach { c -> out += FilmRow(c.film, chip = c.chip, links = c.links) }
+            show.forEach { c -> out += FilmRow(c.film, chip = c.chip, links = c.links, row = row.id) }
             // Hàng có danh sách nhiều trang của nguồn: không ghi số phim (mới tải trang đầu)
             if (n > span) out += MoreRow(row.id, row.title, if (row.more != null) 0 else n)
         }
@@ -1037,6 +1120,10 @@ class MainActivity : BaseActivity() {
 
         /** Số phim tối đa một dải vuốt ngang (còn lại xem ở «Xem thêm»). */
         const val STRIP_MAX = 12
+
+        /** Tìm lại ô cần chọn trong dải: mỗi 50 ms, tối đa 20 lần (1 giây). */
+        const val STRIP_FOCUS_STEP = 50L
+        const val STRIP_FOCUS_TRIES = 20
     }
 
     /**
@@ -1124,14 +1211,14 @@ class MainActivity : BaseActivity() {
         // «Có tập mới» / «Xem tiếp» người xem tắt được (Cài đặt → Trang chủ → Các hàng)
         val on = HomeFeed.rowPrefs().filter { it.second }.map { it.first }.toSet()
         if ((fresh.isNotEmpty() || auto.isNotEmpty()) && "new-eps" in on) {
-            rows += HeaderRow("Có tập mới")
+            rows += HeaderRow("Có tập mới", row = "new-eps")
             val cells = fresh.map { FilmRow(followFilm(it), removable = true, follow = true) } +
-                auto.map { FilmRow(it.card.film, chip = it.card.chip, links = it.card.links) }
+                auto.map { FilmRow(it.card.film, chip = it.card.chip, links = it.card.links, row = "new-eps") }
             if (strips) rows += StripRow("head-new", cells) else rows += cells
         }
         val items = if ("continue" in on) Prefs.history.take(if (strips) STRIP_MAX else gridAdapter.spanCount) else emptyList()
         if (items.isNotEmpty()) {
-            rows += HeaderRow("Xem tiếp")
+            rows += HeaderRow("Xem tiếp", row = "continue")
             val cells = items.map { FilmRow(historyFilm(it), resume = true, removable = true) }
             if (strips) rows += StripRow("head-continue", cells) else rows += cells
         }
@@ -1199,6 +1286,7 @@ class MainActivity : BaseActivity() {
 
     private fun confirmUnfollow(row: FilmRow) {
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .let { hideHeadButton(it, "new-eps", "Có tập mới") }
             .setTitle("Bỏ theo dõi?")
             .setMessage("«${row.film.title}» — app sẽ không báo tập mới của phim này nữa.")
             .setPositiveButton("Bỏ theo dõi") { _, _ ->
@@ -1221,6 +1309,7 @@ class MainActivity : BaseActivity() {
 
     private fun confirmRemoveHistory(row: FilmRow) {
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .let { hideHeadButton(it, "continue", "Xem tiếp") }
             .setTitle("Xoá khỏi lịch sử xem?")
             .setMessage("«${row.film.title}» và chỗ đang xem dở các tập của phim này sẽ bị xoá.")
             .setPositiveButton("Xoá") { _, _ ->

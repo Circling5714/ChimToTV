@@ -20,14 +20,82 @@ import android.widget.Toast
 object HomeRowsUi {
     private fun dialog(a: Activity) = AlertDialog.Builder(a, android.R.style.Theme_DeviceDefault_Dialog_Alert)
 
-    fun show(a: Activity) {
+    /** Nhãn «(tên người xem)» khi có từ hai người xem. */
+    private fun who() = if (Prefs.profiles.size >= 2) " — ${Prefs.profile.name}" else ""
+
+    private fun note(a: Activity, text: String) = TextView(a).apply {
+        this.text = text
+        textSize = 14f
+        setTextColor(a.colorOf(R.color.text_dim))
+        setPadding(0, 0, 0, a.dp(10))
+    }
+
+    private fun button(a: Activity, parent: LinearLayout, text: String, tag: String, onClick: () -> Unit): TextView =
+        (LayoutInflater.from(a).inflate(R.layout.item_button, parent, false) as TextView).also {
+            it.text = text
+            it.tag = tag
+            it.setOnClickListener { onClick() }
+            parent.addView(it)
+        }
+
+    /**
+     * Cài đặt → Trang chủ → «Nguồn cho trang chủ…» (riêng từng người xem): bật / tắt từng nguồn của trang chủ tổng hợp
+     * (HomeFeed.SOURCES; chỉ nguồn có trong danh sách trang). Còn một nguồn thì không tắt được. onClose: lúc đóng hộp.
+     */
+    fun sources(a: Activity, onClose: (() -> Unit)? = null) {
         val list = LinearLayout(a).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(a.dp(22), a.dp(6), a.dp(22), a.dp(6))
         }
-        val who = if (Prefs.profiles.size >= 2) " — ${Prefs.profile.name}" else ""
         val d = dialog(a)
-            .setTitle("Các hàng trên trang chủ$who")
+            .setTitle("Nguồn cho trang chủ${who()}")
+            .setView(ScrollView(a).apply { addView(list) })
+            .setPositiveButton("Xong", null)
+            .create()
+        val all = HomeFeed.allSources()
+        val ids = all.ids
+        lateinit var render: (String?) -> Unit
+        render = { focus ->
+            list.removeAllViews()
+            list.addView(note(a, "Nguồn tắt thì trang chủ không tải phim của nguồn đó. Hàng lọc theo thể loại / nước lấy từ KKPhim — " +
+                "tắt KKPhim thì lấy VSMOV. Phim theo dõi vẫn báo tập mới. Cần ít nhất một nguồn; nguồn không có trong danh sách " +
+                "trang (Đổi trang phim) thì không hiện ở đây." + if (!Prefs.homeMixOn) "\nTrang chủ đang theo trang đang dùng — " +
+                "cài đặt này dùng khi chọn «Tổng hợp mọi nguồn»." else ""))
+            val off = Prefs.homeSrcOff
+            for ((id, name) in HomeFeed.SOURCES) {
+                if (id !in ids) continue
+                val on = id !in off
+                val label = if (id == "web") "$name: " + all.web.mapNotNull { Site.hostOf(it) }.joinToString(", ") else name
+                button(a, list, (if (on) "✓  " else "✗  ") + label + if (on) "" else "  (tắt)", id) {
+                    val cur = Prefs.homeSrcOff
+                    if (id !in cur && ids.count { it !in cur } <= 1) {
+                        Toast.makeText(a, "Cần ít nhất một nguồn cho trang chủ.", Toast.LENGTH_SHORT).show()
+                        return@button
+                    }
+                    Prefs.homeSrcOff = if (id in cur) cur - id else cur + id
+                    render(id)
+                }.apply {
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                        .apply { bottomMargin = a.dp(6) }
+                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                    alpha = if (on) 1f else 0.6f
+                }
+            }
+            focus?.let { list.findViewWithTag<View>(it) }?.let { v -> v.post { v.focusForRemote() } }
+        }
+        d.setOnShowListener { d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { d.dismiss() } }
+        d.setOnDismissListener { onClose?.invoke() }
+        render(ids.firstOrNull())
+        d.show()
+    }
+
+    fun show(a: Activity, onClose: (() -> Unit)? = null) {
+        val list = LinearLayout(a).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(a.dp(22), a.dp(6), a.dp(22), a.dp(6))
+        }
+        val d = dialog(a)
+            .setTitle("Các hàng trên trang chủ${who()}")
             .setView(ScrollView(a).apply { addView(list) })
             .setNeutralButton("Mặc định", null)
             .setPositiveButton("Xong", null)
@@ -47,16 +115,8 @@ object HomeRowsUi {
             }
             return HomeFeed.ROWS.first { it.first == id }.second.replace("Vì …", "Vì ${Prefs.profile.name}")
         }
-        fun save(prefs: List<Pair<String, Boolean>>) {
-            Prefs.homeRows = prefs.map { (id, on) -> if (on) id else "-$id" }
-        }
-        fun button(parent: LinearLayout, text: String, tag: String, onClick: () -> Unit): TextView =
-            (LayoutInflater.from(a).inflate(R.layout.item_button, parent, false) as TextView).also {
-                it.text = text
-                it.tag = tag
-                it.setOnClickListener { onClick() }
-                parent.addView(it)
-            }
+        fun save(prefs: List<Pair<String, Boolean>>) = HomeFeed.saveRows(prefs)
+        fun button(parent: LinearLayout, text: String, tag: String, onClick: () -> Unit) = button(a, parent, text, tag, onClick)
 
         lateinit var render: () -> Unit
         fun toggle(id: String) {
@@ -98,13 +158,9 @@ object HomeRowsUi {
 
         render = render@{
             list.removeAllViews()
-            list.addView(TextView(a).apply {
-                text = "Hàng tắt thì không tải. «Có tập mới» và «Xem tiếp» luôn ở đầu trang; hàng nào không đủ phim thì tự ẩn." +
-                    if (Prefs.kids) "\nHồ sơ trẻ em: chỉ các hàng hoạt hình hợp trẻ em." else ""
-                textSize = 14f
-                setTextColor(a.colorOf(R.color.text_dim))
-                setPadding(0, 0, 0, a.dp(10))
-            })
+            list.addView(note(a, "Hàng tắt thì không tải. «Có tập mới» và «Xem tiếp» luôn ở đầu trang; hàng nào không đủ phim thì tự ẩn. " +
+                "Trên trang chủ: nhấn Menu (hoặc giữ OK) trên một phim của hàng để ẩn / chuyển nhanh." +
+                if (Prefs.kids) "\nHồ sơ trẻ em: chỉ các hàng hoạt hình hợp trẻ em." else ""))
             val shown = HomeFeed.rowPrefs().filter { visible(it.first) }
             val ordered = shown.filter { it.first in HomeFeed.HEAD_ROWS } + shown.filter { it.first !in HomeFeed.HEAD_ROWS }
             val body = ordered.filter { it.first !in HomeFeed.HEAD_ROWS }
@@ -159,8 +215,37 @@ object HomeRowsUi {
             }
             d.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { d.dismiss() }
         }
+        d.setOnDismissListener { onClose?.invoke() }
         render()
         d.show()
+    }
+
+    /**
+     * Sửa nhanh trên trang chủ (Menu / giữ OK trên phim của một hàng hoặc ô «Xem thêm»; điện thoại: giữ tên hàng): «Ẩn hàng
+     * này», «▲ Chuyển lên» / «▼ Chuyển xuống» (qua hàng đang hiện kề nó), «Các hàng trên trang chủ…», «Nguồn cho trang
+     * chủ…». shown: loại hàng đang hiện theo thứ tự. changed(hidden): vừa đổi cài đặt các hàng (xếp lại trang chủ);
+     * closed: đóng hộp «Các hàng» / «Nguồn» (tải lại trang chủ nếu cần). Hồ sơ trẻ em: người gọi hỏi mã PIN phụ huynh trước.
+     */
+    fun rowMenu(a: Activity, title: String, slot: String, shown: List<String>, changed: (Boolean) -> Unit, closed: () -> Unit) {
+        val prefs = HomeFeed.rowPrefs()
+        val items = ArrayList<Pair<String, () -> Unit>>()
+        items += "Ẩn hàng này" to {
+            HomeFeed.saveRows(HomeFeed.hide(prefs, slot))
+            changed(true)
+            Toast.makeText(a, "Đã ẩn hàng «$title» — bật lại trong Cài đặt → Trang chủ → Các hàng trên trang chủ.", Toast.LENGTH_LONG).show()
+        }
+        HomeFeed.moveShown(prefs, shown, slot, up = true)?.let { p ->
+            items += "▲  Chuyển lên" to { HomeFeed.saveRows(p); changed(false) }
+        }
+        HomeFeed.moveShown(prefs, shown, slot, up = false)?.let { p ->
+            items += "▼  Chuyển xuống" to { HomeFeed.saveRows(p); changed(false) }
+        }
+        items += "Các hàng trên trang chủ…" to { show(a, closed) }
+        if (Prefs.homeMixOn) items += "Nguồn cho trang chủ…" to { sources(a, closed) }
+        dialog(a).setTitle("Hàng «$title»")
+            .setItems(items.map { it.first }.toTypedArray()) { _, i -> items[i].second() }
+            .setNegativeButton("Huỷ", null)
+            .show()
     }
 
     /** «＋ Thêm hàng…»: chủ đề có sẵn, hoặc tự chọn loại phim / nước / thể loại / ngôn ngữ. */

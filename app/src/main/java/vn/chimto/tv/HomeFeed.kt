@@ -151,7 +151,11 @@ object HomeFeed {
      * Xếp các hàng theo cài đặt của người xem: bỏ hàng đã tắt, theo thứ tự đã chọn; hàng theo chủ đề (người xem mới) luôn
      * đầu, hàng lạ (không có trong cài đặt) cuối.
      */
-    fun arrange(rows: List<FeedRow>, prefs: List<Pair<String, Boolean>> = rowPrefs()): List<FeedRow> {
+    fun arrange(rows: List<FeedRow>, prefs: List<Pair<String, Boolean>> = rowPrefs()): List<FeedRow> =
+        arrangeSlots(rows, prefs).map { it.first }
+
+    /** Như arrange, kèm loại hàng (id trong cài đặt) của từng hàng — kể cả hàng lưu từ bản cũ (chưa ghi slot). */
+    fun arrangeSlots(rows: List<FeedRow>, prefs: List<Pair<String, Boolean>> = rowPrefs()): List<Pair<FeedRow, String>> {
         val pos = HashMap<String, Int>()
         prefs.forEachIndexed { i, (id, on) -> pos[id] = if (on) i else -1 }
         var interest = 0
@@ -162,7 +166,35 @@ object HomeFeed {
         }
         return keyed.filter { (_, s) -> pos[s] != -1 }
             .sortedBy { (_, s) -> if (s == "topics") -1 else pos[s] ?: Int.MAX_VALUE }
-            .map { it.first }
+    }
+
+    /** Lưu cài đặt các hàng ("id" bật, "-id" tắt). */
+    fun saveRows(prefs: List<Pair<String, Boolean>>) {
+        Prefs.homeRows = prefs.map { (id, on) -> if (on) id else "-$id" }
+    }
+
+    /** Tắt một hàng (sửa nhanh trên trang chủ: «Ẩn hàng này»). */
+    fun hide(prefs: List<Pair<String, Boolean>>, slot: String): List<Pair<String, Boolean>> =
+        prefs.map { if (it.first == slot) slot to false else it }
+
+    /**
+     * Sửa nhanh trên trang chủ: chuyển hàng `slot` lên / xuống qua hàng đang hiện kề nó (shown = loại hàng đang hiện, theo
+     * thứ tự trên trang — hàng tắt / không đủ phim nằm giữa thì bị vượt qua). null: không chuyển được (hàng đầu / cuối,
+     * «Có tập mới» / «Xem tiếp», hàng chủ đề bản cũ).
+     */
+    fun moveShown(prefs: List<Pair<String, Boolean>>, shown: List<String>, slot: String, up: Boolean): List<Pair<String, Boolean>>? {
+        val fixed = HEAD_ROWS + "topics"
+        val i = shown.indexOf(slot)
+        if (i < 0 || slot in fixed) return null
+        val other = shown.getOrNull(if (up) i - 1 else i + 1) ?: return null
+        if (other in fixed) return null
+        val out = prefs.toMutableList()
+        val me = out.firstOrNull { it.first == slot } ?: return null
+        out.remove(me)
+        val j = out.indexOfFirst { it.first == other }
+        if (j < 0) return null
+        out.add(if (up) j else j + 1, me)
+        return out
     }
 
     /** Chủ đề cho người xem chưa có lịch sử (id lưu trong Prefs.homeTopics). */
@@ -174,9 +206,36 @@ object HomeFeed {
     /** Nguồn trong danh sách trang của người xem (gốc địa chỉ); web: trang web đang dùng + trang hay xem gần đây. */
     class Sources(val kk: String?, val nc: String?, val vs: String?, val k20: String?, val web: List<String>) {
         val count get() = listOfNotNull(kk, nc, vs, k20).size + web.size
+
+        /** id (trong SOURCES) của các nguồn có mặt. */
+        val ids get() = listOfNotNull(kk?.let { "kk" }, nc?.let { "nc" }, vs?.let { "vs" }, k20?.let { "k20" }, web.firstOrNull()?.let { "web" })
     }
 
-    fun sources(): Sources {
+    /**
+     * Nguồn của trang chủ tổng hợp người xem bật / tắt được (Cài đặt → Trang chủ → «Nguồn cho trang chủ…», riêng từng người;
+     * khoá Prefs.homeSrcOff), theo thứ tự hiện. «web» = trang đang dùng + trang xem gần đây.
+     */
+    val SOURCES = listOf(
+        "kk" to "KKPhim", "nc" to "NguonC", "vs" to "VSMOV", "k20" to "CLB Phim Xưa", "web" to "Trang đang dùng và trang xem gần đây",
+    )
+
+    /**
+     * Bỏ các nguồn người xem đã tắt. Tắt hết các nguồn đang có (vd nguồn còn bật vừa bị xoá khỏi danh sách trang) thì coi như
+     * bật hết — trang chủ không bao giờ trống vì cài đặt nguồn.
+     */
+    fun withoutOff(all: Sources, off: Set<String>): Sources {
+        if (all.ids.all { it in off }) return all
+        return Sources(
+            all.kk.takeIf { "kk" !in off }, all.nc.takeIf { "nc" !in off }, all.vs.takeIf { "vs" !in off },
+            all.k20.takeIf { "k20" !in off }, if ("web" in off) emptyList() else all.web,
+        )
+    }
+
+    /** Nguồn trang chủ của người xem đang dùng (đã bỏ nguồn tắt). */
+    fun sources(): Sources = withoutOff(allSources(), Prefs.homeSrcOff)
+
+    /** Mọi nguồn có trong danh sách trang (cả nguồn người xem đã tắt). */
+    fun allSources(): Sources {
         val sites = Prefs.sites
         val base = Prefs.baseUrl
         val kk = sites.firstOrNull { ApiSite.isKk(it) }?.let(ApiSite::origin)

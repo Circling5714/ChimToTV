@@ -155,8 +155,8 @@ object Prefs {
         // Trang chủ tổng hợp (HomeFeed): kiểu trang chủ, chủ đề đã chọn, tập mới nhất đã thấy của từng phim, hồ sơ trẻ em,
         // ngôn ngữ bản hay xem (Vietsub / Thuyết minh / Lồng tiếng)
         "home_mix", "home_topics", "seen_eps", "kids", "watch_langs",
-        // Các hàng trang chủ người xem bật / tắt, sắp thứ tự (HomeFeed.rowPrefs); hàng tự thêm (HomeFeed.CustomRow)
-        "home_rows", "home_custom",
+        // Các hàng trang chủ người xem bật / tắt, sắp thứ tự (HomeFeed.rowPrefs); hàng tự thêm (HomeFeed.CustomRow); nguồn tắt
+        "home_rows", "home_custom", "home_src_off",
     )
     private val PROFILE_PREFIXES = listOf("server_type@", "server_label@")
 
@@ -678,6 +678,12 @@ object Prefs {
             return (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let(CustomRow::of) }
         }
         set(value) = sp.edit().putString(k("home_custom"), JSONArray(value.map { it.json() }).toString()).apply()
+
+    /** Nguồn trang chủ tổng hợp người xem đã tắt (id trong HomeFeed.SOURCES: kk, nc, vs, k20, web); rỗng = dùng mọi nguồn. */
+    var homeSrcOff: Set<String>
+        get() = runCatching { JSONArray(sp.getString(k("home_src_off"), "[]")) }.getOrDefault(JSONArray())
+            .let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotEmpty() }.toSet() }
+        set(value) = sp.edit().putString(k("home_src_off"), JSONArray(value.sorted()).toString()).apply()
 
     private fun legacyTopics(): List<String> =
         runCatching { JSONArray(sp.getString(k("home_topics"), "[]")) }.getOrDefault(JSONArray())
