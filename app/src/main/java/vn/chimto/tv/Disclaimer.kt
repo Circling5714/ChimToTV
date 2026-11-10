@@ -125,13 +125,19 @@ class DisclaimerActivity : BaseActivity() {
         findViewById<TextView>(R.id.disclaimerHint).text =
             if (Screen.isTv(this)) "▲ ▼: đọc tiếp  •  OK: ${agree.text}" else ""
         agree.requestFocus()
-        // Remote: ▲ từ nút lên vùng chữ rồi ▲▼ cuộn; hết chữ thì ▼ xuống lại nút
+        // Remote: ▲ từ nút lên vùng chữ rồi ▲▼ cuộn; hết chữ thì ▼ xuống lại nút. OK ở vùng chữ = nút chính (như dòng nhắc):
+        // mở app ở chế độ chạm (chuột bay / màn cảm ứng) thì lần bấm phím đầu chọn vùng chữ chứ không chọn nút
         findViewById<ScrollView>(R.id.disclaimerScroll).setOnKeyListener { v, code, e ->
-            if (e.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_DOWN && !v.canScrollVertically(1)) {
-                agree.requestFocus()
-                true
-            } else {
-                false
+            when {
+                e.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_DOWN && !v.canScrollVertically(1) -> {
+                    agree.requestFocus()
+                    true
+                }
+                code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                    if (e.action == KeyEvent.ACTION_UP) agree.performClick()
+                    true
+                }
+                else -> false
             }
         }
     }
