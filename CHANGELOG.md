@@ -7,6 +7,41 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.14 — 10/11/2026
+
+- **Miễn trừ trách nhiệm & quyền riêng tư** như TV 2.14: lần đầu mở app (kể cả máy cập nhật từ bản cũ) hiện màn «Trước khi bắt
+  đầu» phủ toàn màn — «Đồng ý» mới vào app, «Thoát» đưa app về màn hình chính (lần mở sau vẫn hỏi). Xem lại: Cài đặt → Liên hệ →
+  «Miễn trừ trách nhiệm & quyền riêng tư».
+- bản 1.14 (CFBundleVersion 19) · mã gói `vn.chimto.tv` · tag `ios-v1.14` (không phải "latest") · commit `f179d63` ·
+  `ConBangTV-iPad-1.14.ipa` 4 418 891 byte · SHA-256 `5de3efdbc1693811c12aa64a2d81912657dcf0eafffc637dbc50e235cf7ab801`
+- 140 test lõi trên macOS. Bản thử 105 trên iPhone: hiện màn «Trước khi bắt đầu», «Đồng ý» → trang chủ. Bản chính thức cài lên
+  iPhone (đè 1.13): chạy. Tệp tải từ link công khai khớp SHA-256; `releases/latest` vẫn `v2.14`.
+
+## Windows 1.11 — 10/11/2026
+
+- **Miễn trừ trách nhiệm & quyền riêng tư** như TV 2.14: lần đầu mở app (kể cả máy cập nhật từ bản cũ) hiện hộp «Trước khi bắt
+  đầu» — «Đồng ý» mới vào app, «Thoát» / Esc là đóng app; hỏi cập nhật và «Ai đang xem?» chờ sau khi đồng ý. Xem lại: Cài đặt →
+  «Miễn trừ trách nhiệm & quyền riêng tư».
+- bản 1.11.0 · tag `win-v1.11` (không phải "latest") · commit `f179d63` · `ConBangTV-Windows-1.11.exe` 72 915 844 byte · SHA-256
+  `f4023adc65894cfa28ea7a0319c89a749babcb7abedaa64311345278bce5ab5f`
+- 123 test lõi. Tệp tải từ link công khai khớp SHA-256. **Tự cập nhật thật 1.10 → 1.11** (bản chép riêng) lúc 16:55:50 — mở lại
+  là hiện hộp «Trước khi bắt đầu».
+
+## 2.14 — 10/11/2026
+
+- **Miễn trừ trách nhiệm & quyền riêng tư:** lần đầu mở app (kể cả TV cập nhật từ bản cũ) hiện màn «Trước khi bắt đầu» với 9 mục
+  (app chỉ là trình xem, bản quyền, trách nhiệm người dùng, trang bên thứ ba, tính năng mạng, dữ liệu và quyền riêng tư — DNS mã hoá
+  không lưu nhật ký truy cập —, không bảo đảm, trẻ em, liên hệ). Chọn «Đồng ý» mới vào app; «Thoát» / Back là đóng app. Remote: ▲
+  lên vùng chữ, ▲▼ cuộn, hết chữ ▼ về nút. Hỏi «Ai đang xem?» chờ sau khi đồng ý; đã đồng ý thì không hỏi lại (mỗi máy riêng).
+- Xem lại: Cài đặt → Liên hệ → «Miễn trừ trách nhiệm & quyền riêng tư». README có mục cùng nội dung.
+- versionCode 37 · tag `v2.14` · commit `f179d63` (tính năng: `a418a6c`) · `ChimToTV-2.14.apk` 1 239 190 byte · SHA-256
+  `950a36576c4bfed95c11d63fecd12fb5b8d71a184af2b3cb14ff2f20c634d6d3`
+- 146 test. Thử bản gỡ lỗi trên TV box (hiện trước «Ai đang xem?», cuộn bằng remote, mở lại không hỏi). API `releases/latest` trả
+  `v2.14` + `.apk`, tệp tải từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.13 → 2.14** trên TV box lúc 16:43:55 — mở
+  lại là hiện màn «Trước khi bắt đầu», đồng ý xong vào app.
+- Biết trước: mở app ở chế độ chạm (chuột bay / màn cảm ứng) thì lần bấm phím đầu chọn vùng chữ, OK ở đó chưa tính là «Đồng ý» —
+  bấm ▼ tới nút. Đã sửa cho bản sau.
+
 ## iPad 1.13 — 10/11/2026
 
 - **Proxy kiểu Shadowsocks (mã hoá)** như TV 2.13: Cài đặt → Proxy → «Kiểu: Shadowsocks (mã hoá)»; nút «Dán link ss:// từ bộ
