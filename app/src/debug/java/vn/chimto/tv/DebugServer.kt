@@ -179,6 +179,103 @@ object DebugServer {
                     }
                     text(out, 200, "ok")
                 }
+                "/speed" -> {
+                    // Đo tốc độ tải qua cổng nội bộ (proxy / Shadowsocks đang bật): /speed?url=https://…&n=2
+                    val url = q["url"] ?: "https://speed.cloudflare.com/__down?bytes=20000000"
+                    val out2 = StringBuilder()
+                    repeat(q["n"]?.toIntOrNull() ?: 1) {
+                        val c = java.net.URL(url).openConnection(AppProxy.javaProxy() ?: java.net.Proxy.NO_PROXY) as java.net.HttpURLConnection
+                        c.connectTimeout = 15000
+                        c.readTimeout = 30000
+                        val t0 = System.nanoTime()
+                        var total = 0L
+                        c.inputStream.use { i ->
+                            val b = ByteArray(64 * 1024)
+                            while (true) {
+                                val k = i.read(b)
+                                if (k < 0) break
+                                total += k
+                            }
+                        }
+                        val sec = (System.nanoTime() - t0) / 1e9
+                        out2.append("%d B trong %.2f s = %.2f MB/s\n".format(total, sec, total / sec / 1e6))
+                    }
+                    text(out, 200, out2.toString())
+                }
+                "/latency" -> {
+                    // Độ trễ: tra tên máy chủ SS (DNS của TV) và mở kết nối HTTPS mới qua cổng nội bộ, mỗi thứ n lần (ms)
+                    val n = q["n"]?.toIntOrNull() ?: 5
+                    val sb = StringBuilder()
+                    Prefs.ssHost.takeIf { it.isNotEmpty() }?.let { h ->
+                        val ms = (1..n).map { val t0 = System.nanoTime(); runCatching { java.net.InetAddress.getAllByName(h) }; (System.nanoTime() - t0) / 1_000_000 }
+                        sb.append("DNS máy chủ SS: $ms\n")
+                    }
+                    val url = q["url"] ?: "https://www.cloudflare.com/cdn-cgi/trace"
+                    val ms = (1..n).map {
+                        val t0 = System.nanoTime()
+                        runCatching {
+                            val c = java.net.URL(url).openConnection(AppProxy.javaProxy() ?: java.net.Proxy.NO_PROXY) as java.net.HttpURLConnection
+                            c.setRequestProperty("Connection", "close")
+                            c.connectTimeout = 15000
+                            c.readTimeout = 15000
+                            c.inputStream.use { it.readBytes() }
+                        }.fold({ "${(System.nanoTime() - t0) / 1_000_000}" }, { "lỗi" })
+                    }
+                    sb.append("HTTPS kết nối mới: $ms")
+                    text(out, 200, sb.toString())
+                }
+                "/ssstats" -> {
+                    val c = Shadowsocks.stats.get(0)
+                    val n = Shadowsocks.stats.get(1)
+                    if (q["reset"] == "1") { Shadowsocks.stats.set(0, 0); Shadowsocks.stats.set(1, 0) }
+                    text(out, 200, "chunk nhận: $c, byte: $n, trung bình ${if (c > 0) n / c else 0} B/chunk")
+                }
+                "/cryptobench" -> {
+                    // Tốc độ mã hoá AEAD kiểu SsAead trên máy này (chunk 16 KB, 32 MB mỗi kiểu)
+                    val sb = StringBuilder()
+                    for (m in listOf(SsMethod.B3_AES_128, SsMethod.B3_AES_256, SsMethod.CHACHA)) {
+                        if (!Shadowsocks.supported(m)) { sb.append("${m.id}: không có\n"); continue }
+                        val a = SsAead(m, ByteArray(m.keySize) { it.toByte() })
+                        val p = ByteArray(16 * 1024)
+                        val o = ByteArray(p.size + 16)
+                        val t0 = System.nanoTime()
+                        repeat(2048) { a.seal(p, 0, p.size, o, 0) }
+                        val sec = (System.nanoTime() - t0) / 1e9
+                        sb.append("%s: %.1f MB/s\n".format(m.id, 32.0 * 1.048576 / sec))
+                    }
+                    // So sánh: Cipher chọn nhà cung cấp tự động / chỉ định thẳng; init lại mỗi lần (như SsAead)
+                    for (prov in listOf<String?>(null, "AndroidOpenSSL")) {
+                        for (size in intArrayOf(1024, 16 * 1024)) {
+                            val c = if (prov == null) javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+                            else javax.crypto.Cipher.getInstance("AES/GCM/NoPadding", prov)
+                            val k = javax.crypto.spec.SecretKeySpec(ByteArray(16), "AES")
+                            val p = ByteArray(size)
+                            val o = ByteArray(size + 16)
+                            val nonce = ByteArray(12)
+                            val n = 16 * 1024 * 1024 / size
+                            val t0 = System.nanoTime()
+                            for (j in 0 until n) {
+                                nonce[0] = j.toByte(); nonce[1] = (j shr 8).toByte(); nonce[2] = (j shr 16).toByte()
+                                c.init(javax.crypto.Cipher.ENCRYPT_MODE, k, javax.crypto.spec.GCMParameterSpec(128, nonce))
+                                c.doFinal(p, 0, size, o, 0)
+                            }
+                            val sec = (System.nanoTime() - t0) / 1e9
+                            sb.append("%s %d: %.1f MB/s, %.0f µs/lần (%s)\n".format(prov ?: "tự chọn", size, 16.0 * 1.048576 / sec, sec * 1e6 / n, c.provider.name))
+                        }
+                    }
+                    // Theo cỡ chunk (aes-128): chi phí mỗi lần gọi so với chi phí mỗi byte
+                    for (size in intArrayOf(1024, 4096, 16 * 1024, 64 * 1024)) {
+                        val a = SsAead(SsMethod.B3_AES_128, ByteArray(16))
+                        val p = ByteArray(size)
+                        val o = ByteArray(size + 16)
+                        val n = 32 * 1024 * 1024 / size
+                        val t0 = System.nanoTime()
+                        repeat(n) { a.seal(p, 0, size, o, 0) }
+                        val sec = (System.nanoTime() - t0) / 1e9
+                        sb.append("aes-128 chunk %d: %.1f MB/s, %.0f µs/lần\n".format(size, 32.0 * 1.048576 / sec, sec * 1e6 / n))
+                    }
+                    text(out, 200, sb.toString())
+                }
                 "/settext" -> {
                     // Gõ / dán chữ vào ô nhập theo id (vd link ss:// vào ô máy chủ proxy): /settext?id=proxyHost&t=…
                     val ok = onMain {

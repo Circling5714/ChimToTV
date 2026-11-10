@@ -228,7 +228,7 @@ internal object Blake3 {
 /** AEAD một chiều của phiên: khoá phiên + nonce 12 byte little-endian, tăng sau mỗi lần mã hoá / giải mã. */
 internal class SsAead(m: SsMethod, key: ByteArray) {
     private val chacha = m.chacha
-    private val cipher: Cipher = if (chacha) Shadowsocks.chachaCipher() else Cipher.getInstance("AES/GCM/NoPadding")
+    private val cipher: Cipher = if (chacha) Shadowsocks.chachaCipher() else Shadowsocks.aesGcm()
     private val spec = SecretKeySpec(key, if (chacha) "ChaCha20" else "AES")
     private val nonce = ByteArray(12)
 
@@ -266,6 +266,9 @@ internal class SsOutput(private val raw: OutputStream, private val m: SsMethod, 
     val salt: ByteArray = Shadowsocks.random(m.keySize)
     private val aead = SsAead(m, Shadowsocks.subkey(m, keys.last(), salt))
     private val maxChunk = if (m.v2022) 0xFFFF else 0x3FFF
+    // Dùng lại giữa các chunk (TV yếu: bớt cấp phát / dọn rác khi đang phát video)
+    private var obuf = ByteArray(0)
+    private val lenPlain = ByteArray(2)
     var started = false
         private set
 
@@ -281,10 +284,13 @@ internal class SsOutput(private val raw: OutputStream, private val m: SsMethod, 
         }
         while (n > 0) {
             val k = minOf(n, maxChunk)
-            val out = ByteArray(2 + 16 + k + 16)
-            seal(byteArrayOf((k shr 8).toByte(), k.toByte()), out, 0)
-            aead.seal(b, o, k, out, 18)
-            raw.write(out)
+            val need = 2 + 16 + k + 16
+            if (obuf.size < need) obuf = ByteArray(maxOf(need, 16 * 1024 + 34))
+            lenPlain[0] = (k shr 8).toByte()
+            lenPlain[1] = k.toByte()
+            aead.seal(lenPlain, 0, 2, obuf, 0)
+            aead.seal(b, o, k, obuf, 18)
+            raw.write(obuf, 0, need)
             o += k
             n -= k
         }
@@ -350,6 +356,10 @@ internal class SsInput(private val raw: InputStream, private val m: SsMethod, pr
     private var buf = ByteArray(0)
     private var pos = 0
     private var end = 0
+    // Dùng lại giữa các chunk: chunk độ dài (mã hoá / giải mã) và bản mã của chunk dữ liệu
+    private val lc = ByteArray(18)
+    private val lp = ByteArray(18) // Conscrypt đòi chỗ chứa ≥ cỡ bản mã (kể cả thẻ 16 byte)
+    private var cbuf = ByteArray(0)
 
     override fun read(): Int {
         val one = ByteArray(1)
@@ -372,24 +382,24 @@ internal class SsInput(private val raw: InputStream, private val m: SsMethod, pr
     /** Chunk tiếp theo vào buf; false = máy chủ đóng kết nối (hết dữ liệu). */
     private fun fill(): Boolean {
         val a = aead ?: return start()
-        val lc = ByteArray(18)
-        if (!readFully(lc, eofOk = true)) return false
-        val l = ByteArray(18) // Conscrypt đòi chỗ chứa ≥ cỡ bản mã (kể cả thẻ 16 byte)
+        if (!readFully(lc, 18, eofOk = true)) return false
         try {
-            a.open(lc, 0, 18, l, 0)
+            a.open(lc, 0, 18, lp, 0)
         } catch (e: GeneralSecurityException) {
             throw SsError("dữ liệu từ máy chủ Shadowsocks bị hỏng")
         }
-        payload(a, ((l[0].toInt() and 0xFF) shl 8) or (l[1].toInt() and 0xFF))
+        payload(a, ((lp[0].toInt() and 0xFF) shl 8) or (lp[1].toInt() and 0xFF))
         return true
     }
 
     private fun payload(a: SsAead, n: Int) {
-        val c = ByteArray(n + 16)
-        readFully(c, eofOk = false)
-        if (buf.size < n + 16) buf = ByteArray(maxOf(n + 16, 16 * 1024))
+        Shadowsocks.stats.incrementAndGet(0)
+        Shadowsocks.stats.addAndGet(1, n.toLong())
+        if (cbuf.size < n + 16) cbuf = ByteArray(maxOf(n + 16, 16 * 1024 + 16))
+        readFully(cbuf, n + 16, eofOk = false)
+        if (buf.size < n + 16) buf = ByteArray(maxOf(n + 16, 16 * 1024 + 16))
         try {
-            a.open(c, 0, c.size, buf, 0)
+            a.open(cbuf, 0, n + 16, buf, 0)
         } catch (e: GeneralSecurityException) {
             throw SsError("dữ liệu từ máy chủ Shadowsocks bị hỏng")
         }
@@ -401,7 +411,7 @@ internal class SsInput(private val raw: InputStream, private val m: SsMethod, pr
         val salt = ByteArray(m.keySize)
         // Máy chủ không nhận ra khoá thì đóng / ngắt (RST) / im lặng — chưa có trả lời nào là coi như bị từ chối
         val got = try {
-            readFully(salt, eofOk = true)
+            readFully(salt, salt.size, eofOk = true)
         } catch (e: IOException) {
             throw SsError(Shadowsocks.noReply(m))
         }
@@ -411,7 +421,7 @@ internal class SsInput(private val raw: InputStream, private val m: SsMethod, pr
         if (!m.v2022) return fill()
         val hl = 1 + 8 + m.keySize + 2
         val c = ByteArray(hl + 16)
-        readFully(c, eofOk = false)
+        readFully(c, c.size, eofOk = false)
         val h = ByteArray(c.size)
         try {
             a.open(c, 0, c.size, h, 0)
@@ -428,10 +438,10 @@ internal class SsInput(private val raw: InputStream, private val m: SsMethod, pr
         return true
     }
 
-    private fun readFully(b: ByteArray, eofOk: Boolean): Boolean {
+    private fun readFully(b: ByteArray, size: Int, eofOk: Boolean): Boolean {
         var n = 0
-        while (n < b.size) {
-            val k = raw.read(b, n, b.size - n)
+        while (n < size) {
+            val k = raw.read(b, n, size - n)
             if (k < 0) {
                 if (n == 0 && eofOk) return false
                 throw EOFException("máy chủ Shadowsocks ngắt kết nối giữa chừng")
@@ -450,6 +460,9 @@ class Upstream(val socket: Socket, val input: InputStream, val output: OutputStr
 /** Phía khách Shadowsocks (TCP): SS 2022 (SIP022, có phần nhận dạng người dùng cho máy chủ nhiều người dùng) + AEAD cũ. */
 object Shadowsocks {
     internal val rng = SecureRandom()
+
+    /** Đếm cho cổng gỡ lỗi: [số chunk nhận, số byte nhận]. */
+    internal val stats = java.util.concurrent.atomic.AtomicLongArray(2)
 
     internal fun random(n: Int) = ByteArray(n).also { rng.nextBytes(it) }
 
@@ -510,11 +523,25 @@ object Shadowsocks {
         return out.toByteArray().copyOf(size)
     }
 
+    /**
+     * AES-GCM. Android: chỉ định thẳng Conscrypt ("AndroidOpenSSL") — Cipher tự chọn nhà cung cấp thì mỗi lần init lại dò lại,
+     * đo trên TV box: 126 → 87 µs mỗi lần (mỗi chunk 2 lần). JVM (test): mặc định.
+     */
+    internal fun aesGcm(): Cipher = try {
+        Cipher.getInstance("AES/GCM/NoPadding", "AndroidOpenSSL")
+    } catch (e: GeneralSecurityException) {
+        Cipher.getInstance("AES/GCM/NoPadding")
+    }
+
     /** ChaCha20-Poly1305: JVM gọi "ChaCha20-Poly1305", Android 9+ (Conscrypt) gọi "ChaCha20/Poly1305/NoPadding". */
     internal fun chachaCipher(): Cipher = try {
-        Cipher.getInstance("ChaCha20/Poly1305/NoPadding")
+        Cipher.getInstance("ChaCha20/Poly1305/NoPadding", "AndroidOpenSSL")
     } catch (e: GeneralSecurityException) {
-        Cipher.getInstance("ChaCha20-Poly1305")
+        try {
+            Cipher.getInstance("ChaCha20/Poly1305/NoPadding")
+        } catch (e: GeneralSecurityException) {
+            Cipher.getInstance("ChaCha20-Poly1305")
+        }
     }
 
     /** Máy có hỗ trợ kiểu mã hoá này không (ChaCha20 cần Android 9 trở lên). */
@@ -580,7 +607,7 @@ object Shadowsocks {
         try {
             up.socket.soTimeout = 15_000
             up.output.write("GET /cdn-cgi/trace HTTP/1.1\r\nHost: $host\r\nUser-Agent: ${Http.UA}\r\nConnection: close\r\n\r\n".toByteArray())
-            val text = up.input.readBytes().toString(Charsets.UTF_8)
+            val text = readHttp(up.input)
             val ip = Regex("""(?m)^ip=(\S+)""").find(text)?.groupValues?.get(1) ?: throw IOException("không đọc được kết quả từ $host")
             val loc = Regex("""(?m)^loc=(\S+)""").find(text)?.groupValues?.get(1)
             return ip + (loc?.let { " ($it)" } ?: "")
@@ -592,6 +619,26 @@ object Shadowsocks {
         } finally {
             runCatching { up.socket.close() }
         }
+    }
+
+    /**
+     * Đọc một trả lời HTTP: phần đầu + đủ Content-Length thì thôi, không chờ máy chủ đóng kết nối (Xray giữ thêm 1 giây sau khi
+     * trang đã đóng — thời gian kiểm tra báo ra sẽ sai).
+     */
+    internal fun readHttp(i: InputStream): String {
+        val buf = java.io.ByteArrayOutputStream()
+        val b = ByteArray(4096)
+        while (true) {
+            val n = i.read(b)
+            if (n < 0) break
+            buf.write(b, 0, n)
+            val s = buf.toString("ISO-8859-1")
+            val h = s.indexOf("\r\n\r\n")
+            if (h < 0) continue
+            val len = Regex("""(?im)^content-length:\s*(\d+)""").find(s.substring(0, h))?.groupValues?.get(1)?.toIntOrNull() ?: continue
+            if (buf.size() >= h + 4 + len) break
+        }
+        return buf.toString("UTF-8")
     }
 
     /** Giờ trên máy lệch bao nhiêu giây so với Cloudflare (đi thẳng, không qua proxy); null = không lệch quá 30 giây / không hỏi được. */

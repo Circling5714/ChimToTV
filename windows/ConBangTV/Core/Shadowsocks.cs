@@ -643,9 +643,7 @@ public static class Shadowsocks
         try
         {
             await s.WriteAsync(Encoding.ASCII.GetBytes($"GET /cdn-cgi/trace HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Mozilla/5.0\r\nConnection: close\r\n\r\n"), t.Token);
-            using var ms = new MemoryStream();
-            await s.CopyToAsync(ms, t.Token);
-            var text = Encoding.UTF8.GetString(ms.ToArray());
+            var text = await ReadHttp(s, t.Token);
             var ip = Regex.Match(text, @"(?m)^ip=(\S+)");
             if (!ip.Success) throw new IOException($"không đọc được kết quả từ {host}");
             var loc = Regex.Match(text, @"(?m)^loc=(\S+)");
@@ -658,6 +656,25 @@ public static class Shadowsocks
                 throw new SsError($"giờ trên máy lệch {skew} giây — Shadowsocks 2022 cần giờ đúng (lệch tối đa 30 giây): chỉnh ngày giờ của máy");
             throw e as SsError ?? new SsError(NoReply(m));
         }
+    }
+
+    /// Đọc một trả lời HTTP: phần đầu + đủ Content-Length thì thôi, không chờ máy chủ đóng kết nối (Xray giữ thêm 1 giây sau khi
+    /// trang đã đóng — thời gian thử báo ra sẽ sai).
+    public static async Task<string> ReadHttp(Stream s, CancellationToken ct)
+    {
+        using var ms = new MemoryStream();
+        var b = new byte[4096];
+        int n;
+        while ((n = await s.ReadAsync(b, ct)) > 0)
+        {
+            ms.Write(b, 0, n);
+            var text = Encoding.Latin1.GetString(ms.GetBuffer(), 0, (int)ms.Length);
+            var h = text.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+            if (h < 0) continue;
+            var len = Regex.Match(text[..h], @"(?im)^content-length:\s*(\d+)");
+            if (len.Success && ms.Length >= h + 4 + int.Parse(len.Groups[1].Value)) break;
+        }
+        return Encoding.UTF8.GetString(ms.ToArray());
     }
 
     /// Giờ trên máy lệch bao nhiêu giây so với Cloudflare (đi thẳng); null = không lệch quá 30 giây / không hỏi được.
