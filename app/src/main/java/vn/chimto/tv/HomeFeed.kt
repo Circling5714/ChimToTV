@@ -502,6 +502,21 @@ object HomeFeed {
         return out
     }
 
+    /**
+     * Trang phim — hàng «Cùng thể loại» (Related): danh sách lọc theo loại + nước + thể loại đặc trưng nhất của phim (như hàng
+     * «Giống …»), kèm tên hàng («Hoạt hình Trung Quốc · Tu Tiên»). Hồ sơ trẻ em: chỉ hoạt hình, bỏ thể loại không hợp.
+     */
+    fun relatedList(t: Tags, kids: Boolean): Pair<String, String>? {
+        val type = t.type ?: return null
+        if (kids && type != "hoathinh") return null
+        val c = t.countries.firstOrNull() ?: return null
+        val g = t.genres.filter { it !in GENERIC && !(kids && it in ADULT) }.sortedBy { if (it in HALF) 1 else 0 }.firstOrNull()
+        val url = filterUrl(sources(), type, c, g) ?: return null
+        val tn = typeName(type)
+        val name = listOfNotNull(tn.replaceFirstChar { it.uppercase() } + " " + ApiSite.countryName(c), g?.let { ApiSite.genreName(it).replaceFirstChar { ch -> ch.uppercase() } })
+        return url to name.joinToString(" · ")
+    }
+
     /** Danh sách lọc theo loại phim + nước (+ thể loại) — KKPhim lọc được cả ba; không có KKPhim thì VSMOV (thể loại + nước). */
     private fun filterUrl(s: Sources, type: String, country: String, genre: String?): String? {
         s.kk?.let { o ->

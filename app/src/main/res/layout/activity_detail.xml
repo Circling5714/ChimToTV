@@ -133,6 +133,14 @@
                         android:nextFocusUp="@id/btnSource"
                         android:visibility="gone" />
 
+                    <!-- Phim bộ: nhảy xuống các hàng «Phim liên quan» ở cuối danh sách tập -->
+                    <TextView
+                        android:id="@+id/btnRelated"
+                        style="@style/TvButton"
+                        android:nextFocusUp="@id/btnRelated"
+                        android:text="Liên quan ▼"
+                        android:visibility="gone" />
+
                     <TextView
                         android:id="@+id/btnOrder"
                         style="@style/TvButton"

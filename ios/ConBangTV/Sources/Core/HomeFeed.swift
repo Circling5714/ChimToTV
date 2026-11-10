@@ -529,6 +529,19 @@ enum HomeFeed {
         return out
     }
 
+    /// Trang phim — hàng «Cùng thể loại» (Related): danh sách lọc theo loại + nước + thể loại đặc trưng nhất của phim (như hàng
+    /// «Giống …»), kèm tên hàng («Hoạt hình Trung Quốc · Tu tiên»). Hồ sơ trẻ em: chỉ hoạt hình, bỏ thể loại không hợp.
+    static func relatedList(_ t: Tags, kids: Bool) -> (url: String, title: String)? {
+        guard let type = t.type, !(kids && type != "hoathinh"), let c = t.countries.first else { return nil }
+        let g = t.genres.filter { !generic.contains($0) && !(kids && adult.contains($0)) }
+            .enumerated().sorted { ((half.contains($0.element) ? 1 : 0), $0.offset) < ((half.contains($1.element) ? 1 : 0), $1.offset) }
+            .first?.element
+        guard let url = filterUrl(sources(), type, c, g) else { return nil }
+        func cap(_ s: String) -> String { s.prefix(1).uppercased() + s.dropFirst() }
+        let name = [cap(typeName(type)) + " " + ApiSite.countryName(c), g.map { cap(ApiSite.genreName($0)) }].compactMap { $0 }
+        return (url, name.joined(separator: " · "))
+    }
+
     /// Danh sách lọc theo loại phim + nước (+ thể loại): KKPhim lọc được cả ba; không có KKPhim thì VSMOV.
     private static func filterUrl(_ s: Sources, _ type: String, _ country: String, _ genre: String?) -> String? {
         if let o = s.kk, let t = typeSlug(type) {

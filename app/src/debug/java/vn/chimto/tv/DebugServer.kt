@@ -152,6 +152,18 @@ object DebugServer {
                     onMain { (top ?: app).startActivity(Intent(top ?: app, cls).addFlags(if (top == null) Intent.FLAG_ACTIVITY_NEW_TASK else 0)) }
                     text(out, 200, "ok")
                 }
+                "/detail" -> {
+                    // Mở trang phim: /detail?url=<địa chỉ phim>&title=<tên>
+                    val url = q["url"] ?: return text(out, 400, "thiếu url")
+                    onMain {
+                        val ctx = top ?: app
+                        ctx.startActivity(
+                            DetailActivity.intent(ctx, Film(url, q["title"].orEmpty(), null, null))
+                                .addFlags(if (top == null) Intent.FLAG_ACTIVITY_NEW_TASK else 0),
+                        )
+                    }
+                    text(out, 200, "ok")
+                }
                 "/play" -> {
                     // Mở thẳng trình phát: /play?film=<địa chỉ phim>&ep=<địa chỉ tập>
                     val film = q["film"] ?: return text(out, 400, "thiếu film")

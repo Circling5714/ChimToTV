@@ -17,6 +17,9 @@ final class DetailModel: ObservableObject {
     @Published var toast: String?
     /// Tập đang chọn bằng phím mũi tên.
     @Published var keyEp: String?
+    /// Các hàng «Phim liên quan» (Related) — tải sau khi trang phim đã hiện.
+    @Published private(set) var related: [Related.Row] = []
+    private var relatedLoaded = false
     var epCols = 6
 
     init(film: Film) {
@@ -50,7 +53,18 @@ final class DetailModel: ObservableObject {
         refresh()
         AppModel.shared.rebuildMenu()
         if let r = resumeEp { scrollTarget = r.url }
+        if !relatedLoaded {
+            relatedLoaded = true
+            let title = d.title, url = d.url
+            Task { [weak self] in
+                let rows = await Related.load(title: title, url: url)
+                self?.related = rows
+            }
+        }
     }
+
+    /// Phim lẻ (một bản, một tập): không cần ô tập — nút Xem là đủ, hàng phim liên quan lên ngay dưới.
+    var isMovie: Bool { detail.map { $0.groups.count == 1 && $0.episodeCount == 1 } ?? false }
 
     /// Quay lại từ trình phát: cập nhật "Xem tiếp" và đánh dấu tập đã xem.
     func refresh() {
@@ -184,9 +198,10 @@ struct DetailView: View {
                         actions(d)
                         if d.groups.isEmpty {
                             Text("Phim này chưa có tập nào.").foregroundColor(Theme.dim)
-                        } else {
+                        } else if !m.isMovie {
                             episodesSection(d)
                         }
+                        relatedSections
                     } else if let e = m.error {
                         VStack(alignment: .leading, spacing: 14) {
                             Text(e).foregroundColor(Theme.text)
@@ -202,7 +217,7 @@ struct DetailView: View {
             }
             .onChange(of: m.scrollTarget) { t in
                 guard let t = t else { return }
-                withAnimation { proxy.scrollTo(t, anchor: .center) }
+                withAnimation { proxy.scrollTo(t, anchor: t == "related" ? .top : .center) }
                 m.scrollTarget = nil
             }
         }
@@ -278,9 +293,41 @@ struct DetailView: View {
                             }
                         }
                 }
+                // Phim bộ: nhảy xuống các hàng phim liên quan ở cuối danh sách tập
+                if !m.isMovie && !m.related.isEmpty {
+                    ChipButton(text: "Phim liên quan ▼", icon: "square.stack") { m.scrollTarget = "related" }
+                }
                 ChipButton(text: m.following ? "✓ Đang theo dõi" : "＋ Theo dõi", icon: "bell") { m.toggleFollow() }
                 ChipButton(text: "Mở trang web", icon: "safari") { Router.browse(d.url) }
             }
+        }
+    }
+
+    /// Các hàng «Phim liên quan»: dải vuốt ngang như trang chủ (phim ở trang khác ghi tên trang ở góc).
+    @ViewBuilder
+    private var relatedSections: some View {
+        if !m.related.isEmpty {
+            let host = Site.hostOf(m.detail?.url ?? m.film.url)
+            let sites = Prefs.sites
+            let cardW: CGFloat = narrow ? 118 : 150
+            VStack(alignment: .leading, spacing: 18) {
+                ForEach(m.related) { row in
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(row.title).appFont(20, .semibold).foregroundColor(Theme.text).lineLimit(1)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            LazyHStack(alignment: .top, spacing: 12) {
+                                ForEach(row.films) { f in
+                                    let other = Site.hostOf(f.url).flatMap { $0 == host ? nil : Site.tag($0, sites) }
+                                    FilmCard(item: GridFilm(film: f, chip: other))
+                                        .frame(width: cardW)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+            .id("related")
         }
     }
 

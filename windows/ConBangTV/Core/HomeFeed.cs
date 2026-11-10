@@ -515,6 +515,18 @@ public static class HomeFeed
     }
 
     /// Danh sách lọc theo loại phim + nước (+ thể loại): KKPhim lọc được cả ba; không có KKPhim thì VSMOV.
+    /// Trang phim — hàng «Cùng thể loại» (Related): danh sách lọc theo loại + nước + thể loại đặc trưng nhất của phim (như hàng
+    /// «Giống …»), kèm tên hàng («Hoạt hình Trung Quốc · Tu tiên»). Hồ sơ trẻ em: chỉ hoạt hình, bỏ thể loại không hợp.
+    public static (string Url, string Title)? RelatedList(Tags t, bool kids)
+    {
+        if (t.Type is not { } type || (kids && type != "hoathinh") || t.Countries.FirstOrDefault() is not { } c) return null;
+        var g = t.Genres.Where(x => !Generic.Contains(x) && !(kids && Adult.Contains(x))).OrderBy(x => Half.Contains(x) ? 1 : 0).FirstOrDefault();
+        if (FilterUrl(GetSources(), type, c, g) is not { } url) return null;
+        static string Cap(string s) => s.Length == 0 ? s : char.ToUpper(s[0]) + s[1..];
+        var name = new[] { Cap(TypeName(type)) + " " + ApiSite.CountryName(c), g != null ? Cap(ApiSite.GenreName(g)) : null }.OfType<string>();
+        return (url, string.Join(" · ", name));
+    }
+
     private static string? FilterUrl(Sources s, string type, string country, string? genre)
     {
         if (s.Kk is { } o && TypeSlug(type) is { } t)

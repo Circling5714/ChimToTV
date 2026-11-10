@@ -15,6 +15,11 @@ public sealed class DetailPage : Page
     private EpisodeGroup? _group;
     /// Các nguồn có phim này (mở từ trang chủ tổng hợp) — có từ 2 nguồn thì có nút đổi nguồn.
     private readonly List<FeedItem> _links;
+    /// Các hàng «Phim liên quan» (Related) — tải sau khi trang phim đã hiện (null = chưa xong).
+    private List<Related.Row>? _related;
+    private bool _relatedLoading;
+    private WrapPanel? _buttons;
+    private StackPanel? _relatedPanel;
 
     public DetailPage(string url, Film? hint = null, List<FeedItem>? links = null)
     {
@@ -69,6 +74,8 @@ public sealed class DetailPage : Page
         info.Children.Add(Ui.Dim(Site.HostOf(d.Url) ?? "", 13, new Thickness(0, 6, 0, 0)));
 
         var buttons = new WrapPanel { Margin = new Thickness(0, 18, 0, 0) };
+        _buttons = buttons;
+        var movie = IsMovie(d);
         Button? main = null;
         var h = Prefs.HistoryFor(d.Url);
         var eps = _group?.Episodes ?? new List<Episode>();
@@ -105,6 +112,7 @@ public sealed class DetailPage : Page
             SyncService.SyncSoon();
             Build(false);
         }));
+        if (!movie && _related is { Count: > 0 }) buttons.Children.Add(RelatedButton());
         buttons.Children.Add(Ui.Pill("↗  Mở trên trình duyệt", () => Ui.OpenBrowser(d.Url)));
         info.Children.Add(buttons);
         if (d.Description != null)
@@ -135,7 +143,7 @@ public sealed class DetailPage : Page
         {
             Body.Children.Add(Ui.Dim("Phim này chưa có tập nào.", 16, new Thickness(0, 10, 0, 0)));
         }
-        else
+        else if (!movie)
         {
             Body.Children.Add(Ui.Header(eps.Count > 1 ? $"Danh sách tập ({eps.Count})" : "Tập phim", new Thickness(0, 14, 0, 12)));
             var watched = Prefs.WatchedEpisodes();
@@ -150,8 +158,53 @@ public sealed class DetailPage : Page
             }
             Body.Children.Add(grid);
         }
+        if (_related is { Count: > 0 }) Body.Children.Add(RelatedPanel(_related));
         if (focus && main != null)
             Dispatcher.BeginInvoke(() => KeyNav.FocusAndShow(main), DispatcherPriority.Loaded);
+        if (_related == null && !_relatedLoading)
+        {
+            _relatedLoading = true;
+            _ = LoadRelated(d);
+        }
+    }
+
+    /// Phim lẻ (một bản, một tập): không cần ô tập — nút Xem là đủ, hàng phim liên quan lên ngay dưới.
+    private static bool IsMovie(FilmDetail d) => d.Groups.Count == 1 && d.EpisodeCount == 1;
+
+    /// Tải các hàng phim liên quan rồi thêm vào trang đang hiện (không dựng lại — giữ ô đang chọn).
+    private async Task LoadRelated(FilmDetail d)
+    {
+        List<Related.Row> rows;
+        try { rows = await Related.Load(d.Title, d.Url); }
+        catch (Exception) { rows = new(); }
+        _related = rows;
+        if (rows.Count == 0 || _d != d) return;
+        Body.Children.Add(RelatedPanel(rows));
+        if (!IsMovie(d) && _buttons != null) _buttons.Children.Insert(Math.Max(0, _buttons.Children.Count - 1), RelatedButton());
+    }
+
+    /// Nút «▼ Phim liên quan» (phim bộ): cuộn xuống hàng phim liên quan đầu tiên, chọn phim đầu.
+    private Button RelatedButton() => Ui.Pill("▼  Phim liên quan", () =>
+    {
+        if (_relatedPanel != null && KeyNav.First(_relatedPanel) is { } first) KeyNav.FocusAndShow(first);
+    });
+
+    /// Các hàng phim liên quan: dải vuốt ngang như trang chủ (phim ở trang khác ghi tên trang ở góc).
+    private StackPanel RelatedPanel(List<Related.Row> rows)
+    {
+        var host = Site.HostOf(_url);
+        var panel = new StackPanel { Margin = new Thickness(0, 18, 0, 0) };
+        foreach (var row in rows)
+        {
+            var cards = row.Films.Select(f =>
+            {
+                var other = Site.HostOf(f.Url) is { } h && h != host ? Site.Tag(h, Prefs.Sites) : null;
+                return (UIElement)FilmCard(f, () => Main.Push(new DetailPage(f.Url, f)), sub: other);
+            }).ToList();
+            panel.Children.Add(Ui.Strip(Ui.Text(row.Title, 21, weight: FontWeights.SemiBold, wrap: false), cards));
+        }
+        _relatedPanel = panel;
+        return panel;
     }
 
     private static string SourceName(string url) => Site.HostOf(url) is { } host ? Site.Tag(host, Prefs.Sites) : url;

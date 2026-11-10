@@ -18,6 +18,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlin.math.max
@@ -42,10 +43,16 @@ class DetailActivity : BaseActivity() {
     private lateinit var btnOrder: TextView
     private lateinit var btnJump: TextView
     private lateinit var btnFollow: TextView
+    private lateinit var btnRelated: TextView
     private lateinit var epLabel: TextView
     private lateinit var groupRow: LinearLayout
 
     private val adapter = EpisodeAdapter(::play)
+
+    /** Các hàng «Phim liên quan» (Related): nối sau danh sách tập trong cùng lưới — phim lẻ thấy ngay dưới nút Xem. */
+    private val related = FilmGridAdapter(onClick = { openRelated(it.film) }, onNearEnd = {}, onRemove = {})
+    private var relatedRows: List<Related.Row> = emptyList()
+    private var relatedLoaded = false
     private var detail: FilmDetail? = null
     private var group: EpisodeGroup? = null
     private var ascending = true
@@ -72,6 +79,7 @@ class DetailActivity : BaseActivity() {
         btnOrder = findViewById(R.id.btnOrder)
         btnJump = findViewById(R.id.btnJump)
         btnFollow = findViewById(R.id.btnFollow)
+        btnRelated = findViewById(R.id.btnRelated)
         epLabel = findViewById(R.id.epLabel)
         groupRow = findViewById(R.id.groupRow)
 
@@ -81,10 +89,20 @@ class DetailActivity : BaseActivity() {
             ImageLoader.load(findViewById(R.id.backdrop), it, maxWidth = 200)
         }
 
-        episodes.layoutManager = GridLayoutManager(this, 4)
+        episodes.layoutManager = GridLayoutManager(this, 4).apply {
+            spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+                override fun getSpanSize(position: Int): Int {
+                    val n = adapter.itemCount
+                    return if (position < n) 1 else related.spanLookup.getSpanSize(position - n)
+                }
+            }
+        }
         applyLayout()
-        episodes.adapter = adapter
+        episodes.adapter = ConcatAdapter(adapter, related)
         episodes.itemAnimator = null
+        btnRelated.setOnClickListener { jumpToRelated() }
+        // Màn TV thấp: chọn phim trong hàng liên quan thì tiêu đề hàng (trong lưới) bị cuộn khuất → dòng nhãn trên lưới ghi tên hàng
+        episodes.viewTreeObserver.addOnGlobalFocusChangeListener { _, now -> showSection(now) }
 
         btnOrder.setOnClickListener {
             ascending = !ascending
@@ -169,8 +187,12 @@ class DetailActivity : BaseActivity() {
         // Số cột tập: TV ~ ô 104dp; điện thoại dọc ô nhỏ hơn (~84dp) cho đủ 4 cột
         val widthDp = resources.configuration.screenWidthDp.takeIf { it > 0 }
             ?: (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
-        (episodes.layoutManager as GridLayoutManager).spanCount =
-            if (narrow) max(4, (widthDp - 28) / 84) else max(4, (widthDp - 72) / 104)
+        val span = if (narrow) max(4, (widthDp - 28) / 84) else max(4, (widthDp - 72) / 104)
+        (episodes.layoutManager as GridLayoutManager).spanCount = span
+        // Phim liên quan: dải vuốt ngang chiếm cả hàng, thấy ~5 phim (điện thoại dọc ~3) và một phần phim kế
+        related.spanCount = span
+        related.stripCellWidth = (dp(widthDp - if (narrow) 28 else 72) / ((if (narrow) 3 else 5) + 0.35f)).toInt()
+        related.notifyDataSetChanged()
     }
 
     override fun onResume() {
@@ -224,6 +246,58 @@ class DetailActivity : BaseActivity() {
         HomeFeed.markSeen(d)
         showFollow(d)
         btnPlay.focusForRemote()
+        if (!relatedLoaded) loadRelated(d)
+    }
+
+    /** Phim lẻ (một bản, một tập): không cần ô tập — nút Xem là đủ, hàng phim liên quan lên ngay dưới. */
+    private val isMovie get() = detail?.let { it.groups.size == 1 && it.episodeCount == 1 } == true
+
+    /** Tải các hàng phim liên quan sau khi trang phim đã hiện (không làm chậm danh sách tập). */
+    private fun loadRelated(d: FilmDetail) {
+        relatedLoaded = true
+        background({ Related.load(d.title, d.url) }) { r ->
+            val rows = r.getOrNull().orEmpty()
+            if (isFinishing || isDestroyed || rows.isEmpty()) return@background
+            relatedRows = rows
+            val host = Site.hostOf(d.url)
+            val sites = Prefs.sites
+            related.submit(rows.flatMap { row ->
+                listOf(
+                    HeaderRow(row.title),
+                    StripRow("rel-${row.id}", row.films.map { f ->
+                        // Phim ở trang khác: ghi tên trang ở góc (như trang chủ tổng hợp)
+                        FilmRow(f, chip = Site.hostOf(f.url)?.takeIf { it != host }?.let { siteTag(it, sites) })
+                    }),
+                )
+            }, focusFirst = false)
+            btnRelated.visibility = if (isMovie) View.GONE else View.VISIBLE
+        }
+    }
+
+    /** Hàng liên quan đang có tiêu điểm (null = danh sách tập / nút) → dòng nhãn trên lưới ghi tên hàng đó. */
+    private var section: Related.Row? = null
+
+    private fun showSection(focused: View?) {
+        val h = focused?.let { v -> if (v === episodes) null else episodes.findContainingViewHolder(v) }
+        val row = h?.takeIf { it.bindingAdapter === related }?.bindingAdapterPosition?.takeIf { it >= 0 }
+            ?.let { relatedRows.getOrNull(it / 2) }
+        if (row == section) return
+        section = row
+        (groupRow.parent as View).visibility = if (row != null) View.GONE else View.VISIBLE
+        (epLabel.parent as View).visibility = if (row == null && isMovie) View.GONE else View.VISIBLE
+        showEpisodeLabel()
+    }
+
+    /** Nút «Liên quan ▼» (phim bộ): cuộn xuống hàng phim liên quan đầu tiên, chọn phim đầu. */
+    private fun jumpToRelated() {
+        val first = relatedRows.firstOrNull() ?: return
+        related.stripFocus = "rel-${first.id}" to 0
+        related.notifyItemChanged(1)
+        (episodes.layoutManager as GridLayoutManager).scrollToPositionWithOffset(adapter.itemCount, 0)
+    }
+
+    private fun openRelated(film: Film) {
+        startActivity(intent(this, film))
     }
 
     private fun showFollow(d: FilmDetail) {
@@ -263,7 +337,9 @@ class DetailActivity : BaseActivity() {
 
     private fun showEpisodes() {
         val eps = group?.episodes.orEmpty()
-        adapter.submit(if (ascending) eps else eps.reversed())
+        val movie = isMovie
+        adapter.submit(if (movie) emptyList() else if (ascending) eps else eps.reversed())
+        (epLabel.parent as View).visibility = if (movie) View.GONE else View.VISIBLE
         showEpisodeLabel()
         btnOrder.text = if (ascending) "Thứ tự: cũ → mới" else "Thứ tự: mới → cũ"
         btnOrder.visibility = if (eps.size > 1) View.VISIBLE else View.GONE
@@ -272,6 +348,10 @@ class DetailActivity : BaseActivity() {
     }
 
     private fun showEpisodeLabel() {
+        section?.let {
+            epLabel.text = it.title
+            return
+        }
         val n = group?.episodes?.size ?: 0
         epLabel.text = if (typed.isEmpty()) "Danh sách tập ($n)" else "Danh sách tập ($n) — đến tập $typed…"
     }
