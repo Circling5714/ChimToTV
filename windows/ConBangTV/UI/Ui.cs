@@ -62,6 +62,11 @@ public static class Ui
                 badge.Text = f.Badge ?? "";
                 if (b.Template.FindName("BadgeBox", b) is Border bb) bb.Visibility = string.IsNullOrEmpty(f.Badge) ? Visibility.Collapsed : Visibility.Visible;
             }
+            if (f.Imdb != null && b.Template.FindName("ImdbText", b) is TextBlock it && b.Template.FindName("ImdbBox", b) is Border ib)
+            {
+                it.Text = f.Imdb.Label;
+                ib.Visibility = Visibility.Visible;
+            }
             if (sub != null && b.Template.FindName("Sub", b) is TextBlock s)
             {
                 s.Text = sub;

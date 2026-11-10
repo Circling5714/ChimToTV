@@ -769,7 +769,8 @@ public static class HomeFeed
             var links = new[] { first }.Concat(o.Items.Where(i => i.Url != first.Url)).ToList();
             var badge = f.Latest?.Ep is { } ep ? $"Tập {Num(ep)}" : first.Badge;
             var chip = live.Count == 0 ? "bản lưu" : live.Count > 1 ? $"{live.Count} nguồn" : Tag(first.Host);
-            return new Card(new Film(first.Url, first.Title, links.Select(l => l.Poster).FirstOrDefault(p => p != null), badge), chip, links);
+            return new Card(new Film(first.Url, first.Title, links.Select(l => l.Poster).FirstOrDefault(p => p != null), badge,
+                links.Select(l => l.Imdb).FirstOrDefault(i => i != null)), chip, links);
         }
 
         // Hồ sơ trẻ em: chỉ phim hoạt hình, không có thể loại không hợp trẻ em (phim chưa rõ thể loại — vd danh sách «thiếu
@@ -820,7 +821,8 @@ public static class HomeFeed
             var chip = down.Contains(latest.Host) ? "lần kiểm trước" : latest.Host != ownHost ? $"có ở {Site.Tag(latest.Host, ctx.Sites)}" : null;
             var open = latest.Host == ownHost ? f.Items.FirstOrDefault(i => i.Url == h.FilmUrl) ?? latest : latest;
             var links = new[] { open }.Concat(f.Items.Where(i => i.Url != open.Url)).ToList();
-            fresh.Add(new FreshCard(new Card(new Film(open.Url, h.Title, h.Poster ?? open.Poster, badge), chip, links), key, ep));
+            fresh.Add(new FreshCard(new Card(new Film(open.Url, h.Title, h.Poster ?? open.Poster, badge,
+                links.Select(l => l.Imdb).FirstOrDefault(i => i != null)), chip, links), key, ep));
         }
 
         // Hàng tự thêm (và chủ đề người mới chọn): phim chưa xem, mới cập nhật trước

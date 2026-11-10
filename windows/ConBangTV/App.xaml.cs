@@ -38,6 +38,7 @@ public partial class App : Application
         // Thử trên máy: thư mục dữ liệu riêng (CONBANG_DATA_DIR) để không đụng dữ liệu đang dùng
         Prefs.Load(Environment.GetEnvironmentVariable("CONBANG_DATA_DIR"));
         Prefs.ApplyNetDefaults();
+        ImdbTop.CacheFile = System.IO.Path.Combine(Prefs.DataDir, "imdb_top.json");
         Log.Start();
         Log.D("app", $"Mở bản {UpdateCheck.CurrentVersion} ({string.Join(' ', e.Args)})");
         UpdateCheck.Cleanup();

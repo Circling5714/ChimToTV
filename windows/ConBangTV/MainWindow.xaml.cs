@@ -240,6 +240,8 @@ public partial class MainWindow : Window
         yield return new("history", "🕘  Xem tiếp / Lịch sử", () => ShowRoot(new HistoryPage()));
         var fresh = Prefs.Follows.Count(f => f.NewCount > 0);
         yield return new("follows", "★  Theo dõi" + (fresh > 0 ? $"  ({fresh} mới)" : ""), () => ShowRoot(new FollowsPage()));
+        yield return new("imdb", "⭐  Điểm IMDb cao",
+            () => ShowRoot(new ListPage("Điểm IMDb cao", "imdb:top", () => ImdbTop.Page(Prefs.Kids)) { MenuKey = "imdb" }));
         foreach (var c in _categories)
             yield return new("cat:" + c.Url, c.Title, () => ShowRoot(new ListPage(c.Title, c.Url) { MenuKey = "cat:" + c.Url }));
         var b = Prefs.BaseUrl;

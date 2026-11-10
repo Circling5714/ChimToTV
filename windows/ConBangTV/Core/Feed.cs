@@ -43,7 +43,7 @@ public sealed record Tags(List<string> Genres, List<string> Countries, string? T
 /// Một phim trong danh sách của một nguồn. Names: tên đã chuẩn hoá (KkPhim.Norm) để gộp phim trùng; Updated: lúc nguồn cập
 /// nhật (ms; 0 = không ghi); Ep: số tập mới nhất.
 public sealed record FeedItem(string Url, string Title, string? Poster, string? Badge, HashSet<string> Names, int? Year, long Updated,
-    double? Ep, Tags? Tags)
+    double? Ep, Tags? Tags, Imdb? Imdb = null)
 {
     /// Tên miền nguồn (tính một lần).
     public string Host { get; } = Site.HostOf(Url) ?? "";
@@ -56,6 +56,11 @@ public sealed record FeedItem(string Url, string Title, string? Poster, string? 
             ["t"] = Updated, ["e"] = Ep ?? -1.0,
         };
         if (Tags != null) o["g"] = Tags.Json();
+        if (Imdb != null)
+        {
+            o["is"] = Imdb.Score;
+            o["iv"] = (long)Imdb.Votes;
+        }
         return o;
     }
 
@@ -68,7 +73,8 @@ public sealed record FeedItem(string Url, string Title, string? Poster, string? 
         var y = (int)Feed.Num64(o.GetValueOrDefault("y"));
         return new FeedItem(url, title, J.Str(o, "p").NonEmpty(), J.Str(o, "b").NonEmpty(),
             (J.Arr(o, "k") ?? new()).OfType<string>().Where(s => s.Length > 0).ToHashSet(), y > 0 ? y : null,
-            Feed.Num64(o.GetValueOrDefault("t")), e >= 0 ? e : null, Tags.Of(J.Obj(o, "g")));
+            Feed.Num64(o.GetValueOrDefault("t")), e >= 0 ? e : null, Tags.Of(J.Obj(o, "g")),
+            Feed.Dbl(o.GetValueOrDefault("is")) is > 0 and var s ? new Imdb(s, (int)Feed.Num64(o.GetValueOrDefault("iv"))) : null);
     }
 
     public bool Equals(FeedItem? o) => o != null && Url == o.Url && Title == o.Title && Poster == o.Poster && Badge == o.Badge &&
@@ -136,7 +142,8 @@ public static class Feed
             if (slug.Length == 0 || name.Length == 0) return null;
             var ep = J.Str(o, "episode_current");
             return new FeedItem($"{origin}/phim/{slug}", name, ApiSite.Image(J.Str(o, "poster_url").NonEmpty() ?? J.Str(o, "thumb_url"), cdn),
-                NextSite.Badge(ep), KkPhim.Names(o), Year(o), Time(J.Str(J.Obj(o, "modified"), "time")), EpOf(ep), Tags.FromKk(o));
+                NextSite.Badge(ep), KkPhim.Names(o), Year(o), Time(J.Str(J.Obj(o, "modified"), "time")), EpOf(ep), Tags.FromKk(o),
+                Imdb.Of(J.Obj(o, "imdb")));
         }).OfType<FeedItem>().DistinctBy(i => i.Url).ToList();
     }
 

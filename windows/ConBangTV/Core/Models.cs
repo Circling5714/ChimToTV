@@ -2,7 +2,8 @@ namespace ConBangTV.Core;
 
 // Dữ liệu đọc từ trang phim — giống hệt bản Android (Site.kt) / iPad (Models.swift), để sửa bộ đọc trang song song.
 
-public sealed record Film(string Url, string Title, string? Poster, string? Badge);
+/// Imdb: điểm IMDb (chỉ dữ liệu KKPhim có — ImdbTop.cs); null = không có / quá ít lượt chấm.
+public sealed record Film(string Url, string Title, string? Poster, string? Badge, Imdb? Imdb = null);
 
 public sealed record FilmSection(string Title, List<Film> Films);
 

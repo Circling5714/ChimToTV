@@ -133,6 +133,11 @@
                           Background="#E5533D" Visibility="Collapsed">
                     <TextBlock x:Name="NewText" FontSize="12.5" FontWeight="Bold" Foreground="White" />
                   </Border>
+                  <!-- Điểm IMDb (dữ liệu KKPhim) — vàng như logo IMDb -->
+                  <Border x:Name="ImdbBox" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6,6,6,10" Padding="5,1" CornerRadius="4"
+                          Background="#F5C518" Visibility="Collapsed">
+                    <TextBlock x:Name="ImdbText" FontSize="12" FontWeight="Bold" Foreground="Black" />
+                  </Border>
                   <Border x:Name="ProgressBack" VerticalAlignment="Bottom" Height="5" Background="#66000000" Visibility="Collapsed">
                     <Border x:Name="ProgressBar" HorizontalAlignment="Left" Background="{StaticResource Brand}" />
                   </Border>

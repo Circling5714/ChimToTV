@@ -296,7 +296,7 @@ public static class ApiSite
         var name = J.Str(o, "name").NonEmpty();
         if (slug == null || name == null) return null;
         var poster = Image(J.Str(o, "poster_url").NonEmpty() ?? J.Str(o, "thumb_url"), J.Str(o, "cdnDomain").NonEmpty() ?? b);
-        return new Film($"{origin}/phim/{slug}", name, poster, NextSite.Badge(J.Str(o, "episode_current")));
+        return new Film($"{origin}/phim/{slug}", name, poster, NextSite.Badge(J.Str(o, "episode_current")), Imdb.Of(J.Obj(o, "imdb")));
     }
 
     // ---- Chi tiết phim ----
@@ -318,7 +318,8 @@ public static class ApiSite
         if (year == "0") year = "";
         var info = string.Join("  •  ", new[]
         {
-            J.Str(m, "episode_current"), J.Str(m, "time"), J.Str(m, "lang"), Names(J.Arr(m, "country")), year, Names(J.Arr(m, "category")),
+            J.Str(m, "episode_current"), J.Str(m, "time"), J.Str(m, "lang"), Names(J.Arr(m, "country")), year,
+            Imdb.Of(J.Obj(m, "imdb"))?.Detail ?? "", Names(J.Arr(m, "category")),
         }.Where(s => s.Length > 0)).NonEmpty();
         var groups = new List<EpisodeGroup>();
         var servers = J.Objects(J.Arr(root, "episodes"));

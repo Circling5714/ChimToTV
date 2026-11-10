@@ -399,16 +399,21 @@ public sealed class ListPage : Page
 {
     private readonly string _title;
     private readonly string _url;
+    /// Cách tải riêng (vd «Điểm IMDb cao»); null = danh sách của trang (_url).
+    private readonly Func<Task<FilmPage>>? _loader;
+    /// Danh mục KKPhim đang xếp theo điểm IMDb (nút «Điểm IMDb cao» ở đầu danh mục).
+    private bool _imdb;
     private string? _next;
     private bool _loadingMore;
     private WrapPanel? _grid;
     private Button? _more;
     private readonly HashSet<string> _seen = new();
 
-    public ListPage(string title, string url)
+    public ListPage(string title, string url, Func<Task<FilmPage>>? loader = null)
     {
         _title = title;
         _url = url;
+        _loader = loader;
         Scroller.ScrollChanged += (_, e) =>
         {
             if (_next != null && !_loadingMore && e.VerticalOffset + e.ViewportHeight > e.ExtentHeight - 700) _ = More();
@@ -419,9 +424,22 @@ public sealed class ListPage : Page
     {
         Loading($"Đang tải {_title}…");
         _seen.Clear();
-        var page = await Site.List(_url);
+        _grid = null;
+        _more = null;
+        _next = null;
+        // Danh mục KKPhim: hai nút «Mới cập nhật» / «Điểm IMDb cao» (xếp vài trang đầu của mục theo IMDb), như bản TV
+        var sortable = _loader == null && MenuKey.StartsWith("cat:") && ImdbTop.CanRank(_url);
+        var page = _loader != null ? await _loader() : _imdb && sortable ? await ImdbTop.ForList(_url) : await Site.List(_url);
         Body.Children.Clear();
         Body.Children.Add(Ui.Header(_title));
+        if (sortable)
+        {
+            Body.Children.Add(Ui.Row(
+                Ui.Pill("Mới cập nhật", () => Sort(false), !_imdb ? "active" : null),
+                Ui.Pill("Điểm IMDb cao", () => Sort(true), _imdb ? "active" : null)));
+            Body.Children.Add(Ui.Dim(_imdb ? "Xếp theo điểm IMDb (có tính số lượt chấm) trong khoảng 320 phim mới cập nhật của mục này."
+                : "Phim mới cập nhật — chọn «Điểm IMDb cao» để xếp theo điểm IMDb.", 14, new Thickness(0, 4, 0, 10)));
+        }
         if (page.Sections.Count > 0)
         {
             foreach (var s in page.Sections) Body.Children.Add(Ui.Section(s.Title, s.Films.Select(f => (UIElement)FilmCard(f))));
@@ -429,12 +447,19 @@ public sealed class ListPage : Page
         }
         if (page.Films.Count == 0)
         {
-            Body.Children.Add(Ui.Dim("Không có phim nào.", 16));
+            Body.Children.Add(Ui.Dim(_imdb || _url == "imdb:top" ? "Không có phim nào đủ lượt chấm IMDb." : "Không có phim nào.", 16));
             return;
         }
         _grid = new WrapPanel();
         Body.Children.Add(_grid);
         Add(page);
+    }
+
+    private void Sort(bool imdb)
+    {
+        if (_imdb == imdb) return;
+        _imdb = imdb;
+        _ = Start();
     }
 
     private void Add(FilmPage page)
