@@ -37,7 +37,7 @@ enum SsMethod: String, CaseIterable {
 
     /// Theo tên (không phân biệt hoa / thường; trống = mặc định); "chacha20-poly1305" của Xray / 3X-UI = chacha20-ietf-poly1305.
     static func of(_ name: String) -> SsMethod? {
-        let n = name.trimmingCharacters(in: .whitespaces).lowercased()
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if n.isEmpty { return defaultMethod }
         if n == "chacha20-poly1305" { return .chacha }
         return SsMethod(rawValue: n)
@@ -109,7 +109,7 @@ enum SsLink {
 
     /// "host:cổng" hoặc "[ipv6]:cổng" → (host, cổng).
     static func splitHostPort(_ s: String) -> (String, Int)? {
-        let t = s.trimmingCharacters(in: .whitespaces)
+        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         var host: String
         var port: String
         if t.hasPrefix("[") {
@@ -135,7 +135,7 @@ enum SsLink {
 /// Base64 thường lẫn base64url, có hoặc không dấu "=" (khoá 3X-UI, link SIP002). nil = không phải base64.
 enum SsBase64 {
     static func decode(_ s: String) -> [UInt8]? {
-        var t = s.trimmingCharacters(in: .whitespaces)
+        var t = s.trimmingCharacters(in: .whitespacesAndNewlines)
         while t.hasSuffix("=") { t.removeLast() }
         if t.isEmpty { return nil }
         var out: [UInt8] = []
@@ -450,7 +450,7 @@ enum Shadowsocks {
     static func keys(_ m: SsMethod, _ password: String) throws -> [[UInt8]] {
         guard !password.isEmpty else { throw SsError("Chưa nhập khoá / mật khẩu Shadowsocks.") }
         if !m.is2022 { return [evpBytesToKey(Array(password.utf8), m.keySize)] }
-        let parts = password.split(separator: ":", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespaces) }
+        let parts = password.split(separator: ":", omittingEmptySubsequences: false).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         if parts.count > 1 && m.isChacha {
             throw SsError("\(m.id) không dùng được với máy chủ nhiều người dùng (khoá dạng «khoá-máy-chủ:khoá-người-dùng») — chọn 2022-blake3-aes-256-gcm.")
         }
