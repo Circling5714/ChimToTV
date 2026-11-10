@@ -7,6 +7,41 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.15 — 10/11/2026
+
+- **Điểm IMDb** như TV 2.15: nhãn «IMDb 8.5» trên thẻ phim, dòng IMDb ở trang phim, mục menu «Điểm IMDb cao», nút «Mới cập nhật» /
+  «Điểm IMDb cao» ở danh mục KKPhim.
+- bản 1.15 (CFBundleVersion 20) · mã gói `vn.chimto.tv` · tag `ios-v1.15` (không phải "latest") · commit `8425261` ·
+  `ConBangTV-iPad-1.15.ipa` 4 453 281 byte · SHA-256 `484d5ff393285221074af8d580744964ce7ba8124b6b37355f497b751e00bc7a`
+- 145 test lõi trên macOS (thêm 5). Bản thử 109 trên iPhone: trang «Điểm IMDb cao», nút xếp trong «Phim bộ» KKPhim. Bản chính
+  thức cài lên iPhone (đè 1.14): chạy. Tệp tải từ link công khai khớp SHA-256; `releases/latest` vẫn `v2.15`.
+
+## Windows 1.12 — 10/11/2026
+
+- **Điểm IMDb** như TV 2.15: nhãn «IMDb 8.5» trên thẻ phim, dòng IMDb ở trang phim, mục menu «Điểm IMDb cao», nút «Mới cập nhật» /
+  «Điểm IMDb cao» ở danh mục KKPhim.
+- bản 1.12.0 · tag `win-v1.12` (không phải "latest") · commit `8425261` · `ConBangTV-Windows-1.12.exe` 72 922 413 byte · SHA-256
+  `2ec0af487d33914b343eb008ebf28aa55f10e364ed2bd8ef3f38a240cd3d6b5b`
+- 127 test lõi (thêm 4). Thử bản gỡ lỗi: trang «Điểm IMDb cao», nút xếp trong «Phim bộ» KKPhim. Tệp tải từ link công khai khớp
+  SHA-256. **Tự cập nhật thật 1.11 → 1.12** (bản chép riêng) lúc 19:25:08.
+
+## 2.15 — 10/11/2026
+
+- **Điểm IMDb** (lấy từ dữ liệu KKPhim — phimapi.com có sẵn điểm + số lượt chấm IMDb; không gọi IMDb):
+  - Thẻ phim có nhãn vàng «IMDb 8.5» ở góc dưới bên phải (phim nguồn KKPhim, từ 100 lượt chấm); trang phim KKPhim ghi
+    «IMDb 8.7 (448 nghìn lượt chấm)».
+  - **Mục menu «Điểm IMDb cao»** (sau «Phim theo dõi»): hàng Phim lẻ, Phim bộ, Phim Hàn Quốc, Phim Âu Mỹ, Phim Trung Quốc, Hoạt
+    hình, mỗi hàng 60 phim — xếp theo điểm có trọng số (như Top 250 của IMDb: phim ít lượt chấm bị kéo về điểm trung bình) trong
+    vài trăm phim mới cập nhật mỗi nhóm (API KKPhim không sắp theo điểm, kho ≈ 26 nghìn phim). Hồ sơ trẻ em chỉ hàng Hoạt hình.
+    Lần đầu mở ~20 giây trên TV box, sau đó lưu 12 giờ.
+  - **Danh mục KKPhim**: nút «Mới cập nhật» / «Điểm IMDb cao» ở đầu mục — xếp ≈ 320 phim mới cập nhật của mục theo điểm IMDb.
+- Màn miễn trừ trách nhiệm: bấm OK khi đang ở vùng chữ cũng là «Đồng ý» (trước đây mở app ở chế độ chạm thì phải ▼ tới nút).
+- versionCode 38 · tag `v2.15` · commit `8425261` (tính năng: `9445879`, `f2539cd`) · `ChimToTV-2.15.apk` 1 244 099 byte · SHA-256
+  `beaa11b18e345916467216f8ce778b4df0f6e212c29aede87a6071633cf1e96d`
+- 151 test (thêm 5). Thử bản gỡ lỗi trên TV box: trang «Điểm IMDb cao», nút xếp trong «Phim bộ», dòng IMDb ở trang phim. API
+  `releases/latest` trả `v2.15` + `.apk`, tệp tải từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.14 → 2.15** trên TV box
+  lúc 19:22:43, bản chính thức mở «Điểm IMDb cao» được.
+
 ## iPad 1.14 — 10/11/2026
 
 - **Miễn trừ trách nhiệm & quyền riêng tư** như TV 2.14: lần đầu mở app (kể cả máy cập nhật từ bản cũ) hiện màn «Trước khi bắt

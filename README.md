@@ -10,10 +10,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.14`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.14)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.15`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.15)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.11`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.11)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.12`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.12)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -119,6 +119,20 @@ Trang phim (bấm vào một phim bất kỳ) có thêm các hàng vuốt ngang:
 quan ▼», Windows: «▼ Phim liên quan») nhảy thẳng xuống, chọn sẵn phim đầu. Phim ở trang khác ghi tên trang ở góc. Trên TV, đang
 chọn trong hàng liên quan thì dòng phía trên lưới ghi tên hàng. Các hàng tải sau khi trang phim đã hiện. Chưa có «cùng đạo diễn /
 diễn viên»: các nguồn (KKPhim, VSMOV, NguonC, ophim) chỉ tìm được theo tên phim.
+
+## Điểm IMDb (từ 2.15 / iPad 1.15 / Windows 1.12)
+
+Điểm lấy từ dữ liệu KKPhim (phimapi.com có sẵn điểm + số lượt chấm IMDb của khoảng 60% phim lẻ; hoạt hình Trung Quốc rất ít) — app
+không gọi IMDb. Phim dưới 100 lượt chấm coi như chưa có điểm.
+
+- **Thẻ phim**: nhãn vàng «IMDb 8.5» ở góc dưới bên phải (phim nguồn KKPhim). **Trang phim** KKPhim: «IMDb 8.7 (448 nghìn lượt chấm)».
+- **Menu «Điểm IMDb cao»** (sau «Phim theo dõi»): hàng Phim lẻ, Phim bộ, Phim Hàn Quốc, Phim Âu Mỹ, Phim Trung Quốc, Hoạt hình — mỗi
+  hàng 60 phim, xếp theo điểm có trọng số (như Top 250 của IMDb: phim ít lượt chấm bị kéo về điểm trung bình nên 9,4 điểm từ 1.200
+  lượt không vượt 8,6 điểm từ 2 triệu lượt). API KKPhim không sắp theo điểm và kho quá lớn (≈ 26 nghìn phim) để TV tự quét hết, nên
+  app xếp trong vài trăm phim mới cập nhật mỗi nhóm. Hồ sơ trẻ em chỉ thấy hàng Hoạt hình. Lần đầu mở mất ~20 giây trên TV box,
+  sau đó lưu 12 giờ.
+- **Danh mục KKPhim** (Phim bộ, Phim lẻ, thể loại, quốc gia…): nút «Mới cập nhật» / «Điểm IMDb cao» ở đầu mục — «Điểm IMDb cao» xếp
+  ≈ 320 phim mới cập nhật của mục theo điểm (từ 1.000 lượt chấm).
 
 ## Trang phim hỗ trợ
 
@@ -613,6 +627,11 @@ bộ đăng nhập proxy thật (RFC 1929), gửi tên miền (DNS của proxy) 
 độ "chỉ trang phim" cho đích khác đi thẳng. Đổi cài đặt → mở cổng mới, đóng kết nối cũ (kết nối keep-alive không giữ
 cài đặt cũ). Điểm server khi video đi qua proxy chấm riêng (`<trang>·proxy`). Test:
 `.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.Socks5BridgeTest` (proxy SOCKS5 giả trong test).
+
+Điểm IMDb (từ 2.15 — `ImdbTop.kt` / `.swift` / `.cs`): `Imdb.of` đọc `imdb.vote_average` / `vote_count` của KKPhim (≥ 100
+lượt), `Film.imdb` / `FeedItem.imdb` (bộ nhớ đệm trang chủ: "is" / "iv"); `ImdbTop.page` (nhóm: đường dẫn API kiểu KKPhim,
+số trang × 64 phim, số lượt tối thiểu), `forList` (danh mục, 5 trang), `rank` (WR = v/(v+m)·R + m/(v+m)·C, m = 5 × số lượt
+tối thiểu), lưu `imdb_top.json` 12 giờ; `canRank` = danh sách API kkphim / phimapi. Test: `ImdbTopTest` / `ImdbTopTests`.
 
 Shadowsocks (từ 2.13 — `Shadowsocks.kt` / `.swift` / `.cs`): cổng nội bộ có thêm `RouteConfig.ss` / `Socks5Bridge(ss:)` /
 `Net.Ss`; kết nối tới đích là `Upstream` (ổ cắm + luồng đã mã hoá `SsOutput` / `SsInput`, `SsConnection`, `SsStream`).
