@@ -145,36 +145,66 @@ public static class Net
     private static string? _lastProxyError;
     private static long _lastProxyErrorAt;
 
-    /// Proxy đang bật (null = đi thẳng).
+    /// Proxy SOCKS5 đang bật (null = đi thẳng / đang dùng Shadowsocks).
     public static SocksConfig? Proxy => Prefs.ProxyConfig();
 
+    /// Máy chủ Shadowsocks đang bật (null = đi thẳng / đang dùng SOCKS5).
+    public static SsConfig? Ss => Prefs.ShadowsocksConfig();
+
     /// Có đi qua proxy tới host này không (chế độ "chỉ trang phim": chỉ tên miền trong danh sách trang).
-    public static bool UsesProxy(SocksConfig? c, string host)
+    public static bool UsesProxy(SocksConfig? c, string host) => c != null && UsesProxy(c.SitesOnly, host);
+
+    private static bool UsesProxy(bool sitesOnly, string host)
     {
-        if (c == null) return false;
-        if (!c.SitesOnly) return true;
+        if (!sitesOnly) return true;
         var h = host.ToLowerInvariant();
         return Prefs.Sites.Append(Prefs.BaseUrl).Select(Site.HostOf).OfType<string>()
             .Any(s => h == s || h.EndsWith("." + s));
     }
 
-    /// Kết nối tới host:port theo cài đặt; trả kèm có qua proxy không.
-    public static async Task<(Socket Socket, bool ViaProxy)> Connect(string host, int port, CancellationToken ct)
+    /// Ghi lỗi phía proxy (ghép vào câu báo lỗi cho người xem).
+    public static void NoteProxyError(string message)
+    {
+        lock (Lock)
+        {
+            _lastProxyError = message;
+            _lastProxyErrorAt = Util.NowMs();
+        }
+    }
+
+    /// Kết nối tới host:port theo cài đặt; trả kèm có qua proxy không. Qua Shadowsocks: Ss = luồng đã mã hoá (đọc / ghi qua
+    /// luồng này, không qua ổ cắm).
+    public static async Task<(Socket Socket, bool ViaProxy, SsStream? Ss)> Connect(string host, int port, CancellationToken ct)
     {
         var c = Proxy;
         if (UsesProxy(c, host))
         {
             try
             {
-                return (await Socks5.Connect(c!, host, port, ct), true);
+                return (await Socks5.Connect(c!, host, port, ct), true, null);
             }
             catch (SocksError e)
             {
-                lock (Lock)
-                {
-                    _lastProxyError = e.Message;
-                    _lastProxyErrorAt = Util.NowMs();
-                }
+                NoteProxyError(e.Message);
+                throw;
+            }
+        }
+        var ss = Ss;
+        if (ss != null && UsesProxy(ss.SitesOnly, host))
+        {
+            try
+            {
+                // DNS của máy (không phải của máy chủ SS): DNS mã hoá, lỗi thì DNS của máy
+                IPAddress? ip = null;
+                if (!ss.RemoteDns && !IPAddress.TryParse(host, out ip))
+                    ip = await Doh.ForConnect(host, ct) ?? (await Dns.GetHostAddressesAsync(host, ct))
+                        .OrderBy(a => a.AddressFamily == AddressFamily.InterNetwork ? 0 : 1).First();
+                var st = await Shadowsocks.Connect(ss, host, ip, port, ct);
+                return (st.Socket, true, st);
+            }
+            catch (SocksError e)
+            {
+                NoteProxyError(e.Message);
                 throw;
             }
         }
@@ -185,7 +215,7 @@ public static class Net
         try
         {
             await s.ConnectAsync(real != null ? new IPEndPoint(real, port) : new DnsEndPoint(host, port), ct);
-            return (s, false);
+            return (s, false, null);
         }
         catch
         {
@@ -198,12 +228,13 @@ public static class Net
     /// nối dùng lại — không đóng thì vẫn đi đường cũ).
     public static async ValueTask<Stream> HttpConnect(SocketsHttpConnectionContext ctx, CancellationToken ct)
     {
-        var (s, via) = await Connect(ctx.DnsEndPoint.Host, ctx.DnsEndPoint.Port, ct);
+        var (s, via, ss) = await Connect(ctx.DnsEndPoint.Host, ctx.DnsEndPoint.Port, ct);
         lock (Open)
         {
             Open.RemoveWhere(x => x.SafeHandle.IsClosed);
             Open.Add(s);
         }
+        if (ss != null) return ss; // qua Shadowsocks: nhà mạng chỉ thấy dữ liệu đã mã hoá — khỏi chia nhỏ gói bắt tay
         var ns = new NetworkStream(s, true);
         var level = Unblock.Level;
         return level > 0 && ctx.DnsEndPoint.Port == 443 ? new Unblock.HelloSplit(ns, s, ctx.DnsEndPoint.Host, level, via) : ns;
@@ -212,11 +243,11 @@ public static class Net
     /// Lời nhắc thêm vào câu báo lỗi khi đang bật proxy (kèm lỗi phía proxy trong 2 phút gần đây).
     public static string Note()
     {
-        if (Proxy == null) return "";
+        if (Proxy == null && Ss == null) return "";
         lock (Lock)
         {
             var recent = _lastProxyError != null && Util.NowMs() - _lastProxyErrorAt < 120_000 ? $" Lỗi proxy: {_lastProxyError}." : "";
-            return $"\nĐang bật proxy SOCKS5.{recent}";
+            return $"\nĐang bật proxy {(Ss != null ? "Shadowsocks" : "SOCKS5")}.{recent}";
         }
     }
 
@@ -315,9 +346,10 @@ public static class Net
             await cs.ReadExactlyAsync(pb, t.Token);
             var port = pb[0] << 8 | pb[1];
             bool via;
+            SsStream? ss;
             try
             {
-                (up, via) = await Connect(host, port, t.Token);
+                (up, via, ss) = await Connect(host, port, t.Token);
             }
             catch (Exception e)
             {
@@ -327,14 +359,18 @@ public static class Net
             }
             lock (Open) Open.Add(up);
             await cs.WriteAsync(new byte[] { 5, 0, 0, 1, 0, 0, 0, 0, 0, 0 });
-            var us = new NetworkStream(up, false);
+            Stream us = (Stream?)ss ?? new NetworkStream(up, false);
             var level = Unblock.Level;
-            var helloPending = port == 443 && level > 0;
+            // Qua Shadowsocks: nhà mạng chỉ thấy dữ liệu đã mã hoá, không đọc được tên trang — khỏi chia nhỏ
+            var helloPending = port == 443 && level > 0 && ss == null;
             var upSocket = up;
             var toUp = Task.Run(async () =>
             {
                 var buf = new byte[32 * 1024];
                 int n;
+                // Shadowsocks: phần đầu gửi cùng dữ liệu đầu tiên của bên gọi (HTTPS: gói bắt tay). Bên gọi im quá 0,3 s (giao
+                // thức máy chủ nói trước) thì gửi phần đầu trước để máy chủ mở kết nối tới đích
+                if (ss != null && !client.Poll(300_000, SelectMode.SelectRead)) await ss.StartAsync();
                 while ((n = await cs.ReadAsync(buf)) > 0)
                 {
                     if (helloPending)
@@ -346,7 +382,18 @@ public static class Net
                 }
                 upSocket.Shutdown(SocketShutdown.Send);
             });
-            var toClient = us.CopyToAsync(cs, 64 * 1024);
+            var toClient = Task.Run(async () =>
+            {
+                try
+                {
+                    await us.CopyToAsync(cs, 64 * 1024);
+                }
+                catch (SsError e)
+                {
+                    NoteProxyError(e.Message);
+                    throw;
+                }
+            });
             await Task.WhenAny(toUp, toClient);
             await Task.WhenAny(Task.WhenAll(toUp, toClient), Task.Delay(2000));
         }

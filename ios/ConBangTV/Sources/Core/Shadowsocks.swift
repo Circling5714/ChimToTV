@@ -265,20 +265,20 @@ final class SsAead {
 
 /// Một đầu của kết nối mà cổng nội bộ chép dữ liệu qua lại: ổ cắm thường, hoặc Shadowsocks chồng trên ổ cắm.
 protocol Upstream: AnyObject {
-    var socket: TcpSocket { get }
+    var tcp: TcpSocket { get }
     /// Đọc tối đa n byte; 0 = hết.
     func read(_ buf: UnsafeMutableRawPointer, _ n: Int) throws -> Int
     func write(_ p: UnsafeRawPointer, _ n: Int) throws
 }
 
 extension TcpSocket: Upstream {
-    var socket: TcpSocket { self }
+    var tcp: TcpSocket { self }
 }
 
 /// Kết nối qua máy chủ Shadowsocks. Phần đầu (salt, phần nhận dạng người dùng, địa chỉ đích) gửi chung một lần ghi với
 /// dữ liệu đầu tiên của bên gọi; start() gửi phần đầu không kèm dữ liệu (thêm đệm ngẫu nhiên) khi bên gọi chưa nói gì.
 final class SsConnection: Upstream {
-    let socket: TcpSocket
+    let tcp: TcpSocket
     private let m: SsMethod
     private let keys: [[UInt8]]
     private let target: [UInt8]
@@ -294,7 +294,7 @@ final class SsConnection: Upstream {
     private var rawPos = 0, rawEnd = 0
 
     init(socket: TcpSocket, method: SsMethod, keys: [[UInt8]], target: [UInt8]) {
-        self.socket = socket
+        tcp = socket
         m = method
         self.keys = keys
         self.target = target
@@ -315,7 +315,7 @@ final class SsConnection: Upstream {
             let k = min(data.count, maxChunk)
             let part = Array(data.prefix(k))
             let out = try enc.seal([UInt8(k >> 8), UInt8(k & 0xFF)]) + enc.seal(part)
-            try socket.write(out)
+            try tcp.write(out)
             data = data.dropFirst(k)
         }
     }
@@ -356,7 +356,7 @@ final class SsConnection: Upstream {
             out += try enc.seal([UInt8(first.count >> 8), UInt8(first.count & 0xFF)])
             out += try enc.seal(first)
         }
-        try socket.write(out) // một lần ghi (chuẩn SS 2022: không để lộ cỡ từng phần)
+        try tcp.write(out) // một lần ghi (chuẩn SS 2022: không để lộ cỡ từng phần)
         return sent
     }
 
@@ -421,7 +421,7 @@ final class SsConnection: Upstream {
         out.reserveCapacity(n)
         while out.count < n {
             if rawPos >= rawEnd {
-                let r = try raw.withUnsafeMutableBytes { try socket.read($0.baseAddress!, $0.count) }
+                let r = try raw.withUnsafeMutableBytes { try tcp.read($0.baseAddress!, $0.count) }
                 if r == 0 {
                     if out.isEmpty && eofOk { return nil }
                     throw SocketError(message: "máy chủ Shadowsocks ngắt kết nối giữa chừng")

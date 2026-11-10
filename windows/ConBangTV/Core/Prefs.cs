@@ -726,10 +726,51 @@ public static class Prefs
         set => Set("proxy_sites_only", value);
     }
 
-    /// Proxy đang bật và đủ thông tin (null = đi thẳng).
+    /// Kiểu proxy: "socks5" hoặc "ss" (Shadowsocks). Mỗi kiểu giữ máy chủ / khoá riêng; bật / DNS / phạm vi dùng chung.
+    public static string ProxyKind
+    {
+        get => Get<string>("proxy_kind") == "ss" ? "ss" : "socks5";
+        set => Set("proxy_kind", value);
+    }
+
+    public static string SsHost
+    {
+        get => Get<string>("ss_host") ?? "";
+        set => Set("ss_host", value.Trim());
+    }
+
+    public static int SsPort
+    {
+        get => Has("ss_port") ? Get<int>("ss_port") : 0;
+        set => Set("ss_port", value);
+    }
+
+    /// Kiểu mã hoá (SsMethod.Id).
+    public static string SsMethodId
+    {
+        get => Get<string>("ss_method") ?? SsMethod.Default.Id;
+        set => Set("ss_method", value);
+    }
+
+    /// Khoá / mật khẩu Shadowsocks — mã hoá bằng tài khoản Windows (DPAPI) như mật khẩu proxy.
+    public static string SsKey
+    {
+        get => Secret.Unprotect(Get<string>("ss_key_dpapi"));
+        set => Set("ss_key_dpapi", Secret.Protect(value));
+    }
+
+    /// Máy chủ Shadowsocks đang dùng; null = proxy tắt / đang chọn SOCKS5 / chưa nhập đủ.
+    public static SsConfig? ShadowsocksConfig()
+    {
+        if (!ProxyOn || ProxyKind != "ss" || SsHost.Length == 0 || SsPort is <= 0 or > 65535) return null;
+        var key = SsKey;
+        return key.Length == 0 ? null : new SsConfig(SsHost, SsPort, SsMethodId, key, ProxyRemoteDns, ProxySitesOnly);
+    }
+
+    /// Proxy SOCKS5 đang bật và đủ thông tin (null = đi thẳng / đang chọn Shadowsocks).
     public static SocksConfig? ProxyConfig()
     {
-        if (!ProxyOn || ProxyHost.Length == 0 || ProxyPort is <= 0 or > 65535) return null;
+        if (!ProxyOn || ProxyKind != "socks5" || ProxyHost.Length == 0 || ProxyPort is <= 0 or > 65535) return null;
         return new SocksConfig(ProxyHost, ProxyPort, ProxyUser, ProxyUser.Length > 0 ? ProxyPass : "", ProxyRemoteDns, ProxySitesOnly);
     }
 

@@ -257,7 +257,7 @@ final class ShadowsocksTests: XCTestCase {
     private func roundTrip(_ m: SsMethod, _ password: String, _ server: Listener, _ seen: Seen, _ initial: String) throws {
         let c = SsConfig(host: "127.0.0.1", port: server.port, method: m.id, password: password)
         let up = try Shadowsocks.connect(c, host: "phim.example", ip: nil, port: 443)
-        up.socket.setReadTimeout(5)
+        up.tcp.setReadTimeout(5)
         let first = Array(initial.utf8)
         try first.withUnsafeBytes { try up.write($0.baseAddress!, first.count) }
         let got = seen.wait()
@@ -268,10 +268,10 @@ final class ShadowsocksTests: XCTestCase {
         let big = (0..<40_000).map { UInt8($0 % 97) }
         try big.withUnsafeBytes { try up.write($0.baseAddress!, big.count) }
         XCTAssertEqual(try readAll(up, big.count), big)
-        up.socket.shutdownWrite()
+        up.tcp.shutdownWrite()
         var one = [UInt8](repeating: 0, count: 1)
         XCTAssertEqual(try one.withUnsafeMutableBytes { try up.read($0.baseAddress!, 1) }, 0)
-        up.socket.close()
+        up.tcp.close()
     }
 
     func testSs2022MultiUserRoundTrip() throws {
@@ -309,14 +309,14 @@ final class ShadowsocksTests: XCTestCase {
         let c = SsConfig(host: "127.0.0.1", port: s.port, method: SsMethod.b3Aes256.id,
                          password: "\(b64(serverPsk)):\(b64([UInt8](repeating: 9, count: 32)))")
         let up = try Shadowsocks.connect(c, host: "phim.example", ip: nil, port: 443)
-        up.socket.setReadTimeout(5)
+        up.tcp.setReadTimeout(5)
         let hello = Array("hello".utf8)
         try hello.withUnsafeBytes { try up.write($0.baseAddress!, hello.count) }
         var one = [UInt8](repeating: 0, count: 1)
         XCTAssertThrowsError(try one.withUnsafeMutableBytes { try up.read($0.baseAddress!, 1) }) { e in
             XCTAssertTrue((e as? SsError)?.message.contains("sai khoá") == true, "\(e)")
         }
-        up.socket.close()
+        up.tcp.close()
     }
 
     /// Cổng nội bộ đi qua Shadowsocks: gói bắt tay TLS tới máy chủ nguyên một mẩu (không chia nhỏ), đúng đích.

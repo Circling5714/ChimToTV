@@ -482,7 +482,7 @@ final class Socks5Bridge {
         var up: Upstream?
         defer {
             untrack(client)
-            if let u = up { untrack(u.socket) }
+            if let u = up { untrack(u.tcp) }
         }
         do {
             client.setReadTimeout(15)
@@ -517,7 +517,7 @@ final class Socks5Bridge {
                 return try reply(client, e.code)
             }
             count("\(host):\(port)", viaProxy ? 0 : 1)
-            guard let u = up, track(u.socket) else { return }
+            guard let u = up, track(u.tcp) else { return }
             try reply(client, 0)
             client.setReadTimeout(0)
             // Qua Shadowsocks: nhà mạng chỉ thấy dữ liệu đã mã hoá, không đọc được tên trang — khỏi chia nhỏ
@@ -658,7 +658,7 @@ final class Socks5Bridge {
             var first = hello
             // Shadowsocks: phần đầu gửi cùng dữ liệu đầu tiên của bên gọi (HTTPS: gói bắt tay). Bên gọi im quá 0,3 s (giao
             // thức máy chủ nói trước) thì gửi phần đầu trước để máy chủ mở kết nối tới đích
-            if let ss = to as? SsConnection, !ss.started, !from.socket.waitReadable(ms: 300) { try ss.start() }
+            if let ss = to as? SsConnection, !ss.started, !from.tcp.waitReadable(ms: 300) { try ss.start() }
             while true {
                 let n = try from.read(buf, size)
                 if n == 0 { break }
@@ -670,12 +670,12 @@ final class Socks5Bridge {
                 try to.write(buf, n)
             }
             // Hết dữ liệu: báo bên kia (đóng nửa ghi); chiều ngược lại chờ tối đa 60 s im lặng rồi thôi
-            to.socket.shutdownWrite()
-            to.socket.setReadTimeout(60)
+            to.tcp.shutdownWrite()
+            to.tcp.setReadTimeout(60)
         } catch {
             if let e = error as? SsError { noteError(e.message) }
-            from.socket.close()
-            to.socket.close()
+            from.tcp.close()
+            to.tcp.close()
         }
     }
 }

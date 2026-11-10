@@ -318,7 +318,8 @@ public sealed class SettingsPage : Page
         }, "Trang không vào được / quá thời gian chờ (nhà mạng chặn theo tên trang, vd phimmois.fun): bật Mức 1. " +
            "Vẫn bị chặn thì thử Mức 2. Trang / ảnh bìa bị chặn bằng DNS (DNS trả 0.0.0.0) thì app tự hỏi lại địa chỉ qua DNS mã hoá. " +
            "Không cần VPN.");
-        Body.Children.Add(Ui.Row(Ui.Pill(Prefs.ProxyConfig() is { } pc ? $"Proxy SOCKS5: {pc.Host}:{pc.Port}" : "Proxy SOCKS5: tắt",
+        Body.Children.Add(Ui.Row(Ui.Pill(Prefs.ShadowsocksConfig() is { } sc ? $"Proxy Shadowsocks: {sc.Host}:{sc.Port}"
+            : Prefs.ProxyConfig() is { } pc ? $"Proxy SOCKS5: {pc.Host}:{pc.Port}" : "Proxy: tắt",
             () => Main.Push(new ProxyPage()))));
         Option("Tự kiểm tra bản mới", new[]
         {
