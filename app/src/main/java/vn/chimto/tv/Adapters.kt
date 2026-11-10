@@ -193,6 +193,7 @@ class FilmGridAdapter(
         val name: TextView = view.findViewById(R.id.name)
         val chip: TextView = view.findViewById(R.id.chip)
         val more: TextView = view.findViewById(R.id.more)
+        val imdb: TextView = view.findViewById(R.id.imdb)
     }
 
     class ChipHolder(val text: TextView) : RecyclerView.ViewHolder(text)
@@ -457,6 +458,7 @@ class FilmGridAdapter(
                 h.name.text = row.title
                 h.badge.visibility = View.GONE
                 h.chip.visibility = View.GONE
+                h.imdb.visibility = View.GONE
                 h.more.visibility = View.VISIBLE
                 h.more.text = if (row.count > 0) "Xem thêm ›\n${row.count} phim" else "Xem thêm ›"
                 ImageLoader.load(h.poster, null)
@@ -472,6 +474,8 @@ class FilmGridAdapter(
                 h.badge.visibility = if (f.badge.isNullOrEmpty()) View.GONE else View.VISIBLE
                 h.chip.text = row.chip
                 h.chip.visibility = if (row.chip.isNullOrEmpty()) View.GONE else View.VISIBLE
+                h.imdb.text = f.imdb?.label
+                h.imdb.visibility = if (f.imdb == null) View.GONE else View.VISIBLE
                 h.more.visibility = View.GONE
                 ImageLoader.load(h.poster, f.poster)
                 h.itemView.setOnClickListener { onClick(row) }

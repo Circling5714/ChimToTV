@@ -275,7 +275,7 @@ object ApiSite {
         val slug = str(o, "slug").ifEmpty { return null }
         val name = str(o, "name").ifEmpty { return null }
         val poster = image(str(o, "poster_url").ifEmpty { str(o, "thumb_url") }, str(o, "cdnDomain").ifEmpty { cdn })
-        return Film("$origin/phim/$slug", name, poster, NextSite.badge(str(o, "episode_current")))
+        return Film("$origin/phim/$slug", name, poster, NextSite.badge(str(o, "episode_current")), Imdb.of(o.optJSONObject("imdb")))
     }
 
     // ---- Chi tiết phim ----
@@ -296,6 +296,7 @@ object ApiSite {
             str(m, "lang"),
             names(m.optJSONArray("country")),
             m.opt("year")?.toString()?.takeIf { it.isNotEmpty() && it != "0" && it != "null" }.orEmpty(),
+            Imdb.of(m.optJSONObject("imdb"))?.detail.orEmpty(),
             names(m.optJSONArray("category")),
         ).filter { it.isNotEmpty() }.joinToString("  •  ").ifEmpty { null }
         val groups = objects(root.optJSONArray("episodes")).mapIndexedNotNull { i, s ->

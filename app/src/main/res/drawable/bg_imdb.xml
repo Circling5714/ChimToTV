@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nhãn điểm IMDb trên thẻ phim: màu vàng của IMDb -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#F5C518" />
+    <corners android:radius="4dp" />
+</shape>

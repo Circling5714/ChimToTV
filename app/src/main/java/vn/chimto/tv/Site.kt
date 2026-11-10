@@ -9,7 +9,8 @@ import java.io.IOException
 import java.net.URL
 import java.net.URLEncoder
 
-data class Film(val url: String, val title: String, val poster: String?, val badge: String?)
+/** imdb: điểm IMDb (chỉ dữ liệu KKPhim có — xem ImdbTop.kt); null = không có / quá ít lượt chấm. */
+data class Film(val url: String, val title: String, val poster: String?, val badge: String?, val imdb: Imdb? = null)
 data class Section(val title: String, val films: List<Film>)
 data class Category(val title: String, val url: String)
 
@@ -19,7 +20,7 @@ data class SiteCheck(val ms: Long, val films: Int)
 /** movedTo: trang đã chuyển sang tên miền khác (theo chuyển hướng) → gốc mới. */
 data class Home(val sections: List<Section>, val categories: List<Category>, val movedTo: String?)
 /** sections: trang chia nhóm (vd lịch chiếu theo ngày) — khi có thì hiển thị thay cho films. */
-data class FilmPage(val films: List<Film>, val nextUrl: String?, val sections: List<Section> = emptyList())
+data class FilmPage(val films: List<Film>, val nextUrl: String?, val sections: List<Section> = emptyList(), val note: String? = null)
 data class Episode(val title: String, val url: String)
 
 /** Một danh sách tập, vd "Việt Sub" / "Thuyết Minh" (trang HaLim chia tập theo server). */

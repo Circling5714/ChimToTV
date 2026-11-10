@@ -814,7 +814,7 @@ object HomeFeed {
                 live.size > 1 -> "${live.size} nguồn"
                 else -> tag(first.host)
             }
-            return Card(Film(first.url, first.title, links.firstNotNullOfOrNull { it.poster }, badge), chip, links)
+            return Card(Film(first.url, first.title, links.firstNotNullOfOrNull { it.poster }, badge, links.firstNotNullOfOrNull { it.imdb }), chip, links)
         }
 
         val rows = ArrayList<FeedRow>()
@@ -862,7 +862,7 @@ object HomeFeed {
             }
             val open = if (latest.host == ownHost) f.items.firstOrNull { it.url == h.filmUrl } ?: latest else latest
             val links = listOf(open) + f.items.filter { it !== open }
-            fresh += FreshCard(Card(Film(open.url, h.title, h.poster ?: open.poster, badge), chip, links), key, ep)
+            fresh += FreshCard(Card(Film(open.url, h.title, h.poster ?: open.poster, badge, links.firstNotNullOfOrNull { it.imdb }), chip, links), key, ep)
         }
 
         // Hàng tự thêm (và chủ đề người mới chọn): phim chưa xem, mới cập nhật trước

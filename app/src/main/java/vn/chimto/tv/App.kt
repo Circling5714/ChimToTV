@@ -11,6 +11,7 @@ class App : Application() {
         Privacy.init(this)
         AppProxy.apply()
         ImageLoader.init(this)
+        ImdbTop.cacheDir = cacheDir
         Feed.init(this)
         AutoClear.init(this)
         AppUse.init(this)

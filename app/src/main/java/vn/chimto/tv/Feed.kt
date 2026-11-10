@@ -41,7 +41,7 @@ data class Tags(val genres: List<String>, val countries: List<String>, val type:
  */
 data class FeedItem(
     val url: String, val title: String, val poster: String?, val badge: String?,
-    val names: Set<String>, val year: Int?, val updated: Long, val ep: Double?, val tags: Tags?,
+    val names: Set<String>, val year: Int?, val updated: Long, val ep: Double?, val tags: Tags?, val imdb: Imdb? = null,
 ) {
     /** Tên miền nguồn (tính một lần — dùng rất nhiều lần khi gộp / xếp, đọc địa chỉ mỗi lần thì TV yếu chậm). */
     val host: String = Site.hostOf(url).orEmpty()
@@ -49,6 +49,7 @@ data class FeedItem(
     fun json(): JSONObject = JSONObject().put("u", url).put("n", title).put("p", poster ?: "").put("b", badge ?: "")
         .put("k", JSONArray(names.toList())).put("y", year ?: 0).put("t", updated).put("e", ep ?: -1.0)
         .apply { tags?.let { put("g", it.json()) } }
+        .apply { imdb?.let { put("is", it.score).put("iv", it.votes) } }
 
     companion object {
         fun of(o: JSONObject): FeedItem? {
@@ -58,6 +59,7 @@ data class FeedItem(
                 url, o.optString("n").ifEmpty { return null }, o.optString("p").ifEmpty { null }, o.optString("b").ifEmpty { null },
                 (0 until k.length()).map { k.optString(it) }.filter { it.isNotEmpty() }.toSet(),
                 o.optInt("y").takeIf { it > 0 }, o.optLong("t"), o.optDouble("e", -1.0).takeIf { it >= 0 }, Tags.of(o.optJSONObject("g")),
+                Imdb(o.optDouble("is", 0.0), o.optInt("iv")).takeIf { it.score > 0 },
             )
         }
     }
@@ -135,7 +137,7 @@ object Feed {
             FeedItem(
                 "$origin/phim/$slug", name, ApiSite.image(str(o, "poster_url").ifEmpty { str(o, "thumb_url") }, cdn),
                 NextSite.badge(ep), KkPhim.names(o), year(o), time(o.optJSONObject("modified")?.let { str(it, "time") }),
-                epOf(ep), Tags.fromKk(o),
+                epOf(ep), Tags.fromKk(o), Imdb.of(o.optJSONObject("imdb")),
             )
         }.distinctBy { it.url }
     }

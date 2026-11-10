@@ -42,7 +42,7 @@ class MainActivity : BaseActivity() {
         finish()
     }
 
-    private enum class Kind { PIP_EXPAND, PIP_CLOSE, PROFILE, HOME, SEARCH, HISTORY, FOLLOWS, CATEGORY, FILTER, SITE, WEB, CLEAR, SETTINGS }
+    private enum class Kind { PIP_EXPAND, PIP_CLOSE, PROFILE, HOME, SEARCH, HISTORY, FOLLOWS, IMDB, CATEGORY, FILTER, SITE, WEB, CLEAR, SETTINGS }
 
     private data class Entry(val title: String, val kind: Kind, val url: String? = null)
 
@@ -584,6 +584,7 @@ class MainActivity : BaseActivity() {
         items += Entry("Tìm kiếm", Kind.SEARCH)
         items += Entry("Lịch sử xem", Kind.HISTORY)
         items += Entry(followsTitle(), Kind.FOLLOWS)
+        items += Entry("Điểm IMDb cao", Kind.IMDB)
         categories.forEach { items += Entry(it.title, Kind.CATEGORY, it.url) }
         // Trang kiểu PhimMoi / trang API (mephim): đủ thể loại / quốc gia của bộ lọc (menu trang chỉ có vài mục)
         if (NextSite.isKnown(Prefs.baseUrl) || ApiSite.isKnown(Prefs.baseUrl)) {
@@ -679,9 +680,28 @@ class MainActivity : BaseActivity() {
                 showFollows(focusFirst = true)
                 Follows.check(this, done = ::onFollowsChecked)
             }
+            Kind.IMDB -> showList("imdb:top") { ImdbTop.page(Prefs.kids) }
             Kind.CATEGORY -> showList(entry.url!!)
             else -> Unit
         }
+    }
+
+    /** Danh mục KKPhim đang xếp theo điểm IMDb (nút «Điểm IMDb cao» ở đầu danh mục). */
+    private var imdbSorted = false
+
+    /** Hai nút đầu danh mục KKPhim: «Mới cập nhật» / «Điểm IMDb cao» (xếp vài trang đầu của mục theo IMDb). */
+    private fun sortChips(): List<GridRow> = listOf(
+        ChipRow("sort:new", "Mới cập nhật", !imdbSorted),
+        ChipRow("sort:imdb", "Điểm IMDb cao", imdbSorted),
+        NoteRow(if (imdbSorted) "Xếp theo điểm IMDb (có tính số lượt chấm) trong khoảng 320 phim mới cập nhật của mục này."
+        else "Phim mới cập nhật — chọn «Điểm IMDb cao» để xếp theo điểm IMDb."),
+    )
+
+    private fun sortList(imdb: Boolean) {
+        val url = menuAdapter.active?.url ?: return
+        imdbSorted = imdb
+        pendingFocus = "chip:" + if (imdb) "sort:imdb" else "sort:new"
+        if (imdb) showList(url) { ImdbTop.forList(url) } else showList(url)
     }
 
     private fun showHome() {
@@ -1057,6 +1077,7 @@ class MainActivity : BaseActivity() {
 
     /** Chọn / bỏ một chủ đề (người xem chưa có lịch sử) rồi tải lại trang chủ, giữ ô chủ đề đang chọn. */
     private fun toggleTopic(c: ChipRow) {
+        if (c.id.startsWith("sort:")) return sortList(c.id == "sort:imdb")
         val set = Prefs.homeTopics.toMutableSet()
         if (!set.add(c.id)) set.remove(c.id)
         Prefs.homeTopics = set
@@ -1068,22 +1089,29 @@ class MainActivity : BaseActivity() {
     private fun showList(url: String, loader: () -> FilmPage = { Site.list(url) }) {
         val t = ++token
         nextUrl = null
+        val sortable = ImdbTop.canRank(url) && menuAdapter.active?.kind == Kind.CATEGORY
+        if (!sortable || menuAdapter.active?.url != url) imdbSorted = false
         gridAdapter.clear()
         status.loading()
         background(loader) { r ->
             if (t != token) return@background
             r.onSuccess { page ->
                 nextUrl = page.nextUrl
-                val rows = if (page.sections.isNotEmpty()) {
+                val films = if (page.sections.isNotEmpty()) {
                     page.sections.flatMap { s -> listOf(HeaderRow(s.title)) + s.films.map { FilmRow(it) } }
                 } else {
                     page.films.map { FilmRow(it) }
                 }
-                if (rows.isEmpty()) {
-                    status.message("Không có phim nào.")
+                val head = (if (sortable) sortChips() else emptyList()) + listOfNotNull(page.note?.let { NoteRow(it) })
+                if (films.isEmpty() && !sortable) {
+                    status.message(if (url == "imdb:top") "Chưa có phim nào đủ lượt chấm IMDb." else "Không có phim nào.")
                 } else {
                     status.hide()
-                    gridAdapter.submit(rows, focusFirst = true)
+                    val focus = pendingFocus
+                    pendingFocus = null
+                    gridAdapter.submit(head + films.ifEmpty { listOf(NoteRow("Không có phim nào đủ lượt chấm IMDb trong mục này.")) },
+                        focusFirst = focus == null)
+                    if (focus != null) focusKeyAfterSubmit(focus)
                 }
             }.onFailure { status.message("Không tải được danh sách.\n${it.friendly()}") { showList(url, loader) } }
         }
