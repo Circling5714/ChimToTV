@@ -26,8 +26,8 @@ struct DisclaimerView: View {
                         }
                     }
                     Text("\(Disclaimer.consent)  (bản \(Disclaimer.version) – \(Disclaimer.date))")
+                        .italic() // Text.italic (iOS 13); View.italic chỉ có từ iOS 16
                         .appFont(14)
-                        .italic()
                         .foregroundColor(Theme.dim)
                         .fixedSize(horizontal: false, vertical: true)
                 }
