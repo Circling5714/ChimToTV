@@ -15,7 +15,7 @@
     <Description>Côn Bằng TV</Description>
     <Copyright>Côn Bằng TV</Copyright>
     <!-- Số hiệu bản Windows (tag win-v<bản>) -->
-    <Version>1.10.0</Version>
+    <Version>1.11.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
