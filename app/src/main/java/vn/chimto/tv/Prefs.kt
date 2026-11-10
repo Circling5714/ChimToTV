@@ -473,6 +473,11 @@ object Prefs {
         get() = sp.getBoolean("proxy_sites_only", false)
         set(value) = sp.edit().putBoolean("proxy_sites_only", value).apply()
 
+    /** Bản miễn trừ trách nhiệm đã bấm «Đồng ý» (Disclaimer.VERSION); 0 = chưa. Theo từng máy, không đồng bộ. */
+    var disclaimerVersion: Int
+        get() = sp.getInt("disclaimer_v", 0)
+        set(value) = sp.edit().putInt("disclaimer_v", value).apply()
+
     /** Kiểu proxy: "socks5" hoặc "ss" (Shadowsocks). Mỗi kiểu giữ máy chủ / khoá riêng; bật / DNS / phạm vi dùng chung. */
     var proxyKind: String
         get() = if (sp.getString("proxy_kind", "socks5") == "ss") "ss" else "socks5"

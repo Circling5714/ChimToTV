@@ -67,6 +67,11 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".DisclaimerActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:screenOrientation="sensorLandscape" />
+
+        <activity
             android:name=".SettingsActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:screenOrientation="sensorLandscape"

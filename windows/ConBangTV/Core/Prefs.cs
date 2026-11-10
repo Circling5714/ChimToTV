@@ -726,6 +726,13 @@ public static class Prefs
         set => Set("proxy_sites_only", value);
     }
 
+    /// Bản miễn trừ trách nhiệm đã bấm «Đồng ý» (Disclaimer.Version); 0 = chưa. Theo từng máy, không đồng bộ.
+    public static int DisclaimerVersion
+    {
+        get => Has("disclaimer_v") ? Get<int>("disclaimer_v") : 0;
+        set => Set("disclaimer_v", value);
+    }
+
     /// Kiểu proxy: "socks5" hoặc "ss" (Shadowsocks). Mỗi kiểu giữ máy chủ / khoá riêng; bật / DNS / phạm vi dùng chung.
     public static string ProxyKind
     {

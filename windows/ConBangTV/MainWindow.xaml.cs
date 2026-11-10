@@ -91,13 +91,60 @@ public partial class MainWindow : Window
 #if DEBUG
         DebugServer.Start(this);
 #endif
-        _ = CheckUpdate(false);
         SyncService.DataChanged += () => Dispatcher.BeginInvoke(SyncApplied);
         SyncService.Message += m => Dispatcher.BeginInvoke(() => Toast(m));
         SyncService.AppStarted();
-        // «Ai đang xem?» khi mở app (từ 2 người xem), hoặc người đang dùng có khoá
-        if (Prefs.CurrentProfile.Locked || (Prefs.AskProfile && Prefs.Profiles.Count > 1))
-            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => _ = PickProfile(!Prefs.CurrentProfile.Locked));
+        // Lần đầu mở app (hoặc vừa cập nhật lên bản có hộp này): miễn trừ trách nhiệm — «Đồng ý» mới vào, «Thoát» / Esc là đóng app.
+        // Hỏi cập nhật / «Ai đang xem?» chờ sau đó (hộp thoại mới sẽ đóng hộp đang mở).
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, async () =>
+        {
+            if (Disclaimer.Needed && !await ShowDisclaimer(true))
+            {
+                Close();
+                return;
+            }
+            _ = CheckUpdate(false);
+            // «Ai đang xem?» khi mở app (từ 2 người xem), hoặc người đang dùng có khoá
+            if (Prefs.CurrentProfile.Locked || (Prefs.AskProfile && Prefs.Profiles.Count > 1)) _ = PickProfile(!Prefs.CurrentProfile.Locked);
+        });
+    }
+
+    /// Hộp miễn trừ trách nhiệm (nội dung: Disclaimer). gate: «Đồng ý» (ghi lại) / «Thoát»; không gate (Cài đặt): chỉ đọc, «Đóng».
+    /// Trả true khi bấm nút đầu.
+    public async Task<bool> ShowDisclaimer(bool gate)
+    {
+        var body = new StackPanel();
+        body.Children.Add(Ui.Dim(gate ? $"Côn Bằng TV — {Disclaimer.Title}. Đọc hết rồi chọn «Đồng ý» để vào app."
+            : $"Côn Bằng TV · bản {Disclaimer.Version} – {Disclaimer.Date}", 14, new Thickness(0, 0, 0, 10)));
+        var text = new StackPanel { Margin = new Thickness(0, 0, 14, 0) };
+        foreach (var (title, para) in Disclaimer.Sections)
+        {
+            text.Children.Add(Ui.Text(title, 15.5, Ui.Res("Focus"), FontWeights.SemiBold, margin: new Thickness(0, 10, 0, 3)));
+            text.Children.Add(Ui.Text(para, 14.5));
+        }
+        var consent = Ui.Dim($"{Disclaimer.Consent}  (bản {Disclaimer.Version} – {Disclaimer.Date})", 13.5, new Thickness(0, 14, 0, 0));
+        consent.FontStyle = FontStyles.Italic;
+        text.Children.Add(consent);
+        // Cuộn bằng con lăn, hoặc ▲ lên vùng chữ rồi ▲▼ / PageUp PageDown
+        body.Children.Add(new ScrollViewer
+        {
+            Content = text,
+            MaxHeight = Math.Max(240, ActualHeight * 0.55),
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Focusable = true,
+        });
+        var oldMax = DialogBox.MaxWidth;
+        DialogBox.MaxWidth = 860;
+        try
+        {
+            var r = await Ask(gate ? "Trước khi bắt đầu" : Disclaimer.Title, "", gate ? new[] { "Đồng ý", "Thoát" } : new[] { "Đóng" }, body);
+            if (gate && r == 0) Disclaimer.Accept();
+            return r == 0;
+        }
+        finally
+        {
+            DialogBox.MaxWidth = oldMax;
+        }
     }
 
     private long _deactivatedAt;

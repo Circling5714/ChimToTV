@@ -241,6 +241,9 @@ struct SettingsView: View {
                     Button("Telegram: t.me/tivikit") {
                         if let u = URL(string: "https://t.me/tivikit") { UIApplication.shared.open(u) }
                     }
+                    NavigationLink("Miễn trừ trách nhiệm & quyền riêng tư") {
+                        DisclaimerView(gate: false).appDynamicType()
+                    }
                 } header: { Text("Liên hệ") } footer: {
                     Text("Góp ý, báo lỗi, hỏi đáp: nhắn nhóm Telegram @tivikit.")
                 }

@@ -154,6 +154,19 @@ class MainActivity : BaseActivity() {
             startActivity(Intent(this, SettingsActivity::class.java).putExtra(SettingsActivity.EXTRA_SECTION, "profiles"))
         }
         PlayerActivity.pipListeners += pipChanged
+        // Lần đầu mở app (hoặc vừa cập nhật lên bản có màn này): miễn trừ trách nhiệm — «Đồng ý» mới vào app
+        if (Disclaimer.needed()) {
+            waitingDisclaimer = true
+            DisclaimerActivity.open(this, gate = true)
+        } else {
+            begin()
+        }
+    }
+
+    /** Màn miễn trừ trách nhiệm đang chặn cửa (mở app lần đầu): đồng ý xong (onResume) mới vào. */
+    private var waitingDisclaimer = false
+
+    private fun begin() {
         // Nhà nhiều người xem: hỏi "Ai đang xem?" trước khi tải (mỗi người một trang phim, lịch sử riêng)
         if (ProfileUi.mustAsk()) picker.show(gate = true) else startMain()
     }
@@ -300,6 +313,11 @@ class MainActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (waitingDisclaimer) {
+            if (Disclaimer.needed()) return // chưa đồng ý (vd quay lại từ màn khác): màn miễn trừ vẫn ở trên
+            waitingDisclaimer = false
+            begin()
+        }
         Updater.autoCheck(this)
         SyncNet.onApplied = ::syncApplied
         SyncNet.syncSoon(1500) // đồng bộ trong nhà (đã ghép máy): mở app, xem xong quay ra

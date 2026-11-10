@@ -320,6 +320,7 @@ class SettingsActivity : BaseActivity() {
 
         // Mở trang Telegram ngay trong app (TV thường không có Telegram / trình duyệt riêng)
         findViewById<View>(R.id.btnContact).setOnClickListener { startActivity(WebActivity.intent(this, CONTACT_URL)) }
+        findViewById<View>(R.id.btnDisclaimer).setOnClickListener { DisclaimerActivity.open(this, gate = false) }
 
         val version = packageManager.getPackageInfo(packageName, 0).versionName
         findViewById<TextView>(R.id.about).text =

@@ -296,6 +296,12 @@ enum Prefs {
 
     static func checkParentPin(_ pin: String) -> Bool { store.string(forKey: "parent_pin") == pinHash("parent", pin) }
 
+    /// Bản miễn trừ trách nhiệm đã bấm «Đồng ý» (Disclaimer.version); 0 = chưa. Theo từng máy, không đồng bộ.
+    static var disclaimerVersion: Int {
+        get { store.integer(forKey: "disclaimer_v") }
+        set { store.set(newValue, forKey: "disclaimer_v") }
+    }
+
     /// Hỏi "Ai đang xem?" khi mở app (từ 2 người xem).
     static var askProfile: Bool {
         get { store.object(forKey: "ask_profile") as? Bool ?? true }

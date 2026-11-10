@@ -12,6 +12,7 @@ struct ConBangTVApp: App {
             RootView()
                 .environmentObject(AppModel.shared)
                 .preferredColorScheme(.dark)
+                .modifier(DisclaimerGate())
         }
         .onChange(of: phase) { p in
             Log.d("App", "trạng thái: \(p)")

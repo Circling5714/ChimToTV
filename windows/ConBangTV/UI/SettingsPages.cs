@@ -352,6 +352,7 @@ public sealed class SettingsPage : Page
         Body.Children.Add(Ui.Dim($"Côn Bằng TV cho Windows — bản {UpdateCheck.CurrentVersion}", 15));
         Body.Children.Add(Ui.Row(
             Ui.Pill("Liên hệ: t.me/tivikit", () => Ui.OpenBrowser("https://t.me/tivikit")),
+            Ui.Pill("Miễn trừ trách nhiệm & quyền riêng tư", () => _ = Main.ShowDisclaimer(false)),
             Ui.Pill("Trang phát hành", () => Ui.OpenBrowser(UpdateCheck.ReleasesPage))));
         Body.Children.Add(Ui.Dim($"Dữ liệu của app: {Prefs.DataDir}", 13, new Thickness(0, 6, 0, 0)));
     }

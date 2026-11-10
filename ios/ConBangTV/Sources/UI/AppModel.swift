@@ -141,6 +141,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var profileId = Prefs.profileId
     /// Màn "Ai đang xem?" đang hiện.
     @Published var askingProfile = false
+    /// Màn miễn trừ trách nhiệm đang chặn cửa (mở app lần đầu / sau khi cập nhật lên bản có màn này) — DisclaimerGate.
+    @Published var needsDisclaimer = Disclaimer.needed
     /// Đổi mỗi lần đổi người xem (Cài đặt dựng lại theo người mới).
     @Published private(set) var profileVersion = 0
     /// Màn "Ai đang xem?" đang chặn cửa (mở app / quay lại sau lâu): người đang dùng có mã PIN thì không được đóng.
@@ -156,7 +158,7 @@ final class AppModel: ObservableObject {
     var pickerClosable: Bool { !(pickerGate && Prefs.profile.locked) }
 
     func startIfNeeded() {
-        guard !started, !askingProfile else { return }
+        guard !started, !askingProfile, !needsDisclaimer else { return }
         if mustAskProfile {
             showPicker(gate: true) // chọn người xem trước khi tải (mỗi người một trang phim, lịch sử riêng)
             return
@@ -1137,7 +1139,15 @@ final class AppModel: ObservableObject {
     // MARK: - Cập nhật
 
     /// Tự hỏi GitHub khi mở app (tối đa 2 giờ một lần); manual: nút trong Cài đặt.
+    /// «Đồng ý» ở màn miễn trừ trách nhiệm: ghi lại rồi vào app (hỏi «Ai đang xem?» nếu cần).
+    func acceptDisclaimer() {
+        Disclaimer.accept()
+        needsDisclaimer = false
+        startIfNeeded()
+    }
+
     func checkUpdate(manual: Bool, status: ((String) -> Void)? = nil) {
+        if !manual && needsDisclaimer { return } // chưa đồng ý miễn trừ: khỏi hỏi cập nhật đè lên
         if !manual && (!Prefs.autoUpdate || nowMs() - Prefs.lastUpdateCheck < UpdateCheck.checkEvery) { return }
         if updateBusy { return }
         updateBusy = true
