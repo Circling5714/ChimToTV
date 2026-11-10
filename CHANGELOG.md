@@ -7,6 +7,46 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.13 — 10/11/2026
+
+- **Proxy kiểu Shadowsocks (mã hoá)** như TV 2.13: Cài đặt → Proxy → «Kiểu: Shadowsocks (mã hoá)»; nút «Dán link ss:// từ bộ
+  nhớ tạm» (hoặc dán vào ô máy chủ) tự điền máy chủ, cổng, kiểu mã hoá, khoá. Khoá lưu trong Keychain. «Kiểm tra proxy» báo IP ra
+  ngoài; SS 2022 không trả lời thì xem giờ trên máy có lệch quá 30 giây không.
+- bản 1.13 (CFBundleVersion 18) · mã gói `vn.chimto.tv` · tag `ios-v1.13` (không phải "latest") · commit `693ae51` ·
+  `ConBangTV-iPad-1.13.ipa` 4 396 000 byte · SHA-256 `84a4f7265e9cc370c77e8a04c1640038b71db94ad5a7c31084b78b8054af78e2`
+- 140 test lõi trên macOS (thêm 12). Bản thử trên iPhone: «Kiểm tra proxy» qua máy chủ 3X-UI thật ✓, phát phim KKPhim qua
+  Shadowsocks. Bản chính thức cài lên iPhone (đè 1.12.1): chạy. Tệp tải từ link công khai khớp SHA-256; `releases/latest` vẫn `v2.13`.
+
+## Windows 1.10 — 10/11/2026
+
+- **Proxy kiểu Shadowsocks (mã hoá)** như TV 2.13: Cài đặt → Proxy → «Kiểu proxy: Shadowsocks (mã hoá)», ô dán link `ss://` tự
+  điền, chọn kiểu mã hoá, khoá mã hoá bằng tài khoản Windows (DPAPI); «Thử kết nối» báo IP ra ngoài và độ trễ. Trang, ảnh và trình
+  phát đều đi qua máy chủ Shadowsocks. Kiểu ChaCha20 chỉ có khi Windows hỗ trợ (Windows 10 22H2 không có — nút ghi «máy này không
+  có»); kiểu AES (mặc định của 3X-UI) chạy mọi máy.
+- bản 1.10.0 · tag `win-v1.10` (không phải "latest") · commit `693ae51` · `ConBangTV-Windows-1.10.exe` 72 913 038 byte · SHA-256
+  `206226cfc63cb30c9a12de29b2d83e739016c5f2c5d4fbcf7ddd447e5ac9ff04`
+- 123 test lõi (thêm 14). Thử bản gỡ lỗi qua máy chủ 3X-UI thật: «Thử kết nối» ✓, phim VSMOV (server HLS) phát đều 90 giây. Tệp tải từ link công khai khớp SHA-256. **Tự cập nhật thật 1.9 → 1.10** (bản chép riêng) lúc 15:00:04.
+
+## 2.13 — 10/11/2026
+
+- **Proxy kiểu Shadowsocks (mã hoá):** Cài đặt → Proxy → nút «Kiểu: SOCKS5 / Shadowsocks». Dán link `ss://` chép từ 3X-UI (nút
+  Copy / QR của người dùng) vào ô máy chủ là app tự điền máy chủ, cổng, kiểu mã hoá, khoá. Nhà mạng chỉ thấy dữ liệu đã mã hoá —
+  không đọc được tên trang hay mật khẩu như với SOCKS5.
+  - Kiểu mã hoá: `2022-blake3-aes-256-gcm` / `2022-blake3-aes-128-gcm` (mặc định của 3X-UI, máy chủ nhiều người dùng),
+    `2022-blake3-chacha20-poly1305`, `aes-256-gcm`, `aes-128-gcm`, `chacha20-ietf-poly1305` (ChaCha20 cần Android 9+). Qua TCP
+    thường (3X-UI: Transmission = TCP, Security = None); link dùng ws / grpc / tls / plugin thì app báo chưa hỗ trợ.
+  - «Kiểm tra proxy» báo IP ra ngoài và độ trễ; sai khoá / sai kiểu mã hoá, giờ trên TV lệch quá 30 giây (SS 2022 cần giờ đúng)
+    thì báo rõ. Khoá lưu mã hoá bằng Android Keystore. SOCKS5 dùng như cũ — mỗi kiểu giữ máy chủ riêng; DNS của proxy / của thiết
+    bị và «chỉ trang phim» dùng chung.
+  - Lưu ý: TV box yếu xem «Trình phát VSMOV» qua Shadowsocks có thể giật (TV box thử rớt ~30% khung hình cả khi đi thẳng) — chọn
+    server «HLS» (app tự gợi ý khi thấy giật).
+- versionCode 36 · tag `v2.13` · commit `693ae51` (tính năng: `9307a07`, `cd04e6f`, `f206ece`, `0863a56`) · `ChimToTV-2.13.apk`
+  1 234 912 byte · SHA-256 `b994f314e39b98abcd5e6d033071afcc1aa49b9ba2116d557761ca6f78234977`
+- 146 test (thêm 14: BLAKE3 theo bộ số chuẩn, link 3X-UI / SIP002, máy chủ thử viết theo đặc tả). Thử với Xray chính thức (cả 6
+  kiểu mã hoá) và máy chủ 3X-UI thật: TV box dán link → «Kiểm tra proxy» ✓ 0,3 s, trang chủ + phim KKPhim (HLS) phát mượt qua
+  Shadowsocks. Bản chính thức thử trên TV box trước khi đăng, hạ về 2.12, **cập nhật tự động thật 2.12 → 2.13 lúc 14:53:54**.
+  API `releases/latest` trả `v2.13` + `.apk`.
+
 ## iPad 1.12.1 — 10/11/2026
 
 - **Sửa:** chạm / giữ một phim (nhất là phim VSMOV) có khi trúng phim bên cạnh. Ảnh bìa phóng cho đầy khung 2:3 (ảnh ngang của

@@ -10,10 +10,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.12.1`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.12.1)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.13`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.13)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.9`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.9)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.10`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.10)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -179,7 +179,7 @@ Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStor
   ngón: vừa / lấp đầy màn hình. Vuốt bắt đầu sát mép trên / dưới vẫn để cho iPad; rời trình phát thì độ sáng trở lại.
 - **Màn hình khoá, Trung tâm điều khiển, AirPods** (từ 1.2): tên phim, tập, ảnh phim; phát / dừng, tua, kéo thanh thời
   gian, tập trước / sau (AirPods chạm hai lần: tập sau).
-- **Proxy SOCKS5, Vượt chặn nhà mạng, Giới hạn giờ xem** (từ 1.2): như bản TV — xem [Proxy SOCKS5](#proxy-socks5),
+- **Proxy SOCKS5 / Shadowsocks, Vượt chặn nhà mạng, Giới hạn giờ xem** (từ 1.2; Shadowsocks từ 1.13): như bản TV — xem [Proxy](#proxy-socks5--shadowsocks),
   [Vượt chặn nhà mạng](#vượt-chặn-nhà-mạng-từ-21), [Giới hạn giờ xem](#giới-hạn-giờ-xem-từ-21).
 - **Người xem / hình trong hình** (từ 1.1, như bản TV 2.0 — xem [Người xem](#người-xem-từ-20) và
   [Thu nhỏ phim](#thu-nhỏ-phim--hình-trong-hình-từ-20)): mở app chọn "Ai đang xem?", mã PIN gõ trên bàn phím số của màn
@@ -210,7 +210,7 @@ cả chuột lẫn bàn phím / remote:
 - **Chuột:** rê để hiện thanh điều khiển, bấm vào phim phát / dừng, bấm đúp toàn màn hình, bấm thanh tua nhảy tới chỗ đó,
   Delete hoặc chuột phải trên thẻ phim (Lịch sử / Theo dõi) để xoá; nút lùi của chuột = quay lại.
 - **Cài đặt:** bước tua, tự chuyển tập, **cỡ giao diện** 100–175% (ngồi xa tivi), mở app ở toàn màn hình, **vượt chặn nhà
-  mạng** mức 1 / 2, **proxy SOCKS5** (từ 1.2), **server dự phòng KKPhim** (từ 1.3) / **NguonC** (từ 1.4), tự kiểm tra bản mới, xoá lịch sử / dữ
+  mạng** mức 1 / 2, **proxy SOCKS5** (từ 1.2) / **Shadowsocks** (từ 1.10), **server dự phòng KKPhim** (từ 1.3) / **NguonC** (từ 1.4), tự kiểm tra bản mới, xoá lịch sử / dữ
   liệu duyệt web.
 - **Người xem** (từ 1.2, như TV 2.0): menu «👤 Người xem» → «Ai đang xem?» / «Quản lý người xem…»: tối đa 8 người, mỗi người
   một lịch sử / Xem tiếp / theo dõi / trang phim / server / cách xem; khoá bằng mã PIN 4 số; hỏi khi mở app (từ 2 người) và
@@ -399,9 +399,21 @@ cổng, đúng số cổng cũ (trước đó phải tắt app mở lại mới 
 `Socks5Bridge.listening` (thử kết nối vào chính cổng); vòng `acceptLoop` thấy accept lỗi liền 20 lần thì thôi, khỏi quay
 vòng ăn CPU. Bản thử: `/proxy?break=1` giả ổ cắm bị thu hồi.
 
-## Proxy SOCKS5
+## Proxy (SOCKS5 / Shadowsocks)
 
-**Cài đặt → Proxy SOCKS5** (từ 1.8.0, mặc định tắt; iPad từ 1.2):
+**Cài đặt → Proxy** (SOCKS5 từ 1.8.0, mặc định tắt; iPad từ 1.2. **Shadowsocks** từ 2.13 / iPad 1.13 / Windows 1.10):
+
+- **Kiểu: SOCKS5 / Shadowsocks.** SOCKS5 không mã hoá — nhà mạng thấy tên trang, tên đăng nhập / mật khẩu proxy.
+  **Shadowsocks** mã hoá cả đường tới máy chủ (vd lối vào Shadowsocks của **3X-UI** / Xray): nhà mạng chỉ thấy dữ liệu ngẫu
+  nhiên. Mỗi kiểu giữ máy chủ / khoá riêng; Bật / Tắt, DNS, «Dùng cho» dùng chung.
+- **Shadowsocks:** dán link `ss://` (3X-UI: nút Copy / QR của người dùng) vào ô máy chủ (iPad: thêm nút «Dán link ss:// từ bộ
+  nhớ tạm»; Windows: ô «Dán link») là app tự điền máy chủ, cổng, kiểu mã hoá, khoá. TV: nên dán bằng bàn phím của app Google
+  TV trên điện thoại. Kiểu mã hoá: `2022-blake3-aes-256-gcm` / `2022-blake3-aes-128-gcm` (mặc định 3X-UI, máy chủ nhiều người
+  dùng: khoá dạng `khoá-máy-chủ:khoá-người-dùng`), `2022-blake3-chacha20-poly1305` (một người dùng), `aes-256-gcm`,
+  `aes-128-gcm`, `chacha20-ietf-poly1305` (TV: Android 9+; Windows: chỉ khi Windows có ChaCha20 — Windows 10 thường không). Chỉ
+  TCP thường: trong 3X-UI để Transmission = TCP, Security = None, header None (link ws / grpc / tls / plugin bị báo chưa hỗ trợ).
+  SS 2022 cần giờ trên máy đúng (lệch tối đa 30 giây) — «Kiểm tra proxy» không qua thì xem giờ có lệch không và báo. Khoá lưu
+  mã hoá (Keystore / Keychain / DPAPI). TV box yếu xem «Trình phát VSMOV» qua Shadowsocks có thể giật — chọn server «HLS».
 
 - Nhập máy chủ, cổng, tên đăng nhập / mật khẩu (bỏ trống nếu proxy không cần), hoặc dán nguyên
   `socks5://user:pass@máy-chủ:cổng`. **Kiểm tra proxy** thử ngay (chưa cần lưu): báo IP ra ngoài, nơi đặt máy, thời
@@ -561,6 +573,20 @@ bộ đăng nhập proxy thật (RFC 1929), gửi tên miền (DNS của proxy) 
 độ "chỉ trang phim" cho đích khác đi thẳng. Đổi cài đặt → mở cổng mới, đóng kết nối cũ (kết nối keep-alive không giữ
 cài đặt cũ). Điểm server khi video đi qua proxy chấm riêng (`<trang>·proxy`). Test:
 `.\gradlew.bat :app:testDebugUnitTest --tests vn.chimto.tv.Socks5BridgeTest` (proxy SOCKS5 giả trong test).
+
+Shadowsocks (từ 2.13 — `Shadowsocks.kt` / `.swift` / `.cs`): cổng nội bộ có thêm `RouteConfig.ss` / `Socks5Bridge(ss:)` /
+`Net.Ss`; kết nối tới đích là `Upstream` (ổ cắm + luồng đã mã hoá `SsOutput` / `SsInput`, `SsConnection`, `SsStream`).
+SS 2022 (SIP022): khoá phiên = BLAKE3 derive_key("shadowsocks 2022 session subkey", PSK + salt), phần đầu cố định + phần đầu
+đổi cỡ (địa chỉ SOCKS, đệm, dữ liệu đầu), nonce 12 byte little-endian; máy chủ nhiều người dùng (3X-UI luôn vậy) cần phần nhận
+dạng EIH: AES-ECB(derive_key("shadowsocks 2022 identity subkey", khoá-máy-chủ + salt), BLAKE3(khoá-người-dùng)[0..16]). Kiểu cũ
+(SIP004): EVP_BytesToKey + HKDF-SHA1("ss-subkey"), chunk tối đa 0x3FFF. Phần đầu gửi cùng dữ liệu đầu tiên của bên gọi trong
+một lần ghi (bên gọi im 0,3 s thì gửi kèm đệm); qua Shadowsocks không chia nhỏ gói bắt tay. BLAKE3 tự viết (≤ 1024 byte vào,
+≤ 32 byte ra), kiểm bằng bộ số chuẩn. Prefs: `proxy_kind` (socks5 / ss), `ss_host`, `ss_port`, `ss_method`, khoá `ss_key_enc`
+(Keystore) / Keychain `ss_key` / `ss_key_dpapi`. Test: `ShadowsocksTest` (máy chủ thử viết theo đặc tả); thử máy chủ thật:
+đặt biến `SS_TEST_LINK="ss://… ss://…"` rồi chạy `SsInteropTest` (Gradle cần `--rerun`) / `RealServerWhenGiven` (Windows) —
+không đưa link thật vào code. Nút Kiểm tra đọc trả lời theo Content-Length (Xray giữ kết nối thêm 1 giây sau khi trang đóng).
+Bản debug TV: `/settext?id=proxyHost&t=<link>`, `/click?id=btnProxyTest`, `/speed`, `/latency`, `/cryptobench`, `/ssstats`; iPad:
+`POST /proxy?ss=<link>&on=1&apply=1&check=1`.
 
 Vượt chặn nhà mạng (từ 2.1 — `Socks5Bridge.writeHello` trong `Socks5.kt` / `Socks5.swift`): `RouteConfig.split` →
 cổng nội bộ chạy cả khi không có proxy / DoH; gói đầu tiên bên gọi gửi lên (bắt đầu `16 03` = TLS handshake) được ghi
