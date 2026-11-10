@@ -31,6 +31,7 @@ class SettingsActivity : BaseActivity() {
     private lateinit var proxyUser: EditText
     private lateinit var proxyPass: EditText
     private lateinit var proxyBtn: TextView
+    private lateinit var proxyKindBtn: TextView
     private lateinit var proxyDnsBtn: TextView
     private lateinit var proxyScopeBtn: TextView
     private lateinit var proxyResult: TextView
@@ -374,7 +375,9 @@ class SettingsActivity : BaseActivity() {
         recreate()
     }
 
-    // ---- Proxy SOCKS5 (xem AppProxy) ----
+    // ---- Proxy SOCKS5 / Shadowsocks (xem AppProxy) ----
+
+    private val ssKind get() = Prefs.proxyKind == "ss"
 
     private fun setupProxy() {
         proxyHost = findViewById(R.id.proxyHost)
@@ -382,15 +385,21 @@ class SettingsActivity : BaseActivity() {
         proxyUser = findViewById(R.id.proxyUser)
         proxyPass = findViewById(R.id.proxyPass)
         proxyBtn = findViewById(R.id.btnProxy)
+        proxyKindBtn = findViewById(R.id.btnProxyKind)
         proxyDnsBtn = findViewById(R.id.btnProxyDns)
         proxyScopeBtn = findViewById(R.id.btnProxyScope)
         proxyResult = findViewById(R.id.proxyResult)
 
-        proxyHost.setText(Prefs.proxyHost)
-        proxyPort.setText(if (Prefs.proxyHost.isEmpty()) "" else Prefs.proxyPort.toString())
-        proxyUser.setText(Prefs.proxyUser)
-        proxyPass.setText(Prefs.proxyPass)
+        loadProxyFields()
         listOf(proxyHost, proxyPort, proxyUser, proxyPass).forEach { it.leaveWithUpDown() }
+
+        proxyKindBtn.setOnClickListener {
+            // Mỗi kiểu giữ máy chủ / khoá riêng: đổi kiểu thì hiện ô của kiểu kia (đang bật thì đổi luôn đường đi)
+            Prefs.proxyKind = if (ssKind) "socks5" else "ss"
+            loadProxyFields()
+            AppProxy.apply()
+            showProxy()
+        }
 
         proxyBtn.setOnClickListener {
             // Bật thì lưu luôn máy chủ / cổng đang nhập (sai thì báo, không bật)
@@ -420,25 +429,118 @@ class SettingsActivity : BaseActivity() {
         showProxy()
     }
 
+    /** Ô nhập theo kiểu đang chọn. Shadowsocks: ô "tên đăng nhập" = kiểu mã hoá, ô "mật khẩu" = khoá. */
+    private fun loadProxyFields() {
+        if (ssKind) {
+            proxyHost.setText(Prefs.ssHost)
+            proxyPort.setText(if (Prefs.ssPort in 1..65535) Prefs.ssPort.toString() else "")
+            proxyUser.setText(Prefs.ssMethod)
+            proxyPass.setText(Prefs.ssKey)
+            proxyHost.hint = "Máy chủ Shadowsocks, hoặc dán link ss://… (3X-UI: nút QR / Copy của người dùng)"
+            proxyPort.hint = "Cổng"
+            proxyUser.hint = "Kiểu mã hoá (trống = ${SsMethod.DEFAULT.id})"
+            proxyPass.hint = "Khoá (3X-UI: khoá-máy-chủ:khoá-người-dùng) / mật khẩu"
+        } else {
+            proxyHost.setText(Prefs.proxyHost)
+            proxyPort.setText(if (Prefs.proxyHost.isEmpty()) "" else Prefs.proxyPort.toString())
+            proxyUser.setText(Prefs.proxyUser)
+            proxyPass.setText(Prefs.proxyPass)
+            proxyHost.hint = "Máy chủ proxy (vd 103.1.2.3 hoặc dán socks5://user:pass@host:cổng)"
+            proxyPort.hint = "Cổng (vd 1080)"
+            proxyUser.hint = "Tên đăng nhập (bỏ trống nếu không có)"
+            proxyPass.hint = "Mật khẩu (bỏ trống nếu không có)"
+        }
+    }
+
     private fun showProxy() {
         proxyBtn.text = "Proxy: ${if (Prefs.proxyOn) "Bật" else "Tắt"}"
+        proxyKindBtn.text = "Kiểu: ${if (ssKind) "Shadowsocks" else "SOCKS5"}"
         proxyDnsBtn.text = "DNS: ${if (Prefs.proxyRemoteDns) "của proxy" else "của thiết bị"}"
         proxyScopeBtn.text = "Dùng cho: ${if (Prefs.proxySitesOnly) "chỉ trang phim" else "toàn bộ app"}"
         proxyResult.setTextColor(colorOf(R.color.text_dim))
         val c = Prefs.proxyConfig()
+        val ss = Prefs.ssConfig()
+        val old = if (AppProxy.webViewSupported) "" else "\n⚠ WebView của TV quá cũ, không đi qua proxy được: video và Duyệt web vẫn đi thẳng."
         proxyResult.text = (
-            if (c == null) {
-                "Đang tắt — app dùng mạng mặc định của TV."
-            } else {
-                "Đang bật: ${c.host}:${c.port}" + (if (c.user.isNotEmpty()) " · có đăng nhập" else "") +
-                    (if (AppProxy.webViewSupported) "" else "\n⚠ WebView của TV quá cũ, không đi qua proxy được: video và Duyệt web vẫn đi thẳng.")
+            when {
+                ss != null -> "Đang bật Shadowsocks: ${ss.host}:${ss.port} · ${ss.method}$old"
+                c != null -> "Đang bật SOCKS5: ${c.host}:${c.port}" + (if (c.user.isNotEmpty()) " · có đăng nhập" else "") + old
+                else -> "Đang tắt — app dùng mạng mặc định của TV."
             }
             ) + "\nDNS của proxy: proxy tự tìm địa chỉ trang (vượt chặn tên miền của nhà mạng); DNS của thiết bị: TV tự tìm " +
-            "rồi chỉ gửi IP cho proxy. Chỉ trang phim: video, ảnh, cập nhật app đi thẳng mạng nhà (đỡ tốn proxy)."
+            "rồi chỉ gửi IP cho proxy. Chỉ trang phim: video, ảnh, cập nhật app đi thẳng mạng nhà (đỡ tốn proxy)." +
+            "\nSOCKS5 không mã hoá: nhà mạng thấy tên trang, tên đăng nhập / mật khẩu proxy. Shadowsocks mã hoá cả đường tới máy " +
+            "chủ (vd lối vào Shadowsocks của 3X-UI, TCP, kiểu 2022-blake3-aes-256-gcm): nhà mạng chỉ thấy dữ liệu ngẫu nhiên."
     }
 
-    /** Đọc ô nhập; nhận cả dạng dán sẵn "socks5://user:pass@host:cổng" hoặc "host:cổng". Sai thì báo, trả null. */
-    private fun readProxyFields(): SocksConfig? {
+    /** Đọc ô nhập theo kiểu (dán link ss:// / socks5:// thì tự đổi kiểu). Trả SocksConfig / SsConfig; sai thì báo, trả null. */
+    private fun readProxyFields(): Any? {
+        val text = proxyHost.text.toString().trim()
+        when {
+            text.startsWith("ss://", ignoreCase = true) -> {
+                val c = try {
+                    SsLink.parse(text, Prefs.proxyRemoteDns, Prefs.proxySitesOnly)
+                } catch (e: IllegalArgumentException) {
+                    toast(e.message ?: "Link ss:// không đọc được.")
+                    return null
+                }
+                if (!ssKind) Prefs.proxyKind = "ss"
+                showSsFields(c)
+                showProxy()
+                return c
+            }
+            text.startsWith("socks", ignoreCase = true) && "://" in text && ssKind -> {
+                Prefs.proxyKind = "socks5"
+                val (u, p) = proxyUser.text.toString() to proxyPass.text.toString()
+                loadProxyFields()
+                proxyHost.setText(text)
+                if (u != Prefs.ssMethod) proxyUser.setText(u)
+                if (p != Prefs.ssKey) proxyPass.setText(p)
+                showProxy()
+            }
+        }
+        return if (ssKind) readSsFields() else readSocksFields()
+    }
+
+    private fun showSsFields(c: SsConfig) {
+        proxyHost.setText(c.host)
+        proxyPort.setText(c.port.toString())
+        proxyUser.setText(c.method)
+        proxyPass.setText(c.password)
+    }
+
+    private fun readSsFields(): SsConfig? {
+        var host = proxyHost.text.toString().trim().trimEnd('/')
+        var port = proxyPort.text.toString().trim()
+        SsLink.splitHostPort(host)?.takeIf { host.count { it == ':' } == 1 || host.startsWith('[') }?.let {
+            host = it.first
+            port = it.second.toString()
+        }
+        val p = port.toIntOrNull()
+        val m = SsMethod.of(proxyUser.text.toString())
+        val key = proxyPass.text.toString().trim()
+        when {
+            host.isEmpty() || ' ' in host -> toast("Nhập máy chủ Shadowsocks (vd 103.1.2.3), hoặc dán link ss://…")
+            p == null || p !in 1..65535 -> toast("Cổng không hợp lệ (1–65535).")
+            m == null -> toast("Kiểu mã hoá «${proxyUser.text.toString().trim()}» chưa hỗ trợ. App hỗ trợ: ${SsMethod.names}.")
+            !Shadowsocks.supported(m) -> toast("Máy này không có ${m.id} (cần Android 9 trở lên) — đổi sang ${SsMethod.DEFAULT.id}.")
+            else -> {
+                try {
+                    Shadowsocks.keys(m, key)
+                } catch (e: IllegalArgumentException) {
+                    toast(e.message ?: "Khoá không đúng.")
+                    return null
+                }
+                val c = SsConfig(host, p, m.id, key, Prefs.proxyRemoteDns, Prefs.proxySitesOnly)
+                showSsFields(c)
+                return c
+            }
+        }
+        return null
+    }
+
+    /** Đọc ô nhập SOCKS5; nhận cả dạng dán sẵn "socks5://user:pass@host:cổng" hoặc "host:cổng". Sai thì báo, trả null. */
+    private fun readSocksFields(): SocksConfig? {
         var host = proxyHost.text.toString().trim().substringAfter("://").trimEnd('/')
         var port = proxyPort.text.toString().trim()
         var user = proxyUser.text.toString()
@@ -470,22 +572,36 @@ class SettingsActivity : BaseActivity() {
     }
 
     private fun saveProxyFields(): Boolean {
-        val c = readProxyFields() ?: return false
-        Prefs.proxyHost = c.host
-        Prefs.proxyPort = c.port
-        Prefs.proxyUser = c.user
-        Prefs.proxyPass = c.pass
+        when (val c = readProxyFields()) {
+            is SocksConfig -> {
+                Prefs.proxyHost = c.host
+                Prefs.proxyPort = c.port
+                Prefs.proxyUser = c.user
+                Prefs.proxyPass = c.pass
+            }
+            is SsConfig -> {
+                Prefs.ssHost = c.host
+                Prefs.ssPort = c.port
+                Prefs.ssMethod = c.method
+                Prefs.ssKey = c.password
+            }
+            else -> return false
+        }
         return true
     }
 
-    /** Thử proxy đang nhập (chưa cần lưu / bật): mở HTTPS tới Cloudflare qua proxy, báo IP ra ngoài + thời gian. */
+    /** Thử proxy đang nhập (chưa cần lưu / bật): hỏi Cloudflare qua proxy, báo IP ra ngoài + thời gian. */
     private fun testProxy() {
         val c = readProxyFields() ?: return
         val t = ++proxyToken
         proxyResult.setTextColor(colorOf(R.color.text_dim))
-        proxyResult.text = "Đang kiểm tra proxy ${c.host}:${c.port}…"
+        proxyResult.text = when (c) {
+            is SsConfig -> "Đang kiểm tra Shadowsocks ${c.host}:${c.port}…"
+            is SocksConfig -> "Đang kiểm tra proxy ${c.host}:${c.port}…"
+            else -> ""
+        }
         val start = System.currentTimeMillis()
-        background({ Socks5.check(c) }) { r ->
+        background({ if (c is SsConfig) Shadowsocks.check(c) else Socks5.check(c as SocksConfig) }) { r ->
             if (t != proxyToken) return@background
             val sec = "%.1f s".format((System.currentTimeMillis() - start) / 1000.0).replace('.', ',')
             r.onSuccess {

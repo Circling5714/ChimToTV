@@ -309,12 +309,30 @@ enum DebugRoutes {
             return await probe(q)
         case "/proxy":
             // POST /proxy?direct=1|0 (cổng nội bộ đi thẳng, không proxy thật) · pass=… (lưu mật khẩu) · apply=1 · check=1
+            // · ss=<link ss://> (lưu máy chủ Shadowsocks, chọn kiểu Shadowsocks) · kind=socks5|ss · on=1|0
             if r.method == "POST" {
                 if let d = q["direct"] { AppProxy.setDebugDirect(d == "1") }
                 if let p = q["pass"] { Prefs.proxyPass = p }
+                if let l = q["ss"] {
+                    do {
+                        let c = try SsLink.parse(l)
+                        Prefs.ssHost = c.host
+                        Prefs.ssPort = c.port
+                        Prefs.ssMethod = c.method
+                        Prefs.ssKey = c.password
+                        Prefs.proxyKind = "ss"
+                    } catch { return .json(["ssError": error.localizedDescription]) }
+                }
+                if let k = q["kind"] { Prefs.proxyKind = k }
+                if let o = q["on"] { Prefs.proxyOn = o == "1" }
                 if q["apply"] == "1" { AppProxy.apply() }
                 if q["break"] == "1" { AppProxy.debugBreak() } // giả iOS thu hồi ổ cắm nghe lúc app nằm nền
                 if q["revive"] == "1" { AppProxy.revive() }
+                if q["check"] == "1", Prefs.proxyKind == "ss" {
+                    let c = SsConfig(host: Prefs.ssHost, port: Prefs.ssPort, method: Prefs.ssMethod, password: Prefs.ssKey,
+                                     remoteDns: Prefs.proxyRemoteDns)
+                    do { return .json(["check": try await AppProxy.check(c)]) } catch { return .json(["checkError": friendly(error, proxyNote: false)]) }
+                }
                 if q["check"] == "1" {
                     let c = SocksConfig(host: Prefs.proxyHost, port: Prefs.proxyPort, user: Prefs.proxyUser, pass: Prefs.proxyPass,
                                         remoteDns: Prefs.proxyRemoteDns)

@@ -3,7 +3,8 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// Proxy SOCKS5 cho toàn app (Cài đặt → Proxy SOCKS5), như bản Android (AppProxy.kt).
+/// Proxy cho toàn app (Cài đặt → Proxy), như bản Android (AppProxy.kt): SOCKS5, hoặc Shadowsocks (mã hoá — nhà mạng không
+/// đọc được tên trang / nội dung, vd máy chủ 3X-UI; xem Shadowsocks.swift).
 ///
 /// URLSession và WebKit không đăng nhập được SOCKS5 có tên / mật khẩu, nên app mở một cổng SOCKS5 nội bộ
 /// (Socks5Bridge, chỉ nghe 127.0.0.1): URLSession (Http) và WKWebView (WebSetup) đều đi qua cổng này; cổng nội bộ tự
@@ -13,6 +14,7 @@ enum AppProxy {
     private static let lock = NSLock()
     private static var bridge: Socks5Bridge?
     private static var config: SocksConfig?
+    private static var ss: SsConfig?
     private static var hosts: [String] = []
     private static var gen = 0
     /// Cổng gỡ lỗi: mở cổng nội bộ không có proxy thật (mọi kết nối đi thẳng) — để xem WebKit có đi qua cổng không.
@@ -29,15 +31,15 @@ enum AppProxy {
         return f()
     }
 
-    /// Đang bật proxy SOCKS5.
-    static var active: Bool { locked { config != nil } }
+    /// Đang bật proxy (SOCKS5 hoặc Shadowsocks).
+    static var active: Bool { locked { config != nil || ss != nil } }
 
     /// Tăng mỗi lần đổi cài đặt: Http mở URLSession mới, WebSetup dùng kho dữ liệu web mới.
     static var generation: Int { locked { gen } }
 
     /// Cổng nội bộ; nil = tắt. Bật mà không mở được cổng (rất hiếm) thì trỏ vào cổng 1 (đóng): kết nối báo lỗi chứ không
     /// lén đi thẳng.
-    static var localPort: Int? { locked { bridge?.port ?? (config != nil || split || dns ? 1 : nil) } }
+    static var localPort: Int? { locked { bridge?.port ?? (config != nil || ss != nil || split || dns ? 1 : nil) } }
 
     /// Từ điển proxy CFNetwork (URLSession.connectionProxyDictionary, WebKit); nil = đi thẳng.
     static var cfDictionary: [AnyHashable: Any]? { localPort.map { dictionary(port: $0) } }
@@ -56,6 +58,7 @@ enum AppProxy {
     /// mới (không dùng lại kết nối keep-alive đi theo cài đặt cũ).
     static func apply() {
         let c = Prefs.proxyConfig()
+        let q = Prefs.ssConfig()
         let h = (Prefs.sites + [Prefs.baseUrl]).compactMap { Site.hostOf($0)?.lowercased() }
         let s = Prefs.unblock
         let d = s && Prefs.unblockLevel >= 2
@@ -63,12 +66,13 @@ enum AppProxy {
         lock.lock()
         defer { lock.unlock() }
         hosts = h
-        let want = c != nil || direct || s || n
-        if c == config && s == split && d == disorder && n == dns && want == (bridge != nil) { return }
+        let want = c != nil || q != nil || direct || s || n
+        if c == config && q == ss && s == split && d == disorder && n == dns && want == (bridge != nil) { return }
         bridge?.close()
         Doh.clearCache()
-        bridge = want ? try? Socks5Bridge(socks: c, split: s, disorder: d, dns: n, siteHosts: { AppProxy.siteHosts }) : nil
+        bridge = want ? try? Socks5Bridge(socks: c, ss: q, split: s, disorder: d, dns: n, siteHosts: { AppProxy.siteHosts }) : nil
         config = c
+        ss = q
         split = s
         disorder = d
         dns = n
@@ -83,7 +87,7 @@ enum AppProxy {
         guard let b = bridge, !b.listening else { return }
         let old = b.port
         b.close()
-        bridge = try? Socks5Bridge(socks: config, split: split, disorder: disorder, dns: dns, port: old, siteHosts: { AppProxy.siteHosts })
+        bridge = try? Socks5Bridge(socks: config, ss: ss, split: split, disorder: disorder, dns: dns, port: old, siteHosts: { AppProxy.siteHosts })
         if bridge?.port != old { gen += 1 } // cổng khác: Http mở URLSession mới, WebSetup dùng cấu hình mới
         Log.d("Proxy", "mở lại cổng nội bộ: \(old) → \(bridge.map { String($0.port) } ?? "không mở được")")
     }
@@ -103,22 +107,22 @@ enum AppProxy {
 
     /// Lỗi proxy trong 30 giây gần đây, để ghép vào thông báo lỗi (vd "proxy báo sai tên đăng nhập / mật khẩu").
     static var recentError: String? {
-        locked { config != nil && bridge == nil ? "không mở được cổng nội bộ" : bridge?.recentError }
+        locked { (config != nil || ss != nil) && bridge == nil ? "không mở được cổng nội bộ" : bridge?.recentError }
     }
 
     /// Câu nhắc thêm vào thông báo lỗi khi đang bật proxy.
     static func note() -> String {
         guard active else { return "" }
-        return "\nĐang bật proxy" + (recentError.map { ": \($0)" } ?? "") + " — kiểm tra Cài đặt → Proxy SOCKS5, hoặc tắt proxy."
+        return "\nĐang bật proxy" + (recentError.map { ": \($0)" } ?? "") + " — kiểm tra Cài đặt → Proxy, hoặc tắt proxy."
     }
 
     /// Video cũng đi qua proxy (chế độ "toàn bộ app").
-    static var videoViaProxy: Bool { locked { config.map { !$0.sitesOnly } ?? false } }
+    static var videoViaProxy: Bool { locked { (config?.sitesOnly ?? ss?.sitesOnly).map { !$0 } ?? false } }
 
     /// Câu nhắc cho lỗi video: máy chủ video hay chặn IP của proxy → gợi ý cho video đi thẳng.
     static func videoNote() -> String {
         guard videoViaProxy, recentError == nil else { return note() }
-        return "\nĐang bật proxy cho toàn bộ app: máy chủ video có thể chặn IP của proxy — thử Cài đặt → Proxy SOCKS5 → " +
+        return "\nĐang bật proxy cho toàn bộ app: máy chủ video có thể chặn IP của proxy — thử Cài đặt → Proxy → " +
             "«Dùng cho: chỉ trang phim», hoặc tắt proxy."
     }
 
@@ -130,15 +134,16 @@ enum AppProxy {
         lock.lock()
         defer { lock.unlock() }
         var o: [String: Any] = [:]
-        o["active"] = config != nil
+        o["active"] = config != nil || ss != nil
         o["direct"] = direct
         o["unblock"] = split
         o["dns"] = dns
         o["port"] = bridge?.port ?? 0
         o["generation"] = gen
-        o["proxy"] = config.map { c -> String in "\(c.host):\(c.port)" + (c.user.isEmpty ? "" : " (có đăng nhập)") } ?? ""
-        o["remoteDns"] = config?.remoteDns ?? true
-        o["sitesOnly"] = config?.sitesOnly ?? false
+        o["proxy"] = config.map { c -> String in "\(c.host):\(c.port)" + (c.user.isEmpty ? "" : " (có đăng nhập)") }
+            ?? ss.map { "Shadowsocks \($0.host):\($0.port) \($0.method)" } ?? ""
+        o["remoteDns"] = config?.remoteDns ?? ss?.remoteDns ?? true
+        o["sitesOnly"] = config?.sitesOnly ?? ss?.sitesOnly ?? false
         o["lastError"] = bridge?.recentError ?? ""
         o["hosts"] = hosts
         let stats: [String: [Int]] = bridge?.statsCopy ?? [:]
@@ -151,7 +156,41 @@ enum AppProxy {
     static func check(_ c: SocksConfig) async throws -> String {
         var t = c
         t.sitesOnly = false
-        let b = try Socks5Bridge(socks: t, siteHosts: { [] })
+        return try await trace(Socks5Bridge(socks: t, siteHosts: { [] }))
+    }
+
+    /// Nút "Kiểm tra proxy" với Shadowsocks: như check(SocksConfig). Máy chủ SS 2022 không trả lời thì xem giờ trên máy có
+    /// lệch không (máy chủ bỏ qua yêu cầu lệch quá 30 giây).
+    static func check(_ c: SsConfig) async throws -> String {
+        var t = c
+        t.sitesOnly = false
+        do {
+            return try await trace(Socks5Bridge(socks: nil, ss: t, siteHosts: { [] }))
+        } catch {
+            if SsMethod.of(c.method)?.is2022 == true, let skew = await clockSkew() {
+                throw AppError("giờ trên máy lệch \(skew) giây — Shadowsocks 2022 cần giờ đúng (lệch tối đa 30 giây): chỉnh ngày giờ của máy")
+            }
+            throw error
+        }
+    }
+
+    /// Giờ trên máy lệch bao nhiêu giây so với Cloudflare (đi thẳng); nil = không lệch quá 30 giây / không hỏi được.
+    private static func clockSkew() async -> Int64? {
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.connectionProxyDictionary = [:]
+        cfg.timeoutIntervalForRequest = 8
+        let s = URLSession(configuration: cfg)
+        defer { s.invalidateAndCancel() }
+        guard let r = try? await s.data(from: URL(string: "https://www.cloudflare.com/cdn-cgi/trace")!) else { return nil }
+        let text = String(decoding: r.0, as: UTF8.self)
+        guard let line = text.split(separator: "\n").first(where: { $0.hasPrefix("ts=") }),
+              let ts = Double(line.dropFirst(3)) else { return nil }
+        let skew = abs(Int64(Date().timeIntervalSince1970 - ts))
+        return skew > 30 ? skew : nil
+    }
+
+    /// Tải https://www.cloudflare.com/cdn-cgi/trace qua cổng nội bộ tạm b → IP ra ngoài kèm nơi đặt máy.
+    private static func trace(_ b: Socks5Bridge) async throws -> String {
         defer { b.close() }
         let cfg = URLSessionConfiguration.ephemeral
         cfg.connectionProxyDictionary = dictionary(port: b.port)

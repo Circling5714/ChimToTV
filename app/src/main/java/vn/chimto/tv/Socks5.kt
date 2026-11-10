@@ -26,11 +26,19 @@ data class SocksConfig(
 )
 
 /**
- * Cài đặt của cổng nội bộ: proxy SOCKS5 (null = đi thẳng); dns = DNS mã hoá (Doh: DoH rồi DoT, lỗi hết thì DNS của
- * thiết bị) cho các tên miền thiết bị tự phân giải, false = DNS của thiết bị / nhà mạng.
+ * Cài đặt của cổng nội bộ: proxy SOCKS5 hoặc máy chủ Shadowsocks (cả hai null = đi thẳng); dns = DNS mã hoá (Doh: DoH
+ * rồi DoT, lỗi hết thì DNS của thiết bị) cho các tên miền thiết bị tự phân giải, false = DNS của thiết bị / nhà mạng.
  * split: Vượt chặn nhà mạng (mức 1: chia nhỏ gói bắt tay); disorder: mức 2 — thêm đảo thứ tự (byte đầu gửi với TTL 1).
  */
-data class RouteConfig(val socks: SocksConfig?, val dns: Boolean, val split: Boolean = false, val disorder: Boolean = false)
+data class RouteConfig(
+    val socks: SocksConfig?, val dns: Boolean, val split: Boolean = false, val disorder: Boolean = false, val ss: SsConfig? = null,
+) {
+    /** Đang dùng proxy (SOCKS5 hoặc Shadowsocks). */
+    val proxied: Boolean get() = socks != null || ss != null
+
+    /** Proxy chỉ cho trang phim (null = không có proxy). */
+    val sitesOnly: Boolean? get() = socks?.sitesOnly ?: ss?.sitesOnly
+}
 
 /** Gói bắt tay sắp gửi: tên trang, có đi qua proxy không, có đảo thứ tự không (Socks5Bridge.writeHello). */
 internal data class Hello(val host: String, val viaProxy: Boolean, val disorder: Boolean)
@@ -241,17 +249,20 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
             val port = i.readUnsignedShort()
             if (cmd != 1) return reply(o, 7)
             val c = config() ?: return reply(o, 1)
-            up = try {
+            val u = try {
                 route(c, host, ip, port)
             } catch (e: SocksError) {
                 if (e.viaProxy) noteError(e.message)
                 return reply(o, e.code)
             }
+            up = u.socket
             open += up
             reply(o, 0)
             client.soTimeout = 0
-            val viaProxy = c.socks != null && (!c.socks.sitesOnly || isSite(host))
-            relay(client, up, if (c.split) Hello(host, viaProxy, c.disorder) else null)
+            val viaProxy = c.proxied && (c.sitesOnly == false || isSite(host))
+            // Qua Shadowsocks: nhà mạng chỉ thấy dữ liệu đã mã hoá, không đọc được tên trang — khỏi chia nhỏ
+            val hello = if (c.split && (c.ss == null || !viaProxy)) Hello(host, viaProxy, c.disorder) else null
+            relay(client, u, hello)
         } catch (e: Exception) {
             // bên gọi đóng giữa chừng, hoặc proxy vừa bị tắt — bỏ qua (không để lỗi lọt ra làm sập app)
         } finally {
@@ -260,10 +271,14 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
         }
     }
 
-    private fun route(c: RouteConfig, host: String, ip: InetAddress?, port: Int): Socket {
+    private fun route(c: RouteConfig, host: String, ip: InetAddress?, port: Int): Upstream {
         val socks = c.socks
         if (socks != null && (!socks.sitesOnly || isSite(host))) {
-            return Socks5.connect(socks, host, ip, port) { h -> dns(c, h) }
+            return Upstream(Socks5.connect(socks, host, ip, port) { h -> dns(c, h) })
+        }
+        val ss = c.ss
+        if (ss != null && (!ss.sitesOnly || isSite(host))) {
+            return Shadowsocks.connect(ss, host, ip, port) { h -> dns(c, h) }
         }
         // Đi thẳng: lỗi DNS như kết nối thẳng thường (không phải lỗi proxy)
         val addr = ip ?: try {
@@ -281,7 +296,7 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
         }
         s.tcpNoDelay = true
         s.keepAlive = true
-        return s
+        return Upstream(s)
     }
 
     /**
@@ -320,18 +335,33 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
      * Chép hai chiều tới khi hết; một chiều lỗi thì đóng cả hai cho chiều kia khỏi treo. hello != null (tên trang, đi qua
      * proxy): gói đầu tiên từ bên gọi (a → b) là gói bắt tay HTTPS thì chia nhỏ (vượt chặn nhà mạng).
      */
-    private fun relay(a: Socket, b: Socket, hello: Hello?) {
-        val back = pool.submit { pipe(b, a, null) }
-        pipe(a, b, hello)
+    private fun relay(a: Socket, b: Upstream, hello: Hello?) {
+        val back = pool.submit { pipe(b.socket, b.input, a, a.getOutputStream(), null) }
+        pipe(a, a.getInputStream(), b.socket, b.output, hello)
         runCatching { back.get() }
     }
 
-    private fun pipe(from: Socket, to: Socket, hello: Hello?) {
+    private fun pipe(from: Socket, i: java.io.InputStream, to: Socket, o: OutputStream, hello: Hello?) {
         val buf = ByteArray(16 * 1024)
         try {
-            val i = from.getInputStream()
-            val o = to.getOutputStream()
             var first = hello
+            if (o is SsOutput) {
+                // Shadowsocks: phần đầu gửi cùng dữ liệu đầu tiên của bên gọi (HTTPS: gói bắt tay). Bên gọi im quá 0,3 s
+                // (giao thức máy chủ nói trước) thì gửi phần đầu trước để máy chủ mở kết nối tới đích
+                from.soTimeout = 300
+                val n = try {
+                    i.read(buf)
+                } catch (e: java.net.SocketTimeoutException) {
+                    0
+                }
+                from.soTimeout = 0
+                if (n > 0) o.write(buf, 0, n) else if (n == 0) o.start()
+                if (n < 0) {
+                    to.shutdownOutput()
+                    to.soTimeout = 60_000
+                    return
+                }
+            }
             while (true) {
                 val n = i.read(buf)
                 if (n < 0) break
@@ -348,6 +378,7 @@ class Socks5Bridge(private val config: () -> RouteConfig?, private val siteHosts
             to.soTimeout = 60_000
         } catch (e: Exception) {
             if (hello != null) debugLog?.invoke("chiều gửi lỗi: $e")
+            if (e is SsError) noteError(e.message)
             close(from)
             close(to)
         }

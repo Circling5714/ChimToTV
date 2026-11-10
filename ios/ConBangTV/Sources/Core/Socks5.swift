@@ -198,6 +198,12 @@ final class TcpSocket {
     /// Hết dữ liệu gửi đi: báo bên kia (đóng nửa ghi).
     func shutdownWrite() { Darwin.shutdown(fd, SHUT_WR) }
 
+    /// Chờ tối đa ms mili giây có dữ liệu để đọc (hoặc bên kia đóng); false = hết giờ.
+    func waitReadable(ms: Int) -> Bool {
+        var p = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+        return poll(&p, 1, Int32(ms)) > 0
+    }
+
     func close() {
         lock.lock()
         defer { lock.unlock() }
@@ -316,6 +322,8 @@ enum Socks5 {
 final class Socks5Bridge {
     let port: Int
     let socks: SocksConfig?
+    /// Máy chủ Shadowsocks (thay cho SOCKS5) — xem Shadowsocks.swift.
+    let ss: SsConfig?
     let split: Bool
     /// DNS mã hoá (Doh: DoH rồi DoT, lỗi hết thì DNS của máy) cho tên miền máy tự phân giải.
     let dns: Bool
@@ -336,9 +344,10 @@ final class Socks5Bridge {
     private(set) var stats: [String: [Int]] = [:]
 
     /// port = cổng muốn dùng (0 = tuỳ máy chọn); mở lại cổng cũ sau khi iOS thu hồi thì WebKit / URLSession khỏi đổi gì.
-    init(socks: SocksConfig?, split: Bool = false, disorder: Bool = false, dns: Bool = false, port wanted: Int = 0,
+    init(socks: SocksConfig?, ss: SsConfig? = nil, split: Bool = false, disorder: Bool = false, dns: Bool = false, port wanted: Int = 0,
          siteHosts: @escaping () -> [String]) throws {
         self.socks = socks
+        self.ss = ss
         self.split = split
         self.dns = dns
         self.disorder = split && disorder
@@ -470,10 +479,10 @@ final class Socks5Bridge {
 
     private func handle(_ client: TcpSocket) {
         guard track(client) else { return client.close() }
-        var up: TcpSocket?
+        var up: Upstream?
         defer {
             untrack(client)
-            if let u = up { untrack(u) }
+            if let u = up { untrack(u.socket) }
         }
         do {
             client.setReadTimeout(15)
@@ -499,7 +508,7 @@ final class Socks5Bridge {
             let pb = try client.readFully(2)
             let port = Int(pb[0]) << 8 | Int(pb[1])
             guard cmd == 1 else { return try reply(client, 7) }
-            let viaProxy = socks.map { !$0.sitesOnly || isSite(host) } ?? false
+            let viaProxy = (socks?.sitesOnly ?? ss?.sitesOnly).map { !$0 || isSite(host) } ?? false
             do {
                 up = try route(host, ip, port, viaProxy: viaProxy)
             } catch let e as SocksError {
@@ -508,20 +517,25 @@ final class Socks5Bridge {
                 return try reply(client, e.code)
             }
             count("\(host):\(port)", viaProxy ? 0 : 1)
-            guard let u = up, track(u) else { return }
+            guard let u = up, track(u.socket) else { return }
             try reply(client, 0)
             client.setReadTimeout(0)
-            relay(client, u, hello: split ? (host, viaProxy, disorder) : nil)
+            // Qua Shadowsocks: nhà mạng chỉ thấy dữ liệu đã mã hoá, không đọc được tên trang — khỏi chia nhỏ
+            relay(client, u, hello: split && !(viaProxy && ss != nil) ? (host, viaProxy, disorder) : nil)
         } catch {
             // bên gọi đóng giữa chừng, hoặc proxy vừa bị tắt — bỏ qua
         }
     }
 
-    private func route(_ host: String, _ ip: IPAddr?, _ port: Int, viaProxy: Bool) throws -> TcpSocket {
+    private func route(_ host: String, _ ip: IPAddr?, _ port: Int, viaProxy: Bool) throws -> Upstream {
         if viaProxy, let s = socks {
             // DNS của iPad (không phải của proxy): DNS mã hoá, hoặc Vượt chặn khi DNS của máy bị chặn
             let real = try (ip == nil && !s.remoteDns ? Doh.forConnect(host, secure: dns, split: split) : nil)
             return try Socks5.connect(s, host: host, ip: ip ?? real, port: port)
+        }
+        if viaProxy, let s = ss {
+            let real = try (ip == nil && !s.remoteDns ? Doh.forConnect(host, secure: dns, split: split) ?? Socks5.resolve(host) : nil)
+            return try Shadowsocks.connect(s, host: host, ip: ip ?? real, port: port)
         }
         // Đi thẳng: lỗi DNS / kết nối như kết nối thẳng thường (không phải lỗi proxy)
         do {
@@ -624,7 +638,7 @@ final class Socks5Bridge {
 
     /// Chép hai chiều tới khi hết; một chiều lỗi thì đóng cả hai cho chiều kia khỏi treo. hello != nil: gói đầu tiên
     /// từ bên gọi (a → b) là gói bắt tay HTTPS thì chia nhỏ (vượt chặn nhà mạng).
-    private func relay(_ a: TcpSocket, _ b: TcpSocket, hello: (host: String, viaProxy: Bool, disorder: Bool)?) {
+    private func relay(_ a: TcpSocket, _ b: Upstream, hello: (host: String, viaProxy: Bool, disorder: Bool)?) {
         let done = DispatchSemaphore(value: 0)
         let t = Thread { [weak self] in
             self?.pipe(b, a, hello: nil)
@@ -636,28 +650,32 @@ final class Socks5Bridge {
         done.wait()
     }
 
-    private func pipe(_ from: TcpSocket, _ to: TcpSocket, hello: (host: String, viaProxy: Bool, disorder: Bool)?) {
+    private func pipe(_ from: Upstream, _ to: Upstream, hello: (host: String, viaProxy: Bool, disorder: Bool)?) {
         let size = 16 * 1024
         let buf = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: 8)
         defer { buf.deallocate() }
         do {
             var first = hello
+            // Shadowsocks: phần đầu gửi cùng dữ liệu đầu tiên của bên gọi (HTTPS: gói bắt tay). Bên gọi im quá 0,3 s (giao
+            // thức máy chủ nói trước) thì gửi phần đầu trước để máy chủ mở kết nối tới đích
+            if let ss = to as? SsConnection, !ss.started, !from.socket.waitReadable(ms: 300) { try ss.start() }
             while true {
                 let n = try from.read(buf, size)
                 if n == 0 { break }
-                if let h = first {
+                if let h = first, let t = to as? TcpSocket {
                     first = nil
-                    try Self.writeHello(to, buf, n, host: h.host, viaProxy: h.viaProxy, disorder: h.disorder)
+                    try Self.writeHello(t, buf, n, host: h.host, viaProxy: h.viaProxy, disorder: h.disorder)
                     continue
                 }
                 try to.write(buf, n)
             }
             // Hết dữ liệu: báo bên kia (đóng nửa ghi); chiều ngược lại chờ tối đa 60 s im lặng rồi thôi
-            to.shutdownWrite()
-            to.setReadTimeout(60)
+            to.socket.shutdownWrite()
+            to.socket.setReadTimeout(60)
         } catch {
-            from.close()
-            to.close()
+            if let e = error as? SsError { noteError(e.message) }
+            from.socket.close()
+            to.socket.close()
         }
     }
 }

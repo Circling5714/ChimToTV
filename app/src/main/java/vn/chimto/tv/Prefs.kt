@@ -473,9 +473,54 @@ object Prefs {
         get() = sp.getBoolean("proxy_sites_only", false)
         set(value) = sp.edit().putBoolean("proxy_sites_only", value).apply()
 
-    /** Proxy đang dùng; null = tắt (hoặc chưa nhập máy chủ / cổng hợp lệ). */
+    /** Kiểu proxy: "socks5" hoặc "ss" (Shadowsocks). Mỗi kiểu giữ máy chủ / khoá riêng; bật / DNS / phạm vi dùng chung. */
+    var proxyKind: String
+        get() = if (sp.getString("proxy_kind", "socks5") == "ss") "ss" else "socks5"
+        set(value) = sp.edit().putString("proxy_kind", value).apply()
+
+    var ssHost: String
+        get() = sp.getString("ss_host", "") ?: ""
+        set(value) = sp.edit().putString("ss_host", value).apply()
+
+    var ssPort: Int
+        get() = sp.getInt("ss_port", 0)
+        set(value) = sp.edit().putInt("ss_port", value).apply()
+
+    /** Kiểu mã hoá (SsMethod.id). */
+    var ssMethod: String
+        get() = sp.getString("ss_method", SsMethod.DEFAULT.id) ?: SsMethod.DEFAULT.id
+        set(value) = sp.edit().putString("ss_method", value).apply()
+
+    @Volatile private var ssKeyCache: String? = null
+
+    /** Khoá / mật khẩu Shadowsocks — mã hoá bằng Android Keystore như mật khẩu proxy. */
+    var ssKey: String
+        get() {
+            ssKeyCache?.let { return it }
+            val enc = sp.getString("ss_key_enc", null)
+            val v = if (enc != null) Secret.decrypt(enc).orEmpty() else sp.getString("ss_key", "") ?: ""
+            ssKeyCache = v
+            return v
+        }
+        set(value) {
+            ssKeyCache = value
+            val enc = if (Secret.supported && value.isNotEmpty()) Secret.encrypt(value) else null
+            val e = sp.edit()
+            if (enc != null) e.putString("ss_key_enc", enc).remove("ss_key") else e.putString("ss_key", value).remove("ss_key_enc")
+            e.apply()
+        }
+
+    /** Máy chủ Shadowsocks đang dùng; null = proxy tắt / đang chọn SOCKS5 / chưa nhập đủ. */
+    fun ssConfig(): SsConfig? {
+        if (!proxyOn || proxyKind != "ss") return null
+        val host = ssHost.trim()
+        if (host.isEmpty() || ssPort !in 1..65535 || ssKey.isEmpty()) return null
+        return SsConfig(host, ssPort, ssMethod, ssKey, proxyRemoteDns, proxySitesOnly)
+    }
+
+    /** Proxy SOCKS5 đang dùng; null = tắt / đang chọn Shadowsocks (hoặc chưa nhập máy chủ / cổng hợp lệ). */
     fun proxyConfig(): SocksConfig? {
-        if (!proxyOn) return null
+        if (!proxyOn || proxyKind != "socks5") return null
         val host = proxyHost.trim()
         if (host.isEmpty() || proxyPort !in 1..65535) return null
         return SocksConfig(host, proxyPort, proxyUser, proxyPass, proxyRemoteDns, proxySitesOnly)

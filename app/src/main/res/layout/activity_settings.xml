@@ -204,7 +204,7 @@
 
         <TextView
             style="@style/SettingsLabel"
-            android:text="Proxy SOCKS5" />
+            android:text="Proxy (SOCKS5 / Shadowsocks)" />
 
         <vn.chimto.tv.FlowRow
             android:layout_width="match_parent"
@@ -213,6 +213,10 @@
 
             <TextView
                 android:id="@+id/btnProxy"
+                style="@style/TvButton" />
+
+            <TextView
+                android:id="@+id/btnProxyKind"
                 style="@style/TvButton" />
 
             <TextView

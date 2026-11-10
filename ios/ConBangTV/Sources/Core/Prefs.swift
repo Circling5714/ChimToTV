@@ -672,9 +672,59 @@ enum Prefs {
         store.set(true, forKey: "net_defaults_v1")
     }
 
-    /// Proxy đang dùng; nil = tắt (hoặc chưa nhập máy chủ / cổng hợp lệ).
+    /// Kiểu proxy: "socks5" hoặc "ss" (Shadowsocks). Mỗi kiểu giữ máy chủ / khoá riêng; bật / DNS / phạm vi dùng chung.
+    static var proxyKind: String {
+        get { store.string(forKey: "proxy_kind") == "ss" ? "ss" : "socks5" }
+        set { store.set(newValue, forKey: "proxy_kind") }
+    }
+
+    static var ssHost: String {
+        get { store.string(forKey: "ss_host") ?? "" }
+        set { store.set(newValue, forKey: "ss_host") }
+    }
+
+    static var ssPort: Int {
+        get { store.object(forKey: "ss_port") as? Int ?? 0 }
+        set { store.set(newValue, forKey: "ss_port") }
+    }
+
+    /// Kiểu mã hoá (SsMethod.id).
+    static var ssMethod: String {
+        get { store.string(forKey: "ss_method") ?? SsMethod.defaultMethod.id }
+        set { store.set(newValue, forKey: "ss_method") }
+    }
+
+    private static var ssKeyCache: String?
+
+    /// Khoá / mật khẩu Shadowsocks — trong Keychain như mật khẩu proxy.
+    static var ssKey: String {
+        get {
+            locked {
+                if let c = ssKeyCache { return c }
+                let v = Secret.get("ss_key") ?? store.string(forKey: "ss_key") ?? ""
+                ssKeyCache = v
+                return v
+            }
+        }
+        set {
+            locked {
+                ssKeyCache = newValue
+                if Secret.set("ss_key", newValue) { store.removeObject(forKey: "ss_key") } else { store.set(newValue, forKey: "ss_key") }
+            }
+        }
+    }
+
+    /// Máy chủ Shadowsocks đang dùng; nil = proxy tắt / đang chọn SOCKS5 / chưa nhập đủ.
+    static func ssConfig() -> SsConfig? {
+        guard proxyOn, proxyKind == "ss" else { return nil }
+        let host = ssHost.trimmed
+        guard !host.isEmpty, (1...65535).contains(ssPort), !ssKey.isEmpty else { return nil }
+        return SsConfig(host: host, port: ssPort, method: ssMethod, password: ssKey, remoteDns: proxyRemoteDns, sitesOnly: proxySitesOnly)
+    }
+
+    /// Proxy SOCKS5 đang dùng; nil = tắt / đang chọn Shadowsocks (hoặc chưa nhập máy chủ / cổng hợp lệ).
     static func proxyConfig() -> SocksConfig? {
-        guard proxyOn else { return nil }
+        guard proxyOn, proxyKind == "socks5" else { return nil }
         let host = proxyHost.trimmed
         guard !host.isEmpty, (1...65535).contains(proxyPort) else { return nil }
         return SocksConfig(host: host, port: proxyPort, user: proxyUser, pass: proxyPass, remoteDns: proxyRemoteDns, sitesOnly: proxySitesOnly)
@@ -926,7 +976,7 @@ enum Prefs {
     /// Toàn bộ khoá (cho cổng gỡ lỗi /prefs).
     static func dump() -> [String: Any] {
         store.dictionaryRepresentation().filter { k, _ in
-            !k.hasPrefix("Apple") && !k.hasPrefix("NS") && !k.hasPrefix("com.apple") && k != "proxy_pass"
+            !k.hasPrefix("Apple") && !k.hasPrefix("NS") && !k.hasPrefix("com.apple") && k != "proxy_pass" && k != "ss_key"
         }
     }
 }

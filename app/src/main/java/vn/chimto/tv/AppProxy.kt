@@ -7,7 +7,8 @@ import java.net.InetSocketAddress
 import java.net.Proxy
 
 /**
- * Proxy SOCKS5 cho toàn app (Cài đặt → Proxy SOCKS5).
+ * Proxy cho toàn app (Cài đặt → Proxy): SOCKS5, hoặc Shadowsocks (mã hoá — nhà mạng không đọc được tên trang / nội dung,
+ * vd máy chủ 3X-UI; xem Shadowsocks.kt).
  *
  * WebView (Chromium) không đăng nhập được SOCKS5 có user / pass và luôn để proxy phân giải tên miền; HttpURLConnection
  * cũng tự để proxy phân giải. Nên app mở một cổng SOCKS5 nội bộ (Socks5Bridge, chỉ nghe 127.0.0.1): WebView
@@ -23,8 +24,8 @@ object AppProxy {
     var webViewSupported = true
         private set
 
-    /** Đang bật proxy SOCKS5. */
-    val active: Boolean get() = bridgeConfig?.socks != null
+    /** Đang bật proxy (SOCKS5 hoặc Shadowsocks). */
+    val active: Boolean get() = bridgeConfig?.proxied == true
 
     /** Đang bật DNS mã hoá (DoH / DoT) — cổng nội bộ chạy cả khi không có proxy. */
     val dohActive: Boolean get() = bridgeConfig?.dns == true
@@ -43,8 +44,8 @@ object AppProxy {
      * Http.kt buộc phải kết nối lại theo cài đặt mới ngay (không dùng lại kết nối keep-alive đi theo cài đặt cũ).
      */
     fun apply() {
-        val c = RouteConfig(Prefs.proxyConfig(), Prefs.secureDns, Prefs.unblock, Prefs.unblock && Prefs.unblockLevel >= 2)
-            .takeIf { it.socks != null || it.dns || it.split }
+        val c = RouteConfig(Prefs.proxyConfig(), Prefs.secureDns, Prefs.unblock, Prefs.unblock && Prefs.unblockLevel >= 2, Prefs.ssConfig())
+            .takeIf { it.proxied || it.dns || it.split }
         if (c == bridgeConfig && (c == null) == (bridge == null)) return
         bridge?.close()
         Doh.clearCache()
@@ -63,19 +64,19 @@ object AppProxy {
 
     /** Câu nhắc thêm vào thông báo lỗi khi đang bật proxy. */
     fun note(): String = when {
-        active -> "\nĐang bật proxy" + (recentError()?.let { ": $it" } ?: "") + " — kiểm tra Cài đặt → Proxy SOCKS5, hoặc tắt proxy."
+        active -> "\nĐang bật proxy" + (recentError()?.let { ": $it" } ?: "") +  " — kiểm tra Cài đặt → Proxy, hoặc tắt proxy."
         else -> ""
     }
 
     /** Video cũng đi qua proxy (chế độ "toàn bộ app"). */
-    private val videoViaProxy get() = bridgeConfig?.socks?.sitesOnly == false
+    private val videoViaProxy get() = bridgeConfig?.sitesOnly == false
 
     /**
      * Câu nhắc cho lỗi video: máy chủ video hay chặn IP của proxy (vd CDN của KK Phim trả 404 với IP của proxy dù
      * trang phim vẫn vào được) → gợi ý cho video đi thẳng.
      */
     fun videoNote(): String = if (!videoViaProxy || recentError() != null) note()
-    else "\nĐang bật proxy cho toàn bộ app: máy chủ video có thể chặn IP của proxy — thử Cài đặt → Proxy SOCKS5 → " +
+    else "\nĐang bật proxy cho toàn bộ app: máy chủ video có thể chặn IP của proxy — thử Cài đặt → Proxy → " +
         "«Dùng cho: chỉ trang phim», hoặc tắt proxy."
 
     /**

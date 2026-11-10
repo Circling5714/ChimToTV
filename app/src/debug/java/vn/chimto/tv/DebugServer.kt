@@ -54,6 +54,8 @@ class DebugBoot : ContentProvider() {
  *   /views                        các chữ đang hiện + toạ độ (điểm ảnh) — để chạm theo chữ
  *   /tap?x=&y=                    chạm (điểm ảnh của cửa sổ app)
  *   /tapText?t=Cài đặt            chạm vào chữ (khớp đúng, không có thì khớp một phần)
+ *   /settext?id=proxyHost&t=…     gõ chữ vào ô nhập (theo id)
+ *   /click?id=btnProxyTest        bấm nút theo id
  *   /swipe?x1=&y1=&x2=&y2=&ms=300 vuốt
  *   /key?k=BACK|ENTER|DPAD_DOWN…  phím
  *   /orient?o=portrait|landscape|auto   ép hướng màn (auto = theo cảm biến như bản thật)
@@ -177,6 +179,27 @@ object DebugServer {
                     }
                     text(out, 200, "ok")
                 }
+                "/settext" -> {
+                    // Gõ / dán chữ vào ô nhập theo id (vd link ss:// vào ô máy chủ proxy): /settext?id=proxyHost&t=…
+                    val ok = onMain {
+                        val a = top ?: return@onMain false
+                        val v = a.findViewById<View>(a.resources.getIdentifier(q["id"].orEmpty(), "id", a.packageName)) as? android.widget.EditText
+                        v?.setText(q["t"].orEmpty())
+                        v != null
+                    } == true
+                    text(out, if (ok) 200 else 404, if (ok) "ok" else "không thấy ô ${q["id"]}")
+                }
+                "/click" -> {
+                    // Bấm nút theo id (cuộn tới cho thấy trên màn): /click?id=btnProxyTest
+                    val ok = onMain {
+                        val a = top ?: return@onMain false
+                        val v = a.findViewById<View>(a.resources.getIdentifier(q["id"].orEmpty(), "id", a.packageName)) ?: return@onMain false
+                        v.requestFocus()
+                        v.requestRectangleOnScreen(android.graphics.Rect(0, 0, v.width, v.height))
+                        v.performClick()
+                    } == true
+                    text(out, if (ok) 200 else 404, if (ok) "ok" else "không thấy nút ${q["id"]}")
+                }
                 "/dnsblock" -> {
                     // Giả DNS thiết bị chặn (trả 0.0.0.0) để thử Vượt chặn: /dnsblock?hosts=a.com,b.com (trống = bỏ)
                     Socks5.debugDnsBlock = q["hosts"].orEmpty().split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
@@ -189,7 +212,7 @@ object DebugServer {
                     Doh.clearCache()
                     text(out, 200, Doh.servers.joinToString(" → ") { it.label + if (it.label in Doh.debugFail) " (giả chặn)" else "" })
                 }
-                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /play /js /dnsblock /dohfail")
+                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /play /js /settext /click /dnsblock /dohfail")
             }
         } catch (e: Throwable) {
             runCatching { text(out, 500, e.toString()) }
