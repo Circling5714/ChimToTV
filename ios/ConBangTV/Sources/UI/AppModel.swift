@@ -55,6 +55,7 @@ final class AppModel: ObservableObject {
             case .search: return "magnifyingglass"
             case .history: return "clock.arrow.circlepath"
             case .follows: return "bell"
+            case .imdb: return "star"
             case .category: return "film"
             case .filter: return "line.3.horizontal.decrease.circle"
             case .site: return "arrow.left.arrow.right"
