@@ -256,7 +256,8 @@ enum ApiSite {
     private static func film(_ o: [String: Any], _ origin: String, _ base: String) -> Film? {
         guard let slug = J.str(o, "slug").nonEmpty, let name = J.str(o, "name").nonEmpty else { return nil }
         let poster = image(J.str(o, "poster_url").nonEmpty ?? J.str(o, "thumb_url"), J.str(o, "cdnDomain").nonEmpty ?? base)
-        return Film(url: "\(origin)/phim/\(slug)", title: name, poster: poster, badge: NextSite.badge(J.str(o, "episode_current")))
+        return Film(url: "\(origin)/phim/\(slug)", title: name, poster: poster, badge: NextSite.badge(J.str(o, "episode_current")),
+                    imdb: Imdb.of(J.obj(o, "imdb")))
     }
 
     // MARK: - Chi tiết phim
@@ -275,7 +276,7 @@ enum ApiSite {
         if let y = m["year"] { year = "\(y)" }
         if year == "0" || year == "<null>" { year = "" }
         let info = [J.str(m, "episode_current"), J.str(m, "time"), J.str(m, "lang"), names(J.arr(m, "country")), year,
-                    names(J.arr(m, "category"))].filter { !$0.isEmpty }.joined(separator: "  •  ").nonEmpty
+                    Imdb.of(J.obj(m, "imdb"))?.detail ?? "", names(J.arr(m, "category"))].filter { !$0.isEmpty }.joined(separator: "  •  ").nonEmpty
         var groups: [EpisodeGroup] = []
         for (i, s) in J.objects(J.arr(root, "episodes")).enumerated() {
             let eps = J.objects(J.arr(s, "server_data")).compactMap { e -> Episode? in

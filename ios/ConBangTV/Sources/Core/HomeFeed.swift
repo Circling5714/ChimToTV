@@ -787,7 +787,8 @@ enum HomeFeed {
             let links = [first] + o.items.filter { $0.url != first.url }
             let badge = f.latest?.ep.map { "Tập \(num($0))" } ?? first.badge
             let chip = live.isEmpty ? "bản lưu" : (live.count > 1 ? "\(live.count) nguồn" : tag(first.host))
-            return Card(film: Film(url: first.url, title: first.title, poster: links.lazy.compactMap { $0.poster }.first, badge: badge),
+            return Card(film: Film(url: first.url, title: first.title, poster: links.lazy.compactMap { $0.poster }.first, badge: badge,
+                                   imdb: links.lazy.compactMap { $0.imdb }.first),
                         chip: chip, links: links)
         }
 
@@ -848,7 +849,8 @@ enum HomeFeed {
             let chip: String? = down.contains(latest.host) ? "lần kiểm trước" : (latest.host != ownHost ? "có ở \(Site.tag(latest.host, ctx.sites))" : nil)
             let open = latest.host == ownHost ? (f.items.first { $0.url == h.filmUrl } ?? latest) : latest
             let links = [open] + f.items.filter { $0.url != open.url }
-            fresh.append(FreshCard(card: Card(film: Film(url: open.url, title: h.title, poster: h.poster ?? open.poster, badge: badge),
+            fresh.append(FreshCard(card: Card(film: Film(url: open.url, title: h.title, poster: h.poster ?? open.poster, badge: badge,
+                                                     imdb: links.lazy.compactMap { $0.imdb }.first),
                                               chip: chip, links: links), key: key, ep: ep))
         }
 

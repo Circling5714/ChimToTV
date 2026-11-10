@@ -41,7 +41,7 @@ struct GridSection: Identifiable, Hashable {
 final class AppModel: ObservableObject {
     static let shared = AppModel()
 
-    enum Kind: String { case home, search, history, follows, category, filter, site, web, clear, settings }
+    enum Kind: String { case home, search, history, follows, imdb, category, filter, site, web, clear, settings }
 
     struct Entry: Identifiable, Hashable {
         let title: String
@@ -297,6 +297,7 @@ final class AppModel: ObservableObject {
             Entry(title: "Lịch sử xem", kind: .history),
             Entry(title: followsTitle(), kind: .follows),
         ]
+        items.append(Entry(title: "Điểm IMDb cao", kind: .imdb))
         items += categories.map { Entry(title: $0.title, kind: .category, url: $0.url) }
         // Trang kiểu PhimMoi / trang API (mephim): đủ thể loại / quốc gia của bộ lọc (menu trang chỉ có vài mục)
         if NextSite.isKnown(Prefs.baseUrl) || ApiSite.isKnown(Prefs.baseUrl) {
@@ -352,9 +353,30 @@ final class AppModel: ObservableObject {
         case .follows:
             showFollows()
             checkFollows()
+        case .imdb: showList("imdb:top") { try await ImdbTop.page(kids: Prefs.kids) }
         case .category: if let u = e.url { showList(u) }
         default: break
         }
+    }
+
+    /// Danh mục KKPhim đang xếp theo điểm IMDb (nút «Điểm IMDb cao» ở đầu danh mục).
+    private var imdbSorted = false
+
+    /// Hai nút đầu danh mục KKPhim: «Mới cập nhật» / «Điểm IMDb cao» (xếp vài trang đầu của mục theo IMDb), như bản TV.
+    private func sortSection() -> GridSection {
+        func chip(_ id: String, _ label: String, _ on: Bool) -> GridFilm {
+            GridFilm(film: Film(url: id, title: label, poster: nil, badge: nil), topic: id, topicOn: on)
+        }
+        return GridSection(id: "sort", title: nil, items: [chip("sort:new", "Mới cập nhật", !imdbSorted),
+                                                           chip("sort:imdb", "Điểm IMDb cao", imdbSorted)],
+                           note: imdbSorted ? "Xếp theo điểm IMDb (có tính số lượt chấm) trong khoảng 320 phim mới cập nhật của mục này."
+                               : "Phim mới cập nhật — chọn «Điểm IMDb cao» để xếp theo điểm IMDb.")
+    }
+
+    private func sortList(imdb: Bool) {
+        guard let url = active?.url else { return }
+        imdbSorted = imdb
+        if imdb { showList(url) { try await ImdbTop.forList(url) } } else { showList(url) }
     }
 
     func showSiteLabel() {
@@ -645,6 +667,7 @@ final class AppModel: ObservableObject {
 
     /// Chọn / bỏ một chủ đề (người xem chưa có lịch sử) rồi tải các hàng theo chủ đề.
     func toggleTopic(_ id: String) {
+        if id.hasPrefix("sort:") { return sortList(imdb: id == "sort:imdb") }
         var set = Prefs.homeTopics
         if set.contains(id) { set.remove(id) } else { set.insert(id) }
         Prefs.homeTopics = set
@@ -662,6 +685,8 @@ final class AppModel: ObservableObject {
         token += 1
         let t = token
         nextUrl = nil
+        let sortable = ImdbTop.canRank(url) && active?.kind == .category
+        if !sortable || active?.url != url { imdbSorted = false }
         sections = []
         status = .loading("Đang tải…")
         retry = { [weak self] in self?.showList(url, loader: loader) }
@@ -677,7 +702,14 @@ final class AppModel: ObservableObject {
                 } else {
                     sections = [GridSection(id: "list", title: nil, items: page.films.map { GridFilm(film: $0) })]
                 }
-                status = sections.allSatisfy { $0.items.isEmpty } ? .message("Không có phim nào.", retry: false) : .none
+                let empty = sections.allSatisfy { $0.items.isEmpty }
+                if sortable {
+                    if empty { sections = [GridSection(id: "list", title: nil, items: [], note: "Không có phim nào đủ lượt chấm IMDb trong mục này.")] }
+                    sections.insert(sortSection(), at: 0)
+                    status = .none
+                } else {
+                    status = empty ? .message(url == "imdb:top" ? "Chưa có phim nào đủ lượt chấm IMDb." : "Không có phim nào.", retry: false) : .none
+                }
             } catch {
                 guard t == token else { return }
                 status = .message("Không tải được danh sách.\n\(friendly(error))", retry: true)

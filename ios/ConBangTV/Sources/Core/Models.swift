@@ -7,6 +7,8 @@ struct Film: Hashable, Identifiable {
     let title: String
     let poster: String?
     let badge: String?
+    /// Điểm IMDb (chỉ dữ liệu KKPhim có — ImdbTop.swift); nil = không có / quá ít lượt chấm.
+    var imdb: Imdb? = nil
     var id: String { url }
 }
 

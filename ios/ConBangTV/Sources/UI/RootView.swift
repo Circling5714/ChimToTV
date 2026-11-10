@@ -578,6 +578,19 @@ struct FilmCard: View {
                                 .padding(7)
                         }
                     }
+                    .overlay(alignment: .bottomTrailing) {
+                        // Điểm IMDb (dữ liệu KKPhim) — vàng như logo IMDb
+                        if let i = item.film.imdb {
+                            Text(i.label)
+                                .appFont(11, .heavy)
+                                .lineLimit(1)
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(RoundedRectangle(cornerRadius: 4).fill(Color(hex: 0xF5C518)))
+                                .padding(7)
+                        }
+                    }
                     .overlay(alignment: .topTrailing) {
                         // Trang chủ tổng hợp: số nguồn / tên nguồn / bản lưu / «có ở …»
                         if let c = item.chip {

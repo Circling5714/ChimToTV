@@ -41,11 +41,13 @@ struct FeedItem: Hashable {
     var updated: Int64
     let ep: Double?
     let tags: Tags?
+    /// Điểm IMDb (KKPhim).
+    let imdb: Imdb?
     /// Tên miền nguồn (tính một lần).
     let host: String
 
     init(url: String, title: String, poster: String?, badge: String?, names: Set<String>, year: Int?, updated: Int64,
-         ep: Double?, tags: Tags?) {
+         ep: Double?, tags: Tags?, imdb: Imdb? = nil) {
         self.url = url
         self.title = title
         self.poster = poster
@@ -55,6 +57,7 @@ struct FeedItem: Hashable {
         self.updated = updated
         self.ep = ep
         self.tags = tags
+        self.imdb = imdb
         host = Site.hostOf(url) ?? ""
     }
 
@@ -62,6 +65,7 @@ struct FeedItem: Hashable {
         var o: [String: Any] = ["u": url, "n": title, "p": poster ?? "", "b": badge ?? "", "k": Array(names), "y": year ?? 0,
                                 "t": updated, "e": ep ?? -1.0]
         if let t = tags { o["g"] = t.json() }
+        if let i = imdb { o["is"] = i.score; o["iv"] = i.votes }
         return o
     }
 
@@ -70,7 +74,8 @@ struct FeedItem: Hashable {
         let e = dbl(o["e"]) ?? -1
         return FeedItem(url: url, title: title, poster: J.str(o, "p").nonEmpty, badge: J.str(o, "b").nonEmpty,
                         names: Set(((o["k"] as? [String]) ?? []).filter { !$0.isEmpty }), year: Int(num64(o["y"])).nonZero,
-                        updated: num64(o["t"]), ep: e >= 0 ? e : nil, tags: Tags.of(J.obj(o, "g")))
+                        updated: num64(o["t"]), ep: e >= 0 ? e : nil, tags: Tags.of(J.obj(o, "g")),
+                        imdb: (dbl(o["is"]) ?? 0) > 0 ? Imdb(score: dbl(o["is"])!, votes: Int(num64(o["iv"]))) : nil)
     }
 }
 
@@ -156,7 +161,8 @@ enum Feed {
             return FeedItem(url: "\(origin)/phim/\(slug)", title: name,
                             poster: ApiSite.image(J.str(o, "poster_url").nonEmpty ?? J.str(o, "thumb_url"), cdn),
                             badge: NextSite.badge(ep), names: KkPhim.names(o), year: year(o),
-                            updated: time(J.str(J.obj(o, "modified"), "time")), ep: epOf(ep), tags: Tags.fromKk(o))
+                            updated: time(J.str(J.obj(o, "modified"), "time")), ep: epOf(ep), tags: Tags.fromKk(o),
+                            imdb: Imdb.of(J.obj(o, "imdb")))
         }.distinct { $0.url }
     }
 
