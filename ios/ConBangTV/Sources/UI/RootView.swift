@@ -607,6 +607,8 @@ struct FilmCard: View {
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // Vùng chạm = đúng khung thẻ (ảnh bìa không nhận chạm — xem PosterImage)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressScale())
         .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 10))

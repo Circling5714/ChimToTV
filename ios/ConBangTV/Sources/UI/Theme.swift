@@ -173,14 +173,22 @@ struct PosterImage: View {
     @State private var image: UIImage?
 
     var body: some View {
-        ZStack {
-            Theme.surface2
-            if let img = image {
-                Image(uiImage: img).resizable().scaledToFill()
-            } else {
-                Image(systemName: "film").appFont(28).foregroundColor(Theme.dim.opacity(0.5))
+        // Ảnh phóng cho đầy khung (scaledToFill) rộng hơn khung — ảnh ngang (VSMOV) rộng gấp mấy lần ô 2:3. Phần thừa cắt bớt
+        // vẫn được tính là vùng chạm và phủ lên thẻ bên cạnh (chạm thẻ này trúng thẻ kế bên): Color.clear giữ đúng cỡ khung,
+        // ảnh vẽ đè rồi cắt theo khung, và ảnh không nhận chạm (nút của thẻ tự lo vùng chạm theo khung của nó).
+        Color.clear
+            .overlay {
+                ZStack {
+                    Theme.surface2
+                    if let img = image {
+                        Image(uiImage: img).resizable().scaledToFill()
+                    } else {
+                        Image(systemName: "film").appFont(28).foregroundColor(Theme.dim.opacity(0.5))
+                    }
+                }
             }
-        }
+            .clipped()
+            .allowsHitTesting(false)
         .task(id: url) {
             image = nil
             if let u = url { image = await ImageCache.shared.image(u, maxPixel: maxPixel) }
