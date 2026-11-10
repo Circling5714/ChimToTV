@@ -7,6 +7,16 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.12.1 — 10/11/2026
+
+- **Sửa:** chạm / giữ một phim (nhất là phim VSMOV) có khi trúng phim bên cạnh. Ảnh bìa phóng cho đầy khung 2:3 (ảnh ngang của
+  VSMOV rộng gấp mấy lần thẻ); phần thừa bị cắt khi vẽ nhưng vẫn là vùng chạm / vùng giữ, phủ lên thẻ kế bên. Giờ ảnh bìa nằm gọn
+  trong khung, không nhận chạm; vùng chạm của thẻ đúng bằng khung thẻ. TV / Windows không bị lỗi này.
+- bản 1.12.1 (CFBundleVersion 17) · mã gói `vn.chimto.tv` · tag `ios-v1.12.1` (không phải "latest") · commit `423e9f2` (sửa:
+  `eae166c`) · `ConBangTV-iPad-1.12.1.ipa` 4 345 736 byte · SHA-256 `09f7a3abc398a188c9b898aff73de26b503d23f46341a8a6cb5169a04a3f7351`
+- 128 test lõi trên macOS. Anh thử bằng tay trên iPhone (bản thử 96, danh sách VSMOV → Phim bộ): chạm / giữ đúng thẻ. Bản chính thức
+  cài lên iPhone (đè 1.12): chạy, không văng. Tệp tải từ link công khai khớp SHA-256; `releases/latest` vẫn `v2.12`.
+
 ## iPad 1.12 — 10/11/2026
 
 - **Phim liên quan ở trang phim** như TV 2.12: hàng «Cùng bộ» và «Cùng thể loại» (thẻ phim như trang chủ); phim lẻ ngay dưới nút

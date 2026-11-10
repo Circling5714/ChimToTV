@@ -10,7 +10,7 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.12`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.12)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.12.1`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.12.1)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
 **Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.9`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.9)
@@ -723,7 +723,9 @@ DoT đóng < 20 giây, Google DoT ~45–70 giây), DoH đọc đúng một trả
 Nhật ký bản debug / thử ghi máy chủ, IP và thời gian mỗi lần hỏi. Phim liên quan (từ 2.12): `Related.kt` / `.swift` / `.cs` (searchName,
 base, part, sameSeries, pickSeries — bỏ trùng theo tên đầy đủ, không theo số phần —, pickSimilar, load) +
 `HomeFeed.relatedList`; TV nối vào lưới tập bằng `ConcatAdapter` (`DetailActivity`), bản debug `/detail?url=&title=` mở
-thẳng trang phim. **Mã hồ sơ NextDNS không có trong git:** tệp `keys/nextdns.txt`
+thẳng trang phim. iPad / iPhone: `PosterImage` (ảnh bìa `scaledToFill`) phải nằm trong `Color.clear` +
+`.clipped()` + `.allowsHitTesting(false)`, thẻ có `.contentShape(Rectangle())` — `clipShape` / `clipped` chỉ cắt khi vẽ,
+phần ảnh thừa vẫn nhận chạm (từng làm chạm thẻ VSMOV trúng thẻ bên cạnh, sửa ở 1.12.1). **Mã hồ sơ NextDNS không có trong git:** tệp `keys/nextdns.txt`
 (TV: `BuildConfig.NEXTDNS_ID`; Windows: EmbeddedResource `nextdns.txt`), iPad: secret `NEXTDNS_ID` của repo → Info.plist
 `CBNextDnsId` lúc CI dựng. Không có mã thì chuỗi bỏ NextDNS. Khoá cài đặt `doh` = `AUTO` / `OFF`, `net_defaults_v1` (bật một lần). Mật khẩu proxy: `Secret.kt` (AES-GCM, khoá trong
 AndroidKeyStore).
