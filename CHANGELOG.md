@@ -7,6 +7,44 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.12 — 10/11/2026
+
+- **Phim liên quan ở trang phim** như TV 2.12: hàng «Cùng bộ» và «Cùng thể loại» (thẻ phim như trang chủ); phim lẻ ngay dưới nút
+  «Xem phim», phim bộ ở cuối danh sách tập + nút «Phim liên quan ▼» cuộn thẳng xuống.
+- bản 1.12 (CFBundleVersion 16) · mã gói `vn.chimto.tv` · tag `ios-v1.12` (không phải "latest") · commit `f4df900` ·
+  `ConBangTV-iPad-1.12.ipa` 4 344 479 byte · SHA-256 `b0eba931829776a0e65719b1fd0688bcbc6e0e452552aa43802a3a03593373c5`
+- 128 test lõi trên macOS (thêm 5). Bản thử 93 thử thật trên iPhone: phim bộ «Đấu Phá Thương Khung (Phần 5)» → nút «Phim liên
+  quan ▼» → hàng «Cùng bộ «Đấu Phá Thương Khung»» và «Cùng thể loại · Hoạt hình Trung Quốc · Phiêu lưu»; phim lẻ «… Thức Tỉnh» hàng
+  ngay dưới nút Xem. Bản chính thức đã cài lên iPhone (gói app ghi 1.12; máy đang khoá màn hình nên chưa mở lên được). Tệp tải từ
+  link công khai khớp SHA-256; `releases/latest` vẫn `v2.12`.
+
+## Windows 1.9 — 10/11/2026
+
+- **Phim liên quan ở trang phim** như TV 2.12: hàng «Cùng bộ» (các phần / mùa khác, phim ngoại truyện) và «Cùng thể loại»; phim
+  lẻ ngay dưới thông tin phim, phim bộ ở cuối danh sách tập + nút «▼ Phim liên quan» (chọn sẵn phim đầu).
+- bản 1.9.0 · tag `win-v1.9` (không phải "latest") · commit `f4df900` · `ConBangTV-Windows-1.9.exe` 72 893 026 byte · SHA-256
+  `858c4e7ba911c84c72ee67951f293373ca39facd90373134cd6b7f67de3d3ebf`
+- 109 test lõi (thêm 5). Thử bản gỡ lỗi: trang «Đấu Phá Thương Khung (Phần 5)» → nút «▼ Phim liên quan» cuộn xuống hàng «Cùng bộ»,
+  chọn phim đầu. Tệp tải từ link công khai khớp SHA-256. **Tự cập nhật thật 1.8.1 → 1.9** (bản chép riêng).
+
+## 2.12 — 10/11/2026
+
+- **Phim liên quan ở trang phim:**
+  - **Cùng bộ** — các phần / mùa khác và phim ngoại truyện của cùng bộ, xếp theo số phần (tìm theo tên gốc trên trang của phim +
+    KKPhim; bỏ phim trùng ở nguồn khác).
+  - **Cùng thể loại** — KKPhim / VSMOV theo loại + nước + thể loại đặc trưng nhất; bỏ phim đang xem và các phần cùng bộ, phim
+    chưa xem lên trước; hồ sơ trẻ em chỉ hoạt hình.
+  - Phim lẻ: hàng nằm ngay dưới nút «Xem phim» (bỏ ô tập «Full» thừa). Phim bộ: ở cuối danh sách tập + nút «Liên quan ▼» nhảy
+    xuống. Đang chọn trong hàng liên quan thì dòng phía trên lưới ghi tên hàng (màn TV thấp, tên hàng hay bị cuộn khuất). Tải sau
+    khi trang phim đã hiện.
+- Chưa có «cùng đạo diễn / diễn viên» — KKPhim, VSMOV, NguonC, ophim chỉ tìm được theo tên phim.
+- versionCode 35 · tag `v2.12` · commit `f4df900` · `ChimToTV-2.12.apk` 1 222 867 byte · SHA-256
+  `ae65639e09a94ff68917fda84178100602c3df6e4cbc1787eb04582d1138d3b5`
+- 132 test (thêm 5). Thử bản gỡ lỗi trên TV box: phim bộ (nút «Liên quan ▼» → hàng «Cùng bộ», ▼ → «Cùng thể loại», ▲ về tập, nhãn
+  đổi theo hàng), phim lẻ (hàng ngay dưới nút Xem). Bản chính thức thử trên TV box trước khi đăng (phim yanhh3d có nút + hàng «Cùng
+  bộ»). API `releases/latest` trả `v2.12` + `.apk`, tệp tải từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.11.1 → 2.12**
+  trên TV box.
+
 ## iPad 1.11.1 — 09/11/2026
 
 - **DNS mã hoá nhanh hơn** như TV 2.11.1: NextDNS dùng máy chủ gần nhất (Hà Nội) thay cho máy chủ Hồng Kông, giữ kết nối tới

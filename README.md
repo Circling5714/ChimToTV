@@ -10,10 +10,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.11`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.11)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.12`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.12)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.8`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.8)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.9`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.9)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -64,6 +64,21 @@ người xem**:
   xem): bật / tắt KKPhim, NguonC, VSMOV, CLB Phim Xưa và «trang đang dùng + trang xem gần đây». Còn một nguồn thì không tắt được;
   tắt hết (vd nguồn còn bật bị xoá khỏi danh sách trang) thì coi như bật hết. Tắt KKPhim thì các hàng lọc theo thể loại / nước lấy
   từ VSMOV. Phim theo dõi vẫn báo tập mới.
+
+## Phim liên quan (từ 2.12 / iPad 1.12 / Windows 1.9)
+
+Trang phim (bấm vào một phim bất kỳ) có thêm các hàng vuốt ngang:
+
+- **Cùng bộ** — các phần / mùa khác và phim ngoại truyện của cùng bộ (vd «Đấu Phá Thương Khung» Phần 1–5, «… 2: Ngừng Chiến»,
+  bản người đóng), xếp theo số phần. App tìm theo tên gốc (bỏ «Phần N / Season / Mùa», năm, «– 20 Tập», phần sau dấu «:») trên
+  trang của phim và KKPhim, bỏ phim trùng ở nguồn khác.
+- **Cùng thể loại** — cùng loại phim + nước + thể loại đặc trưng nhất (lấy từ KKPhim, không có thì VSMOV), bỏ phim đang xem và các
+  phần cùng bộ, phim chưa xem lên trước. Hồ sơ trẻ em chỉ hiện hoạt hình.
+
+**Phim lẻ**: các hàng nằm ngay dưới nút «Xem phim». **Phim bộ**: ở cuối danh sách tập; nút «Liên quan ▼» (iPad: «Phim liên
+quan ▼», Windows: «▼ Phim liên quan») nhảy thẳng xuống, chọn sẵn phim đầu. Phim ở trang khác ghi tên trang ở góc. Trên TV, đang
+chọn trong hàng liên quan thì dòng phía trên lưới ghi tên hàng. Các hàng tải sau khi trang phim đã hiện. Chưa có «cùng đạo diễn /
+diễn viên»: các nguồn (KKPhim, VSMOV, NguonC, ophim) chỉ tìm được theo tên phim.
 
 ## Trang phim hỗ trợ
 
@@ -705,7 +720,10 @@ giả máy chủ bị chặn, `/dnsblock?hosts=` giả DNS máy trả 0.0.0.0. T
 (`nextPops`: hỏi chính NextDNS tên `dns.nextdns.io` qua anycast, không được thì DNS máy; nhớ 6 giờ) rồi anycast; nhóm kết nối
 nghỉ theo máy chủ + IP (tối đa 4, bỏ sau 90 giây — đo: NextDNS / Cloudflare DoH / Google DoH giữ ≥ 100 giây, Cloudflare
 DoT đóng < 20 giây, Google DoT ~45–70 giây), DoH đọc đúng một trả lời HTTP/1.1 (`DohHttp.read`: Content-Length / chunked).
-Nhật ký bản debug / thử ghi máy chủ, IP và thời gian mỗi lần hỏi. **Mã hồ sơ NextDNS không có trong git:** tệp `keys/nextdns.txt`
+Nhật ký bản debug / thử ghi máy chủ, IP và thời gian mỗi lần hỏi. Phim liên quan (từ 2.12): `Related.kt` / `.swift` / `.cs` (searchName,
+base, part, sameSeries, pickSeries — bỏ trùng theo tên đầy đủ, không theo số phần —, pickSimilar, load) +
+`HomeFeed.relatedList`; TV nối vào lưới tập bằng `ConcatAdapter` (`DetailActivity`), bản debug `/detail?url=&title=` mở
+thẳng trang phim. **Mã hồ sơ NextDNS không có trong git:** tệp `keys/nextdns.txt`
 (TV: `BuildConfig.NEXTDNS_ID`; Windows: EmbeddedResource `nextdns.txt`), iPad: secret `NEXTDNS_ID` của repo → Info.plist
 `CBNextDnsId` lúc CI dựng. Không có mã thì chuỗi bỏ NextDNS. Khoá cài đặt `doh` = `AUTO` / `OFF`, `net_defaults_v1` (bật một lần). Mật khẩu proxy: `Secret.kt` (AES-GCM, khoá trong
 AndroidKeyStore).
