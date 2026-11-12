@@ -25,7 +25,10 @@ import java.security.MessageDigest
  * số hiệu lớn hơn → cài qua PackageInstaller. Android luôn hỏi xác nhận một lần (trừ Android 12+ khi chính app
  * là bên cài bản đang chạy — lúc đó cập nhật được hoàn toàn tự động).
  *
- * Phát hành bản mới: tạo release tag "vX.Y" trên GitHub, đính kèm tệp .apk (build.ps1 tạo sẵn).
+ * Phát hành bản mới: build.ps1 dựng tệp .apk, release.ps1 tạo release tag "vX.Y" (luôn là "latest") trên GitHub. Từ 2.15 mỗi
+ * release TV đính kèm HAI tệp .apk giống hệt nhau: ChimToTV-X.Y.apk và ChimToTV.apk (tên cố định cho link tải
+ * …/releases/latest/download/ChimToTV.apk của app Downloader). latest() lấy tệp .apk đầu tiên — tệp nào cũng được: download
+ * lưu bằng tên tự đặt, verify chỉ xét mã gói + chữ ký + số hiệu, không dựa vào tên tệp / cỡ / hash.
  */
 object Updater {
     private const val CHECK_EVERY = 2 * 60 * 60 * 1000L

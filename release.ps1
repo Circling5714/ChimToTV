@@ -1,0 +1,202 @@
+﻿# Đăng một bản ĐÃ DỰNG lên GitHub Releases. Cờ "Latest" đặt sẵn theo nền tảng — không phải nhớ tay:
+#
+#   tv       tag v<bản>       ChimToTV-<bản>.apk + ChimToTV.apk (bản sao giống hệt, tên cố định)   LUÔN là Latest
+#   windows  tag win-v<bản>   ConBangTV-Windows-<bản>.exe                                         KHÔNG BAO GIỜ là Latest
+#   ipad     tag ios-v<bản>   ConBangTV-iPad-<bản>.ipa                                            KHÔNG BAO GIỜ là Latest
+#
+# Vì sao phải đúng — hai thứ đi theo bản đang là Latest:
+#   1. app TV tự cập nhật: Updater.kt hỏi .../releases/latest rồi lấy tệp .apk;
+#   2. link tải cố định cho app Downloader trên Android TV (chỉ tải đúng một địa chỉ, không đọc được API):
+#        https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk
+#      Link này cần tệp tên ChimToTV.apk có trong MỌI bản TV — nên bản TV đính kèm hai tệp.
+# Bản Windows / iPad mà thành Latest thì mọi TV hết thấy bản mới và link trên trả 404.
+#
+# Cách dùng (sau khi đã dựng tệp và đã git push):
+#   .\release.ps1 tv      -Notes ghi-chu.md
+#   .\release.ps1 windows -Notes ghi-chu.md
+#   .\release.ps1 ipad    -Notes ghi-chu.md [-File đường\dẫn\ConBangTV-iPad-<bản>.ipa]
+#   Thêm -DryRun: kiểm tệp, in lệnh sẽ chạy, không đăng gì.
+#   .\release.ps1 tv -Verify      (windows / ipad cũng vậy): chỉ kiểm lại bản đã đăng, không đăng, không sửa gì.
+# Số bản đọc từ app\build.gradle.kts (tv), windows\ConBangTV\ConBangTV.csproj (windows), ios\project.yml (ipad).
+#
+# Kiểm sau khi đăng (và khi -Verify): Latest là bản TV — lúc đăng mà lệch thì script tự trả về bản TV mới nhất; tệp trên
+# GitHub khớp SHA-256 với tệp trong máy; riêng bản TV: tải thử qua link cố định và so SHA-256.
+param(
+    [Parameter(Mandatory = $true, Position = 0)][ValidateSet("tv", "windows", "ipad")][string]$Platform,
+    [string]$Notes = "",
+    [string]$File = "",
+    [switch]$DryRun,
+    [switch]$Verify
+)
+$ErrorActionPreference = "Stop"
+
+# Đường dẫn người gọi đưa vào tính theo thư mục họ đang đứng — đổi sang đường dẫn đầy đủ trước khi chuyển thư mục
+if (-not $Verify) {
+    if (-not $Notes) { throw "Thiếu -Notes <tệp ghi chú phát hành>" }
+    if (-not (Test-Path $Notes)) { throw "Không thấy tệp ghi chú: $Notes" }
+    $Notes = (Resolve-Path $Notes).Path
+}
+if ($File) {
+    if (-not (Test-Path $File)) { throw "Không thấy tệp: $File" }
+    $File = (Resolve-Path $File).Path
+}
+Set-Location $PSScriptRoot
+
+$repo = "Circling5714/ChimToTV"
+$fixedName = "ChimToTV.apk"
+$fixedLink = "https://github.com/$repo/releases/latest/download/$fixedName"
+$certSha256 = "949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b"
+
+function Sha256([string]$path) { (Get-FileHash $path -Algorithm SHA256).Hash.ToLower() }
+
+# Chạy gh, lỗi thì dừng. Gọi thẳng gh.exe: tên lệnh trong PowerShell không phân biệt hoa / thường, hàm tên "gh" sẽ tự gọi
+# lại chính nó.
+function Gh {
+    $out = & gh.exe @args
+    if ($LASTEXITCODE -ne 0) { throw "Lệnh gh $($args -join ' ') lỗi (mã $LASTEXITCODE)" }
+    $out
+}
+
+# Việc chỉ quan trọng lúc đăng thật: chạy thử (-DryRun) thì chỉ cảnh báo
+function Stop-OrWarn([string]$message) {
+    if ($DryRun) { Write-Warning $message } else { throw $message }
+}
+
+function TagVersion([string]$tag) {
+    try { [version]($tag -replace '^[a-z-]*v', '') } catch { [version]"0.0" }
+}
+
+function LatestTag { ("" + (Gh api "repos/$repo/releases/latest" --jq ".tag_name")).Trim() }
+
+# ---- Nền tảng → tag, tiêu đề, tệp, cờ Latest ----
+switch ($Platform) {
+    "tv" {
+        $ver = (Select-String -Path app\build.gradle.kts -Pattern 'versionName = "(.+)"').Matches[0].Groups[1].Value
+        $tag = "v$ver"; $title = "Côn Bằng TV $ver"; $latest = $true; $name = "ChimToTV-$ver.apk"
+    }
+    "windows" {
+        $full = ([xml](Get-Content windows\ConBangTV\ConBangTV.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+        $ver = $full -replace '\.0$', ''
+        $tag = "win-v$ver"; $title = "Côn Bằng TV cho Windows $ver"; $latest = $false; $name = "ConBangTV-Windows-$ver.exe"
+    }
+    "ipad" {
+        $ver = (Select-String -Path ios\project.yml -Pattern 'MARKETING_VERSION:\s*"?([0-9.]+)"?').Matches[0].Groups[1].Value
+        $tag = "ios-v$ver"; $title = "Côn Bằng TV cho iPad $ver"; $latest = $false; $name = "ConBangTV-iPad-$ver.ipa"
+    }
+}
+if (-not $File) {
+    $File = Join-Path $PSScriptRoot "dist\$name"
+    if (-not (Test-Path $File)) { throw "Không thấy $File — dựng bản $ver trước (tv: .\build.ps1 · windows: .\windows\build.ps1 · ipad: tải artifact rồi dùng -File)" }
+}
+if ((Split-Path $File -Leaf) -ne $name) { throw "Tệp phải tên $name (bản $ver đọc từ mã nguồn), đang là $(Split-Path $File -Leaf)" }
+# Tên các tệp của bản này trên GitHub — bản TV có thêm bản sao tên cố định
+$assetNames = @($name)
+if ($Platform -eq "tv") { $assetNames += $fixedName }
+
+$tags = @(Gh api "repos/$repo/releases?per_page=100" --jq '.[].tag_name')
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ("chimto-release-" + [Guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Force $tmp | Out-Null
+
+# Kiểm một bản đã đăng. $heal: Latest lệch khỏi bản TV thì sửa luôn (lúc đăng); không thì chỉ báo lỗi (-Verify).
+function Test-Published([bool]$heal) {
+    # 1. Latest phải là một bản TV; bản TV mới nhất phải chính là Latest
+    $now = LatestTag
+    $want = @($tags | Where-Object { $_ -match '^v[0-9]' } | Sort-Object { TagVersion $_ } -Descending)[0]
+    if ($now -ne $want) {
+        if (-not $heal) { throw "Latest đang là $now, cần là $want (bản TV mới nhất) — sửa: gh release edit $want --latest" }
+        Write-Warning "Latest đang là $now, cần là $want (bản TV mới nhất) — đang trả về"
+        Gh release edit $want --repo $repo --latest | Out-Null
+        $now = LatestTag
+        if ($now -ne $want) { throw "Latest vẫn là $now, cần là $want — sửa tay: gh release edit $want --latest" }
+    }
+    Write-Host "Latest: $now"
+
+    # 2. Tệp trên GitHub khớp tệp trong máy
+    $local = Sha256 $File
+    $rel = ((Gh api "repos/$repo/releases/tags/$tag") -join "`n") | ConvertFrom-Json
+    foreach ($leaf in $assetNames) {
+        $up = $rel.assets | Where-Object { $_.name -eq $leaf }
+        if (-not $up) { throw "Release $tag thiếu tệp $leaf" }
+        if ($up.digest -ne "sha256:$local") { throw "Tệp $leaf trên GitHub không khớp SHA-256 với $File" }
+        Write-Host ("{0}: {1:N0} byte, {2}" -f $leaf, $up.size, $up.digest)
+    }
+
+    # 3. Bản TV đang là Latest: link cố định (Downloader) phải tải về đúng tệp này
+    if ($Platform -eq "tv" -and $now -eq $tag) {
+        $got = Join-Path $tmp "tai-ve.apk"
+        $ok = $false
+        foreach ($wait in 0, 5, 15) {
+            Start-Sleep -Seconds $wait
+            & curl.exe -sL -m 300 -o $got $fixedLink
+            if ($LASTEXITCODE -eq 0 -and (Test-Path $got) -and (Sha256 $got) -eq $local) { $ok = $true; break }
+        }
+        if (-not $ok) { throw "Link cố định chưa trả đúng tệp bản ${ver}: $fixedLink" }
+        Write-Host "Link cố định tải về đúng bản ${ver}: $fixedLink"
+    }
+}
+
+try {
+    if ($Verify) {
+        if ($tags -notcontains $tag) { throw "Chưa có release $tag trên GitHub" }
+        Test-Published $false
+        Write-Host "Đạt: $tag" -ForegroundColor Green
+        return
+    }
+
+    if (-not (Select-String -Path $Notes -Pattern '^\s*##\s*Có gì mới' -Encoding UTF8 -Quiet)) {
+        throw "Ghi chú phải có mục '## Có gì mới' — app hiện mục này trong hộp thoại cập nhật"
+    }
+
+    # ---- Bản TV: đúng gói, đúng số bản, đúng khoá ký (sai khoá là mọi TV từ chối bản cập nhật) ----
+    if ($Platform -eq "tv") {
+        $tools = Get-ChildItem "$env:LOCALAPPDATA\Android\Sdk\build-tools" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+        if ($tools) {
+            if (-not $env:JAVA_HOME) { $env:JAVA_HOME = "$env:USERPROFILE\.jdks\jdk-17.0.20.1+1" }
+            $badging = "" + (& "$($tools.FullName)\aapt2.exe" dump badging $File | Select-String -Pattern "^package:" | Select-Object -First 1)
+            if ($badging -notmatch "name='vn\.chimto\.tv'" -or $badging -notmatch "versionName='$([regex]::Escape($ver))'") {
+                throw "APK không đúng gói vn.chimto.tv / bản ${ver}: $badging"
+            }
+            $certs = & "$($tools.FullName)\apksigner.bat" verify --print-certs $File
+            if ($LASTEXITCODE -ne 0 -or -not ($certs -match $certSha256)) {
+                throw "APK không ký bằng khoá của app (cần chứng chỉ SHA-256 $certSha256) — kiểm thư mục keys\"
+            }
+            Write-Host "APK: $badging"
+            Write-Host "Chữ ký: đúng chứng chỉ $($certSha256.Substring(0, 8))…$($certSha256.Substring(60))"
+        } else {
+            Write-Warning "Không thấy Android build-tools — chưa kiểm được chữ ký / số bản của APK (kiểm tay bằng apksigner, aapt2)"
+        }
+    }
+
+    # ---- Đã đẩy code chưa, tag đã có chưa ----
+    & git fetch origin main --quiet
+    $head = ("" + (& git rev-parse HEAD)).Trim()
+    $remote = ("" + (& git rev-parse origin/main)).Trim()
+    if ($head -ne $remote) {
+        Stop-OrWarn "HEAD ($($head.Substring(0, 7))) khác origin/main ($($remote.Substring(0, 7))) — đẩy code trước (vd: git push origin <nhánh> <nhánh>:main)"
+    }
+    if ($tags -contains $tag) { Stop-OrWarn "Release $tag đã có trên GitHub — tăng số bản trước khi đăng" }
+
+    # ---- Tệp đính kèm: bản TV thêm bản sao tên cố định ----
+    $assets = @($File)
+    if ($Platform -eq "tv") {
+        $copy = Join-Path $tmp $fixedName
+        Copy-Item $File $copy
+        if ((Sha256 $copy) -ne (Sha256 $File)) { throw "Bản sao $fixedName không giống tệp gốc" }
+        $assets += $copy
+    }
+    $flag = if ($latest) { "--latest" } else { "--latest=false" }
+    $cmd = @("release", "create", $tag) + $assets + @("--repo", $repo, "--title", $title, "--notes-file", $Notes, $flag, "--target", "main")
+    Write-Host ""
+    Write-Host ("gh " + (($cmd | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join " "))
+    Write-Host ("SHA-256 {0}: {1} ({2:N0} byte)" -f $name, (Sha256 $File), (Get-Item $File).Length)
+    if ($DryRun) {
+        Write-Host "(DryRun) không đăng gì. Latest hiện giờ: $(LatestTag)"
+        return
+    }
+    Gh @cmd | Out-Host
+    $tags = @($tag) + $tags
+    Test-Published $true
+    Write-Host "Xong: $tag — $title" -ForegroundColor Green
+} finally {
+    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+}

@@ -200,6 +200,18 @@ loại trên menu của trang, và **Thể loại…** / **Quốc gia…** (từ
 - Qua mạng (tivi/box bật gỡ lỗi ADB): `.\build.ps1 -Install <IP-tivi>` (dựng từ mã nguồn rồi cài).
 - Đã có bản 1.3 trở lên thì không cần cài tay nữa: app tự tìm bản mới và hỏi cài.
 
+## Cài trên Android TV bằng Downloader
+
+Tivi / box có app **Downloader** (AFTVnews) thì không cần USB hay máy tính — nhập mã hoặc gõ link rồi cài:
+
+- **Mã Downloader:** ____ *(chưa tạo — tạo ở aftv.news rồi điền vào đây)*
+- **Link cố định:** `https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk`
+
+Link này luôn tải thẳng APK của bản TV mới nhất (tệp `ChimToTV.apk` — bản sao giống hệt `ChimToTV-<phiên bản>.apk`, có trong mọi
+release TV từ 2.15). Cài xong, các bản sau app tự cập nhật. Link đi theo release đang được đánh dấu **Latest** nên bản TV luôn là
+Latest, bản Windows / iPad thì không — xem [Phát hành bản mới](#phát-hành-bản-mới-app-tự-cập-nhật). GitHub đôi lúc lỗi tải tệp (đã gặp
+11/2026): thử lại sau, hoặc cài theo mục trên.
+
 ## Bản iPad
 
 Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStore; iPhone từ 1.3), viết riêng bằng Swift (thư mục
@@ -561,18 +573,31 @@ Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ l�
 
 1. Tăng `versionCode` / `versionName` trong `app/build.gradle.kts`.
 2. `.\build.ps1` → `dist\ChimToTV-<phiên bản>.apk` (ký bằng `keys\` — phải cùng khoá thì app mới nhận).
-3. Tạo release tag `v<phiên bản>` và đính kèm APK, ví dụ:
-   `gh release create v1.8.0 dist\ChimToTV-1.8.0.apk --title "Côn Bằng TV 1.8.0" --notes-file ghi-chu.md`
-   Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập nhật trên TV.
+3. `git push`, rồi `.\release.ps1 tv -Notes ghi-chu.md` — tạo release tag `v<phiên bản>`, **đánh dấu Latest**, đính kèm hai
+   tệp giống hệt nhau: `ChimToTV-<phiên bản>.apk` và `ChimToTV.apk` (tên cố định, cho
+   [link Downloader](#cài-trên-android-tv-bằng-downloader)). Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập
+   nhật trên TV.
+
+**`release.ps1` (từ 12/11/2026) — không gọi `gh release create` tay nữa.** Ba nền tảng dùng chung một trang Releases, và hai
+thứ đi theo release đang là **Latest**: app TV tự cập nhật (hỏi `releases/latest` rồi lấy tệp `.apk`) và link cố định
+`…/releases/latest/download/ChimToTV.apk`. Script đặt sẵn cờ theo nền tảng: `tv` luôn `--latest`, `windows` / `ipad` luôn
+`--latest=false`. Trước khi đăng nó kiểm: ghi chú có `## Có gì mới`, tên tệp đúng số bản trong mã nguồn, code đã đẩy, tag chưa
+có; riêng APK: đúng gói, đúng số bản, đúng chứng chỉ ký. Sau khi đăng: Latest phải là bản TV mới nhất (lệch thì tự trả về), tệp
+trên GitHub khớp SHA-256 với tệp trong máy, bản TV thì tải thử qua link cố định. `-DryRun` chỉ in lệnh; `.\release.ps1
+<tv|windows|ipad> -Verify` kiểm lại một bản đã đăng, không sửa gì.
+
+Release TV có hai tệp `.apk` không ảnh hưởng app: `Updater.kt` (mọi bản từ 1.3) lấy tệp `.apk` đầu tiên, lưu bằng tên tự đặt,
+chỉ kiểm mã gói + chữ ký + `versionCode` — không dựa vào tên tệp, cỡ hay hash. Thử thật 12/11/2026: TV box 2.14 → 2.15 với
+release hai tệp.
 
 **Bản iPad / iPhone** phát hành bằng tag riêng `ios-v<bản>` (vd `ios-v1.0`) và **không bao giờ đánh dấu "latest"**
-(`gh release create ios-v1.0 ConBangTV-iPad-1.0.ipa --latest=false …`): app TV hỏi `releases/latest` rồi lấy tệp `.apk`,
+(`.\release.ps1 ipad -Notes … -File ConBangTV-iPad-<bản>.ipa`): app TV hỏi `releases/latest` rồi lấy tệp `.apk`,
 release iPad mà thành latest thì mọi TV hết thấy bản mới. Bản iPad duyệt danh sách release, lấy tag `ios-v*` có tệp
 `.ipa` (bỏ bản nháp / thử nghiệm) và mở `apple-magnifier://install?url=<link .ipa>` để TrollStore cài. Số bản ở
 `MARKETING_VERSION` trong `ios/project.yml`; ghi chú phát hành cũng cần mục `## Có gì mới`.
 
-**Bản Windows** cũng vậy: tag `win-v<bản>`, tệp `.exe`, **luôn `--latest=false`**
-(`gh release create win-v1.0 dist\ConBangTV-Windows-1.0.exe --title "Côn Bằng TV cho Windows 1.0" --notes-file … --latest=false`).
+**Bản Windows** cũng vậy: tag `win-v<bản>`, tệp `.exe`, **không bao giờ "latest"** (`.\windows\build.ps1` rồi
+`.\release.ps1 windows -Notes …`).
 App duyệt danh sách release, lấy tag `win-v*` có tệp `.exe`; tải về, kiểm đúng cỡ, đúng SHA-256 GitHub báo (`digest`),
 đúng tên sản phẩm + số bản trong tệp, rồi đổi tên tệp đang chạy thành `.old`, đặt tệp mới vào chỗ cũ và mở lại app
 (`--updated`; lần mở sau xoá `.old`). Thư mục chứa app không ghi được thì mở trang Releases để tải tay.

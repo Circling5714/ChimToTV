@@ -16,9 +16,13 @@ Trước đây tên là ChimTo TV: chỉ đổi tên hiển thị / logo — mã
 2. `.\build.ps1` → `dist\ChimToTV-<bản>.apk`, ký bằng `keys\` (không có trong git — mất là app trên mọi TV không nhận
    bản cập nhật OTA nữa).
 3. Kiểm APK: `apksigner verify --print-certs` (chứng chỉ SHA-256 `949ef2b5…177b`), `aapt2 dump badging` (đúng bản).
-4. `git push`, rồi `gh release create v<bản> dist\ChimToTV-<bản>.apk --title "Côn Bằng TV <bản>" --notes-file … --latest`.
-   Ghi chú phải có mục `## Có gì mới` — app hiện mục này trong hộp thoại cập nhật trên TV.
-5. Kiểm sau phát hành: API `releases/latest` trả đúng tag + có tệp `.apk`; tải từ link công khai, SHA-256 khớp.
+4. `git push`, rồi `.\release.ps1 tv -Notes <tệp ghi chú>` — **không gọi `gh release create` tay**. Script đăng `v<bản>`, luôn
+   đánh dấu Latest, kèm **hai tệp giống hệt nhau**: `ChimToTV-<bản>.apk` và `ChimToTV.apk` (tên cố định — link Downloader
+   `…/releases/latest/download/ChimToTV.apk` cần tệp này trong mọi bản TV), rồi tự kiểm (Latest đúng tag, hai tệp cùng SHA-256
+   với tệp trong máy, link cố định tải về đúng tệp). Ghi chú phải có mục `## Có gì mới` — app hiện mục này trong hộp thoại cập
+   nhật trên TV. `-DryRun` để xem lệnh trước.
+5. Kiểm sau phát hành: API `releases/latest` trả đúng tag + có tệp `.apk`; tải từ link công khai, SHA-256 khớp
+   (`.\release.ps1 tv -Verify` chạy lại các bước kiểm này bất cứ lúc nào).
 
 ## Phát hành bản iPad (`ios/`, cài bằng TrollStore)
 
@@ -26,9 +30,20 @@ Trước đây tên là ChimTo TV: chỉ đổi tên hiển thị / logo — mã
    bản thử; `main` + phát hành chờ anh bảo).
 2. `gh workflow run ios.yml --ref main -f release=true` → artifact `ipa` có `ConBangTV-iPad-<bản>.ipa` (mã gói
    `vn.chimto.tv`, không có cổng gỡ lỗi). Kiểm Info.plist (mã gói, tên, bản), cài thử lên iPad thật.
-3. `gh release create ios-v<bản> ConBangTV-iPad-<bản>.ipa --title "Côn Bằng TV cho iPad <bản>" --notes-file … --latest=false`
-   — **luôn `--latest=false`**: app TV đọc `releases/latest` + tệp `.apk`. Ghi chú cũng phải có `## Có gì mới`.
-4. Kiểm: `releases/latest` vẫn là bản Android; release iPad có `.ipa`; tải từ link công khai, SHA-256 khớp.
+3. `.\release.ps1 ipad -Notes <tệp ghi chú> -File ConBangTV-iPad-<bản>.ipa` — script **luôn đặt `--latest=false`**: app TV đọc
+   `releases/latest` + tệp `.apk`, link Downloader cũng đi theo Latest. Ghi chú cũng phải có `## Có gì mới`.
+4. Kiểm: `releases/latest` vẫn là bản Android (script tự kiểm, lệch thì trả về bản TV mới nhất); release iPad có `.ipa`; tải từ
+   link công khai, SHA-256 khớp.
+
+## Phát hành bản Windows (`windows/`)
+
+1. Tăng `<Version>` trong `windows/ConBangTV/ConBangTV.csproj`.
+2. `.\windows\build.ps1` → chạy test rồi đóng gói `dist\ConBangTV-Windows-<bản>.exe`. Chạy thử tệp đóng gói (thư mục dữ liệu riêng:
+   `CONBANG_DATA_DIR`).
+3. `git push`, rồi `.\release.ps1 windows -Notes <tệp ghi chú>` — tag `win-v<bản>`, script **luôn đặt `--latest=false`**. Ghi chú
+   cũng phải có `## Có gì mới`.
+4. Kiểm: `releases/latest` vẫn là bản Android; release có `.exe`; tải từ link công khai, SHA-256 khớp; tự cập nhật thật từ bản
+   trước (bản chép riêng).
 
 ## Luật lâu dài: phát hành thành công xong thì luôn cập nhật markdown
 

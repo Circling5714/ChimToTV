@@ -58,6 +58,11 @@ Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề
 - 151 test (thêm 5). Thử bản gỡ lỗi trên TV box: trang «Điểm IMDb cao», nút xếp trong «Phim bộ», dòng IMDb ở trang phim. API
   `releases/latest` trả `v2.15` + `.apk`, tệp tải từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.14 → 2.15** trên TV box
   lúc 19:22:43, bản chính thức mở «Điểm IMDb cao» được.
+- **Bổ sung 12/11/2026 — link tải cố định cho app Downloader:** release `v2.15` có thêm tệp `ChimToTV.apk`, bản sao giống hệt
+  `ChimToTV-2.15.apk` (cùng 1 244 099 byte, cùng SHA-256), để
+  `https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk` luôn tải thẳng bản TV mới nhất. App không đổi.
+  Từ nay mọi bản TV đăng bằng `release.ps1` đều kèm hai tệp. Thử lại cập nhật tự động với release hai tệp: TV box hạ về 2.14 →
+  2.15 lúc 20:22:45.
 
 ## iPad 1.14 — 10/11/2026
 
