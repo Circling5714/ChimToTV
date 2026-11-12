@@ -56,6 +56,16 @@ shot() { sleep "${2:-4}"; alive || dead "trước ảnh $1"; xcrun simctl io "$u
 orient() { curl -s -X POST "$D/orient?to=$1" > /dev/null; sleep 2; }
 q() { python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"; }
 
+# Máy ảo mới cài: lần đầu mở app hiện màn «Miễn trừ trách nhiệm» (từ 1.14), chưa bấm «Đồng ý» thì app chưa bắt đầu — menu
+# trống, /go?to=home không có gì để mở. Chụp màn đó, bấm «Đồng ý», rồi chờ tới khi về được trang chủ.
+shot "0-mien-tru" 3
+curl -s -X POST "$D/press?label=$(q "Đồng ý")"; echo
+for i in $(seq 1 40); do
+  curl -s -X POST "$D/go?to=home" | grep -q '"ok" *: *true' && break
+  sleep 1
+done
+curl -s -X POST "$D/go?to=home"; echo
+
 # Phim đầu tiên trên trang chủ + tập đầu
 FILM=$(curl -s -m 60 "$D/probe?fn=home" | python3 -c "import json,sys; o=json.load(sys.stdin); print(o['sections'][0]['films'][0]['url'])" 2>/dev/null)
 EP=$(curl -s -m 60 "$D/probe?fn=detail&url=$(q "$FILM")" | python3 -c "import json,sys; o=json.load(sys.stdin); print(o['groups'][0]['first'][0][1])" 2>/dev/null)

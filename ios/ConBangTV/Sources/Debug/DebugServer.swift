@@ -408,7 +408,10 @@ enum DebugRoutes {
         let app = AppModel.shared
         switch q["to"] ?? "" {
         case "home":
-            app.select(app.menu[0])
+            // Menu còn trống khi app chưa bắt đầu (đang ở màn miễn trừ lần đầu mở, hoặc «Ai đang xem?») — trả lỗi chứ đừng
+            // văng: máy ảo mới cài lần nào cũng ở màn miễn trừ (sim-shots.sh bấm «Đồng ý» trước)
+            guard let first = app.menu.first else { return .json(["ok": false, "why": "menu trống — app chưa bắt đầu"]) }
+            app.select(first)
         case "menu":
             let t = q["title"] ?? ""
             guard let e = app.menu.first(where: { $0.title == t }) ?? app.menu.first(where: { $0.title.lowercased().hasPrefix(t.lowercased()) }) else {
