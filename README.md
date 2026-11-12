@@ -13,7 +13,7 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.15`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.15)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.12`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.12)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.13`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.13)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -448,6 +448,12 @@ xác nhận thì tự gửi lại với TTL bình thường → byte đầu tớ
 khoảng 10–40 ms mỗi kết nối. Không cần root / VPN. Qua proxy thì dùng cách mức 1 (proxy nhận đủ theo thứ tự rồi mới gửi
 tiếp). Máy soi nào ghép đủ cả luồng theo thứ tự rồi mới đọc thì vẫn có thể thấy tên trang.
 
+**Mức 2 trên Windows (sửa ở Windows 1.13):** Windows gửi lại *mọi* byte chưa được xác nhận trong một gói (Android / Linux chỉ gửi
+lại đúng byte bị mất), nên làm như bản TV thì gói gửi lại chứa nguyên gói bắt tay có tên trang — đo 12/11/2026: Mức 2 bị chặn
+trong khi Mức 1 qua. Từ 1.13 bản Windows gửi theo nhịp riêng: byte đầu (TTL 1), ba byte kế mỗi byte một gói, **chờ trang xác
+nhận** (lúc đó Windows đã gửi lại 4 byte đầu, chưa có tên trang), rồi mới gửi phần còn lại như Mức 1. Chậm thêm khoảng 0,1 giây
+mỗi kết nối mới. Windows 1.12 trở về trước: dùng Mức 1, hoặc cập nhật.
+
 iPad / iPhone: app nằm nền lâu thì iOS có thể thu hồi cổng nội bộ (vượt chặn / proxy) — từ 1.8.2 quay lại app là tự mở lại
 cổng, đúng số cổng cũ (trước đó phải tắt app mở lại mới vào được trang). Code: `AppProxy.revive` (lúc app `active`),
 `Socks5Bridge.listening` (thử kết nối vào chính cổng); vòng `acceptLoop` thấy accept lỗi liền 20 lần thì thôi, khỏi quay
@@ -824,7 +830,11 @@ phát nhúng thấy Referer của trang phim); agent chèn vào mọi khung bằ
 miền, chặn cửa sổ mới và điều hướng cả trang do trang tự gây ra. Thanh điều khiển nằm ở một cửa sổ phủ trong suốt
 (`Player/PlayerOverlay`) vì WPF không vẽ đè lên cửa sổ của WebView2; WebView2 không bao giờ giữ phím. Ảnh bìa WebP giải mã
 bằng SkiaSharp. Vượt chặn nhà mạng: kết nối của HttpClient (`ConnectCallback`) tách gói bắt tay (`Core/Unblock.cs`, cùng
-cách tách với `writeHello` của TV, mức 2 đặt `Socket.Ttl = 1` cho byte đầu). Từ 1.2 trình phát **luôn** đi qua cổng SOCKS5
+cách tách với `writeHello` của TV). Mức 2 từ 1.13 khác bản TV: `HelloChunks` cho byte 0 (`Socket.Ttl = 1`), byte 1–3 mỗi byte
+một gói, rồi điểm chờ `Hold` — `WaitAcked` hỏi `SIO_TCP_INFO` (trường `BytesInFlight`, Windows 10 1703 trở lên) tới khi trang xác
+nhận hết, tối đa 1,5 giây, rồi mới gửi tên trang; không hỏi được trạng thái TCP thì gửi như mức 1. Lý do: Windows gửi lại mọi byte
+chưa xác nhận trong một gói — **đừng** gửi tên trang trước khi byte đầu được xác nhận. Xem gói gửi lại của một hệ điều hành: gửi
+nhịp mức 2 từ máy đó tới một cổng TCP trên TV box (cách một router) rồi `tcpdump` ở TV box. Từ 1.2 trình phát **luôn** đi qua cổng SOCKS5
 nội bộ 127.0.0.1 (`Core/Net.cs`, `--proxy-server=socks5://…`, như cầu nối của TV) — proxy SOCKS5 thật (RFC 1929) và vượt chặn
 dùng chung đường này, đổi cài đặt là có hiệu lực ngay (`Net.SettingsChanged` đóng mọi kết nối cũ, cả của HttpClient); mật
 khẩu proxy mã hoá DPAPI (`Core/Secret.cs`). Đồng bộ trong nhà: `Core/SyncData.cs` + `Core/SyncService.cs` (cùng giao thức /

@@ -7,6 +7,23 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## Windows 1.13 — 12/11/2026
+
+- **Sửa «Vượt chặn nhà mạng» Mức 2 trên Windows:** trước đây chọn Mức 2 thì trang bị nhà mạng chặn lại không vào được, trong khi
+  Mức 1 vẫn vào được. Windows gửi lại mọi byte chưa được xác nhận trong một gói, nên gói gửi lại chứa nguyên gói bắt tay (có tên
+  trang) và máy soi của nhà mạng đọc được. Bản này gửi theo nhịp riêng cho Windows: byte đầu (TTL 1), ba byte kế mỗi byte một gói,
+  chờ trang xác nhận rồi mới gửi phần còn lại như Mức 1 — không gói nào còn chứa tên trang nguyên vẹn. Mỗi kết nối mới ở Mức 2
+  chậm thêm khoảng 0,1 giây.
+- Mức 1 (mặc định) và DNS mã hoá không đổi. Bản TV không bị lỗi này (Android gửi lại đúng 1 byte — bắt gói trên TV box 12/11);
+  iPad / iPhone chưa đo lại.
+- bản 1.13.0 · tag `win-v1.13` (không phải "latest") · commit `3250e9b` (sửa: `821dcdf`) · `ConBangTV-Windows-1.13.exe`
+  72 922 753 byte · SHA-256 `862b248946b67962678ccd6cfb45a8656000e1fa2ad5f07760693b9a713fc3c8`
+- 129 test lõi (thêm 2). Thử với trang đang bị chặn theo tên trang: mã cũ ở Mức 2 bị chặn 2/2 lần; mã mới qua 4/4 lần, bắt gói ở
+  đầu nhận thấy gói gửi lại chỉ có 4 byte đầu. Bản gỡ lỗi ở Mức 2: trang chủ của trang bị chặn tải được, trình phát (WebView2) tải
+  được ảnh từ trang bị chặn, phim vẫn phát; đối chứng qua cổng nội bộ: Mức 1 qua, tắt thì treo rồi lỗi, Mức 2 qua. Tệp đóng gói
+  chạy ở Mức 2 tải được trang bị chặn. Tệp tải từ link công khai khớp SHA-256; `releases/latest` vẫn `v2.15`. **Tự cập nhật thật
+  1.12 → 1.13** (bản chép riêng) lúc 20:01:49.
+
 ## iPad 1.15 — 10/11/2026
 
 - **Điểm IMDb** như TV 2.15: nhãn «IMDb 8.5» trên thẻ phim, dòng IMDb ở trang phim, mục menu «Điểm IMDb cao», nút «Mới cập nhật» /
