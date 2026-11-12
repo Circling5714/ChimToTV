@@ -350,6 +350,9 @@ public sealed class SettingsPage : Page
 
         Body.Children.Add(Ui.Header("Giới thiệu", new Thickness(0, 26, 0, 10)));
         Body.Children.Add(Ui.Dim($"Côn Bằng TV cho Windows — bản {UpdateCheck.CurrentVersion}", 15));
+        // Mã Downloader để cài bản TV lên tivi của mình / của người quen (InvitePage)
+        Body.Children.Add(Ui.Row(
+            Ui.Pill($"Cài lên tivi / mời bạn bè — mã Downloader {Invite.Code}", () => Main.Push(new InvitePage()))));
         Body.Children.Add(Ui.Row(
             Ui.Pill("Liên hệ: t.me/tivikit", () => Ui.OpenBrowser("https://t.me/tivikit")),
             Ui.Pill("Miễn trừ trách nhiệm & quyền riêng tư", () => _ = Main.ShowDisclaimer(false)),

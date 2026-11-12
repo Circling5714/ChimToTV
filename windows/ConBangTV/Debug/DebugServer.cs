@@ -57,7 +57,7 @@ public static class DebugServer
             switch (ctx.Request.Url!.AbsolutePath)
             {
                 case "/shot":
-                    body = await _w!.Dispatcher.InvokeAsync(Shot);
+                    body = await _w!.Dispatcher.InvokeAsync(() => q["render"] == "1" ? ShotRender() : Shot());
                     type = "image/png";
                     break;
                 case "/key":
@@ -221,6 +221,31 @@ public static class DebugServer
         ReleaseDC(IntPtr.Zero, screen);
         BitmapSource outImg = src;
         if (w > 1600) outImg = new TransformedBitmap(src, new ScaleTransform(1600.0 / w, 1600.0 / w));
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(outImg));
+        using var ms = new MemoryStream();
+        enc.Save(ms);
+        return ms.ToArray();
+    }
+
+    /// /shot?render=1 — vẽ lại cây giao diện WPF ra ảnh, không qua màn hình: dùng khi máy đang khoá màn hình (Windows không
+    /// vẽ lại cửa sổ, PrintWindow trả hình cũ). Không có hình của WebView2 (trình phát) và các cửa sổ phủ.
+    private static byte[] ShotRender()
+    {
+        var root = (FrameworkElement)_w!.Content;
+        var dpi = VisualTreeHelper.GetDpi(root);
+        var area = new Rect(0, 0, root.ActualWidth, root.ActualHeight);
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawRectangle(_w.Background ?? Brushes.Black, null, area);
+            dc.DrawRectangle(new VisualBrush(root), null, area);
+        }
+        var rtb = new RenderTargetBitmap((int)(area.Width * dpi.DpiScaleX), (int)(area.Height * dpi.DpiScaleY),
+            dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+        rtb.Render(dv);
+        BitmapSource outImg = rtb;
+        if (rtb.PixelWidth > 1600) outImg = new TransformedBitmap(rtb, new ScaleTransform(1600.0 / rtb.PixelWidth, 1600.0 / rtb.PixelWidth));
         var enc = new PngBitmapEncoder();
         enc.Frames.Add(BitmapFrame.Create(outImg));
         using var ms = new MemoryStream();
