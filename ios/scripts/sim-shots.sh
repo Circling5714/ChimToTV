@@ -10,9 +10,10 @@ OUT=shots
 mkdir -p "$OUT"
 D="http://127.0.0.1:8790"
 
-# Đời iOS của máy ảo phải khớp SDK đã dựng app: máy chạy của GitHub cài nhiều đời máy ảo, lấy đại cái đầu danh sách có khi
-# trúng đời mới hơn SDK — đời đó không còn /usr/lib/swift/libswiftWebKit.dylib, app văng ngay lúc mở (dyld «Library missing»,
-# 11/2026; máy thật không bị — bản iphoneos nạp cùng danh sách thư viện với các bản đang chạy trên iOS 15).
+# Chọn máy ảo đúng đời iOS của SDK đã dựng app (máy chạy của GitHub cài nhiều đời: 11/2026 có 18.5, 18.6, 26.x).
+# Bản cho máy ảo phải dựng với mức iOS tối thiểu = đời SDK (ios.yml đặt IPHONEOS_DEPLOYMENT_TARGET): dựng với mức 15.0 thì
+# tệp chạy đòi /usr/lib/swift/libswiftWebKit.dylib, mà bộ máy ảo iOS 18.5 không có tệp này → app văng ngay lúc mở (dyld
+# «Library missing», cổng gỡ lỗi không trả lời). Chỉ máy ảo bị: máy thật có thư viện đó — IPA mức 15.0 chạy trên iOS 15.8.
 SDK=$(/usr/libexec/PlistBuddy -c 'Print :DTPlatformVersion' "$APP/Info.plist" 2>/dev/null || true)
 read -r udid runtime < <(xcrun simctl list devices available -j | python3 -c "
 import json,re,sys
@@ -63,9 +64,11 @@ for o in portrait landscape; do
   orient "$o"
   curl -s -X POST "$D/go?to=home" > /dev/null; shot "$o-1-trang-chu" 8
   curl -s -X POST "$D/go?to=settings" > /dev/null; shot "$o-2-cai-dat"
-  curl -s -X POST "$D/go?to=back" > /dev/null; sleep 2
-  # Cài đặt → «Cài lên tivi / mời bạn bè» (mã Downloader)
-  curl -s -X POST "$D/go?to=invite" > /dev/null; shot "$o-5-cai-len-tivi" 6
+  # Cài đặt → «Cài lên tivi / mời bạn bè» (mã Downloader): cuộn tới cuối rồi bấm đúng dòng đó như người dùng. Lối tắt
+  # /go?to=invite không dùng được trên iPhone — dòng nằm dưới mép màn hình chưa được dựng nên không mở được trang con.
+  curl -s -X POST "$D/scroll?dir=bottom" > /dev/null; sleep 2
+  curl -s -X POST "$D/press?partial=1&label=$(q "Cài lên tivi")"; echo
+  shot "$o-5-cai-len-tivi" 4
   curl -s -X POST "$D/go?to=back" > /dev/null; sleep 2
   if [ -n "$FILM" ]; then
     curl -s -X POST "$D/go?to=film&url=$(q "$FILM")" > /dev/null; shot "$o-3-trang-phim" 8

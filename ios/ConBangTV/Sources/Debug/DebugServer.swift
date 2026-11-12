@@ -435,7 +435,9 @@ enum DebugRoutes {
             app.selectSite(u)
         case "settings": app.sheet = .settings
         case "invite":
-            // Cài đặt → «Cài lên tivi» (SettingsView.debugOpenInvite đọc cờ này lúc bảng Cài đặt hiện)
+            // Cài đặt → «Cài lên tivi» (SettingsView.debugOpenInvite đọc cờ này lúc bảng Cài đặt hiện). Chỉ mở được khi dòng
+            // «Cài lên tivi…» đã nằm trong màn hình (iPad); trên iPhone dòng đó ở dưới mép, chưa được dựng → dùng
+            // /go?to=settings, /scroll?dir=bottom rồi /press?partial=1&label=Cài lên tivi (đã thử trên iPhone iOS 15.8)
             DebugServer.openInvite = true
             app.sheet = .settings
         case "sites": app.sheet = .sites

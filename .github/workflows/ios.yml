@@ -104,9 +104,13 @@ jobs:
         working-directory: ios
         run: |
           set -o pipefail
+          # Riêng bản cho máy ảo: mức iOS tối thiểu = đời SDK. Để mức 15.0 như bản thật thì tệp chạy đòi
+          # /usr/lib/swift/libswiftWebKit.dylib — bộ máy ảo iOS 18.5 không có, app văng lúc mở (xem sim-shots.sh)
+          SIM_OS=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          echo "SDK máy ảo: $SIM_OS"
           xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Beta -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify --renderer github-actions
+            IPHONEOS_DEPLOYMENT_TARGET="$SIM_OS" CODE_SIGNING_ALLOWED=NO | xcbeautify --renderer github-actions
       - name: Chụp
         run: bash ios/scripts/sim-shots.sh "${{ inputs.device }}"
       - uses: actions/upload-artifact@v4
