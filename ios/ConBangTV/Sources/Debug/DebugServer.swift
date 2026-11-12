@@ -38,8 +38,25 @@ final class DebugServer {
 
     var addressText: String { "http://\(Self.wifiAddress() ?? "?"):\(port)  (\(state))" }
 
+    /// Máy ảo: SwiftUI chỉ dựng cây trợ năng khi có công cụ trợ năng / tự động hoá đang chạy, nên /ui và /press không thấy
+    /// nút nào (máy ảo iOS 18.5, 13/11/2026; máy thật iOS 15 thì thấy). Bật cờ «automation» của hệ thống — chỉ trên máy ảo,
+    /// không đụng cài đặt trợ năng của máy thật.
+    private func enableAccessibilityOnSimulator() {
+        #if targetEnvironment(simulator)
+        let root = ProcessInfo.processInfo.environment["IPHONE_SIMULATOR_ROOT"] ?? ""
+        guard let lib = dlopen(root + "/usr/lib/libAccessibility.dylib", RTLD_NOW),
+              let sym = dlsym(lib, "_AXSSetAutomationEnabled") else {
+            Log.d("Debug", "không bật được trợ năng trên máy ảo")
+            return
+        }
+        typealias SetEnabled = @convention(c) (Int32) -> Void
+        unsafeBitCast(sym, to: SetEnabled.self)(1)
+        #endif
+    }
+
     func start() {
         guard listener == nil, let p = NWEndpoint.Port(rawValue: port) else { return }
+        enableAccessibilityOnSimulator()
         do {
             let params = NWParameters.tcp
             params.allowLocalEndpointReuse = true
@@ -412,6 +429,9 @@ enum DebugRoutes {
             // văng: máy ảo mới cài lần nào cũng ở màn miễn trừ (sim-shots.sh bấm «Đồng ý» trước)
             guard let first = app.menu.first else { return .json(["ok": false, "why": "menu trống — app chưa bắt đầu"]) }
             app.select(first)
+        case "agree":
+            // Như bấm «Đồng ý» ở màn miễn trừ lần đầu mở app (máy ảo mới cài)
+            if app.needsDisclaimer { app.acceptDisclaimer() }
         case "menu":
             let t = q["title"] ?? ""
             guard let e = app.menu.first(where: { $0.title == t }) ?? app.menu.first(where: { $0.title.lowercased().hasPrefix(t.lowercased()) }) else {
@@ -451,7 +471,7 @@ enum DebugRoutes {
         case "update":
             app.checkUpdate(manual: true)
         default:
-            return .text("to=? (home, menu, film, play, resume, back, search, site, settings, invite, sites, browse, follows, update)", status: 400)
+            return .text("to=? (home, agree, menu, film, play, resume, back, search, site, settings, invite, sites, browse, follows, update)", status: 400)
         }
         return .json(["ok": true])
     }

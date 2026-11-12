@@ -57,14 +57,18 @@ orient() { curl -s -X POST "$D/orient?to=$1" > /dev/null; sleep 2; }
 q() { python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"; }
 
 # Máy ảo mới cài: lần đầu mở app hiện màn «Miễn trừ trách nhiệm» (từ 1.14), chưa bấm «Đồng ý» thì app chưa bắt đầu — menu
-# trống, /go?to=home không có gì để mở. Chụp màn đó, bấm «Đồng ý», rồi chờ tới khi về được trang chủ.
+# trống, /go?to=home không có gì để mở. Chụp màn đó, đồng ý (/go?to=agree = nút «Đồng ý»), rồi chờ tới khi về được trang chủ.
 shot "0-mien-tru" 3
-curl -s -X POST "$D/press?label=$(q "Đồng ý")"; echo
+curl -s -X POST "$D/go?to=agree" > /dev/null
+started=
 for i in $(seq 1 40); do
-  curl -s -X POST "$D/go?to=home" | grep -q '"ok" *: *true' && break
+  curl -s -X POST "$D/go?to=home" | grep -q '"ok" *: *true' && { started=1; break; }
   sleep 1
 done
-curl -s -X POST "$D/go?to=home"; echo
+if [ -z "$started" ]; then
+  echo "::error::App không qua được màn miễn trừ / chưa có menu sau 40 giây"; curl -s -X POST "$D/go?to=home"; echo
+  exit 1
+fi
 
 # Phim đầu tiên trên trang chủ + tập đầu
 FILM=$(curl -s -m 60 "$D/probe?fn=home" | python3 -c "import json,sys; o=json.load(sys.stdin); print(o['sections'][0]['films'][0]['url'])" 2>/dev/null)
