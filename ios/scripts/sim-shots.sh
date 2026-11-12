@@ -38,7 +38,10 @@ xcrun simctl bootstatus "$udid" -b
 xcrun simctl install "$udid" "$APP"
 xcrun simctl launch "$udid" vn.chimto.tv.debug
 
-alive() { curl -sf -m 5 "$D/ping" > /dev/null; }
+ping1() { curl -sf -m 5 "$D/ping" > /dev/null; }
+# Hỏi lại tới ~50 giây: lúc mở trình phát trên máy ảo, luồng chính của app bận hơn 20 giây (WebKit khởi động trên máy chạy
+# chậm) nên /ping trả lời trễ — chưa phải app đã chết.
+alive() { for _ in 1 2 3 4 5 6 7 8; do ping1 && return 0; sleep 1; done; return 1; }
 # App không còn trả lời cổng gỡ lỗi (văng, hoặc bị đưa ra nền): in nhật ký của app + tóm tắt báo cáo văng để biết vì sao, rồi
 # dừng với lỗi. Chụp tiếp chỉ ra màn hình chính của máy ảo mà job vẫn báo thành công (đã gặp 13/11/2026).
 dead() {
@@ -48,9 +51,9 @@ dead() {
   exit 1
 }
 
-for i in $(seq 1 60); do alive && break; sleep 1; done
+for i in $(seq 1 60); do ping1 && break; sleep 1; done
 curl -s "$D/ping"; echo
-alive || dead "lúc mở"
+ping1 || dead "lúc mở"
 
 shot() { sleep "${2:-4}"; alive || dead "trước ảnh $1"; xcrun simctl io "$udid" screenshot "$OUT/$1.png" > /dev/null 2>&1 && echo "chụp $1"; }
 orient() { curl -s -X POST "$D/orient?to=$1" > /dev/null; sleep 2; }
