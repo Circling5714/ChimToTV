@@ -2,6 +2,9 @@
 
 ![Côn Bằng TV](design/banner-1280.png)
 
+**Trang giới thiệu:** <https://conbangtv.github.io> — cách cài nhanh, tính năng, link tải cho Android TV / iPad / Windows
+(mã nguồn của trang ở repo [conbangtv/conbangtv.github.io](https://github.com/conbangtv/conbangtv.github.io)).
+
 App Android TV xem phim hoạt hình 3D (và phim bộ / phim lẻ ở phimmois.fun) từ trang web bằng remote hoặc bàn phím
 (trước đây tên là ChimTo TV — vẫn cùng một app, cài đè và tự cập nhật bình thường). Từ 2.4 dùng tốt cả trên điện thoại
 Android, cầm dọc hay ngang — xem [Điện thoại Android](#điện-thoại-android-từ-24).

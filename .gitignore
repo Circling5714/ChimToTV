@@ -16,3 +16,6 @@ windows/**/bin/
 windows/**/obj/
 windows/**/TestResults/
 *.user
+
+# Trang giới thiệu https://conbangtv.github.io — repo riêng (conbangtv/conbangtv.github.io) đặt trong thư mục này
+site/
