@@ -24,6 +24,16 @@ xcrun simctl launch "$udid" vn.chimto.tv.debug
 
 for i in $(seq 1 60); do curl -sf -m 3 "$D/ping" > /dev/null && break; sleep 1; done
 curl -s "$D/ping"; echo
+# App không trả lời cổng gỡ lỗi (văng lúc mở?): in nhật ký của app + báo cáo văng để biết vì sao, rồi dừng — chụp tiếp chỉ ra
+# màn hình chính của máy ảo
+if ! curl -sf -m 3 "$D/ping" > /dev/null; then
+  echo "::error::App không trả lời cổng gỡ lỗi trên máy ảo"
+  xcrun simctl spawn "$udid" log show --last 3m --style compact --predicate 'process == "ConBangTV"' 2>/dev/null | tail -80
+  for f in "$HOME"/Library/Logs/DiagnosticReports/ConBangTV*; do
+    [ -f "$f" ] && { echo "--- $f"; head -120 "$f"; }
+  done
+  exit 1
+fi
 
 shot() { sleep "${2:-4}"; xcrun simctl io "$udid" screenshot "$OUT/$1.png" > /dev/null 2>&1 && echo "chụp $1"; }
 orient() { curl -s -X POST "$D/orient?to=$1" > /dev/null; sleep 2; }
