@@ -25,7 +25,12 @@ Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề
   bật).
 - Máy ảo iPhone trên CI lúc phát hành không mở được app: bộ máy ảo iOS 18.5 của máy chạy GitHub không có
   `/usr/lib/swift/libswiftWebKit.dylib` mà tệp chạy đặt mức tối thiểu iOS 15 lại cần. Chỉ máy ảo bị — tệp chạy trong IPA 1.16 nạp
-  cùng danh sách thư viện, cùng SDK 18.5 với IPA 1.15, và chạy trên iPhone thật.
+  cùng danh sách thư viện, cùng SDK 18.5 với IPA 1.15, và chạy trên iPhone thật. (Sau phát hành đã sửa job chụp màn hình máy ảo:
+  dựng riêng bản máy ảo với mức tối thiểu = đời SDK, qua màn miễn trừ lần đầu mở, dừng với lỗi khi app không trả lời.)
+- **Lỗi đã biết (tìm ra sau phát hành, nhờ ảnh máy ảo iPhone SE):** trên iPhone cầm dọc màn rộng 375 pt (SE / 6s / 7 / 8 / X…),
+  màn «Cài lên tivi» tràn sát hai mép màn hình vì ba nút xếp một hàng không đủ chỗ — vẫn bấm được; màn 320 pt hoặc cỡ chữ lớn thì
+  bị cắt hai bên. iPhone 6s Plus (414 pt) dùng để thử không lộ ra. Đã sửa trong mã nguồn (nút «Gửi hướng dẫn…» một hàng riêng,
+  «Chép» / «Đóng» chia đôi hàng dưới; thử trên máy ảo 375 pt và iPhone thật) — sẽ có ở bản iPad / iPhone kế tiếp.
 
 ## Windows 1.14 — 13/11/2026
 
