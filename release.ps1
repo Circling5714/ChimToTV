@@ -8,7 +8,8 @@
 #   1. app TV tự cập nhật: Updater.kt hỏi .../releases/latest rồi lấy tệp .apk;
 #   2. link tải cố định cho app Downloader trên Android TV (chỉ tải đúng một địa chỉ, không đọc được API):
 #        https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk
-#      Link này cần tệp tên ChimToTV.apk có trong MỌI bản TV — nên bản TV đính kèm hai tệp.
+#      Link này cần tệp tên ChimToTV.apk có trong MỌI bản TV — nên bản TV đính kèm hai tệp. Mã Downloader 9192365 trỏ vào
+#      link này; ghi chú của bản TV được thêm mục "## Cài mới trên Android TV" ghi mã đó.
 # Bản Windows / iPad mà thành Latest thì mọi TV hết thấy bản mới và link trên trả 404.
 #
 # Cách dùng (sau khi đã dựng tệp và đã git push):
@@ -45,6 +46,9 @@ Set-Location $PSScriptRoot
 $repo = "Circling5714/ChimToTV"
 $fixedName = "ChimToTV.apk"
 $fixedLink = "https://github.com/$repo/releases/latest/download/$fixedName"
+# Mã của app Downloader (aftv.news) trỏ vào $fixedLink, và trang hướng dẫn — cùng giá trị với Invite.kt và README
+$downloaderCode = "9192365"
+$guideUrl = "https://github.com/$repo/blob/main/README.md#downloader"
 $certSha256 = "949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b"
 
 function Sha256([string]$path) { (Get-FileHash $path -Algorithm SHA256).Hash.ToLower() }
@@ -184,12 +188,27 @@ try {
         if ((Sha256 $copy) -ne (Sha256 $File)) { throw "Bản sao $fixedName không giống tệp gốc" }
         $assets += $copy
     }
+    # Bản TV: thêm cuối ghi chú cách cài mới bằng Downloader (người vào trang Releases thấy ngay mã). Hộp cập nhật trên TV chỉ
+    # lấy mục "## Có gì mới" tới tiêu đề "## " kế tiếp, nên mục thêm này không làm hộp dài ra.
+    $notesFile = $Notes
+    if ($Platform -eq "tv") {
+        $text = [IO.File]::ReadAllText($Notes, [Text.Encoding]::UTF8)
+        if (-not $text.Contains($downloaderCode)) {
+            $text = $text.TrimEnd() + "`n`n## Cài mới trên Android TV`n`nMở app **Downloader** (AFTVnews) trên tivi, nhập mã **$downloaderCode** rồi bấm Go. Hướng dẫn: $guideUrl`n"
+            $notesFile = Join-Path $tmp "ghi-chu.md"
+            [IO.File]::WriteAllText($notesFile, $text, (New-Object Text.UTF8Encoding $false))
+        }
+    }
     $flag = if ($latest) { "--latest" } else { "--latest=false" }
-    $cmd = @("release", "create", $tag) + $assets + @("--repo", $repo, "--title", $title, "--notes-file", $Notes, $flag, "--target", "main")
+    $cmd = @("release", "create", $tag) + $assets + @("--repo", $repo, "--title", $title, "--notes-file", $notesFile, $flag, "--target", "main")
     Write-Host ""
     Write-Host ("gh " + (($cmd | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join " "))
     Write-Host ("SHA-256 {0}: {1} ({2:N0} byte)" -f $name, (Sha256 $File), (Get-Item $File).Length)
     if ($DryRun) {
+        if ($notesFile -ne $Notes) {
+            Write-Host "--- ghi chú sẽ đăng (đã thêm mục cài mới) ---"
+            Write-Host ([IO.File]::ReadAllText($notesFile, [Text.Encoding]::UTF8))
+        }
         Write-Host "(DryRun) không đăng gì. Latest hiện giờ: $(LatestTag)"
         return
     }

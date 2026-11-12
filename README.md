@@ -203,11 +203,21 @@ loại trên menu của trang, và **Thể loại…** / **Quốc gia…** (từ
 - Qua mạng (tivi/box bật gỡ lỗi ADB): `.\build.ps1 -Install <IP-tivi>` (dựng từ mã nguồn rồi cài).
 - Đã có bản 1.3 trở lên thì không cần cài tay nữa: app tự tìm bản mới và hỏi cài.
 
+<a id="downloader"></a>
+
 ## Cài trên Android TV bằng Downloader
 
-Tivi / box có app **Downloader** (AFTVnews) thì không cần USB hay máy tính — nhập mã hoặc gõ link rồi cài:
+Cách nhanh nhất để cài Côn Bằng TV lên tivi / box Android — không cần USB hay máy tính:
 
-- **Mã Downloader: `9192365`** — mở Downloader, nhập 7 số này vào ô địa chỉ, bấm **Go**, tải xong chọn **Install**.
+1. Trên tivi, mở **CH Play** và cài app **Downloader** (của AFTVnews).
+2. Mở Downloader, nhập mã **`9192365`** rồi bấm **Go**.
+3. Tải xong chọn **Install**. Lần đầu tivi hỏi cho phép Downloader cài ứng dụng thì cho phép.
+
+Cài xong, các bản sau app tự cập nhật.
+
+**Mời bạn bè (từ 2.16):** trong app, menu bên trái → **Mời bạn bè cài app** (hoặc Cài đặt → Liên hệ) hiện mã này thật to kèm mã QR
+mở đúng mục hướng dẫn này — khách chụp bằng điện thoại là có đủ cách cài mang về.
+
 - Trên trình duyệt: `aftv.news/9192365` (tải cùng tệp; trang thông tin của mã: `aftv.news/9192365+`).
 - **Link cố định** (mã trên trỏ vào đây): `https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk`
 
