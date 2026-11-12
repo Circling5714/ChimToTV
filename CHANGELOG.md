@@ -7,6 +7,26 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## 2.16 — 12/11/2026
+
+- **Mời bạn bè cài app** — mục mới trong menu bên trái (ngay trên «Cài đặt») và trong Cài đặt → Liên hệ: màn hiện **mã Downloader
+  `9192365`** thật to, ba bước cài (cài app Downloader trên tivi → nhập mã → Install) và mã QR mở trang hướng dẫn tiếng Việt, để
+  người quen tự cài Côn Bằng TV lên tivi của họ mà không cần USB hay máy tính. Mã do aftv.news cấp, trỏ vào link cố định
+  `…/releases/latest/download/ChimToTV.apk` (luôn là bản TV mới nhất).
+- Dùng app trên điện thoại / máy tính bảng: màn này xếp dọc, có nút **«Gửi hướng dẫn…»** gửi cách cài qua Zalo, tin nhắn.
+- Trang Releases: ghi chú mỗi bản TV từ nay có thêm mục «Cài mới trên Android TV» ghi mã Downloader (hộp cập nhật trên TV không
+  đổi — vẫn chỉ hiện «Có gì mới»).
+- versionCode 39 · tag `v2.16` · commit `2892584` (tính năng: `28abd2a`, `5249319`) · `ChimToTV-2.16.apk` 1 248 194 byte (lớn hơn
+  2.15 4 KB — mã QR vẽ sẵn, không thêm thư viện) · SHA-256 `16a6c2f338a1ae5383f26f628a4bac94b0b33697dd166f4fe727c76be7974e79` ·
+  kèm `ChimToTV.apk` (bản sao giống hệt, cho link cố định).
+- 154 test (thêm 3: mã QR trong mã nguồn được dựng lại và đọc lại bằng ZXing — chỉ trong test). Thử trên TV box, bản gỡ lỗi và
+  bản chính thức: vào màn từ menu bằng remote và từ Cài đặt, OK / Back đóng màn, mã QR trên ảnh chụp màn hình đọc ra đúng link
+  hướng dẫn; giả điện thoại cầm dọc: bố cục dọc, nút «Gửi hướng dẫn…» mở bảng chọn app. **Bản đầu tiên đăng bằng `release.ps1`:**
+  Latest = `v2.16`, hai tệp `.apk` cùng SHA-256, link cố định tải về đúng bản 2.16; API `releases/latest` trả `v2.16` + `.apk`, tệp
+  tải từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.15 → 2.16** trên TV box lúc 21:07:50 (hộp cập nhật chỉ hiện mục
+  «Có gì mới»). Chưa thử: nhập mã bằng app Downloader thật trên một tivi (TV box thử không cài Downloader), bấm «Gửi hướng dẫn…»
+  trên điện thoại thật.
+
 ## Windows 1.13 — 12/11/2026
 
 - **Sửa «Vượt chặn nhà mạng» Mức 2 trên Windows:** trước đây chọn Mức 2 thì trang bị nhà mạng chặn lại không vào được, trong khi

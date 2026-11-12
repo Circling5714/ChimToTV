@@ -600,6 +600,14 @@ có; riêng APK: đúng gói, đúng số bản, đúng chứng chỉ ký. Sau k
 trên GitHub khớp SHA-256 với tệp trong máy, bản TV thì tải thử qua link cố định. `-DryRun` chỉ in lệnh; `.\release.ps1
 <tv|windows|ipad> -Verify` kiểm lại một bản đã đăng, không sửa gì.
 
+**Mã Downloader `9192365`** (aftv.news, trỏ vào link cố định) nằm ở ba chỗ — đổi mã thì sửa cả ba: `Invite.kt` (màn «Mời bạn bè
+cài app», từ 2.16), `release.ps1` (mục «Cài mới trên Android TV» script tự thêm vào cuối ghi chú mỗi bản TV; hộp cập nhật chỉ lấy
+«Có gì mới» nên không dài ra) và README. Mã QR của màn đó vẽ sẵn trong `Invite.QR` (không thêm thư viện vào app), mở
+`…/blob/main/README.md#downloader` — neo `<a id="downloader">` ngay trên mục Downloader, đừng xoá. Đổi `Invite.GUIDE_URL` thì chạy
+`InviteTest`: test dựng lại mã bằng ZXing (chỉ là phụ thuộc của test), báo lệch và in các hàng mới để dán vào; test thứ hai đọc
+lại mã như điện thoại. Bản gỡ lỗi mở thẳng màn bằng `/open?s=invite`. Điện thoại / máy tính bảng có thêm nút «Gửi hướng dẫn…»
+(`Invite.MESSAGE`, `ACTION_SEND`) — TV thì ẩn.
+
 Release TV có hai tệp `.apk` không ảnh hưởng app: `Updater.kt` (mọi bản từ 1.3) lấy tệp `.apk` đầu tiên, lưu bằng tên tự đặt,
 chỉ kiểm mã gói + chữ ký + `versionCode` — không dựa vào tên tệp, cỡ hay hash. Thử thật 12/11/2026: TV box 2.14 → 2.15 với
 release hai tệp.
