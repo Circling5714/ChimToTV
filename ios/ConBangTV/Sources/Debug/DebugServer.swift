@@ -436,7 +436,7 @@ enum DebugRoutes {
         case "settings": app.sheet = .settings
         case "invite":
             // Cài đặt → «Cài lên tivi» (SettingsView.debugOpenInvite đọc cờ này lúc bảng Cài đặt hiện)
-            openInvite = true
+            DebugServer.openInvite = true
             app.sheet = .settings
         case "sites": app.sheet = .sites
         case "browse":
