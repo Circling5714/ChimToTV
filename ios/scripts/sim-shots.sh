@@ -10,13 +10,28 @@ OUT=shots
 mkdir -p "$OUT"
 D="http://127.0.0.1:8790"
 
-udid=$(xcrun simctl list devices available -j | python3 -c "
-import json,sys
-want=sys.argv[1]
-devs=[d for rt,l in json.load(sys.stdin)['devices'].items() if 'iOS' in rt for d in l]
-pick=[d for d in devs if d['name']==want] or [d for d in devs if d['name'].startswith('iPhone')]
-print(pick[0]['udid'])" "$DEVICE")
-echo "Máy ảo: $DEVICE ($udid)"
+# Đời iOS của máy ảo phải khớp SDK đã dựng app: máy chạy của GitHub cài nhiều đời máy ảo, lấy đại cái đầu danh sách có khi
+# trúng đời mới hơn SDK — đời đó không còn /usr/lib/swift/libswiftWebKit.dylib, app văng ngay lúc mở (dyld «Library missing»,
+# 11/2026; máy thật không bị — bản iphoneos nạp cùng danh sách thư viện với các bản đang chạy trên iOS 15).
+SDK=$(/usr/libexec/PlistBuddy -c 'Print :DTPlatformVersion' "$APP/Info.plist" 2>/dev/null || true)
+read -r udid runtime < <(xcrun simctl list devices available -j | python3 -c "
+import json,re,sys
+want,sdk=sys.argv[1],sys.argv[2]
+def ver(rt):
+    m=re.search(r'iOS-(\d+)-(\d+)',rt)
+    return (int(m.group(1)),int(m.group(2))) if m else None
+rts=sorted(((ver(rt),l) for rt,l in json.load(sys.stdin)['devices'].items() if ver(rt) and l),key=lambda r:r[0])
+print('đời máy ảo có sẵn:',', '.join('%d.%d'%v for v,_ in rts),'| SDK dựng app:',sdk or '?',file=sys.stderr)
+sdkv=tuple(int(x) for x in sdk.split('.')[:2]) if sdk else None
+# Ưu tiên: đúng đời SDK → đời mới nhất không vượt SDK → (không còn cách nào) đời cũ nhất
+ok=[r for r in rts if sdkv and r[0]<=sdkv][::-1] or rts
+for v,l in ok:
+    pick=[d for d in l if d['name']==want] or [d for d in l if d['name'].startswith('iPhone')]
+    if pick:
+        print(pick[0]['udid'],'%d.%d'%v); break
+" "$DEVICE" "$SDK")
+if [ -z "${udid:-}" ]; then echo "::error::Không tìm thấy máy ảo iPhone nào"; exit 1; fi
+echo "Máy ảo: $DEVICE ($udid), iOS $runtime"
 xcrun simctl boot "$udid" 2>/dev/null || true
 xcrun simctl bootstatus "$udid" -b
 xcrun simctl install "$udid" "$APP"
