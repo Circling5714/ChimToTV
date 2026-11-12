@@ -32,6 +32,9 @@ struct SettingsView: View {
     /// Tắt hồ sơ trẻ em: hỏi mã PIN phụ huynh (nếu đã đặt).
     @State private var parentForKids = false
 
+    /// Đang mở màn «Cài lên tivi» (bản thử: cổng gỡ lỗi /go?to=invite mở thẳng màn này để chụp).
+    @State private var inviteShown = false
+
     @State private var resting = Feed.restingHosts()
     @ObservedObject private var textScale = TextScale.shared
 
@@ -45,6 +48,17 @@ struct SettingsView: View {
             case .edit(let p): return "edit|\(p.id)"
             }
         }
+    }
+
+    /// Bản thử: /go?to=invite của cổng gỡ lỗi mở Cài đặt rồi vào thẳng màn «Cài lên tivi» (chụp màn hình trên máy ảo). Bản
+    /// chính không có cổng gỡ lỗi — hàm này không làm gì.
+    private func debugOpenInvite() {
+        #if DEVTOOLS
+        guard DebugServer.openInvite else { return }
+        DebugServer.openInvite = false
+        // Chờ bảng Cài đặt hiện xong rồi mới đẩy màn con (đẩy ngay lúc onAppear thì NavigationView bỏ qua)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { inviteShown = true }
+        #endif
     }
 
     /// Nhà nhiều người xem: các mục của riêng người đang dùng ghi rõ tên.
@@ -238,6 +252,10 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    // Mã Downloader để cài bản TV lên tivi của mình / của người quen (InviteView)
+                    NavigationLink("Cài lên tivi / mời bạn bè — mã Downloader \(Invite.code)", isActive: $inviteShown) {
+                        InviteView().appDynamicType()
+                    }
                     Button("Telegram: t.me/tivikit") {
                         if let u = URL(string: "https://t.me/tivikit") { UIApplication.shared.open(u) }
                     }
@@ -267,6 +285,7 @@ struct SettingsView: View {
             // bảng (lỗi bố cục của SwiftUI, nhất là sau hộp thoại «Có bản mới»)
             .navigationBarHidden(true)
             .safeAreaInset(edge: .top, spacing: 0) { header }
+            .onAppear { debugOpenInvite() }
 
             .alert("Xoá lịch sử xem\(who)?", isPresented: $confirmHistory) {
                 Button("Xoá", role: .destructive) {

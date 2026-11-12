@@ -39,6 +39,9 @@ for o in portrait landscape; do
   curl -s -X POST "$D/go?to=home" > /dev/null; shot "$o-1-trang-chu" 8
   curl -s -X POST "$D/go?to=settings" > /dev/null; shot "$o-2-cai-dat"
   curl -s -X POST "$D/go?to=back" > /dev/null; sleep 2
+  # Cài đặt → «Cài lên tivi / mời bạn bè» (mã Downloader)
+  curl -s -X POST "$D/go?to=invite" > /dev/null; shot "$o-5-cai-len-tivi" 6
+  curl -s -X POST "$D/go?to=back" > /dev/null; sleep 2
   if [ -n "$FILM" ]; then
     curl -s -X POST "$D/go?to=film&url=$(q "$FILM")" > /dev/null; shot "$o-3-trang-phim" 8
     curl -s -X POST "$D/go?to=back" > /dev/null; sleep 2

@@ -33,6 +33,9 @@ final class DebugServer {
     private let queue = DispatchQueue(label: "vn.chimto.debug")
     private(set) var state = "chưa chạy"
 
+    /// /go?to=invite: bảng Cài đặt mở xong thì vào thẳng màn «Cài lên tivi» (SettingsView.debugOpenInvite đọc rồi xoá cờ).
+    static var openInvite = false
+
     var addressText: String { "http://\(Self.wifiAddress() ?? "?"):\(port)  (\(state))" }
 
     func start() {
@@ -431,6 +434,10 @@ enum DebugRoutes {
             guard let u = q["url"] else { return .text("thiếu url", status: 400) }
             app.selectSite(u)
         case "settings": app.sheet = .settings
+        case "invite":
+            // Cài đặt → «Cài lên tivi» (SettingsView.debugOpenInvite đọc cờ này lúc bảng Cài đặt hiện)
+            openInvite = true
+            app.sheet = .settings
         case "sites": app.sheet = .sites
         case "browse":
             Router.browse(q["url"] ?? Prefs.baseUrl)
@@ -439,7 +446,7 @@ enum DebugRoutes {
         case "update":
             app.checkUpdate(manual: true)
         default:
-            return .text("to=? (home, menu, film, play, resume, back, search, site, settings, sites, browse, follows, update)", status: 400)
+            return .text("to=? (home, menu, film, play, resume, back, search, site, settings, invite, sites, browse, follows, update)", status: 400)
         }
         return .json(["ok": true])
     }
