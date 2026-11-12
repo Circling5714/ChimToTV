@@ -18,7 +18,8 @@ import android.widget.Toast
 /**
  * Cài app lên tivi khác bằng app Downloader (AFTVnews): người mới chỉ cần cài Downloader trên tivi rồi nhập CODE. Mã do
  * aftv.news cấp, trỏ vào APK_URL — link cố định luôn tải bản TV mới nhất (mỗi release TV đính kèm tệp tên ChimToTV.apk,
- * xem release.ps1). Đổi mã / link thì sửa ở đây, README (mục «Cài trên Android TV bằng Downloader») và release.ps1.
+ * xem release.ps1). Đổi mã / link thì sửa đủ năm chỗ: ở đây, bản iPad (Invite.swift), bản Windows (Invite.cs), release.ps1 và
+ * README (mục «Cài trên Android TV bằng Downloader»).
  */
 object Invite {
     const val TITLE = "Mời bạn bè cài app"

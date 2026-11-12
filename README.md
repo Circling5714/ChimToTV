@@ -600,9 +600,11 @@ có; riêng APK: đúng gói, đúng số bản, đúng chứng chỉ ký. Sau k
 trên GitHub khớp SHA-256 với tệp trong máy, bản TV thì tải thử qua link cố định. `-DryRun` chỉ in lệnh; `.\release.ps1
 <tv|windows|ipad> -Verify` kiểm lại một bản đã đăng, không sửa gì.
 
-**Mã Downloader `9192365`** (aftv.news, trỏ vào link cố định) nằm ở ba chỗ — đổi mã thì sửa cả ba: `Invite.kt` (màn «Mời bạn bè
-cài app», từ 2.16), `release.ps1` (mục «Cài mới trên Android TV» script tự thêm vào cuối ghi chú mỗi bản TV; hộp cập nhật chỉ lấy
-«Có gì mới» nên không dài ra) và README. Mã QR của màn đó vẽ sẵn trong `Invite.QR` (không thêm thư viện vào app), mở
+**Mã Downloader `9192365`** (aftv.news, trỏ vào link cố định) nằm ở năm chỗ — đổi mã thì sửa cả năm: `Invite.kt` (TV: màn «Mời
+bạn bè cài app», từ 2.16), `Invite.swift` (iPad / iPhone) và `Invite.cs` (Windows) — Cài đặt → «Cài lên tivi / mời bạn bè»: mã to,
+ba bước, nút gửi / chép hướng dẫn, không có mã QR —, `release.ps1` (mục «Cài mới trên Android TV» script tự thêm vào cuối ghi chú
+mỗi bản TV; hộp cập nhật chỉ lấy «Có gì mới» nên không dài ra) và README. Tin nhắn gửi người quen (`MESSAGE` / `message`) giống
+hệt nhau ở ba bản — mỗi bản có test so đúng từng chữ. Mã QR của màn đó vẽ sẵn trong `Invite.QR` (không thêm thư viện vào app), mở
 `…/blob/main/README.md#downloader` — neo `<a id="downloader">` ngay trên mục Downloader, đừng xoá. Đổi `Invite.GUIDE_URL` thì chạy
 `InviteTest`: test dựng lại mã bằng ZXing (chỉ là phụ thuộc của test), báo lệch và in các hàng mới để dán vào; test thứ hai đọc
 lại mã như điện thoại. Bản gỡ lỗi mở thẳng màn bằng `/open?s=invite`. Điện thoại / máy tính bảng có thêm nút «Gửi hướng dẫn…»

@@ -46,7 +46,8 @@ Set-Location $PSScriptRoot
 $repo = "Circling5714/ChimToTV"
 $fixedName = "ChimToTV.apk"
 $fixedLink = "https://github.com/$repo/releases/latest/download/$fixedName"
-# Mã của app Downloader (aftv.news) trỏ vào $fixedLink, và trang hướng dẫn — cùng giá trị với Invite.kt và README
+# Mã của app Downloader (aftv.news) trỏ vào $fixedLink, và trang hướng dẫn — cùng giá trị với Invite.kt (TV), Invite.swift
+# (iPad), Invite.cs (Windows) và README
 $downloaderCode = "9192365"
 $guideUrl = "https://github.com/$repo/blob/main/README.md#downloader"
 $certSha256 = "949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b"
