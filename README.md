@@ -10,6 +10,9 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản mới nhất:** [tải APK trên GitHub Releases](https://github.com/Circling5714/ChimToTV/releases/latest) ·
 [nhật ký phiên bản](CHANGELOG.md). Từ bản 1.3 app tự cập nhật.
 
+**Cài nhanh trên Android TV:** mở app **Downloader** (AFTVnews) trên tivi, nhập mã **`9192365`** — xem
+[Cài trên Android TV bằng Downloader](#cài-trên-android-tv-bằng-downloader).
+
 **Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.15`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.15)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
@@ -204,8 +207,9 @@ loại trên menu của trang, và **Thể loại…** / **Quốc gia…** (từ
 
 Tivi / box có app **Downloader** (AFTVnews) thì không cần USB hay máy tính — nhập mã hoặc gõ link rồi cài:
 
-- **Mã Downloader:** ____ *(chưa tạo — tạo ở aftv.news rồi điền vào đây)*
-- **Link cố định:** `https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk`
+- **Mã Downloader: `9192365`** — mở Downloader, nhập 7 số này vào ô địa chỉ, bấm **Go**, tải xong chọn **Install**.
+- Trên trình duyệt: `aftv.news/9192365` (tải cùng tệp; trang thông tin của mã: `aftv.news/9192365+`).
+- **Link cố định** (mã trên trỏ vào đây): `https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk`
 
 Link này luôn tải thẳng APK của bản TV mới nhất (tệp `ChimToTV.apk` — bản sao giống hệt `ChimToTV-<phiên bản>.apk`, có trong mọi
 release TV từ 2.15). Cài xong, các bản sau app tự cập nhật. Link đi theo release đang được đánh dấu **Latest** nên bản TV luôn là
