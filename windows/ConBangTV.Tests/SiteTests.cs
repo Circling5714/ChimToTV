@@ -150,14 +150,78 @@ public class SiteTests
         // Gói bắt tay giả: 16 03 01 … rồi tên trang ở giữa
         var hello = new byte[] { 0x16, 0x03, 0x01, 0x00, 0x20, 1, 2, 3 }.Concat(System.Text.Encoding.ASCII.GetBytes("phimmois.fun")).Concat(new byte[] { 9, 9 }).ToArray();
         var c = Unblock.HelloChunks(hello, "PhimMois.fun", 1);
-        Assert.Equal((0, 1, false), c[0]);
-        Assert.Equal((1, 7, false), c[1]);
+        Assert.Equal((0, 1, false, false), c[0]);
+        Assert.Equal((1, 7, false, false), c[1]);
         Assert.Equal(new[] { 2, 2, 2, 2, 2, 2 }, c.Skip(2).Take(6).Select(x => x.Length));
-        Assert.Equal((20, 2, false), c[^1]);
+        Assert.Equal((20, 2, false, false), c[^1]);
         Assert.Equal(hello.Length, c.Sum(x => x.Length));
-        Assert.True(Unblock.HelloChunks(hello, "phimmois.fun", 2)[0].Ttl1);
+        Assert.DoesNotContain(c, x => x.Ttl1 || x.Hold);
         Assert.Single(Unblock.HelloChunks(hello, "phimmois.fun", 0));
         Assert.Single(Unblock.HelloChunks(new byte[] { 0x17, 3, 3, 0, 1, 5, 6 }, "x.y", 1));
+    }
+
+    /// Mức 2 trên Windows: Windows gửi lại MỌI byte chưa được xác nhận trong một gói, nên tên trang phải nằm sau điểm chờ
+    /// (Hold) — lúc byte đầu (TTL 1) được gửi lại thì gói gửi lại chỉ có 4 byte đầu, chưa có tên trang.
+    [Fact]
+    public void UnblockLevel2HoldsNameUntilFirstBytesAcked()
+    {
+        var hello = new byte[] { 0x16, 0x03, 0x01, 0x00, 0x20, 1, 2, 3 }.Concat(System.Text.Encoding.ASCII.GetBytes("phimmois.fun")).Concat(new byte[] { 9, 9 }).ToArray();
+        var c = Unblock.HelloChunks(hello, "phimmois.fun", 2);
+        Assert.Equal((0, 1, true, false), c[0]);
+        Assert.Equal((1, 1, false, false), c[1]);
+        Assert.Equal((2, 1, false, false), c[2]);
+        Assert.Equal((3, 1, false, true), c[3]);
+        Assert.Equal((4, 4, false, false), c[4]);
+        Assert.Equal(new[] { 2, 2, 2, 2, 2, 2 }, c.Skip(5).Take(6).Select(x => x.Length));
+        Assert.Equal((20, 2, false, false), c[^1]);
+        // Các mẩu nối tiếp nhau và phủ hết gói
+        var at = 0;
+        foreach (var x in c)
+        {
+            Assert.Equal(at, x.Start);
+            at += x.Length;
+        }
+        Assert.Equal(hello.Length, at);
+        // Một byte TTL 1, một điểm chờ; trước điểm chờ chỉ có 4 byte đầu
+        Assert.Single(c, x => x.Ttl1);
+        Assert.Single(c, x => x.Hold);
+        Assert.All(c.Take(c.FindIndex(x => x.Hold) + 1), x => Assert.True(x.Start + x.Length <= 4));
+        // Gói bắt tay không có tên trang (vd bên gọi gửi IP): vẫn 4 byte đầu rồi phần còn lại
+        var other = Unblock.HelloChunks(hello, "khac.vn", 2);
+        Assert.Equal(5, other.Count);
+        Assert.Equal((4, hello.Length - 4, false, false), other[^1]);
+    }
+
+    /// Gửi thật qua một kết nối trong máy: mọi mức đều phải tới đủ, đúng thứ tự, và không treo ở điểm chờ của mức 2.
+    [Fact]
+    public void UnblockWriteHelloDeliversEveryByteInOrder()
+    {
+        var hello = new byte[] { 0x16, 0x03, 0x01, 0x00, 0x20, 1, 2, 3 }.Concat(System.Text.Encoding.ASCII.GetBytes("phimmois.fun")).Concat(new byte[] { 9, 9 }).ToArray();
+        foreach (var (level, viaProxy) in new[] { (1, false), (2, false), (2, true) })
+        {
+            var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+            listener.Start();
+            try
+            {
+                using var client = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp) { NoDelay = true };
+                client.Connect(listener.LocalEndpoint);
+                using var server = listener.AcceptSocket();
+                Assert.Equal(0, Unblock.InFlight(client)); // hỏi được trạng thái TCP trên Windows 10 / 11
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                Unblock.WriteHello(client, hello, "phimmois.fun", level, viaProxy);
+                Assert.True(sw.ElapsedMilliseconds < 1000, $"mức {level} mất {sw.ElapsedMilliseconds} ms");
+                client.Shutdown(System.Net.Sockets.SocketShutdown.Send);
+                var got = new System.IO.MemoryStream();
+                var b = new byte[64];
+                int n;
+                while ((n = server.Receive(b)) > 0) got.Write(b, 0, n);
+                Assert.Equal(hello, got.ToArray());
+            }
+            finally
+            {
+                listener.Stop();
+            }
+        }
     }
 
     [Fact]
