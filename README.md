@@ -16,10 +16,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Cài nhanh trên Android TV:** mở app **Downloader** (AFTVnews) trên tivi, nhập mã **`9192365`** — xem
 [Cài trên Android TV bằng Downloader](#cài-trên-android-tv-bằng-downloader).
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.15`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.15)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.16`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.16)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.13`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.13)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.14`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.14)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -219,7 +219,8 @@ Cách nhanh nhất để cài Côn Bằng TV lên tivi / box Android — không 
 Cài xong, các bản sau app tự cập nhật.
 
 **Mời bạn bè (từ 2.16):** trong app, menu bên trái → **Mời bạn bè cài app** (hoặc Cài đặt → Liên hệ) hiện mã này thật to kèm mã QR
-mở đúng mục hướng dẫn này — khách chụp bằng điện thoại là có đủ cách cài mang về.
+mở đúng mục hướng dẫn này — khách chụp bằng điện thoại là có đủ cách cài mang về. Bản iPad / iPhone (từ 1.16) và bản Windows
+(từ 1.14) cũng có: Cài đặt → **Cài lên tivi / mời bạn bè** — mã to, ba bước, nút gửi / chép sẵn tin nhắn hướng dẫn.
 
 - Trên trình duyệt: `aftv.news/9192365` (tải cùng tệp; trang thông tin của mã: `aftv.news/9192365+`).
 - **Link cố định** (mã trên trỏ vào đây): `https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk`
@@ -269,6 +270,9 @@ Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStor
   hình; nút thu nhỏ cạnh nút Menu của trình phát → phim chạy tiếp ở cửa sổ nổi của iPad (cửa sổ có nút phóng to / đóng);
   vuốt về màn hình chính lúc đang xem là tự thu nhỏ (Cài đặt → Phát video).
 - **DNS mã hoá** (từ 1.11, bật sẵn): như bản TV — xem [DNS mã hoá](#dns-mã-hoá-doh--dot-bật-sẵn-từ-211).
+- **Cài lên tivi / mời bạn bè** (từ 1.16): Cài đặt → Liên hệ → «Cài lên tivi / mời bạn bè — mã Downloader 9192365» hiện mã
+  Downloader thật to và ba bước cài bản TV; «Gửi hướng dẫn…» mở bảng chia sẻ của máy (Zalo, Tin nhắn, AirDrop…) với sẵn tin nhắn
+  hướng dẫn, «Chép» chép tin nhắn đó — xem [Cài trên Android TV bằng Downloader](#cài-trên-android-tv-bằng-downloader).
 - **Khác bản TV:** không có con trỏ ảo (chạm thẳng vào trang web). Lúc bật proxy / vượt chặn / DNS mã hoá, trên iPadOS 15–16
   app không giữ cookie của trang web sau khi tắt app.
 
@@ -306,6 +310,9 @@ cả chuột lẫn bàn phím / remote:
   ghép của máy tính, tìm máy trong mạng, ghép bằng mã hoặc IP của máy kia. Lần đầu Windows hỏi cho dùng mạng: **Cho phép** (mạng
   riêng) — không thì TV / iPad không gọi sang máy tính được (máy tính vẫn tự gọi sang TV / iPad).
 - **DNS mã hoá** (từ 1.8, bật sẵn): như bản TV — xem [DNS mã hoá](#dns-mã-hoá-doh--dot-bật-sẵn-từ-211).
+- **Cài lên tivi / mời bạn bè** (từ 1.14): Cài đặt → Giới thiệu → «Cài lên tivi / mời bạn bè — mã Downloader 9192365» hiện mã
+  Downloader thật to và ba bước cài bản TV; nút «Chép hướng dẫn để gửi bạn bè» (dán vào Zalo, tin nhắn), «Chép mã», «Mở trang
+  hướng dẫn» — xem [Cài trên Android TV bằng Downloader](#cài-trên-android-tv-bằng-downloader).
 - **Chưa có:** xem riêng, chấm điểm server.
 
 ## Phím điều khiển
@@ -604,7 +611,7 @@ trên GitHub khớp SHA-256 với tệp trong máy, bản TV thì tải thử qu
 <tv|windows|ipad> -Verify` kiểm lại một bản đã đăng, không sửa gì.
 
 **Mã Downloader `9192365`** (aftv.news, trỏ vào link cố định) nằm ở năm chỗ — đổi mã thì sửa cả năm: `Invite.kt` (TV: màn «Mời
-bạn bè cài app», từ 2.16), `Invite.swift` (iPad / iPhone) và `Invite.cs` (Windows) — Cài đặt → «Cài lên tivi / mời bạn bè»: mã to,
+bạn bè cài app», từ 2.16), `Invite.swift` (iPad / iPhone, từ 1.16) và `Invite.cs` (Windows, từ 1.14) — Cài đặt → «Cài lên tivi / mời bạn bè»: mã to,
 ba bước, nút gửi / chép hướng dẫn, không có mã QR —, `release.ps1` (mục «Cài mới trên Android TV» script tự thêm vào cuối ghi chú
 mỗi bản TV; hộp cập nhật chỉ lấy «Có gì mới» nên không dài ra) và README. Tin nhắn gửi người quen (`MESSAGE` / `message`) giống
 hệt nhau ở ba bản — mỗi bản có test so đúng từng chữ. Mã QR của màn đó vẽ sẵn trong `Invite.QR` (không thêm thư viện vào app), mở

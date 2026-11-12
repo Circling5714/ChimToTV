@@ -7,6 +7,41 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## iPad 1.16 — 13/11/2026
+
+- **Cài lên tivi / mời bạn bè** — mục mới ở Cài đặt → Liên hệ («Cài lên tivi / mời bạn bè — mã Downloader 9192365»): màn hiện
+  **mã Downloader `9192365`** thật to cùng ba bước cài bản TV lên tivi / box Android, không cần USB hay máy tính. Nút **«Gửi
+  hướng dẫn…»** mở bảng chia sẻ của máy (Zalo, Tin nhắn, AirDrop…) với sẵn tin nhắn hướng dẫn — cùng nội dung với bản TV và
+  Windows; **«Chép»** chép tin nhắn đó; «Đóng». Dùng được cả dọc lẫn ngang, iPad và iPhone. Không có mã QR.
+- bản 1.16 (CFBundleVersion 21) · mã gói `vn.chimto.tv` · tag `ios-v1.16` (không phải "latest") · commit `c4472af` (tính năng:
+  `2d96a65`) · `ConBangTV-iPad-1.16.ipa` 4 481 661 byte · SHA-256
+  `22cc5039b80199b9e98c7475916bf5ea6f6ee7445c53293520e3d175579e9295`
+- 147 test lõi trên macOS (thêm 2). Bản thử 117 (cùng mã nguồn app) trên iPhone iOS 15.8.3: Cài đặt → cuộn tới «Liên hệ» → bấm
+  mục mới, màn hiện đúng khi cầm dọc và ngang; «Chép» đổi thành «Đã chép»; «Gửi hướng dẫn…» mở bảng chia sẻ có đúng tin nhắn;
+  «Đóng» về lại Cài đặt. Bản chính thức cài lên iPhone (đè 1.15): mở được, không có báo cáo văng (dừng ở màn «Miễn trừ trách
+  nhiệm» — bản chính thức trên máy thử chưa bấm «Đồng ý», nên chưa xem được màn mới trong chính bản này). Bản thử thấy bản mới
+  trên GitHub và hiện hộp «Có bản mới 1.16» lúc 05:20:50. **Bản iPad đầu tiên đăng bằng `release.ps1`** (tự đặt
+  `--latest=false`): `releases/latest` vẫn `v2.16`, tệp tải từ link công khai khớp SHA-256. Chưa thử trên iPad (máy thử không
+  bật).
+- Máy ảo iPhone trên CI lúc phát hành không mở được app: bộ máy ảo iOS 18.5 của máy chạy GitHub không có
+  `/usr/lib/swift/libswiftWebKit.dylib` mà tệp chạy đặt mức tối thiểu iOS 15 lại cần. Chỉ máy ảo bị — tệp chạy trong IPA 1.16 nạp
+  cùng danh sách thư viện, cùng SDK 18.5 với IPA 1.15, và chạy trên iPhone thật.
+
+## Windows 1.14 — 13/11/2026
+
+- **Cài lên tivi / mời bạn bè** — mục mới ở Cài đặt → Giới thiệu («Cài lên tivi / mời bạn bè — mã Downloader 9192365»): trang
+  hiện **mã Downloader `9192365`** thật to cùng ba bước cài bản TV lên tivi / box Android (cài app Downloader → nhập mã → Install),
+  không cần USB. Ba nút: **«Chép hướng dẫn để gửi bạn bè»** (chép sẵn tin nhắn để dán vào Zalo, tin nhắn — cùng nội dung với nút
+  «Gửi hướng dẫn…» của bản TV), **«Chép mã»**, **«Mở trang hướng dẫn»**. Không có mã QR (máy tính thì gửi thẳng tin nhắn).
+- Ghi chú bản này trên trang Releases có thêm link trang giới thiệu của app: <https://conbangtv.github.io>.
+- bản 1.14.0 · tag `win-v1.14` (không phải "latest") · commit `c4472af` (tính năng: `a8bd585`) · `ConBangTV-Windows-1.14.exe`
+  72 924 136 byte · SHA-256 `9fdd8581683f6745cb048abb112c11e47f15d6400d5a06bd138fa504106e63e8`
+- 131 test lõi (thêm 2: mã, link và tin nhắn gửi người quen đúng từng chữ như bản TV). Thử tệp đóng gói (điều khiển bằng UI
+  Automation): Cài đặt → mục mới mở đúng trang, đủ chữ; «Chép mã» đưa `9192365` vào bộ nhớ tạm, «Chép hướng dẫn…» đưa đúng tin
+  nhắn; không có cổng gỡ lỗi. **Bản Windows đầu tiên đăng bằng `release.ps1`** (tự đặt `--latest=false`): `releases/latest` vẫn
+  `v2.16`, tệp tải từ link công khai khớp SHA-256. **Tự cập nhật thật 1.13 → 1.14** (bản chép riêng) lúc 04:40:31 — hộp «Có bản
+  mới» hiện đúng mục «Có gì mới».
+
 ## 2.16 — 12/11/2026
 
 - **Mời bạn bè cài app** — mục mới trong menu bên trái (ngay trên «Cài đặt») và trong Cài đặt → Liên hệ: màn hiện **mã Downloader
