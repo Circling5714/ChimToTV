@@ -59,7 +59,7 @@ class DebugBoot : ContentProvider() {
  *   /swipe?x1=&y1=&x2=&y2=&ms=300 vuốt
  *   /key?k=BACK|ENTER|DPAD_DOWN…  phím
  *   /orient?o=portrait|landscape|auto   ép hướng màn (auto = theo cảm biến như bản thật)
- *   /open?s=main|settings         mở màn
+ *   /open?s=main|settings|invite  mở màn
  *   /js?c=<mã JS>                 chạy JS ở khung trên cùng của WebView đang hiện (trình phát, Duyệt web)
  */
 object DebugServer {
@@ -149,6 +149,7 @@ object DebugServer {
                 "/open" -> {
                     val cls = when (q["s"]) {
                         "settings" -> SettingsActivity::class.java
+                        "invite" -> InviteActivity::class.java
                         else -> MainActivity::class.java
                     }
                     onMain { (top ?: app).startActivity(Intent(top ?: app, cls).addFlags(if (top == null) Intent.FLAG_ACTIVITY_NEW_TASK else 0)) }

@@ -42,7 +42,7 @@ class MainActivity : BaseActivity() {
         finish()
     }
 
-    private enum class Kind { PIP_EXPAND, PIP_CLOSE, PROFILE, HOME, SEARCH, HISTORY, FOLLOWS, IMDB, CATEGORY, FILTER, SITE, WEB, CLEAR, SETTINGS }
+    private enum class Kind { PIP_EXPAND, PIP_CLOSE, PROFILE, HOME, SEARCH, HISTORY, FOLLOWS, IMDB, CATEGORY, FILTER, SITE, WEB, CLEAR, INVITE, SETTINGS }
 
     private data class Entry(val title: String, val kind: Kind, val url: String? = null)
 
@@ -594,6 +594,8 @@ class MainActivity : BaseActivity() {
         items += Entry("Đổi trang phim", Kind.SITE)
         items += Entry("Duyệt web", Kind.WEB)
         items += Entry("Xoá dữ liệu web", Kind.CLEAR)
+        // Mã Downloader + mã QR để người quen tự cài app lên tivi của họ (Invite.kt)
+        items += Entry(Invite.TITLE, Kind.INVITE)
         items += Entry("Cài đặt", Kind.SETTINGS)
         return items
     }
@@ -645,6 +647,10 @@ class MainActivity : BaseActivity() {
             }
             Kind.SETTINGS -> {
                 startActivity(Intent(this, SettingsActivity::class.java))
+                return
+            }
+            Kind.INVITE -> {
+                InviteActivity.open(this)
                 return
             }
             Kind.SITE -> {

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mời bạn bè cài app (InviteActivity): mã Downloader thật to, ba bước cài, mã QR mở trang hướng dẫn. InviteActivity.arrange
+     đổi lề, cỡ chữ và hướng xếp cho điện thoại cầm dọc. Trên TV mọi thứ vừa một màn, chỉ nút «Đóng» nhận phím. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/inviteRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:orientation="vertical"
+    android:paddingStart="48dp"
+    android:paddingTop="28dp"
+    android:paddingEnd="48dp"
+    android:paddingBottom="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Mời bạn bè cài Côn Bằng TV"
+        android:textColor="@color/text"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Tivi / box Android nào cũng cài được bằng app Downloader — không cần USB hay máy tính."
+        android:textColor="@color/text_dim"
+        android:textSize="15sp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="14dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:focusable="false">
+
+        <LinearLayout
+            android:id="@+id/inviteContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/inviteSteps"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="1.  Trên tivi, mở CH Play và cài app Downloader (của AFTVnews)."
+                    android:textColor="@color/text"
+                    android:textSize="19sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="2.  Mở Downloader, nhập mã này rồi bấm Go:"
+                    android:textColor="@color/text"
+                    android:textSize="19sp" />
+
+                <TextView
+                    android:id="@+id/inviteCode"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="28dp"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/focus"
+                    android:textSize="64sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="3.  Tải xong chọn Install. Lần đầu tivi hỏi cho phép Downloader cài ứng dụng thì cho phép."
+                    android:textColor="@color/text"
+                    android:textSize="19sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="Cài xong, các bản sau app tự cập nhật."
+                    android:textColor="@color/text_dim"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/inviteQrBox"
+                android:layout_width="290dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="40dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <vn.chimto.tv.QrView
+                    android:layout_width="260dp"
+                    android:layout_height="260dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:text="Chụp mã QR bằng điện thoại để mở hướng dẫn này và gửi cho bạn bè"
+                    android:textColor="@color/text_dim"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/btnInviteClose"
+            style="@style/TvButton"
+            android:minWidth="140dp"
+            android:text="Đóng" />
+
+        <!-- Chỉ trên điện thoại / máy tính bảng (TV không có app nhắn tin): gửi cách cài qua Zalo, tin nhắn… -->
+        <TextView
+            android:id="@+id/btnInviteShare"
+            style="@style/TvButton"
+            android:text="Gửi hướng dẫn…"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/inviteLinks"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:textColor="@color/text_dim"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

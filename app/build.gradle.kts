@@ -80,4 +80,6 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     // org.json của Android trong test JVM chỉ là vỏ rỗng — NextSite đọc JSON nên test cần bản thật
     testImplementation("org.json:json:20240303")
+    // Chỉ cho test (không vào APK): dựng lại và đọc lại mã QR vẽ sẵn của màn «Mời bạn bè cài app» (InviteTest)
+    testImplementation("com.google.zxing:core:3.5.3")
 }

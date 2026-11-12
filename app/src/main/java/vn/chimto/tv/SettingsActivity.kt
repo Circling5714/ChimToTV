@@ -319,6 +319,10 @@ class SettingsActivity : BaseActivity() {
         }
 
         // Mở trang Telegram ngay trong app (TV thường không có Telegram / trình duyệt riêng)
+        findViewById<TextView>(R.id.btnInvite).apply {
+            text = "${Invite.TITLE} — mã Downloader ${Invite.CODE}"
+            setOnClickListener { InviteActivity.open(this@SettingsActivity) }
+        }
         findViewById<View>(R.id.btnContact).setOnClickListener { startActivity(WebActivity.intent(this, CONTACT_URL)) }
         findViewById<View>(R.id.btnDisclaimer).setOnClickListener { DisclaimerActivity.open(this, gate = false) }
 

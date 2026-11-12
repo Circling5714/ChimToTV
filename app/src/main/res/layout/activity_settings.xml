@@ -460,6 +460,12 @@
             style="@style/SettingsLabel"
             android:text="Liên hệ" />
 
+        <!-- Mã Downloader + mã QR để người quen cài app lên tivi của họ (InviteActivity); chữ đặt trong SettingsActivity -->
+        <TextView
+            android:id="@+id/btnInvite"
+            style="@style/TvButton"
+            android:layout_marginTop="8dp" />
+
         <!-- Nút (không phải chữ thường) để remote đi tới được và màn hình cuộn xuống tới mục này -->
         <TextView
             android:id="@+id/btnContact"
