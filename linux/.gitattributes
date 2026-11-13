@@ -1,0 +1,5 @@
+# Mã nguồn bản Linux luôn xuống dòng kiểu Unix (gửi sang máy Ubuntu để dựng; script .sh hỏng nếu có CRLF)
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.svg text eol=lf
