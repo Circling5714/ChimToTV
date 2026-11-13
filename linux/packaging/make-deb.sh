@@ -24,6 +24,8 @@ for s in 32 48 64 128 256 512; do
   install -Dm644 "$HERE/icons/$s.png" "$ROOT/usr/share/icons/hicolor/${s}x${s}/apps/vn.chimto.tv.png"
 done
 install -Dm644 "$HERE/vn.chimto.tv.metainfo.xml" "$ROOT/usr/share/metainfo/vn.chimto.tv.metainfo.xml"
+# Font Inter nhúng trong tệp chạy (app/src/fonts.rs) — giấy phép SIL OFL phải đi kèm
+install -Dm644 "$HERE/../app/fonts/OFL.txt" "$ROOT/usr/share/doc/conbangtv/Inter-OFL.txt"
 
 SIZE=$(du -sk "$ROOT/usr" | cut -f1)
 mkdir -p "$ROOT/DEBIAN"

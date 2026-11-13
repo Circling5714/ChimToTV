@@ -34,12 +34,14 @@ fn css(s: f64) -> String {
     format!(
         r#"
 * {{ outline-width: 0; -gtk-outline-radius: 0; }}
+window, tooltip, popover, menu {{ font-family: {font_text}; }}
 window, .bg {{ background-color: {BG}; color: {TEXT}; }}
 label {{ color: {TEXT}; }}
 .dim, label.dim {{ color: {DIM}; }}
 .sidebar {{ background-color: {SURFACE}; }}
 .app-name {{ font-size: {f19}; font-weight: bold; }}
 .site-name {{ font-size: {f13}; color: {DIM}; }}
+.h1, .big, .dialog-title, .osd-title, .hud label {{ font-family: {font_display}; }}
 .h1 {{ font-size: {f21}; font-weight: 600; }}
 .h2 {{ font-size: {f16}; font-weight: 600; }}
 .big {{ font-size: {f24}; font-weight: 600; }}
@@ -112,6 +114,8 @@ scale.seek trough {{ background-color: rgba(255,255,255,0.33); min-height: {p5};
 scale.seek highlight {{ background-color: {BRAND}; border-radius: 3px; border: none; }}
 scale.seek slider {{ background-color: #FFFFFF; min-width: {p16}; min-height: {p16}; border-radius: 50%; border: none; box-shadow: none; }}
 "#,
+        font_text = crate::fonts::TEXT,
+        font_display = crate::fonts::DISPLAY,
         f13 = f(13.0),
         f14 = f(14.0),
         f15 = f(15.0),

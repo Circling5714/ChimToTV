@@ -34,6 +34,7 @@ fn circle(p: &Profile, size: f64) -> gtk::DrawingArea {
         let _ = cr.fill();
         let l = w.create_pango_layout(Some(&initial));
         let mut fd = pango::FontDescription::new();
+        fd.set_family(crate::fonts::DISPLAY_PANGO);
         fd.set_absolute_size(s * 0.45 * pango::SCALE as f64);
         fd.set_weight(pango::Weight::Bold);
         l.set_font_description(Some(&fd));

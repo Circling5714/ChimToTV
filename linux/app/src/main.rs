@@ -6,6 +6,7 @@ mod assets;
 mod card;
 mod css;
 mod debug;
+mod fonts;
 mod hooks;
 mod images;
 mod keynav;
@@ -36,6 +37,7 @@ fn main() {
     cbtv::log::d("app", &format!("Côn Bằng TV {} (Linux) mở", cbtv::version()));
     cbtv::prefs::apply_net_defaults();
     cbtv::net::start_bridge();
+    fonts::install();
     glib::set_prgname(Some("conbangtv"));
     glib::set_application_name("Côn Bằng TV");
 
