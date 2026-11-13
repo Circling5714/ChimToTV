@@ -7,6 +7,49 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## Link tải cố định cho bản Windows và iPad / iPhone — 13/11/2026
+
+Như link APK của bản TV, hai link này **luôn tải bản mới nhất** và không bao giờ đổi (trang giới thiệu
+<https://conbangtv.github.io> đã dùng):
+
+- Windows: `https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_windows/ConBangTV-Windows.exe`
+- iPad / iPhone: `https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_ios/ConBangTV-iPad.ipa`
+
+Mỗi nền tảng có một release riêng với tag không đổi (`conbangtv_windows`, `conbangtv_ios`); mỗi lần phát hành `release.ps1` chép
+đè tệp mới vào đó và ghi ở ghi chú của release đang là bản nào. Lúc tạo (07:47 và 07:50): Windows = bản 1.14, iPad / iPhone = bản
+1.16.1; tệp tải qua hai link khớp SHA-256 với tệp của `win-v1.14` / `ios-v1.16.1`. Ba bộ tự cập nhật không bị ảnh hưởng: bản
+Windows 1.13 chạy thử vẫn được mời lên đúng 1.14, bản iPhone 1.16.1 không bị mời cài gì, `releases/latest` vẫn là bản TV.
+
+## iPad 1.16.1 — 13/11/2026
+
+- **Sửa nhãn IMDb đè lên nhãn tập** trên thẻ phim (có từ 1.15): nhãn tập ở góc dưới trái và điểm IMDb ở góc dưới phải trước đây
+  là hai lớp riêng, nên thẻ hẹp (iPhone cầm dọc, dải vuốt ngang) hoặc nhãn tập dài («Tập 189 mới») thì chồng lên nhau — rõ nhất ở
+  trang «Điểm IMDb cao» và hàng «Có tập mới». Giờ đủ chỗ thì vẫn chung một hàng, không đủ thì nhãn IMDb lên hàng trên.
+- **Màn «Cài lên tivi / mời bạn bè» trên iPhone cầm dọc** (lỗi của 1.16): nội dung không còn tràn sát hai mép màn hình — nút
+  «Gửi hướng dẫn…» một hàng riêng, «Chép» / «Đóng» chia đôi hàng dưới; màn ngang và iPad như cũ.
+- bản 1.16.1 (CFBundleVersion 22) · mã gói `vn.chimto.tv` · tag `ios-v1.16.1` (không phải "latest") · commit `3a3e862` (sửa:
+  `9a972eb`, `9e706e7`) · `ConBangTV-iPad-1.16.1.ipa` 4 489 492 byte · SHA-256
+  `fb6986e9e859eb5cd4e59a9f708f1c653b1ac155b1d0dc8f0bd1f40ae768eab4`
+- 148 test lõi trên macOS (thêm 1). iPhone thật iOS 15.8.3 (414 pt), bản thử cùng mã nguồn: trang chủ (thẻ «Già Thiên» trước bị
+  đè → nhãn IMDb nằm trên nhãn tập), «Điểm IMDb cao» (một hàng, vừa khít), Phim bộ xếp theo IMDb (hai hàng), màn «Cài lên tivi»
+  dọc / ngang. Máy ảo iPhone SE 375 pt trên CI: các trang trên đúng, không đè, có lề. Bản chính thức cài lên iPhone (đè 1.16): mở
+  được, không có báo cáo văng. Tệp tải từ link công khai và từ link cố định khớp SHA-256; `releases/latest` vẫn là bản TV. Chưa thử
+  trên iPad (máy thử không bật).
+
+## 2.16.1 — 13/11/2026
+
+- **Sửa nhãn IMDb đè lên nhãn tập** trên thẻ phim (có từ 2.15): khi không đủ chỗ chung một hàng — điện thoại cầm dọc, thẻ hẹp ở
+  dải vuốt ngang, nhãn tập dài như «Tập 108 mới» — nhãn IMDb nằm ở hàng trên, sát mép phải; nhãn tập quá dài thì cắt bằng dấu ….
+  Đủ chỗ thì vẫn một hàng như cũ (nhãn tập trái, IMDb phải). Thấy rõ nhất ở trang «Điểm IMDb cao» và hàng «Có tập mới».
+- versionCode 40 · tag `v2.16.1` · commit `3a3e862` (sửa: `9a972eb`) · `ChimToTV-2.16.1.apk` 1 248 537 byte · SHA-256
+  `5eaa6c99e24f90d4191dcd0f0883cd6ca189aa98e59f15028b88f3d80166a82c` · kèm `ChimToTV.apk` (bản sao giống hệt, cho link cố định).
+- 156 test (thêm 1). Thử trên TV box: bản gỡ lỗi ở chế độ TV («Điểm IMDb cao», Phim bộ xếp theo IMDb — vẫn một hàng) và giả điện
+  thoại cầm dọc 3 cột (các trang trên — nhãn IMDb ở hàng trên, không đè); bản chính thức: «Điểm IMDb cao», trang chủ (thẻ có
+  «Tập 108 mới» + IMDb xếp hai hàng). Đăng bằng `release.ps1`: Latest = `v2.16.1`, hai tệp `.apk` cùng SHA-256, link cố định của
+  Downloader tải đúng bản 2.16.1, tệp tải từ link công khai khớp SHA-256. **Cập nhật tự động thật 2.16 → 2.16.1** trên TV box lúc
+  07:47 (hộp cập nhật chỉ hiện mục «Có gì mới»). Chưa thử trên điện thoại Android thật. Bản Windows không dính lỗi này (nhãn tập ở
+  góc trên trái) nên không có bản mới.
+
 ## iPad 1.16 — 13/11/2026
 
 - **Cài lên tivi / mời bạn bè** — mục mới ở Cài đặt → Liên hệ («Cài lên tivi / mời bạn bè — mã Downloader 9192365»): màn hiện
@@ -30,7 +73,7 @@ Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề
 - **Lỗi đã biết (tìm ra sau phát hành, nhờ ảnh máy ảo iPhone SE):** trên iPhone cầm dọc màn rộng 375 pt (SE / 6s / 7 / 8 / X…),
   màn «Cài lên tivi» tràn sát hai mép màn hình vì ba nút xếp một hàng không đủ chỗ — vẫn bấm được; màn 320 pt hoặc cỡ chữ lớn thì
   bị cắt hai bên. iPhone 6s Plus (414 pt) dùng để thử không lộ ra. Đã sửa trong mã nguồn (nút «Gửi hướng dẫn…» một hàng riêng,
-  «Chép» / «Đóng» chia đôi hàng dưới; thử trên máy ảo 375 pt và iPhone thật) — sẽ có ở bản iPad / iPhone kế tiếp.
+  «Chép» / «Đóng» chia đôi hàng dưới; thử trên máy ảo 375 pt và iPhone thật) — **đã sửa ở bản 1.16.1**.
 
 ## Windows 1.14 — 13/11/2026
 

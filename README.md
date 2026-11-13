@@ -16,10 +16,12 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Cài nhanh trên Android TV:** mở app **Downloader** (AFTVnews) trên tivi, nhập mã **`9192365`** — xem
 [Cài trên Android TV bằng Downloader](#cài-trên-android-tv-bằng-downloader).
 
-**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [release `ios-v1.16`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.16)
+**Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [tải bản mới nhất](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_ios/ConBangTV-iPad.ipa)
+(link cố định) · [release `ios-v1.16.1`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.16.1)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
-**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [release `win-v1.14`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.14)
+**Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [tải bản mới nhất](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_windows/ConBangTV-Windows.exe)
+(link cố định) · [release `win-v1.14`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.14)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -235,8 +237,9 @@ Latest, bản Windows / iPad thì không — xem [Phát hành bản mới](#phá
 Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStore; iPhone từ 1.3), viết riêng bằng Swift (thư mục
 `ios/`), đủ các tính năng chính của bản TV, điều khiển bằng chạm:
 
-- **Cài:** cần TrollStore. Tải `ConBangTV-iPad-<bản>.ipa` ở release `ios-v<bản>` (một tệp cho cả iPad và iPhone) → mở
-  bằng TrollStore → Install. Bản sau app tự tìm trên GitHub (release `ios-v…`) và mở TrollStore để cài đè, giữ lịch sử xem:
+- **Cài:** cần TrollStore. Tải bản mới nhất qua
+  [link cố định](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_ios/ConBangTV-iPad.ipa) (hoặc
+  `ConBangTV-iPad-<bản>.ipa` ở release `ios-v<bản>`; một tệp cho cả iPad và iPhone) → mở bằng TrollStore → Install. Bản sau app tự tìm trên GitHub (release `ios-v…`) và mở TrollStore để cài đè, giữ lịch sử xem:
   hộp thoại «Có bản mới» → **Cài đặt ngay** → TrollStore tự tải rồi hỏi Install (cả iOS / iPadOS 15 từ 1.8.2; bản 1.8.1 trở
   về trước trên iOS 15 bấm «Kiểm tra cập nhật» trong Cài đặt không hiện hộp thoại — tải tay một lần lên 1.8.2).
 - **iPhone** (từ 1.3): màn chính dọc hoặc ngang (menu ẩn vào nút ☰), trình phát luôn xem ngang, thanh nút gọn (chạm đúp hai
@@ -281,8 +284,9 @@ Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStor
 App cho máy tính và mini PC cắm tivi chạy Windows 10 / 11 (thư mục `windows/`, C# .NET 8 + WPF + WebView2), dùng được
 cả chuột lẫn bàn phím / remote:
 
-- **Cài:** tải `ConBangTV-Windows-<bản>.exe` ở release `win-v<bản>`, để vào thư mục nào cũng được rồi mở — không cần cài
-  .NET. Lần đầu Windows báo «Windows protected your PC» (app chưa có chữ ký số): **More info → Run anyway**. Cần Microsoft
+- **Cài:** tải bản mới nhất qua
+  [link cố định](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_windows/ConBangTV-Windows.exe) (hoặc
+  `ConBangTV-Windows-<bản>.exe` ở release `win-v<bản>`), để vào thư mục nào cũng được rồi mở — không cần cài .NET. Lần đầu Windows báo «Windows protected your PC» (app chưa có chữ ký số): **More info → Run anyway**. Cần Microsoft
   Edge WebView2 Runtime (Windows 10 / 11 cập nhật thường có sẵn; máy chưa có thì app báo và mở trang tải). Dữ liệu ở
   `%LOCALAPPDATA%\ConBangTV`. Bản sau tự cập nhật (Cài đặt → **Kiểm tra cập nhật**; tự hỏi tối đa 2 giờ một lần).
 - **Màn chính:** menu bên trái (Người xem, Trang chủ, Tìm kiếm, Xem tiếp / Lịch sử, Theo dõi, các mục của trang, Thể loại… /
@@ -609,6 +613,19 @@ thứ đi theo release đang là **Latest**: app TV tự cập nhật (hỏi `re
 có; riêng APK: đúng gói, đúng số bản, đúng chứng chỉ ký. Sau khi đăng: Latest phải là bản TV mới nhất (lệch thì tự trả về), tệp
 trên GitHub khớp SHA-256 với tệp trong máy, bản TV thì tải thử qua link cố định. `-DryRun` chỉ in lệnh; `.\release.ps1
 <tv|windows|ipad> -Verify` kiểm lại một bản đã đăng, không sửa gì.
+
+**Link tải cố định của bản Windows / iPad (từ 13/11/2026)** — luôn là bản mới nhất, như link APK:
+
+- `https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_windows/ConBangTV-Windows.exe`
+- `https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_ios/ConBangTV-iPad.ipa`
+
+Bản Windows / iPad không bao giờ là Latest nên không dùng được `…/releases/latest/download/…`; thay vào đó mỗi nền tảng có một
+release «cuốn chiếu» với tag không đổi (`conbangtv_windows`, `conbangtv_ios`) và tệp tên cố định. `.\release.ps1 windows|ipad`
+đăng bản có số xong thì tự chép tệp vào đó (tải lên dưới tên tạm rồi đổi tên — link chỉ gián đoạn chừng một giây), ghi vào ghi chú
+của release đang là bản nào, rồi kiểm SHA-256 và tải thử link. `.\release.ps1 windows -FixedOnly` (hoặc `ipad`) chỉ chép tệp của
+bản đã đăng vào link cố định — dùng khi link lệch. **Đừng đổi hai tag / hai tên tệp này và đừng xoá hai release đó** (link đã gửi
+cho người dùng và nằm trên trang giới thiệu). Bộ tự cập nhật không nhìn thấy chúng: TV đọc `releases/latest`, Windows / iPad chỉ
+nhận tag `win-v…` / `ios-v…`.
 
 **Mã Downloader `9192365`** (aftv.news, trỏ vào link cố định) nằm ở năm chỗ — đổi mã thì sửa cả năm: `Invite.kt` (TV: màn «Mời
 bạn bè cài app», từ 2.16), `Invite.swift` (iPad / iPhone, từ 1.16) và `Invite.cs` (Windows, từ 1.14) — Cài đặt → «Cài lên tivi / mời bạn bè»: mã to,

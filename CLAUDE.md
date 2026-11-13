@@ -31,9 +31,10 @@ Trước đây tên là ChimTo TV: chỉ đổi tên hiển thị / logo — mã
 2. `gh workflow run ios.yml --ref main -f release=true` → artifact `ipa` có `ConBangTV-iPad-<bản>.ipa` (mã gói
    `vn.chimto.tv`, không có cổng gỡ lỗi). Kiểm Info.plist (mã gói, tên, bản), cài thử lên iPad thật.
 3. `.\release.ps1 ipad -Notes <tệp ghi chú> -File ConBangTV-iPad-<bản>.ipa` — script **luôn đặt `--latest=false`**: app TV đọc
-   `releases/latest` + tệp `.apk`, link Downloader cũng đi theo Latest. Ghi chú cũng phải có `## Có gì mới`.
+   `releases/latest` + tệp `.apk`, link Downloader cũng đi theo Latest. Ghi chú cũng phải có `## Có gì mới`. Script tự chép tệp
+   vào link cố định (xem dưới).
 4. Kiểm: `releases/latest` vẫn là bản Android (script tự kiểm, lệch thì trả về bản TV mới nhất); release iPad có `.ipa`; tải từ
-   link công khai, SHA-256 khớp.
+   link công khai và từ link cố định, SHA-256 khớp.
 
 ## Phát hành bản Windows (`windows/`)
 
@@ -41,9 +42,16 @@ Trước đây tên là ChimTo TV: chỉ đổi tên hiển thị / logo — mã
 2. `.\windows\build.ps1` → chạy test rồi đóng gói `dist\ConBangTV-Windows-<bản>.exe`. Chạy thử tệp đóng gói (thư mục dữ liệu riêng:
    `CONBANG_DATA_DIR`).
 3. `git push`, rồi `.\release.ps1 windows -Notes <tệp ghi chú>` — tag `win-v<bản>`, script **luôn đặt `--latest=false`**. Ghi chú
-   cũng phải có `## Có gì mới`.
-4. Kiểm: `releases/latest` vẫn là bản Android; release có `.exe`; tải từ link công khai, SHA-256 khớp; tự cập nhật thật từ bản
-   trước (bản chép riêng).
+   cũng phải có `## Có gì mới`. Script tự chép tệp vào link cố định (xem dưới).
+4. Kiểm: `releases/latest` vẫn là bản Android; release có `.exe`; tải từ link công khai và từ link cố định, SHA-256 khớp; tự cập
+   nhật thật từ bản trước (bản chép riêng).
+
+## Link tải cố định của bản Windows / iPad (từ 13/11/2026) — không đổi tag, không xoá
+
+- `…/releases/download/conbangtv_windows/ConBangTV-Windows.exe` và `…/releases/download/conbangtv_ios/ConBangTV-iPad.ipa` luôn là
+  bản mới nhất (anh đặt hai tên tag này; link đã gửi cho người dùng và nằm trên trang giới thiệu). Hai release đó là release
+  «cuốn chiếu»: `release.ps1` chép đè tệp mỗi lần phát hành — **đừng đổi tag / tên tệp, đừng xoá, đừng để thành Latest**.
+- Link lệch (script `-Verify` báo) thì sửa bằng `.\release.ps1 <windows|ipad> -FixedOnly`.
 
 ## Luật lâu dài: phát hành thành công xong thì luôn cập nhật markdown
 
