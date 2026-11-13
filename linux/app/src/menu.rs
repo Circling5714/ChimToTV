@@ -38,7 +38,8 @@ pub fn entries(a: &App) -> Vec<MenuEntry> {
         let k2 = key.clone();
         add(&key, c.title.clone(), Rc::new(move || app().show_root(pages::lists::list(&t, &u, &k2))));
     }
-    if cbtv::site::has_filters(&prefs::base_url()) {
+    let b = prefs::base_url();
+    if cbtv::next_site::is_known(&b) || cbtv::api_site::is_known(&b) {
         add("genres", "Thể loại…".into(), Rc::new(|| app().show_root(pages::lists::filter(true))));
         add("countries", "Quốc gia…".into(), Rc::new(|| app().show_root(pages::lists::filter(false))));
     }

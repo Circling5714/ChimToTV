@@ -557,20 +557,21 @@ impl Page for FilterPage {
         let t = self.base.next_token();
         let b = prefs::base_url();
         let me = self.clone();
-        ui::spawn(async move { cbtv::site::filters(&b).await }, move |r| {
+        ui::spawn(async move { if cbtv::api_site::is_known(&b) { Ok(cbtv::api_site::filters(&b)) } else { cbtv::next_site::filters(&b).await } }, move |r| {
             if t != me.base.token() {
                 return;
             }
             match r {
-                Ok(f) => {
-                    let items = if me.genres { f.genres } else { f.countries };
+                Ok((g, c)) => {
+                    let items = if me.genres { g } else { c };
                     me.base.clear();
                     me.base.add(&ui::header(if me.genres { "Thể loại" } else { "Quốc gia" }));
                     let grid = ui::flow(10.0, 10.0);
                     let key = me.base.menu_key.borrow().clone();
                     for c in items {
                         let k = key.clone();
-                        let p = ui::pill(&c.title, move || app().push(list(&c.title, &c.url, &k)));
+                        let (t, u) = (c.title.clone(), c.url.clone());
+                        let p = ui::pill(&c.title, move || app().push(list(&t, &u, &k)));
                         p.set_size_request(px(150.0), -1);
                         ui::add_flow(&grid, p.upcast_ref());
                     }

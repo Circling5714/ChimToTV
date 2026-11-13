@@ -78,7 +78,7 @@ impl ProfilesPage {
             );
             name.set_size_request(px(170.0), -1);
             row.pack_start(&name, false, false, 0);
-            let mut add = |label: &str, f: Box<dyn Fn()>| {
+            let add = |label: &str, f: Box<dyn Fn()>| {
                 row.pack_start(&ui::pill(label, f), false, false, 0);
             };
             let me = self.clone();
@@ -257,9 +257,8 @@ impl ProfilesPage {
             for (i, name) in prefs::PROFILE_COLOR_NAMES.iter().enumerate() {
                 let b = ui::pill_tag(name, (i as i64 == p.color).then_some("active"), move || app().close_dialog(100 + i as i32));
                 b.set_size_request(px(120.0), -1);
-                let (r, g, bl) = rgb(&format!("#{:06X}", prefs::PROFILE_COLORS[i]));
-                if let Some(l) = b.child() {
-                    l.override_color(gtk::StateFlags::NORMAL, Some(&gdk::RGBA::new(r, g, bl, 1.0)));
+                if let Some(l) = b.child().and_then(|c| c.downcast::<gtk::Label>().ok()) {
+                    l.set_markup(&format!("<span foreground='#{:06X}'>{}</span>", prefs::PROFILE_COLORS[i], glib::markup_escape_text(name)));
                 }
                 ui::add_flow(&tiles, b.upcast_ref());
             }

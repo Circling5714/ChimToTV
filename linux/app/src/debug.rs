@@ -19,7 +19,7 @@ pub fn start() {
     if std::env::var_os("CONBANG_DEBUG").is_none() {
         return;
     }
-    let (tx, rx) = async_channel_like();
+    let (tx, mut rx) = async_channel_like();
     std::thread::spawn(move || {
         let l = match std::net::TcpListener::bind("127.0.0.1:8790") {
             Ok(l) => l,

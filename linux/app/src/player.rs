@@ -10,7 +10,7 @@
 
 use crate::app::app;
 use crate::css::px;
-use crate::keynav::{self, Dir};
+use crate::keynav;
 use crate::ui;
 use cbtv::util::format_time;
 use cbtv::{prefs, EpisodeGroup, EpisodeSource, FilmDetail, HistoryItem, Server};

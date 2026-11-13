@@ -4,6 +4,7 @@
 use crate::app::app;
 use cbtv::prefs;
 use cbtv::watch_limit as wl;
+use gtk::prelude::*;
 
 pub use wl::Block;
 
