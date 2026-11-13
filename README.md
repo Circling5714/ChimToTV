@@ -372,7 +372,14 @@ WebKitGTK 4.1), dùng được cả chuột lẫn bàn phím / remote — giao d
 - **Tự cập nhật:** Cài đặt → **Kiểm tra cập nhật** (tự hỏi tối đa 2 giờ một lần) — tải `.deb` của release `linux-v<bản>`, kiểm tên
   gói / số bản / kiến trúc, cài bằng `pkexec apt-get install` (hệ thống hỏi mật khẩu máy) rồi mở lại app.
 - **Đồng bộ trong nhà:** như TV / iPad / Windows (cổng 8791, mDNS `_conbangtv._tcp`, nền tảng «linux»).
-- **Chưa có:** cửa sổ phim nhỏ (Wayland không cho app tự đặt cửa sổ luôn nổi), xem riêng, chấm điểm server.
+- **Cửa sổ phim nhỏ:** nút «▣ Thu nhỏ» / phím W — phim chạy tiếp ở cửa sổ nhỏ, cửa sổ app trở lại các trang (bấm vào phim:
+  phát / dừng, bấm đúp hoặc Enter: phóng to, Esc: tắt). Trên X11 cửa sổ nhỏ luôn nổi ở góc dưới phải; GNOME Wayland không cho app
+  tự đặt chỗ / tự nổi trên cùng — muốn thì Alt+Space → «Luôn ở trên».
+- **Font chữ:** Inter (gần giống San Francisco của iOS nhất trong các font mở, đủ dấu tiếng Việt; tiêu đề lớn dùng Inter Display) —
+  nhúng sẵn trong app, giấy phép SIL OFL ở `/usr/share/doc/conbangtv/Inter-OFL.txt`.
+- **Máy không có card đồ hoạ** (máy ảo…): app tự tắt dựng hình bằng OpenGL giả lập của WebKit (đo trên máy ảo: phim 1080p từ 240%
+  còn 72% CPU, không rơi khung). Ép bằng biến môi trường `CONBANG_HWACCEL=never|always|ondemand`.
+- **Chưa có:** xem riêng, chấm điểm server.
 
 Dựng: `.\linux\build.ps1 [-CoreOnly] [-Test] [-Run]` gửi mã nguồn sang máy Ubuntu thử (bộ lệnh `E:\DEV_CODE\_May_Test_App\ubuntu.ps1`),
 dựng và chạy test / mở app trên màn hình máy đó (bản thử có cổng gỡ lỗi 127.0.0.1:8790 khi chạy với `CONBANG_DEBUG=1`).
