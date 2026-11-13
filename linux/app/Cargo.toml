@@ -1,0 +1,23 @@
+[package]
+name = "conbangtv"
+description = "Côn Bằng TV — xem phim bằng bàn phím / remote / chuột"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "conbangtv"
+path = "src/main.rs"
+
+[dependencies]
+conbang-core = { path = "../core" }
+gtk = "0.18"
+gdk = "0.18"
+glib = "0.18"
+gio = "0.18"
+gdk-pixbuf = "0.18"
+pango = "0.18"
+webkit2gtk = { version = "2.0", features = ["v2_38"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "io-util", "sync", "macros"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+async-channel = "2"
