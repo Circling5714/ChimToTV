@@ -354,6 +354,31 @@ cả chuột lẫn bàn phím / remote:
   hướng dẫn» — xem [Cài trên Android TV bằng Downloader](#cài-trên-android-tv-bằng-downloader).
 - **Chưa có:** xem riêng, chấm điểm server.
 
+## Bản Linux
+
+App cho máy tính / mini PC chạy **Ubuntu 22.04+, Linux Mint 21+, Debian 12+** (64-bit x86; thư mục `linux/`, Rust + GTK3 +
+WebKitGTK 4.1), dùng được cả chuột lẫn bàn phím / remote — giao diện, phím và tính năng như [Bản Windows](#bản-windows):
+
+- **Cài:** tải tệp `.deb` rồi mở bằng App Center / «Software Install», hoặc `sudo apt install ./ConBangTV-Linux-<bản>.deb` (apt tự
+  cài GTK / WebKitGTK / GStreamer còn thiếu). App hiện trong danh sách ứng dụng với tên «Côn Bằng TV». Tệp `.deb` chỉ vài MB vì
+  dùng thư viện có sẵn của hệ thống. Dữ liệu ở `~/.local/share/conbangtv` (mật khẩu proxy / khoá Shadowsocks trong
+  `secret.json`, quyền 600 — không dùng kho khoá GNOME vì máy tự đăng nhập thì kho khoá bị khoá), ảnh bìa ở
+  `~/.cache/conbangtv/img`.
+- **Trình phát:** WebKitGTK dùng chung trang phát của bản Android (`player.html` / `hls.html` / `player-agent.js`); trang bọc
+  nạp tại địa chỉ trang tập (`load_alternate_html`), hls.js gắn thẳng vào trang. Mọi kết nối của app và trình phát đi qua cổng
+  SOCKS5 nội bộ 127.0.0.1 (DNS mã hoá, vượt chặn, proxy) — tên miền quảng cáo / theo dõi bị từ chối ngay ở cổng này. JW Player
+  (streamfree.vip) trên WebKitGTK không tự phát → app tự gửi lệnh phát sau 2,5 giây. Giải mã H.264 bằng GStreamer
+  (`gstreamer1.0-libav`); máy có card Intel / AMD cài thêm `gstreamer1.0-vaapi` để giải mã bằng phần cứng.
+- **Tự cập nhật:** Cài đặt → **Kiểm tra cập nhật** (tự hỏi tối đa 2 giờ một lần) — tải `.deb` của release `linux-v<bản>`, kiểm tên
+  gói / số bản / kiến trúc, cài bằng `pkexec apt-get install` (hệ thống hỏi mật khẩu máy) rồi mở lại app.
+- **Đồng bộ trong nhà:** như TV / iPad / Windows (cổng 8791, mDNS `_conbangtv._tcp`, nền tảng «linux»).
+- **Chưa có:** cửa sổ phim nhỏ (Wayland không cho app tự đặt cửa sổ luôn nổi), xem riêng, chấm điểm server.
+
+Dựng: `.\linux\build.ps1 [-CoreOnly] [-Test] [-Run]` gửi mã nguồn sang máy Ubuntu thử (bộ lệnh `E:\DEV_CODE\_May_Test_App\ubuntu.ps1`),
+dựng và chạy test / mở app trên màn hình máy đó (bản thử có cổng gỡ lỗi 127.0.0.1:8790 khi chạy với `CONBANG_DEBUG=1`).
+Bản phát hành: `bash linux/packaging/release-build.sh <thư mục ra>` trên máy Ubuntu — dựng trong container Ubuntu 22.04 (podman,
+glibc 2.35) rồi đóng gói `.deb` (`linux/packaging/make-deb.sh`). Mã NextDNS lấy từ `keys/nextdns.txt` lúc dựng (`linux/core/build.rs`).
+
 ## Phím điều khiển
 
 | Màn hình | Phím |

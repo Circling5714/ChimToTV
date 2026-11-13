@@ -5,6 +5,7 @@
 #   windows  tag win-v<bản>   ConBangTV-Windows-<bản>.exe                                         KHÔNG BAO GIỜ là Latest
 #   ipad     tag ios-v<bản>   ConBangTV-iPad-<bản>.ipa                                            KHÔNG BAO GIỜ là Latest
 #   mac      tag mac-v<bản>   ConBangTV-Mac-<bản>.zip (Mac Catalyst, cùng số bản với iPad)         KHÔNG BAO GIỜ là Latest
+#   linux    tag linux-v<bản> ConBangTV-Linux-<bản>.deb (dist\linux, dựng trong Ubuntu 22.04)          KHÔNG BAO GIỜ là Latest
 #
 # Vì sao phải đúng — hai thứ đi theo bản đang là Latest:
 #   1. app TV tự cập nhật: Updater.kt hỏi .../releases/latest rồi lấy tệp .apk đầu tiên (tên nào cũng được — từ bản 1.3);
@@ -39,7 +40,7 @@
 # GitHub khớp SHA-256 với tệp trong máy; bản TV: tải thử qua hai link cố định (tên mới, tên cũ) và so SHA-256; bản Windows /
 # iPad mới nhất: tệp ở link cố định khớp SHA-256 và link tải được.
 param(
-    [Parameter(Mandatory = $true, Position = 0)][ValidateSet("tv", "windows", "ipad", "mac")][string]$Platform,
+    [Parameter(Mandatory = $true, Position = 0)][ValidateSet("tv", "windows", "ipad", "mac", "linux")][string]$Platform,
     [string]$Notes = "",
     [string]$File = "",
     [switch]$DryRun,
@@ -82,6 +83,12 @@ $rolling = @{
         Tag = "conbangtv_ios"; Name = "ConBangTV-iPad.ipa"; Prefix = "ios-v"; What = "iPad / iPhone"
         Title = "Côn Bằng TV cho iPad / iPhone — link cố định (luôn là bản mới nhất)"
         How = "Cài bằng TrollStore (iOS / iPadOS 15 trở lên): mở tệp bằng TrollStore rồi chọn Install. Đã cài rồi thì không cần tải lại: app tự cập nhật."
+    }
+    linux = @{
+        Tag = "conbangtv_linux"; Name = "ConBangTV-Linux.deb"; Prefix = "linux-v"; What = "Linux"
+        Title = "Côn Bằng TV cho Linux — link cố định (luôn là bản mới nhất)"
+        How = "Ubuntu 22.04+ / Linux Mint 21+ / Debian 12+ (máy 64-bit): mở tệp bằng App Center / Software Install, hoặc chạy " +
+              "«sudo apt install ./ConBangTV-Linux.deb». Đã cài rồi thì không cần tải lại: app tự cập nhật."
     }
     mac = @{
         Tag = "conbangtv_macos"; Name = "ConBangTV-Mac.zip"; Prefix = "mac-v"; What = "Mac"
@@ -129,13 +136,18 @@ switch ($Platform) {
         $ver = (Select-String -Path ios\project.yml -Pattern 'MARKETING_VERSION:\s*"?([0-9.]+)"?').Matches[0].Groups[1].Value
         $tag = "ios-v$ver"; $title = "Côn Bằng TV cho iPad $ver"; $latest = $false; $name = "ConBangTV-iPad-$ver.ipa"
     }
+    "linux" {
+        $full = (Select-String -Path linux\Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+        $ver = $full -replace '\.0$', ''
+        $tag = "linux-v$ver"; $title = "Côn Bằng TV cho Linux $ver"; $latest = $false; $name = "ConBangTV-Linux-$ver.deb"
+    }
     "mac" {
         $ver = (Select-String -Path ios\project.yml -Pattern 'MARKETING_VERSION:\s*"?([0-9.]+)"?').Matches[0].Groups[1].Value
         $tag = "mac-v$ver"; $title = "Côn Bằng TV cho Mac $ver"; $latest = $false; $name = "ConBangTV-Mac-$ver.zip"
     }
 }
 if (-not $File) {
-    $File = Join-Path $PSScriptRoot "dist\$name"
+    $File = Join-Path $PSScriptRoot ($(if ($Platform -eq "linux") { "dist\linux\$name" } else { "dist\$name" }))
     if (-not (Test-Path $File)) { throw "Không thấy $File — dựng bản $ver trước (tv: .\build.ps1 · windows: .\windows\build.ps1 · ipad / mac: tải artifact rồi dùng -File)" }
 }
 if ((Split-Path $File -Leaf) -ne $name) { throw "Tệp phải tên $name (bản $ver đọc từ mã nguồn), đang là $(Split-Path $File -Leaf)" }

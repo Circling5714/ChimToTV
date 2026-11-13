@@ -10,7 +10,9 @@ KIND=${3:-}
 HERE=$(cd "$(dirname "$0")" && pwd)
 VER=$(grep -m1 '^version' "$HERE/../Cargo.toml" | sed -E 's/.*"(.*)".*/\1/')
 ARCH=$(dpkg --print-architecture)
-NAME="ConBangTV-Linux-$VER"
+# Tên tệp theo số bản rút gọn như tag (1.0.0 → 1.0, 1.2.3 giữ nguyên) — cùng cách release.ps1 / update_check
+SHORT=$(echo "$VER" | sed -E 's/\.0$//')
+NAME="ConBangTV-Linux-$SHORT"
 [ "$KIND" = "thu" ] && NAME="$NAME-thu-$(date +%m%d.%H%M)"
 ROOT=$(mktemp -d)
 trap 'rm -rf "$ROOT"' EXIT
