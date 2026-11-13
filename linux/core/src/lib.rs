@@ -14,6 +14,12 @@ pub mod doh;
 pub mod unblock;
 pub mod shadowsocks;
 pub mod site;
+pub mod next_site;
+pub mod api_site;
+pub mod kk_phim;
+pub mod nguon_c;
+pub mod stremio;
+pub mod ad_block;
 
 pub use models::*;
 pub use util::{Error, Result};
