@@ -59,13 +59,26 @@ sang `ConBangTV…apk` từ 13/11/2026 (anh bảo), nhưng release TV vẫn kèm
 4. Kiểm: `releases/latest` vẫn là bản Android; release có `.exe`; tải từ link công khai và từ link cố định, SHA-256 khớp; tự cập
    nhật thật từ bản trước (bản chép riêng).
 
-## Link tải cố định của bản Windows / iPad / Mac (từ 13/11/2026) — không đổi tag, không xoá
+## Phát hành bản Linux (`linux/`, Rust + GTK3 + WebKitGTK, từ 13/11/2026)
 
-- `…/releases/download/conbangtv_windows/ConBangTV-Windows.exe`, `…/releases/download/conbangtv_ios/ConBangTV-iPad.ipa` và
-  `…/releases/download/conbangtv_macos/ConBangTV-Mac.zip` luôn là bản mới nhất (anh đặt hai tên tag đầu, tên thứ ba anh đồng ý theo
-  đề xuất; link đã gửi cho người dùng và nằm trên trang giới thiệu). Các release đó là release «cuốn chiếu»: `release.ps1` chép đè
-  tệp mỗi lần phát hành — **đừng đổi tag / tên tệp, đừng xoá, đừng để thành Latest**.
-- Link lệch (script `-Verify` báo) thì sửa bằng `.\release.ps1 <windows|ipad|mac> -FixedOnly`.
+1. Tăng `version` trong `linux/Cargo.toml` (tag bỏ `.0` cuối: 1.0.0 → `linux-v1.0`, tệp `ConBangTV-Linux-1.0.deb`).
+2. Gộp nhánh làm việc, `.\linux\build.ps1 -SyncOnly`, rồi trên máy Ubuntu thử: `bash linux/packaging/release-build.sh <thư mục ra>`
+   (dựng trong container Ubuntu 22.04 — tệp chạy cần glibc ≤ 2.34; dựng thẳng trên máy 26.04 thì máy cũ không chạy được). Chép
+   tệp về `dist\linux\`. Kiểm `dpkg-deb -f` (gói `conbangtv`, đúng bản, amd64), tệp chạy không có cổng gỡ lỗi (chỉ bản thử có),
+   cài bằng `apt install ./…deb` và mở từ biểu tượng app.
+3. `git push`, rồi `.\release.ps1 linux -Notes <tệp ghi chú>` — tag `linux-v<bản>`, script **luôn đặt `--latest=false`**, tự chép
+   tệp vào link cố định `conbangtv_linux`. Ghi chú phải có `## Có gì mới` (hộp «Có bản mới» của app hiện mục này).
+4. Kiểm: `releases/latest` vẫn là bản Android; tải từ link công khai và link cố định, SHA-256 khớp; tự cập nhật thật từ bản trước
+   (bản cài bằng .deb trên máy Ubuntu thử — app tải .deb, `pkexec apt-get install`, mở lại).
+
+## Link tải cố định của bản Windows / iPad / Mac / Linux (từ 13/11/2026) — không đổi tag, không xoá
+
+- `…/releases/download/conbangtv_windows/ConBangTV-Windows.exe`, `…/releases/download/conbangtv_ios/ConBangTV-iPad.ipa`,
+  `…/releases/download/conbangtv_macos/ConBangTV-Mac.zip` và `…/releases/download/conbangtv_linux/ConBangTV-Linux.deb` luôn là bản
+  mới nhất (anh đặt hai tên tag đầu, hai tên sau anh đồng ý theo đề xuất; link đã gửi cho người dùng và nằm trên trang giới thiệu).
+  Các release đó là release «cuốn chiếu»: `release.ps1` chép đè tệp mỗi lần phát hành — **đừng đổi tag / tên tệp, đừng xoá, đừng
+  để thành Latest**.
+- Link lệch (script `-Verify` báo) thì sửa bằng `.\release.ps1 <windows|ipad|mac|linux> -FixedOnly`.
 
 ## Luật lâu dài: phát hành thành công xong thì luôn cập nhật markdown
 

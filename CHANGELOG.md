@@ -7,6 +7,33 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 Bản Mac (macOS 12+, từ 13/11/2026, cùng mã nguồn và số bản với bản iPad) ghi riêng với tiêu đề "Mac …", tag `mac-v…`.
+Bản Linux (Ubuntu 22.04+ / Linux Mint 21+ / Debian 12+, từ 13/11/2026, tệp `.deb`) ghi riêng với tiêu đề "Linux …", tag `linux-v…`.
+
+## Linux 1.0 — 13/11/2026 (bản Linux đầu tiên)
+
+- **Côn Bằng TV cho máy tính Linux**: Ubuntu 22.04 trở lên, Linux Mint 21+, Debian 12+ (máy 64-bit x86). Viết mới bằng Rust + GTK3 +
+  WebKitGTK, giao diện và tính năng như bản Windows: trang chủ tổng hợp nhiều nguồn (sửa nhanh hàng, Các hàng / Thêm hàng / Nguồn),
+  phim liên quan, Điểm IMDb cao, tìm kiếm (một trang hoặc mọi trang), xem tiếp, theo dõi tập mới, thể loại / quốc gia, người xem +
+  mã PIN + giới hạn giờ xem, đồng bộ trong nhà với TV / iPad / Windows / Mac, proxy SOCKS5 / Shadowsocks, vượt chặn nhà mạng (tự lên
+  Mức 2), DNS mã hoá, chặn tên miền quảng cáo / theo dõi, mời bạn bè cài app. Dùng chuột, bàn phím hoặc remote (phím như bản Windows).
+- **Trình phát** dùng chung trang phát của bản Android; **cửa sổ phim nhỏ** (nút «▣ Thu nhỏ» / phím W) — phim chạy tiếp trong lúc dùng
+  các trang khác. Máy không có card đồ hoạ (máy ảo…) tự tắt dựng hình bằng OpenGL giả lập: phim 1080p 72% CPU thay vì 240%.
+- **Font chữ Inter** (gần giống San Francisco của iOS nhất trong các font mở), nhúng sẵn trong app.
+- **Tự cập nhật**: app tìm release `linux-v…` trên GitHub, tải `.deb`, kiểm (cỡ, SHA-256, tên gói, số bản, kiến trúc), cài bằng
+  `pkexec apt-get install` (hệ thống hỏi mật khẩu máy) rồi mở lại.
+- **Cài:** tải `ConBangTV-Linux-1.0.deb` (hoặc link luôn là bản mới nhất
+  `https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_linux/ConBangTV-Linux.deb`), bấm đúp để mở bằng App Center
+  rồi Cài đặt, hoặc `sudo apt install ./ConBangTV-Linux-1.0.deb`. Máy có card Intel / AMD nên cài thêm `gstreamer1.0-vaapi`.
+- bản 1.0.0 · gói `conbangtv` (amd64, cần glibc ≥ 2.34) · tag `linux-v1.0` (không phải "latest") · commit `a8e65ac` (đăng 21:29) ·
+  `ConBangTV-Linux-1.0.deb` 5 371 044 byte · SHA-256 `3421bcb4ab74df1f6152e660ab3d8f1e96a49ad9e3d9ce3fecd94dd62b27ef28` · dựng
+  trong container Ubuntu 22.04 trên máy Ubuntu thử. Link cố định `conbangtv_linux` tạo lúc 21:29, cùng tệp.
+- 203 test lõi (200 đạt, 3 test cần mạng thật để riêng). Thử trên máy ảo Ubuntu 26.04 (GNOME 50 Wayland, không card đồ hoạ):
+  trang chủ, chi tiết, tìm kiếm tiếng Việt, theo dõi, lịch sử, người xem + PIN + giờ đi ngủ + cho xem thêm, sửa hàng trang chủ, phát
+  phim (streamfree JW Player, KKPhim HLS 1080p, 0 khung rơi), toàn màn hình, chuyển tập, nhạc mở đầu, cửa sổ phim nhỏ, Shadowsocks
+  thật (thử kết nối, trang chủ và phát phim qua proxy), đồng bộ với tivi TX3 (TV 2.17) hai chiều kể cả khi xoá. Sau khi đăng: tự cập
+  nhật thật từ bản giả 0.9 (cài bằng .deb) — thấy «Có bản mới 1.0», tải từ GitHub, `pkexec apt-get install`, mở lại 1.0 trong 4 giây,
+  tệp chạy đã cài trùng tệp phát hành; `releases/latest` vẫn `v2.17`; tệp tải từ link công khai và link cố định khớp SHA-256.
+  **Chưa thử trên máy thật có card đồ hoạ / phiên X11.**
 
 ## Mac 1.17 — 13/11/2026 (bản Mac đầu tiên)
 

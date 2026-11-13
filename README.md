@@ -2,7 +2,7 @@
 
 ![Côn Bằng TV](design/banner-1280.png)
 
-**Trang giới thiệu:** <https://conbangtv.github.io> — cách cài nhanh, tính năng, link tải cho Android TV / iPad / Windows
+**Trang giới thiệu:** <https://conbangtv.github.io> — cách cài nhanh, tính năng, link tải cho Android TV / iPad / Windows / Mac / Linux
 (mã nguồn của trang ở repo [conbangtv/conbangtv.github.io](https://github.com/conbangtv/conbangtv.github.io)).
 
 App Android TV xem phim hoạt hình 3D (và phim bộ / phim lẻ ở phimmois.fun) từ trang web bằng remote hoặc bàn phím
@@ -27,6 +27,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 **Bản Mac** (macOS 12+, máy Intel và chip Apple): [tải bản mới nhất](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_macos/ConBangTV-Mac.zip)
 (link cố định) · [release `mac-v1.17`](https://github.com/Circling5714/ChimToTV/releases/tag/mac-v1.17)
 — xem mục [Bản Mac](#bản-mac) (lần đầu mở: Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Vẫn mở).
+
+**Bản Linux** (Ubuntu 22.04+ / Linux Mint 21+ / Debian 12+, máy 64-bit, tệp `.deb`): [tải bản mới nhất](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_linux/ConBangTV-Linux.deb)
+(link cố định) · [release `linux-v1.0`](https://github.com/Circling5714/ChimToTV/releases/tag/linux-v1.0)
+— xem mục [Bản Linux](#bản-linux). Đồng bộ được với TV, iPad / iPhone, Windows và Mac.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
 **Liên hệ**.

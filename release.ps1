@@ -15,26 +15,28 @@
 #      Hai link này cần tệp tên ConBangTV.apk / ChimToTV.apk có trong MỌI bản TV — nên bản TV đính kèm ba tệp. ĐỪNG bỏ tệp tên
 #      cũ: mã Downloader 9192365 (aftv.news) trỏ vào link cũ, và màn «Cài lên tivi» của TV 2.16–2.17 / iPad 1.16–1.17 /
 #      Windows 1.14–1.15 đã cài in link cũ. Ghi chú của bản TV được thêm mục "## Cài mới trên Android TV" ghi mã Downloader.
-# Bản Windows / iPad / Mac mà thành Latest thì mọi TV hết thấy bản mới và hai link trên trả 404.
+# Bản Windows / iPad / Mac / Linux mà thành Latest thì mọi TV hết thấy bản mới và hai link trên trả 404.
 #
-# Link tải cố định của bản Windows / iPad / Mac (luôn là bản mới nhất, như link APK ở trên) — mỗi nền tảng một release "cuốn chiếu"
+# Link tải cố định của bản Windows / iPad / Mac / Linux (luôn là bản mới nhất, như link APK ở trên) — mỗi nền tảng một release "cuốn chiếu"
 # với tag không bao giờ đổi và tệp tên cố định; mỗi lần đăng bản mới script chép đè tệp vào đó:
 #   https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_windows/ConBangTV-Windows.exe
 #   https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_ios/ConBangTV-iPad.ipa
 #   https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_macos/ConBangTV-Mac.zip   (tạo ở lần đăng bản Mac đầu)
+#   https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_linux/ConBangTV-Linux.deb (tạo ở lần đăng bản Linux đầu)
 # ĐỪNG đổi các tag / tên tệp này: link đã gửi cho người dùng và nằm trên trang giới thiệu. Các bộ tự cập nhật không nhìn
-# thấy các release này (TV đọc releases/latest; Windows / iPad / Mac chỉ nhận tag win-v… / ios-v… / mac-v…).
+# thấy các release này (TV đọc releases/latest; Windows / iPad / Mac / Linux chỉ nhận tag win-v… / ios-v… / mac-v… / linux-v…).
 #
 # Cách dùng (sau khi đã dựng tệp và đã git push):
 #   .\release.ps1 tv      -Notes ghi-chu.md
 #   .\release.ps1 windows -Notes ghi-chu.md
 #   .\release.ps1 ipad    -Notes ghi-chu.md [-File đường\dẫn\ConBangTV-iPad-<bản>.ipa]
 #   .\release.ps1 mac     -Notes ghi-chu.md [-File đường\dẫn\ConBangTV-Mac-<bản>.zip]   (artifact `mac` của ios.yml)
+#   .\release.ps1 linux   -Notes ghi-chu.md [-File đường\dẫn\ConBangTV-Linux-<bản>.deb] (mặc định dist\linux\…)
 #   Thêm -DryRun: kiểm tệp, in lệnh sẽ chạy, không đăng gì.
-#   .\release.ps1 tv -Verify      (windows / ipad / mac cũng vậy): chỉ kiểm lại bản đã đăng, không đăng, không sửa gì.
-#   .\release.ps1 windows -FixedOnly   (ipad / mac cũng vậy): không đăng bản mới — chỉ chép tệp của bản ĐÃ đăng vào link cố
+#   .\release.ps1 tv -Verify      (windows / ipad / mac / linux cũng vậy): chỉ kiểm lại bản đã đăng, không đăng, không sửa gì.
+#   .\release.ps1 windows -FixedOnly   (ipad / mac / linux cũng vậy): không đăng bản mới — chỉ chép tệp của bản ĐÃ đăng vào link cố
 #                                      định (lần đầu tạo link, hoặc sửa khi link lệch).
-# Số bản đọc từ app\build.gradle.kts (tv), windows\ConBangTV\ConBangTV.csproj (windows), ios\project.yml (ipad, mac).
+# Số bản đọc từ app\build.gradle.kts (tv), windows\ConBangTV\ConBangTV.csproj (windows), ios\project.yml (ipad, mac), linux\Cargo.toml (linux).
 #
 # Kiểm sau khi đăng (và khi -Verify): Latest là bản TV — lúc đăng mà lệch thì script tự trả về bản TV mới nhất; tệp trên
 # GitHub khớp SHA-256 với tệp trong máy; bản TV: tải thử qua hai link cố định (tên mới, tên cũ) và so SHA-256; bản Windows /
