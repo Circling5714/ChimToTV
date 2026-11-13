@@ -33,6 +33,37 @@ function add(){try{if(document.getElementById('chimto-css'))return;var s=documen
 s.textContent=css;(document.head||document.documentElement).appendChild(s);}catch(e){}}\
 if(document.documentElement)add();document.addEventListener('DOMContentLoaded',add);})();\n";
 
+/// Bản thử (CONBANG_DEBUG): chẩn đoán khung trình phát — khung trên cùng gửi {chimto:'diag'} xuống, mỗi khung báo trạng thái
+/// JW Player / <video> lên window.__diag (cổng gỡ lỗi /diag).
+const DIAG_JS: &str = r#"
+(function(){
+  if (window.__chimtoDiag) return; window.__chimtoDiag = 1;
+  if (window.top === window) {
+    window.__diag = [];
+    window.addEventListener('message', function (e) { if (e.data && e.data.chimtoDiag) window.__diag.push(e.data.chimtoDiag); });
+  }
+  var errs = [];
+  var hook = setInterval(function () {
+    try { var p = window.jwplayer && window.jwplayer(); if (p && p.on && !p.__diag) { p.__diag = 1;
+      p.on('error', function (e) { errs.push('error ' + e.code + ' ' + e.message); });
+      p.on('setupError', function (e) { errs.push('setupError ' + e.code + ' ' + e.message); });
+      p.on('warning', function (e) { errs.push('warning ' + e.code + ' ' + e.message); });
+      clearInterval(hook); } } catch (x) {}
+  }, 300);
+  window.addEventListener('message', function (e) {
+    if (!e.data || e.data.chimto !== 'diag') return;
+    var o = { href: location.href.slice(0, 120), errs: errs };
+    try { var p = window.jwplayer && window.jwplayer(); if (p && p.getState) o.jw = { state: p.getState(), provider: (p.getProvider && p.getProvider() || {}).name,
+      levels: p.getQualityLevels ? p.getQualityLevels().length : null, file: (p.getPlaylistItem && (p.getPlaylistItem() || {}).file || '').slice(0, 120) }; } catch (x) { o.jwErr = String(x); }
+    var v = document.querySelector('video');
+    if (v) o.v = { src: (v.currentSrc || v.src || '').slice(0, 80), rs: v.readyState, ns: v.networkState, err: v.error && (v.error.code + ' ' + v.error.message), buf: v.buffered.length };
+    try { window.top.postMessage({ chimtoDiag: o }, '*'); } catch (x) {}
+    var fs = document.getElementsByTagName('iframe');
+    for (var i = 0; i < fs.length; i++) try { fs[i].contentWindow.postMessage({ chimto: 'diag' }, '*'); } catch (x) {}
+  });
+})();
+"#;
+
 #[derive(Debug, Clone, Copy, Default)]
 struct PlayState {
     t: f64,
@@ -82,6 +113,9 @@ struct St {
     limit_warned: bool,
     expect_nav: Option<String>,
     osd_hover: bool,
+    /// Số lần app tự gửi lệnh phát (JW Player trên WebKitGTK không tự phát — đứng «idle» chờ bấm)
+    nudges: u32,
+    last_nudge: i64,
 }
 
 pub struct Player {
@@ -513,10 +547,13 @@ impl Player {
     fn navigate(&self, url: &str, html: Option<String>, start: i64) {
         let load = self.s.borrow().page_load;
         self.ucm.remove_all_scripts();
-        let js = format!(
+        let mut js = format!(
             "window.__chimtoStart={start};if(window.top===window)window.__chimtoLoad={load};\n{STYLE_SHIM}{}",
             crate::assets::PLAYER_AGENT_JS
         );
+        if std::env::var_os("CONBANG_DEBUG").is_some() {
+            js.push_str(DIAG_JS);
+        }
         let script = UserScript::new(&js, UserContentInjectedFrames::AllFrames, UserScriptInjectionTime::Start, &[], &[]);
         self.ucm.add_script(&script);
         self.s.borrow_mut().expect_nav = Some(url.to_string());
@@ -803,6 +840,8 @@ impl Player {
             s.ended_handled = false;
             s.hint_shown = false;
             s.seek_target = None;
+            s.nudges = 0;
+            s.last_nudge = 0;
             s.page_load += 1;
         }
         if let Some(id) = self.seek_timer.borrow_mut().take() {
@@ -965,6 +1004,7 @@ impl Player {
                 self.show_panel();
             }
         }
+        self.nudge(st, now);
         let started = self.s.borrow().started;
         crate::limits::tick(started && !st.paused && !st.waiting, now);
         if self.check_limit() {
@@ -1035,6 +1075,24 @@ impl Player {
                 self.notice(&format!("Hết tập — chuyển sang {t}"), 4000);
                 self.open_episode(i + 1);
             }
+        }
+    }
+
+    /// Trình phát đã nạp mà video chưa có dữ liệu, đang dừng (JW Player trên WebKitGTK đứng «idle», không tự phát như trên
+    /// Chromium): sau 2,5 giây tự gửi lệnh phát — như người xem bấm Enter; tối đa 4 lần, cách nhau 3 giây.
+    fn nudge(&self, st: PlayState, now: i64) {
+        let go = {
+            let s = self.s.borrow();
+            !s.started && st.paused && !st.ready && s.nudges < 4 && now - s.load_started_at > 2_500 && now - s.last_nudge > 3_000
+        };
+        if go {
+            {
+                let mut s = self.s.borrow_mut();
+                s.nudges += 1;
+                s.last_nudge = now;
+            }
+            cbtv::log::d("player", "Trình phát chưa tự phát — gửi lệnh phát");
+            self.cmd("play", None);
         }
     }
 

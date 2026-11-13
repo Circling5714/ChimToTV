@@ -137,6 +137,17 @@ fn handle(r: Req) {
                 None => send("trình phát chưa mở".into()),
             }
         }
+        "/diag" => {
+            // Chẩn đoán khung trình phát (DIAG_JS trong player.rs): gửi lệnh xuống mọi khung, đọc kết quả sau 800 ms
+            match app().player.borrow().clone() {
+                Some(p) => {
+                    p.eval("window.__diag=[];var fs=document.getElementsByTagName('iframe');for(var i=0;i<fs.length;i++)fs[i].contentWindow.postMessage({chimto:'diag'},'*');window.postMessage({chimto:'diag'},'*');'ok'", |_| {});
+                    let p2 = p.clone();
+                    crate::ui::after(800, move || p2.eval("JSON.stringify(window.__diag)", send));
+                }
+                None => send("trình phát chưa mở".into()),
+            }
+        }
         "/play" => {
             app().play(r.q.get("film").map(|s| s.as_str()).unwrap_or(""), r.q.get("ep").map(|s| s.as_str()).unwrap_or(""), r.q.contains_key("resume"));
             send("ok".into());
