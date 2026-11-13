@@ -365,7 +365,7 @@ impl LimitsPage {
         b.add(&t);
         let d = ui::flow(10.0, 10.0);
         let cur_d = prefs::daily_limit(Some(&self.id));
-        for m in wl::DAILY {
+        for m in wl::DAILY.iter().copied() {
             let me = self.clone();
             let p = ui::pill_tag(&wl::daily_label(m), (cur_d == m).then_some("active"), move || {
                 let text = ui::focused_label();
@@ -382,7 +382,7 @@ impl LimitsPage {
         b.add(&t);
         let bd = ui::flow(10.0, 10.0);
         let cur_b = prefs::bedtime(Some(&self.id));
-        for m in wl::BEDTIMES {
+        for m in wl::BEDTIMES.iter().copied() {
             let me = self.clone();
             let p = ui::pill_tag(&wl::bedtime_label(m), (cur_b == m).then_some("active"), move || {
                 let text = ui::focused_label();

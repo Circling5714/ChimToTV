@@ -18,9 +18,9 @@ use gtk::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use webkit2gtk::{
-    NetworkProxyMode, NetworkProxySettings, PolicyDecisionType, SettingsExt, UserContentInjectedFrames, UserContentManager,
+    NetworkProxyMode, NetworkProxySettings, SettingsExt, UserContentInjectedFrames, UserContentManager,
     UserContentManagerExt, UserScript, UserScriptInjectionTime, WebContext, WebContextExt, WebView, WebViewExt,
-    WebsiteDataManagerExt,
+    WebsiteDataManagerExt, WebsiteDataManagerExtManual,
 };
 
 const RATES: [f64; 5] = [0.75, 1.0, 1.25, 1.5, 2.0];
@@ -159,15 +159,20 @@ impl Player {
     pub fn new() -> Rc<Player> {
         setup_web_context();
         let ucm = UserContentManager::new();
-        let web = WebView::with_user_content_manager(&ucm);
+        // Cho trang phát tự phát video có tiếng (mặc định WebKitGTK chỉ cho video không tiếng tự phát)
+        let policies = webkit2gtk::WebsitePolicies::builder().autoplay(webkit2gtk::AutoplayPolicy::Allow).build();
+        let web = WebView::builder().user_content_manager(&ucm).website_policies(&policies).build();
         web.set_background_color(&gdk::RGBA::new(0.0, 0.0, 0.0, 1.0));
         web.set_can_focus(false);
         if let Some(st) = WebViewExt::settings(&web) {
             st.set_media_playback_requires_user_gesture(false);
             st.set_javascript_can_open_windows_automatically(false);
             st.set_enable_fullscreen(true);
-            st.set_enable_developer_extras(std::env::var_os("CONBANG_DEBUG").is_some());
-            st.set_enable_write_console_messages_to_stdout(std::env::var_os("CONBANG_DEBUG").is_some());
+            // Chỉ bật khi cần soi (CONBANG_CONSOLE=1): trang phát như streamfree.vip dò công cụ lập trình bằng cách đo thời gian
+            // ghi console — ghi ra ngoài làm chậm → trang tưởng đang mở công cụ lập trình, không phát
+            let console = std::env::var_os("CONBANG_CONSOLE").is_some();
+            st.set_enable_developer_extras(console);
+            st.set_enable_write_console_messages_to_stdout(console);
             st.set_user_agent(Some(&web_user_agent()));
         }
         if std::env::var("CONBANG_MUTE").as_deref() == Ok("1") {
@@ -359,18 +364,11 @@ impl Player {
         // Cửa sổ quảng cáo / trang tự mở cửa sổ mới: chặn
         self.web.connect_create(|_, _| None);
         self.web.connect_context_menu(|_, _, _, _| true);
-        self.web.connect_decide_policy(|_, d, t| {
-            let Some(p) = me() else { return false };
-            if t != PolicyDecisionType::NavigationAction {
-                return false;
-            }
-            let Some(nd) = d.downcast_ref::<webkit2gtk::NavigationPolicyDecision>() else { return false };
-            let Some(mut action) = webkit2gtk::NavigationPolicyDecisionExt::navigation_action(nd) else { return false };
-            let uri = action.request().and_then(|r| webkit2gtk::URIRequestExt::uri(&r)).map(|s| s.to_string()).unwrap_or_default();
-            p.on_navigation(d, &uri, action.is_redirect())
-        });
         self.web.connect_load_changed(|_, ev| {
             if let Some(p) = me() {
+                if ev == webkit2gtk::LoadEvent::Started {
+                    p.on_main_load_started();
+                }
                 if matches!(ev, webkit2gtk::LoadEvent::Committed | webkit2gtk::LoadEvent::Finished) {
                     p.inject_page();
                 }
@@ -479,38 +477,26 @@ impl Player {
 
     // ---- WebKit ----
 
-    /// Chặn mọi điều hướng cả trang do trang tự gây ra (quảng cáo); app tự nạp trang. Chuyển hướng phía máy chủ thì cho qua.
-    /// Khung con (iframe trình phát) không bị chặn.
-    fn on_navigation(&self, d: &webkit2gtk::PolicyDecision, uri: &str, redirect: bool) -> bool {
-        use webkit2gtk::PolicyDecisionExt;
-        let mut s = self.s.borrow_mut();
-        if let Some(e) = &s.expect_nav {
-            if same_url(uri, e) {
-                s.expect_nav = None;
-                return false;
+    /// Chặn mọi điều hướng cả trang do trang tự gây ra (quảng cáo); app tự nạp trang. Chỉ khung trên cùng mới báo «bắt đầu tải»
+    /// (khung con — iframe trình phát — không), chuyển hướng phía máy chủ báo «Redirected» nên không bị chặn. Dừng tải thì
+    /// trang đang hiện vẫn giữ nguyên.
+    fn on_main_load_started(&self) {
+        let uri = self.web.uri().map(|u| u.to_string()).unwrap_or_default();
+        {
+            let mut s = self.s.borrow_mut();
+            if let Some(e) = &s.expect_nav {
+                if same_url(&uri, e) {
+                    s.expect_nav = None;
+                    return;
+                }
             }
         }
-        if redirect || uri == "about:blank" || uri.starts_with("data:") || uri.starts_with("blob:") {
-            return false;
-        }
-        // Chỉ điều hướng khung trên cùng: WebKit chỉ hỏi cho khung trên cùng khi đích có tên khung rỗng và là trang mới
-        let main_frame = d
-            .downcast_ref::<webkit2gtk::NavigationPolicyDecision>()
-            .map(|nd| {
-                #[allow(deprecated)]
-                let f = webkit2gtk::NavigationPolicyDecisionExt::frame_name(nd);
-                f.is_none()
-            })
-            .unwrap_or(true);
-        let current = self.web.uri().map(|u| u.to_string()).unwrap_or_default();
-        if !main_frame || current.is_empty() || current == "about:blank" {
-            return false;
+        if uri.is_empty() || uri == "about:blank" || !self.is_open() {
+            return;
         }
         cbtv::log::d("player", &format!("Chặn điều hướng: {uri}"));
-        d.ignore();
-        true
+        self.web.stop_loading();
     }
-
     fn inject_page(&self) {
         if !self.s.borrow().page_mode {
             return;
@@ -1684,6 +1670,19 @@ impl Player {
             done(s);
         });
     }
+}
+
+/// Xoá cookie / bộ nhớ đệm của trình duyệt trong app và ảnh bìa đã lưu.
+pub fn clear_browsing_data() {
+    setup_web_context();
+    if let Some(dm) = WebContext::default().and_then(|c| c.website_data_manager()) {
+        dm.clear(webkit2gtk::WebsiteDataTypes::ALL, glib::TimeSpan::from_seconds(0), None::<&gio::Cancellable>, |r| {
+            if let Err(e) = r {
+                cbtv::log::d("player", &format!("Xoá dữ liệu lỗi: {e}"));
+            }
+        });
+    }
+    crate::images::clear_disk();
 }
 
 /// Trang hls.html với hls.js đóng kèm (gắn thẳng vào trang thay cho /__chimto/hls.js — WebKitGTK không chặn được yêu cầu

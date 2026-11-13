@@ -44,7 +44,7 @@ pub fn entries(a: &App) -> Vec<MenuEntry> {
         add("countries", "Quốc gia…".into(), Rc::new(|| app().show_root(pages::lists::filter(false))));
     }
     add("sites", "🌐  Đổi trang phim".into(), Rc::new(|| app().show_root(pages::sites::new())));
-    add("sync", "⇄  Đồng bộ trong nhà".into(), Rc::new(|| app().show_root(pages::placeholder::new("sync", "Đồng bộ trong nhà"))));
-    add("settings", "⚙  Cài đặt".into(), Rc::new(|| app().show_root(pages::placeholder::new("settings", "Cài đặt"))));
+    add("sync", "⇄  Đồng bộ trong nhà".into(), Rc::new(|| app().show_root(pages::sync_page::new())));
+    add("settings", "⚙  Cài đặt".into(), Rc::new(|| app().show_root(pages::settings::new())));
     v
 }

@@ -41,6 +41,10 @@ pub fn card(film: Film, open: Action, o: CardOpts) -> gtk::Widget {
     let h = POSTER_H + 7.0 + 40.0 + if has_sub { 19.0 } else { 0.0 };
     let da = gtk::DrawingArea::new();
     da.set_size_request(px(W), px(h));
+    // lưới (FlowBox) kéo giãn ô — thẻ giữ đúng cỡ, nằm sát trái
+    da.set_halign(gtk::Align::Start);
+    da.set_valign(gtk::Align::Start);
+    da.set_hexpand(false);
     da.set_can_focus(true);
     da.set_tooltip_text(Some(&film.title));
     da.set_widget_name(o.uid.as_deref().unwrap_or(&film.url));

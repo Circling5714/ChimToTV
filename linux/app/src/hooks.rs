@@ -6,6 +6,42 @@ use cbtv::FilmDetail;
 /// Trang chủ tổng hợp: người xem đã mở phim → hết báo «tập mới» tới khi có tập sau.
 pub fn mark_seen(_d: &FilmDetail) {}
 
+/// Cài đặt → «Các hàng trên trang chủ…» (home_feed — chuyển sau).
+pub fn home_rows_page() -> std::rc::Rc<dyn crate::pages::Page> {
+    crate::pages::placeholder::new("settings", "Các hàng trên trang chủ")
+}
+
+/// Cài đặt → «Nguồn cho trang chủ…».
+pub fn home_sources_page() -> std::rc::Rc<dyn crate::pages::Page> {
+    crate::pages::placeholder::new("settings", "Nguồn cho trang chủ")
+}
+
+/// Chữ trên nút «Nguồn cho trang chủ: n / m…».
+pub fn sources_label() -> String {
+    "Nguồn cho trang chủ…".into()
+}
+
+/// Thứ tự máy chủ DNS mã hoá (doh — chuyển sau).
+pub fn doh_providers() -> String {
+    "NextDNS → Cloudflare → Google".into()
+}
+
+/// Chữ trên nút proxy trong Cài đặt.
+pub fn proxy_label() -> String {
+    if let Some(c) = cbtv::shadowsocks::config() {
+        format!("Proxy Shadowsocks: {}:{}", c.host, c.port)
+    } else if let Some(c) = cbtv::net::proxy() {
+        format!("Proxy SOCKS5: {}:{}", c.host, c.port)
+    } else {
+        "Proxy: tắt".into()
+    }
+}
+
+/// Trang Proxy (SOCKS5 / Shadowsocks — chờ lõi mạng).
+pub fn proxy_page() -> std::rc::Rc<dyn crate::pages::Page> {
+    crate::pages::placeholder::new("settings", "Proxy")
+}
+
 /// Id các hàng trang chủ đang bật ("new-eps", "continue", …).
 pub fn rows_on() -> std::collections::HashSet<String> {
     ["new-eps", "continue"].iter().map(|s| s.to_string()).collect()

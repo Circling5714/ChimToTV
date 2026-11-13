@@ -217,6 +217,7 @@ impl App {
         if let Some(p) = self.player.borrow().clone() {
             p.close(false);
         }
+        cbtv::sync_service::stop();
         prefs::flush();
     }
 

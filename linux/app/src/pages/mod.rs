@@ -12,10 +12,13 @@ pub mod detail;
 pub mod history;
 pub mod home;
 pub mod home_mix;
+pub mod invite;
 pub mod lists;
 pub mod placeholder;
 pub mod profiles_page;
+pub mod settings;
 pub mod sites;
+pub mod sync_page;
 
 pub struct PageBase {
     pub scroller: gtk::ScrolledWindow,
