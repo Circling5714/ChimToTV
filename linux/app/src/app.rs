@@ -227,7 +227,8 @@ impl App {
         }
         crate::images::cleanup();
         self.rebuild_menu();
-        self.show_root(crate::pages::history::home());
+        self.show_root(crate::menu::home_page());
+        crate::debug::start();
         crate::startup::after_show();
     }
 

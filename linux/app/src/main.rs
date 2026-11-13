@@ -5,6 +5,8 @@ mod app;
 mod assets;
 mod card;
 mod css;
+mod debug;
+mod hooks;
 mod images;
 mod keynav;
 mod limits;

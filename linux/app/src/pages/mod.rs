@@ -8,8 +8,14 @@ use gtk::prelude::*;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+pub mod detail;
 pub mod history;
+pub mod home;
+pub mod home_mix;
+pub mod lists;
 pub mod placeholder;
+pub mod profiles_page;
+pub mod sites;
 
 pub struct PageBase {
     pub scroller: gtk::ScrolledWindow,
@@ -80,7 +86,7 @@ impl PageBase {
         let r = retry.clone();
         let row = ui::row(&[
             ui::pill("↻  Thử lại", move || r()).upcast(),
-            ui::pill("🌐  Đổi trang phim", || app().show_root(crate::pages::placeholder::sites())).upcast(),
+            ui::pill("🌐  Đổi trang phim", || app().show_root(crate::pages::sites::new())).upcast(),
         ]);
         self.add(&row);
         let body = self.body.clone();

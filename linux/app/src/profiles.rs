@@ -47,7 +47,7 @@ pub async fn pick_profile_async(cancellable: bool) {
         let r = rx.await.unwrap_or(-1);
         if r == 0 {
             if cancellable || !prefs::current_profile().locked() {
-                a.show_root(crate::pages::placeholder::new("profile", "Quản lý người xem"));
+                a.show_root(crate::pages::profiles_page::new());
                 break;
             }
             a.toast("Chọn người xem trước.");

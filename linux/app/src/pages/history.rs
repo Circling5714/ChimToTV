@@ -16,11 +16,6 @@ pub fn history() -> Rc<dyn Page> {
     Rc::new(HistoryPage { base: PageBase::new("history") })
 }
 
-/// TẠM: trang chủ (chưa có trang chủ tổng hợp) — dùng trang lịch sử.
-pub fn home() -> Rc<dyn Page> {
-    Rc::new(HistoryPage { base: PageBase::new("home") })
-}
-
 impl HistoryPage {
     fn build(self: &Rc<Self>) {
         let b = &self.base;

@@ -26,3 +26,5 @@ futures = "0.3"
 # Giải mã ảnh bìa (JPEG / PNG / WebP / GIF) bằng Rust — máy Ubuntu không phải máy nào cũng có bộ giải mã WebP cho GdkPixbuf
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 sha1 = "0.10"
+url = "2"
+javascriptcore = { package = "javascriptcore-rs", version = "1" }

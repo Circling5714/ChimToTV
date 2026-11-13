@@ -160,6 +160,47 @@ pub fn card(film: Film, open: Action, o: CardOpts) -> gtk::Widget {
     da.upcast()
 }
 
+/// Ảnh bìa lớn (trang phim): bo góc, cắt kiểu «lấp đầy», chữ 鵬 khi chưa có ảnh.
+pub fn poster(url: Option<&str>, w: f64, h: f64) -> gtk::Widget {
+    let da = gtk::DrawingArea::new();
+    let (pw, ph) = (px(w), px(h));
+    da.set_size_request(pw, ph);
+    da.set_valign(gtk::Align::Start);
+    let pix: Rc<RefCell<Option<gdk_pixbuf::Pixbuf>>> = Rc::new(RefCell::new(None));
+    {
+        let pix = pix.clone();
+        da.connect_draw(move |w, cr| {
+            let s = crate::css::scale();
+            let (ww, hh) = (w.allocated_width() as f64, w.allocated_height() as f64);
+            rounded(cr, 0.0, 0.0, ww, hh, 12.0 * s);
+            cr.clip();
+            set(cr, SURFACE2, 1.0);
+            let _ = cr.paint();
+            if let Some(p) = pix.borrow().as_ref() {
+                cr.set_source_pixbuf(p, 0.0, 0.0);
+                let _ = cr.paint();
+            } else {
+                let l = layout(w.upcast_ref(), "鵬", 70.0 * s, false);
+                let (tw, th) = l.pixel_size();
+                cr.set_source_rgba(1.0, 1.0, 1.0, 0.2);
+                cr.move_to((ww - tw as f64) / 2.0, (hh - th as f64) / 2.0);
+                pangocairo::functions::show_layout(cr, &l);
+            }
+            glib::Propagation::Stop
+        });
+    }
+    if let Some(u) = url.filter(|u| !u.is_empty()) {
+        let weak = da.downgrade();
+        crate::images::load(u, pw, ph, move |p| {
+            if let (Some(p), Some(w)) = (p, weak.upgrade()) {
+                *pix.borrow_mut() = Some(p);
+                w.queue_draw();
+            }
+        });
+    }
+    da.upcast()
+}
+
 fn rounded(cr: &gtk::cairo::Context, x: f64, y: f64, w: f64, h: f64, r: f64) {
     cr.new_sub_path();
     cr.arc(x + w - r, y + r, r, -PI / 2.0, 0.0);

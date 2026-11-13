@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Côn Bằng TV
+GenericName=Xem phim
+Comment=Xem phim hoạt hình 3D và phim bộ từ các trang phim bằng bàn phím / remote / chuột
+Exec=conbangtv
+Icon=vn.chimto.tv
+Terminal=false
+Categories=AudioVideo;Video;Player;
+Keywords=phim;hoạt hình;donghua;tv;video;
+StartupNotify=true
+StartupWMClass=conbangtv

@@ -279,6 +279,25 @@ pub fn clear(b: &impl IsA<gtk::Container>) {
     }
 }
 
+/// Chữ của nút đang chọn (để chọn lại nút cùng chữ sau khi dựng lại trang).
+pub fn focused_label() -> Option<String> {
+    crate::app::app().window.focused_widget().and_then(|w| w.downcast::<gtk::Button>().ok()).and_then(|b| b.label()).map(|s| s.to_string())
+}
+
+/// Chọn lại nút có chữ `text` trong root (sau khi dựng lại).
+pub fn refocus_label(root: &gtk::Widget, text: Option<String>) {
+    let Some(text) = text else { return };
+    let root = root.clone();
+    after(30, move || {
+        if let Some(w) = crate::keynav::targets(&root)
+            .into_iter()
+            .find(|w| w.clone().downcast::<gtk::Button>().ok().and_then(|b| b.label()).map(|l| l == text.as_str()).unwrap_or(false))
+        {
+            w.grab_focus();
+        }
+    });
+}
+
 /// Mở địa chỉ bằng trình duyệt của máy.
 pub fn open_browser(url: &str) {
     if let Err(e) = gio::AppInfo::launch_default_for_uri(url, None::<&gio::AppLaunchContext>) {

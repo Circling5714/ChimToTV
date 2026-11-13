@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>vn.chimto.tv</id>
+  <name>Côn Bằng TV</name>
+  <summary>Xem phim hoạt hình 3D và phim bộ bằng bàn phím / remote / chuột</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <description>
+    <p>Trang chủ tổng hợp phim mới từ nhiều nguồn, tìm kiếm trên mọi trang, xem tiếp, theo dõi tập mới, người xem có mã PIN và
+      giới hạn giờ xem, đồng bộ trong nhà với TV / iPad / Windows, DNS mã hoá, vượt chặn nhà mạng, proxy SOCKS5 / Shadowsocks.</p>
+    <p>App chỉ là trình xem: không lưu trữ hay phát tán phim; mọi nội dung thuộc các trang web bên thứ ba.</p>
+  </description>
+  <launchable type="desktop-id">vn.chimto.tv.desktop</launchable>
+  <url type="homepage">https://conbangtv.github.io</url>
+  <content_rating type="oars-1.1" />
+</component>
