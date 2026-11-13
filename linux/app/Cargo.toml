@@ -27,4 +27,5 @@ futures = "0.3"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 sha1 = "0.10"
 url = "2"
+libc = "0.2"
 javascriptcore = { package = "javascriptcore-rs", version = "1" }

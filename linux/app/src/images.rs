@@ -133,8 +133,58 @@ async fn fetch(url: String, w: u32, h: u32) -> Option<(Vec<u8>, i32, i32)> {
     tokio::task::spawn_blocking(move || decode_cover(&bytes, w, h)).await.ok().flatten()
 }
 
-/// Giải mã + cắt giữa cho vừa khung w×h (như Stretch="UniformToFill"); trả RGBA.
+/// Giải mã + cắt giữa cho vừa khung w×h (như Stretch="UniformToFill"); trả RGBA. JPEG / PNG / GIF giải mã bằng GdkPixbuf ở sẵn
+/// cỡ cần (libjpeg giải mã thẳng ở 1/2, 1/4, 1/8 cỡ gốc — không bung cả ảnh lớn ra bộ nhớ); WebP (máy Ubuntu không phải máy nào
+/// cũng có bộ đọc WebP cho GdkPixbuf) và ảnh GdkPixbuf không đọc được thì giải mã bằng crate image.
 pub fn decode_cover(bytes: &[u8], w: u32, h: u32) -> Option<(Vec<u8>, i32, i32)> {
+    let webp = bytes.len() > 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP";
+    if !webp {
+        if let Some(r) = decode_pixbuf(bytes, w as i32, h as i32) {
+            return Some(r);
+        }
+    }
+    decode_image(bytes, w, h)
+}
+
+fn decode_pixbuf(bytes: &[u8], tw: i32, th: i32) -> Option<(Vec<u8>, i32, i32)> {
+    use gdk_pixbuf::prelude::*;
+    let loader = gdk_pixbuf::PixbufLoader::new();
+    loader.connect_size_prepared(move |l, iw, ih| {
+        if iw <= 0 || ih <= 0 {
+            return;
+        }
+        let s = (tw as f64 / iw as f64).max(th as f64 / ih as f64).min(1.0);
+        l.set_size(((iw as f64 * s).ceil() as i32).max(1), ((ih as f64 * s).ceil() as i32).max(1));
+    });
+    let ok = loader.write(bytes).is_ok();
+    let closed = loader.close().is_ok();
+    if !ok || !closed {
+        return None;
+    }
+    let mut p = loader.pixbuf()?;
+    // Ảnh nhỏ hơn khung: phóng lên cho phủ kín
+    let s = (tw as f64 / p.width() as f64).max(th as f64 / p.height() as f64);
+    if s > 1.0 {
+        p = p.scale_simple(((p.width() as f64) * s).ceil() as i32, ((p.height() as f64) * s).ceil() as i32, gdk_pixbuf::InterpType::Bilinear)?;
+    }
+    let (pw, ph) = (p.width(), p.height());
+    let (cw, ch) = (tw.min(pw), th.min(ph));
+    let (x, y) = (((pw - cw) / 2) as usize, ((ph - ch) / 2) as usize);
+    let n = p.n_channels() as usize;
+    let rs = p.rowstride() as usize;
+    let data = p.read_pixel_bytes();
+    let mut out = Vec::with_capacity((cw * ch * 4) as usize);
+    for row in 0..ch as usize {
+        let base = (y + row) * rs + x * n;
+        for col in 0..cw as usize {
+            let o = base + col * n;
+            out.extend_from_slice(&[data[o], data[o + 1], data[o + 2], if n == 4 { data[o + 3] } else { 255 }]);
+        }
+    }
+    Some((out, cw, ch))
+}
+
+fn decode_image(bytes: &[u8], w: u32, h: u32) -> Option<(Vec<u8>, i32, i32)> {
     let img = image::load_from_memory(bytes).ok()?;
     let (iw, ih) = (img.width().max(1), img.height().max(1));
     let s = (w as f64 / iw as f64).max(h as f64 / ih as f64);

@@ -56,7 +56,8 @@ const DIAG_JS: &str = r#"
     try { var p = window.jwplayer && window.jwplayer(); if (p && p.getState) o.jw = { state: p.getState(), provider: (p.getProvider && p.getProvider() || {}).name,
       levels: p.getQualityLevels ? p.getQualityLevels().length : null, file: (p.getPlaylistItem && (p.getPlaylistItem() || {}).file || '').slice(0, 120) }; } catch (x) { o.jwErr = String(x); }
     var v = document.querySelector('video');
-    if (v) o.v = { src: (v.currentSrc || v.src || '').slice(0, 80), rs: v.readyState, ns: v.networkState, err: v.error && (v.error.code + ' ' + v.error.message), buf: v.buffered.length };
+    if (v) o.v = { src: (v.currentSrc || v.src || '').slice(0, 80), rs: v.readyState, ns: v.networkState, err: v.error && (v.error.code + ' ' + v.error.message), buf: v.buffered.length, w: v.videoWidth, h: v.videoHeight,
+      q: v.getVideoPlaybackQuality ? (function (q) { return q.droppedVideoFrames + '/' + q.totalVideoFrames; })(v.getVideoPlaybackQuality()) : null };
     try { window.top.postMessage({ chimtoDiag: o }, '*'); } catch (x) {}
     var fs = document.getElementsByTagName('iframe');
     for (var i = 0; i < fs.length; i++) try { fs[i].contentWindow.postMessage({ chimto: 'diag' }, '*'); } catch (x) {}
@@ -204,6 +205,17 @@ impl Player {
             st.set_enable_developer_extras(console);
             st.set_enable_write_console_messages_to_stdout(console);
             st.set_user_agent(Some(&web_user_agent()));
+            // Vẽ trang phát. Máy không có GPU (máy ảo, không có /dev/dri/renderD*) mà để WebKit dựng lớp bằng OpenGL thì nó chạy
+            // OpenGL giả lập (llvmpipe): đo trên máy ảo thử, phim 1080p ăn 240% CPU + 338 MB; tắt hẳn thì còn 85% + 203 MB.
+            // Máy có GPU giữ mặc định của WebKit. CONBANG_HWACCEL=never | always | ondemand để ép.
+            use webkit2gtk::HardwareAccelerationPolicy as Hw;
+            match std::env::var("CONBANG_HWACCEL").as_deref() {
+                Ok("never") => st.set_hardware_acceleration_policy(Hw::Never),
+                Ok("always") => st.set_hardware_acceleration_policy(Hw::Always),
+                Ok("ondemand") => st.set_hardware_acceleration_policy(Hw::OnDemand),
+                _ if !has_gpu() => st.set_hardware_acceleration_policy(Hw::Never),
+                _ => {}
+            }
         }
         if std::env::var("CONBANG_MUTE").as_deref() == Ok("1") {
             web.set_is_muted(true);
@@ -1765,6 +1777,16 @@ fn rate_text(r: f64) -> String {
 
 /// User-Agent của trình phát: WebKitGTK mặc định ghi «Version/60.5 Safari» lạ — đặt như Safari trên Mac (cùng nhân WebKit),
 /// trang phát chọn đường MSE / hls.js như trên trình duyệt thường.
+/// Có GPU vẽ được không: có nút render DRM (/dev/dri/renderD*) và không bị ép vẽ bằng phần mềm (LIBGL_ALWAYS_SOFTWARE).
+fn has_gpu() -> bool {
+    if std::env::var("LIBGL_ALWAYS_SOFTWARE").map(|v| v == "1" || v == "true").unwrap_or(false) {
+        return false;
+    }
+    std::fs::read_dir("/dev/dri")
+        .map(|rd| rd.flatten().any(|e| e.file_name().to_string_lossy().starts_with("renderD")))
+        .unwrap_or(false)
+}
+
 fn web_user_agent() -> String {
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15".to_string()
 }

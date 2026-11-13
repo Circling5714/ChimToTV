@@ -20,6 +20,17 @@ mod ui;
 use gtk::prelude::*;
 
 fn main() {
+    // Bộ nhớ: glibc mặc định mỗi luồng một vùng cấp phát (8 × số nhân) — app nhiều luồng mạng thì giữ hàng chục MB không dùng.
+    // Hai vùng là đủ; định kỳ trả phần đã giải phóng cho hệ thống (sau khi giải mã ảnh bìa, tải trang…)
+    unsafe {
+        libc::mallopt(libc::M_ARENA_MAX, 2);
+    }
+    glib::timeout_add_seconds_local(30, || {
+        unsafe {
+            libc::malloc_trim(0);
+        }
+        glib::ControlFlow::Continue
+    });
     cbtv::prefs::load(None);
     cbtv::log::start();
     cbtv::log::d("app", &format!("Côn Bằng TV {} (Linux) mở", cbtv::version()));
