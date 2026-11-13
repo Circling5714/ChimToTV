@@ -4,6 +4,7 @@
 #                             tên cố định)
 #   windows  tag win-v<bản>   ConBangTV-Windows-<bản>.exe                                         KHÔNG BAO GIỜ là Latest
 #   ipad     tag ios-v<bản>   ConBangTV-iPad-<bản>.ipa                                            KHÔNG BAO GIỜ là Latest
+#   mac      tag mac-v<bản>   ConBangTV-Mac-<bản>.zip (Mac Catalyst, cùng số bản với iPad)         KHÔNG BAO GIỜ là Latest
 #
 # Vì sao phải đúng — hai thứ đi theo bản đang là Latest:
 #   1. app TV tự cập nhật: Updater.kt hỏi .../releases/latest rồi lấy tệp .apk đầu tiên (tên nào cũng được — từ bản 1.3);
@@ -13,30 +14,32 @@
 #      Hai link này cần tệp tên ConBangTV.apk / ChimToTV.apk có trong MỌI bản TV — nên bản TV đính kèm ba tệp. ĐỪNG bỏ tệp tên
 #      cũ: mã Downloader 9192365 (aftv.news) trỏ vào link cũ, và màn «Cài lên tivi» của TV 2.16–2.17 / iPad 1.16–1.17 /
 #      Windows 1.14–1.15 đã cài in link cũ. Ghi chú của bản TV được thêm mục "## Cài mới trên Android TV" ghi mã Downloader.
-# Bản Windows / iPad mà thành Latest thì mọi TV hết thấy bản mới và hai link trên trả 404.
+# Bản Windows / iPad / Mac mà thành Latest thì mọi TV hết thấy bản mới và hai link trên trả 404.
 #
-# Link tải cố định của bản Windows / iPad (luôn là bản mới nhất, như link APK ở trên) — mỗi nền tảng một release "cuốn chiếu"
+# Link tải cố định của bản Windows / iPad / Mac (luôn là bản mới nhất, như link APK ở trên) — mỗi nền tảng một release "cuốn chiếu"
 # với tag không bao giờ đổi và tệp tên cố định; mỗi lần đăng bản mới script chép đè tệp vào đó:
 #   https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_windows/ConBangTV-Windows.exe
 #   https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_ios/ConBangTV-iPad.ipa
-# ĐỪNG đổi hai tag / hai tên tệp này: link đã gửi cho người dùng và nằm trên trang giới thiệu. Ba bộ tự cập nhật không nhìn
-# thấy hai release này (TV đọc releases/latest; Windows / iPad chỉ nhận tag win-v… / ios-v…).
+#   https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_macos/ConBangTV-Mac.zip   (tạo ở lần đăng bản Mac đầu)
+# ĐỪNG đổi các tag / tên tệp này: link đã gửi cho người dùng và nằm trên trang giới thiệu. Các bộ tự cập nhật không nhìn
+# thấy các release này (TV đọc releases/latest; Windows / iPad / Mac chỉ nhận tag win-v… / ios-v… / mac-v…).
 #
 # Cách dùng (sau khi đã dựng tệp và đã git push):
 #   .\release.ps1 tv      -Notes ghi-chu.md
 #   .\release.ps1 windows -Notes ghi-chu.md
 #   .\release.ps1 ipad    -Notes ghi-chu.md [-File đường\dẫn\ConBangTV-iPad-<bản>.ipa]
+#   .\release.ps1 mac     -Notes ghi-chu.md [-File đường\dẫn\ConBangTV-Mac-<bản>.zip]   (artifact `mac` của ios.yml)
 #   Thêm -DryRun: kiểm tệp, in lệnh sẽ chạy, không đăng gì.
-#   .\release.ps1 tv -Verify      (windows / ipad cũng vậy): chỉ kiểm lại bản đã đăng, không đăng, không sửa gì.
-#   .\release.ps1 windows -FixedOnly   (ipad cũng vậy): không đăng bản mới — chỉ chép tệp của bản ĐÃ đăng vào link cố định
-#                                      (lần đầu tạo link, hoặc sửa khi link lệch).
-# Số bản đọc từ app\build.gradle.kts (tv), windows\ConBangTV\ConBangTV.csproj (windows), ios\project.yml (ipad).
+#   .\release.ps1 tv -Verify      (windows / ipad / mac cũng vậy): chỉ kiểm lại bản đã đăng, không đăng, không sửa gì.
+#   .\release.ps1 windows -FixedOnly   (ipad / mac cũng vậy): không đăng bản mới — chỉ chép tệp của bản ĐÃ đăng vào link cố
+#                                      định (lần đầu tạo link, hoặc sửa khi link lệch).
+# Số bản đọc từ app\build.gradle.kts (tv), windows\ConBangTV\ConBangTV.csproj (windows), ios\project.yml (ipad, mac).
 #
 # Kiểm sau khi đăng (và khi -Verify): Latest là bản TV — lúc đăng mà lệch thì script tự trả về bản TV mới nhất; tệp trên
 # GitHub khớp SHA-256 với tệp trong máy; bản TV: tải thử qua hai link cố định (tên mới, tên cũ) và so SHA-256; bản Windows /
 # iPad mới nhất: tệp ở link cố định khớp SHA-256 và link tải được.
 param(
-    [Parameter(Mandatory = $true, Position = 0)][ValidateSet("tv", "windows", "ipad")][string]$Platform,
+    [Parameter(Mandatory = $true, Position = 0)][ValidateSet("tv", "windows", "ipad", "mac")][string]$Platform,
     [string]$Notes = "",
     [string]$File = "",
     [switch]$DryRun,
@@ -68,7 +71,7 @@ $legacyLink = "https://github.com/$repo/releases/latest/download/$legacyName"
 $downloaderCode = "9192365"
 $guideUrl = "https://github.com/$repo/blob/main/README.md#downloader"
 $certSha256 = "949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b"
-# Release "cuốn chiếu" giữ link tải cố định của bản Windows / iPad (xem đầu tệp). Prefix: tag của các bản có số.
+# Release "cuốn chiếu" giữ link tải cố định của bản Windows / iPad / Mac (xem đầu tệp). Prefix: tag của các bản có số.
 $rolling = @{
     windows = @{
         Tag = "conbangtv_windows"; Name = "ConBangTV-Windows.exe"; Prefix = "win-v"; What = "Windows"
@@ -79,6 +82,13 @@ $rolling = @{
         Tag = "conbangtv_ios"; Name = "ConBangTV-iPad.ipa"; Prefix = "ios-v"; What = "iPad / iPhone"
         Title = "Côn Bằng TV cho iPad / iPhone — link cố định (luôn là bản mới nhất)"
         How = "Cài bằng TrollStore (iOS / iPadOS 15 trở lên): mở tệp bằng TrollStore rồi chọn Install. Đã cài rồi thì không cần tải lại: app tự cập nhật."
+    }
+    mac = @{
+        Tag = "conbangtv_macos"; Name = "ConBangTV-Mac.zip"; Prefix = "mac-v"; What = "Mac"
+        Title = "Côn Bằng TV cho Mac — link cố định (luôn là bản mới nhất)"
+        How = "Giải nén, kéo ConBangTV vào thư mục Applications (Ứng dụng) rồi mở (macOS 12 trở lên, máy Intel hoặc chip Apple). " +
+              "Lần đầu macOS chặn vì app không mua chứng chỉ của Apple: vào Cài đặt hệ thống → Quyền riêng tư & Bảo mật → «Vẫn mở». " +
+              "Đã cài rồi thì không cần tải lại: app tự cập nhật."
     }
 }
 function RollingLink($r) { "https://github.com/$repo/releases/download/$($r.Tag)/$($r.Name)" }
@@ -119,10 +129,14 @@ switch ($Platform) {
         $ver = (Select-String -Path ios\project.yml -Pattern 'MARKETING_VERSION:\s*"?([0-9.]+)"?').Matches[0].Groups[1].Value
         $tag = "ios-v$ver"; $title = "Côn Bằng TV cho iPad $ver"; $latest = $false; $name = "ConBangTV-iPad-$ver.ipa"
     }
+    "mac" {
+        $ver = (Select-String -Path ios\project.yml -Pattern 'MARKETING_VERSION:\s*"?([0-9.]+)"?').Matches[0].Groups[1].Value
+        $tag = "mac-v$ver"; $title = "Côn Bằng TV cho Mac $ver"; $latest = $false; $name = "ConBangTV-Mac-$ver.zip"
+    }
 }
 if (-not $File) {
     $File = Join-Path $PSScriptRoot "dist\$name"
-    if (-not (Test-Path $File)) { throw "Không thấy $File — dựng bản $ver trước (tv: .\build.ps1 · windows: .\windows\build.ps1 · ipad: tải artifact rồi dùng -File)" }
+    if (-not (Test-Path $File)) { throw "Không thấy $File — dựng bản $ver trước (tv: .\build.ps1 · windows: .\windows\build.ps1 · ipad / mac: tải artifact rồi dùng -File)" }
 }
 if ((Split-Path $File -Leaf) -ne $name) { throw "Tệp phải tên $name (bản $ver đọc từ mã nguồn), đang là $(Split-Path $File -Leaf)" }
 # Tên các tệp của bản này trên GitHub — bản TV có thêm hai bản sao tên cố định (tên mới, tên cũ)
@@ -172,7 +186,7 @@ function Test-Published([bool]$heal) {
         }
     }
 
-    # 4. Bản Windows / iPad mới nhất: tệp ở link cố định phải chính là tệp này, và link phải tải được
+    # 4. Bản Windows / iPad / Mac mới nhất: tệp ở link cố định phải chính là tệp này, và link phải tải được
     $r = $rolling[$Platform]
     if ($r) {
         $newest = @($tags | Where-Object { $_.StartsWith($r.Prefix) } | Sort-Object { TagVersion $_ } -Descending)[0]

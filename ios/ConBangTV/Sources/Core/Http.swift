@@ -26,7 +26,22 @@ enum Http {
     static func defaultUserAgent() -> String {
         let v = ProcessInfo.processInfo.operatingSystemVersion
         return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) " +
-            "Version/\(v.majorVersion).\(v.minorVersion) Safari/605.1.15"
+            "Version/\(safariMajor(v.majorVersion)).\(v.minorVersion) Safari/605.1.15"
+    }
+
+    /// Số bản Safari đi kèm hệ điều hành: iOS / iPadOS cùng số với Safari. Bản Mac (Mac Catalyst) ProcessInfo trả số macOS:
+    /// macOS 12–15 đi kèm Safari 15–18 (cộng 3), từ macOS 26 cùng số (Safari 26) — không đổi thì trang web tưởng Safari 14 cũ.
+    static func safariMajor(_ osMajor: Int, mac: Bool = isMac) -> Int {
+        guard mac else { return osMajor }
+        return osMajor >= 26 ? osMajor : osMajor + 3
+    }
+
+    static var isMac: Bool {
+        #if targetEnvironment(macCatalyst)
+        return true
+        #else
+        return false
+        #endif
     }
 
     private static let sessionLock = NSLock()

@@ -118,8 +118,9 @@ final class SyncService: ObservableObject {
             let l = try NWListener(using: params, on: p)
             let txt = NWTXTRecord(["id": Prefs.deviceId, "p": Self.platform])
             l.service = NWListener.Service(name: Self.deviceName, type: Self.serviceType, domain: nil, txtRecord: txt)
+            // [weak self] cả ở Task: Swift 5.10 (Xcode 15.4 trên Mac dựng) không cho bắt biến weak của closure ngoài vào Task
             l.stateUpdateHandler = { [weak self] s in
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.serverState = "\(s)"
                     if case .failed = s {
                         self?.listener?.cancel()
@@ -145,7 +146,7 @@ final class SyncService: ObservableObject {
                       case let .bonjour(txt) = r.metadata, let id = txt["id"], id != Prefs.deviceId else { return nil }
                 return SyncFound(id: id, name: name, platform: txt["p"] ?? "", endpoint: r.endpoint)
             }
-            Task { @MainActor in self?.found = list.sorted { $0.name < $1.name } }
+            Task { @MainActor [weak self] in self?.found = list.sorted { $0.name < $1.name } }
         }
         b.start(queue: queue)
         browser = b
@@ -175,8 +176,9 @@ final class SyncService: ObservableObject {
             guard let self = self else { return }
             var b = buf
             if let d = data { b.append(d) }
-            if var req = SyncHTTP.parseRequest(b) {
-                req.remoteHost = SyncHTTP.host(of: c)
+            if var parsed = SyncHTTP.parseRequest(b) {
+                parsed.remoteHost = SyncHTTP.host(of: c)
+                let req = parsed
                 Task { @MainActor in
                     let resp = await self.handle(req)
                     self.queue.async { c.send(content: resp, completion: .contentProcessed { _ in c.cancel() }) }
@@ -466,8 +468,9 @@ enum SyncHTTP {
             let time = String(nowMs())
             head += "X-Device: \(Prefs.deviceId)\r\nX-Time: \(time)\r\nX-Sig: \(sign(t, time: time, body: body))\r\n"
         }
-        var req = Data((head + "\r\n").utf8)
-        req.append(body)
+        var packet = Data((head + "\r\n").utf8)
+        packet.append(body)
+        let req = packet
         let c = NWConnection(to: ep, using: .tcp)
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Message, Error>) in

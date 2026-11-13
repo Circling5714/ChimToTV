@@ -2,6 +2,7 @@
 //   node design/render.mjs preview <file.png>   → ảnh xem trước cả 3 phương án
 //   node design/render.mjs export <a|b|c>       → ghi PNG vào app/src/main/res (+ design/logo-512.png, banner-1280.png)
 //   node design/render.mjs ios <a|b|c>          → icon 1024 + logo cho bản iPad (ios/ConBangTV/Assets.xcassets)
+//   node design/render.mjs mac <a|b|c>          → các cỡ icon macOS (16…1024) cho bản Mac, cùng bộ AppIcon
 import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,7 +36,7 @@ const evaluate = async expr => (await send('Runtime.evaluate', { expression: exp
 
 await send('Page.enable');
 await send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } });
-const query = mode === 'export' || mode === 'ios' ? `?mode=${mode}&concept=${arg || 'a'}` : '?mode=preview';
+const query = mode === 'export' || mode === 'ios' || mode === 'mac' ? `?mode=${mode}&concept=${arg || 'a'}` : '?mode=preview';
 await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
 await send('Page.navigate', { url: pathToFileURL(join(here, 'logo.html')).href + query });
 for (let i = 0; i < 100 && (await evaluate('document.title')) !== 'ready'; i++) await sleep(200);
@@ -43,7 +44,7 @@ await sleep(300);
 
 const shot = async clip => Buffer.from((await send('Page.captureScreenshot', { format: 'png', clip: { ...clip, scale: 1 }, captureBeyondViewport: true })).result.data, 'base64');
 
-if (mode === 'export' || mode === 'ios') {
+if (mode === 'export' || mode === 'ios' || mode === 'mac') {
   const items = await evaluate(`[...document.querySelectorAll('.asset')].map(d => { const r = d.firstElementChild.getBoundingClientRect(); return { name: d.dataset.name, x: r.x, y: r.y, w: r.width, h: r.height }; })`);
   const total = Math.ceil(Math.max(...items.map(i => i.y + i.h)));
   await send('Emulation.setDeviceMetricsOverride', { width: 1400, height: total, deviceScaleFactor: 1, mobile: false });

@@ -1,6 +1,6 @@
-# Bản iPad (iPadOS 15+, cài bằng TrollStore): dựng trên máy macOS của GitHub (repo công khai → miễn phí).
-# - Đẩy nhánh `ios` (đổi gì trong ios/ hoặc assets JS dùng chung) → test lõi trên macOS + dựng IPA bản thử (Beta).
-# - Chạy tay (workflow_dispatch) với release = true → dựng thêm IPA bản chính (Release).
+# Bản iPad (iPadOS 15+, cài bằng TrollStore) và bản Mac (Mac Catalyst): dựng trên máy macOS của GitHub (repo công khai → miễn phí).
+# - Đẩy nhánh `ios` (đổi gì trong ios/ hoặc assets JS dùng chung) → test lõi trên macOS + IPA bản thử + bản Mac thử (Beta).
+# - Chạy tay (workflow_dispatch) với release = true → dựng thêm bản chính (Release) của cả hai: artifact `ipa` và `mac`.
 # IPA chưa ký: ký giả bằng ldid, TrollStore cài được; không cần tài khoản Apple.
 name: iOS
 
@@ -86,6 +86,47 @@ jobs:
         with:
           name: ipa
           path: ios/dist/*.ipa
+          retention-days: 14
+
+  # Bản Mac = app iPad dựng bằng Mac Catalyst (macOS 12+, Intel + Apple Silicon), ký ad-hoc, nén .zip (scripts/package-mac.sh)
+  mac:
+    name: Bản Mac (Mac Catalyst)
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Công cụ
+        run: brew install xcodegen xcbeautify
+      - name: Dựng project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Dựng bản thử (Beta)
+        working-directory: ios
+        env:
+          NEXTDNS_ID: ${{ secrets.NEXTDNS_ID }}
+        run: |
+          set -o pipefail
+          xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Beta \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' -derivedDataPath build ARCHS="x86_64 arm64" \
+            ONLY_ACTIVE_ARCH=NO CURRENT_PROJECT_VERSION=${{ github.run_number }} NEXTDNS_ID="$NEXTDNS_ID" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= | xcbeautify --renderer github-actions
+      - name: Dựng bản chính (Release)
+        if: ${{ inputs.release }}
+        working-directory: ios
+        env:
+          NEXTDNS_ID: ${{ secrets.NEXTDNS_ID }}
+        run: |
+          set -o pipefail
+          xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Release \
+            -destination 'generic/platform=macOS,variant=Mac Catalyst' -derivedDataPath build ARCHS="x86_64 arm64" \
+            ONLY_ACTIVE_ARCH=NO NEXTDNS_ID="$NEXTDNS_ID" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= | xcbeautify --renderer github-actions
+      - name: Đóng gói
+        run: bash ios/scripts/package-mac.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: ios/dist/*.zip
           retention-days: 14
 
   shots:

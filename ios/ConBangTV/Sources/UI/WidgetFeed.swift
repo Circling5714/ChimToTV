@@ -9,6 +9,10 @@ enum WidgetFeed {
     private static var pending: Task<Void, Never>?
 
     static func update() {
+        #if targetEnvironment(macCatalyst)
+        // Bản Mac không có widget; ghi vào thư mục App Group của app khác mã gói làm macOS 15 hỏi quyền
+        return
+        #endif
         pending?.cancel()
         pending = Task {
             try? await Task.sleep(nanoseconds: 400_000_000)

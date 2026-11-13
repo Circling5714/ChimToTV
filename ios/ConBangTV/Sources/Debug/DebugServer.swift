@@ -26,6 +26,7 @@ import WebKit
 ///   GET  /proxy  ·  POST /proxy?direct=1|0 | pass=… | apply=1 | check=1   cổng proxy nội bộ: trạng thái, thử, đi thẳng
 ///   POST /upload  (thân = .ipa)    đẩy bản mới lên iPad  ·  GET /ipa  tải lại tệp đó
 ///   POST /update[?url=…]           cài .ipa qua TrollStore (apple-magnifier://install); không url = tệp vừa đẩy lên
+///   POST /macupdate?version=…[&url=…]  bản Mac: tự cập nhật bằng tệp .zip (không url = tệp vừa đẩy lên bằng /upload)
 final class DebugServer {
     static let shared = DebugServer()
     let port: UInt16 = 8790
@@ -427,6 +428,22 @@ enum DebugRoutes {
             keepServing()
             UIApplication.shared.open(u, options: [:]) { ok in Log.d("Debug", "mở TrollStore: \(ok)") }
             return .json(["ok": true, "open": u.absoluteString])
+        #if targetEnvironment(macCatalyst)
+        case "/macupdate":
+            // Bản Mac: chạy đúng quy trình tự cập nhật (MacUpdate: tải, kiểm, thay .app, mở lại) với tệp .zip ở url — mặc định tệp
+            // vừa đẩy lên bằng /upload. version = số bản trong tệp (phải mới hơn bản đang dùng; giả bản cũ: prefs debug_fake_version)
+            let url = q["url"] ?? "http://127.0.0.1:\(DebugServer.shared.port)/ipa"
+            let v = q["version"] ?? ""
+            let rel = UpdateCheck.Release(version: v, fileUrl: url, notes: "", tag: "mac-v" + v)
+            Task { @MainActor in
+                do {
+                    try await MacUpdate.install(rel) { Log.d("Debug", "cập nhật Mac: \($0)") }
+                } catch {
+                    Log.d("Debug", "cập nhật Mac lỗi: \(error.localizedDescription)")
+                }
+            }
+            return .json(["ok": true, "url": url, "app": MacUpdate.appURL.path, "blocker": MacUpdate.blocker ?? ""])
+        #endif
         default:
             return .text("không có \(r.path)", status: 404)
         }
@@ -664,6 +681,8 @@ enum DebugRoutes {
         fmt.scale = max(0.2, min(3, scale))
         guard UIApplication.shared.applicationState == .active else { return nil }
         fmt.opaque = true
+        // Mac Catalyst: dải màu tự chọn là dải mở rộng tuyến tính → JPEG nhạt hẳn (#0E1014 thành xám #45…)
+        fmt.preferredRange = .standard
         var ok = false
         var img = UIGraphicsImageRenderer(bounds: w.bounds, format: fmt).image { _ in
             ok = w.drawHierarchy(in: w.bounds, afterScreenUpdates: false)

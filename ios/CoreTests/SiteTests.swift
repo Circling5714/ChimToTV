@@ -103,6 +103,32 @@ final class SiteTests: XCTestCase {
                        "apple-magnifier://install?url=https%3A%2F%2Fg.test%2Fa%20b.ipa")
     }
 
+    func testSafariVersionForUserAgent() {
+        XCTAssertEqual(Http.safariMajor(15, mac: false), 15) // iPadOS 15 → Safari 15
+        XCTAssertEqual(Http.safariMajor(14, mac: true), 17)  // macOS 14 Sonoma → Safari 17
+        XCTAssertEqual(Http.safariMajor(15, mac: true), 18)
+        XCTAssertEqual(Http.safariMajor(26, mac: true), 26)  // macOS 26 → Safari 26
+    }
+
+    /// Mỗi nền tảng chỉ nhận đúng tag + loại tệp của mình (bản Mac không cài nhầm .ipa, bản iPad không thấy bản Mac).
+    func testUpdatePicksPlatformRelease() {
+        func rel(_ tag: String, _ file: String, draft: Bool = false) -> String {
+            #"{"tag_name":"\#(tag)","draft":\#(draft),"prerelease":false,"body":"ghi chú","assets":[{"name":"\#(file)","browser_download_url":"https://g.test/\#(file)"}]}"#
+        }
+        let json = Data(("[" + [rel("v2.17", "ConBangTV.apk"), rel("ios-v1.17", "ConBangTV-iPad-1.17.ipa"),
+                                rel("mac-v1.18", "ConBangTV-Mac-1.18.zip", draft: true),
+                                rel("mac-v1.17", "ConBangTV-Mac-1.17.zip"), rel("mac-v1.9", "ConBangTV-Mac-1.9.zip"),
+                                rel("win-v1.15", "ConBangTV-Windows-1.15.exe"), rel("conbangtv_ios", "ConBangTV-iPad.ipa")]
+            .joined(separator: ",") + "]").utf8)
+        let ios = UpdateCheck.pick(json, platform: .ios)
+        XCTAssertEqual(ios?.version, "1.17")
+        XCTAssertEqual(ios?.fileUrl, "https://g.test/ConBangTV-iPad-1.17.ipa")
+        let mac = UpdateCheck.pick(json, platform: .mac)
+        XCTAssertEqual(mac?.version, "1.17") // bản nháp 1.18 bị bỏ, 1.17 mới hơn 1.9
+        XCTAssertEqual(mac?.fileUrl, "https://g.test/ConBangTV-Mac-1.17.zip")
+        XCTAssertNil(UpdateCheck.pick(Data("[]".utf8), platform: .mac))
+    }
+
     func testAdBlockRules() throws {
         XCTAssertTrue(AdBlock.isAd("static.cloudflareinsights.com"))
         XCTAssertFalse(AdBlock.isAd("ssl.p.jwpcdn.com"))

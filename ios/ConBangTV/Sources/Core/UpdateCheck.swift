@@ -1,16 +1,33 @@
 import Foundation
 
-/// Tìm bản iPad mới trên GitHub Releases (bản Android: Updater.kt). Bản iPad phát hành bằng tag riêng "ios-v…" và không
-/// bao giờ là bản "latest" (app TV đọc releases/latest và lấy tệp .apk) → ở đây duyệt danh sách release, lấy tag ios-v*.
-/// Cài bằng TrollStore: mở apple-magnifier://install?url=<link .ipa>.
+/// Tìm bản iPad / Mac mới trên GitHub Releases (bản Android: Updater.kt). Bản iPad phát hành bằng tag riêng "ios-v…", bản Mac
+/// "mac-v…", không bao giờ là bản "latest" (app TV đọc releases/latest và lấy tệp .apk) → ở đây duyệt danh sách release, lấy
+/// tag của nền tảng đang chạy. iPad / iPhone cài bằng TrollStore (apple-magnifier://install?url=<link .ipa>); Mac tự thay
+/// chính nó (MacUpdate.swift).
 enum UpdateCheck {
     static let releasesApi = "https://api.github.com/repos/Circling5714/ChimToTV/releases?per_page=30"
     static let checkEvery: Int64 = 2 * 60 * 60 * 1000
     static let snooze: Int64 = 24 * 60 * 60 * 1000
 
+    /// Tag và loại tệp của từng nền tảng.
+    struct Platform {
+        let tagPrefix: String
+        let fileSuffix: String
+        static let ios = Platform(tagPrefix: "ios-v", fileSuffix: ".ipa")
+        static let mac = Platform(tagPrefix: "mac-v", fileSuffix: ".zip")
+        static var current: Platform {
+            #if targetEnvironment(macCatalyst)
+            return .mac
+            #else
+            return .ios
+            #endif
+        }
+    }
+
     struct Release {
         let version: String
-        let ipaUrl: String
+        /// Link tải tệp cài: .ipa (iPad / iPhone) hoặc .zip chứa ConBangTV.app (Mac)
+        let fileUrl: String
         let notes: String
         let tag: String
     }
@@ -23,17 +40,23 @@ enum UpdateCheck {
         return (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
     }
 
-    /// Bản iPad mới nhất (bỏ bản nháp / thử nghiệm); nil = chưa có bản nào.
-    static func latest(api: String = releasesApi) async throws -> Release? {
+    /// Bản mới nhất của nền tảng (bỏ bản nháp / thử nghiệm); nil = chưa có bản nào.
+    static func latest(api: String = releasesApi, platform: Platform = .current) async throws -> Release? {
         let r = try await Http.get(api, headers: ["Accept": "application/vnd.github+json"])
-        guard let list = try JSONSerialization.jsonObject(with: r.data) as? [[String: Any]] else { return nil }
+        return pick(r.data, platform: platform)
+    }
+
+    /// Đọc danh sách release (JSON của GitHub) → bản mới nhất của nền tảng.
+    static func pick(_ json: Data, platform: Platform) -> Release? {
+        guard let list = (try? JSONSerialization.jsonObject(with: json)) as? [[String: Any]] else { return nil }
         let releases: [Release] = list.compactMap { o in
             let tag = (o["tag_name"] as? String) ?? ""
-            guard tag.hasPrefix("ios-v"), o["draft"] as? Bool != true, o["prerelease"] as? Bool != true,
+            guard tag.hasPrefix(platform.tagPrefix), o["draft"] as? Bool != true, o["prerelease"] as? Bool != true,
                   let assets = o["assets"] as? [[String: Any]],
-                  let ipa = assets.first(where: { (($0["name"] as? String) ?? "").lowercased().hasSuffix(".ipa") }),
-                  let url = ipa["browser_download_url"] as? String else { return nil }
-            return Release(version: String(tag.dropFirst("ios-v".count)), ipaUrl: url, notes: (o["body"] as? String) ?? "", tag: tag)
+                  let file = assets.first(where: { (($0["name"] as? String) ?? "").lowercased().hasSuffix(platform.fileSuffix) }),
+                  let url = file["browser_download_url"] as? String else { return nil }
+            return Release(version: String(tag.dropFirst(platform.tagPrefix.count)), fileUrl: url,
+                           notes: (o["body"] as? String) ?? "", tag: tag)
         }
         return releases.max { isNewer($1.version, than: $0.version) }
     }

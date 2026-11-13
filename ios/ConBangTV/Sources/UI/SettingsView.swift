@@ -248,7 +248,11 @@ struct SettingsView: View {
                     Toggle("Tự động kiểm tra cập nhật", isOn: $autoUpdate)
                         .onChange(of: autoUpdate) { Prefs.autoUpdate = $0 }
                 } header: { Text("Cập nhật app") } footer: {
+                    #if targetEnvironment(macCatalyst)
+                    Text("App tự tìm bản mới (Mac) trên GitHub khi mở (tối đa 2 giờ một lần); đồng ý thì app tự tải, thay bản đang dùng rồi mở lại. Để app trong thư mục Applications (Ứng dụng) thì mới tự thay được.")
+                    #else
                     Text("App tự tìm bản mới (iPad / iPhone) trên GitHub khi mở (tối đa 2 giờ một lần) rồi mở TrollStore để cài.")
+                    #endif
                 }
 
                 Section {

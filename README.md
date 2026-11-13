@@ -286,6 +286,28 @@ Cùng app cho iPad và iPhone (iOS / iPadOS 15 trở lên, cài bằng TrollStor
 - **Khác bản TV:** không có con trỏ ảo (chạm thẳng vào trang web). Lúc bật proxy / vượt chặn / DNS mã hoá, trên iPadOS 15–16
   app không giữ cookie của trang web sau khi tắt app.
 
+## Bản Mac
+
+Chính app iPad dựng thành app Mac bằng **Mac Catalyst** (cùng mã nguồn `ios/`, cùng số bản với bản iPad): macOS 12 trở lên,
+máy Intel và máy chip Apple (M1…), giao diện và tính năng như bản iPad, dùng chuột / bàn di chuột / bàn phím (phím tắt như
+mục «Bàn phím rời» của [Bản iPad](#bản-ipad)).
+
+- **Cài:** tải `ConBangTV-Mac-<bản>.zip` ở release `mac-v<bản>` (link cố định
+  `…/releases/download/conbangtv_macos/ConBangTV-Mac.zip` có từ bản Mac đầu tiên), mở tệp .zip, kéo **ConBangTV** vào thư mục
+  **Applications** (Ứng dụng) rồi mở. App không mua chứng chỉ của Apple (ký ad-hoc) nên lần đầu macOS chặn: vào **Cài đặt hệ
+  thống → Quyền riêng tư & Bảo mật** → «Vẫn mở» (macOS 14 trở về trước: chuột phải vào app → Mở → Mở). Hoặc trong Terminal:
+  `xattr -dr com.apple.quarantine /Applications/ConBangTV.app`.
+- **Tự cập nhật:** app tìm bản mới (release `mac-v…`, tệp `.zip`) như bản iPad; bấm **Cài đặt ngay** thì app tự tải, kiểm
+  (đúng mã gói, đúng số bản, chữ ký còn nguyên), thay chính nó rồi mở lại — không hỏi Gatekeeper nữa. Chỉ tự thay được khi app
+  nằm ở chỗ ghi được (Applications); chạy thẳng từ Downloads thì macOS chạy bản sao tạm chỉ đọc → app báo và mở link tải.
+- **Khác bản iPad:** không có widget, không cần TrollStore; mật khẩu proxy cất trong tệp riêng của tài khoản macOS
+  (`~/Library/Application Support/vn.chimto.tv/secret.json`, quyền 0600) thay cho Keychain — app ký ad-hoc không dùng
+  được Keychain kiểu iOS, còn Keychain kiểu cũ hỏi lại mật khẩu máy sau mỗi lần app tự cập nhật. Cửa sổ nhỏ nhất 900 × 600.
+- **Dựng:** CI (`.github/workflows/ios.yml`, job «Bản Mac») dựng Intel + Apple Silicon, `ios/scripts/package-mac.sh` ký ad-hoc và
+  nén `.zip` (artifact `mac`); trên Mac trong nhà: `.\ios\scripts\mac-build.ps1 -Mac [-Release] [-Run]`. Phát hành:
+  `.\release.ps1 mac -Notes <ghi chú> -File ConBangTV-Mac-<bản>.zip` (tag `mac-v…`, không bao giờ là Latest).
+- Biểu tượng: `node design/render.mjs mac c` (các cỡ macOS 16–1024, bo góc theo lưới icon của macOS, cùng bộ AppIcon).
+
 ## Bản Windows
 
 App cho máy tính và mini PC cắm tivi chạy Windows 10 / 11 (thư mục `windows/`, C# .NET 8 + WPF + WebView2), dùng được
@@ -623,7 +645,8 @@ cần Mac:
 - **Dựng nhanh trên Mac trong nhà (từ 13/11/2026):** `.\ios\scripts\mac-build.ps1 [-Release] [-NoTest] [-SyncOnly]` gửi mã
   nguồn đang sửa trong máy (cả phần chưa commit) sang Mac qua SSH, chạy test lõi, dựng và đóng gói y như job IPA của CI (cùng
   `ios/scripts/package.sh`), kéo IPA về `dist\mac\` — không phải đẩy nhánh `ios`. Đăng nhập Mac đọc từ tệp ngoài repo
-  (`..\_May_Test_App\info.txt` hoặc biến `CONBANG_MAC_INFO`; dòng 2 = `địa-chỉ/tài-khoản/mật-khẩu`). Mac Sonoma 14.4 chỉ chạy
+  (`..\_May_Test_App\info.txt` hoặc biến `CONBANG_MAC_INFO`: dòng tên máy có chữ «Mac», rồi dòng
+  `địa-chỉ/tài-khoản/mật-khẩu`). Mac Sonoma 14.4 chỉ chạy
   được Xcode 15.4 (Swift 5.10, SDK iOS 17.5) — cũ hơn Xcode của CI, nên mã phải dựng được trên cả hai. Bản phát hành chính thức
   vẫn dựng trên GitHub.
 

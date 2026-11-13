@@ -18,6 +18,7 @@ struct ConBangTVApp: App {
             Log.d("App", "trạng thái: \(p)")
             switch p {
             case .active:
+                MacWindow.configure()
                 AppProxy.revive() // vượt chặn / proxy: cổng nội bộ bị thu hồi lúc nằm nền thì mở lại
                 PlayerModel.detachedModel?.appBecameActive() // phóng to từ cửa sổ nhỏ lúc đang ở màn hình chính iPad
                 AppModel.shared.appReturned() // quay lại sau ≥ 30 phút: hỏi lại "Ai đang xem?"
@@ -34,7 +35,16 @@ struct ConBangTVApp: App {
     }
 }
 
-final class AppDelegate: NSObject, UIApplicationDelegate {
+final class AppDelegate: UIResponder, UIApplicationDelegate {
+    /// Thanh menu của bản Mac: bỏ các menu không dùng (định dạng chữ, mở cửa sổ mới — app chỉ có một cửa sổ).
+    override func buildMenu(with builder: UIMenuBuilder) {
+        super.buildMenu(with: builder)
+        guard builder.system == .main else { return }
+        builder.remove(menu: .format)
+        builder.remove(menu: .newScene)
+        builder.remove(menu: .toolbar)
+    }
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         // Phim vẫn có tiếng khi gạt công tắc im lặng
@@ -61,8 +71,33 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         DebugServer.shared.start()
         #endif
         AutoClear.launched()
-        Log.d("App", "mở app \(UpdateCheck.currentVersion), iOS \(UIDevice.current.systemVersion), \(UIDevice.current.model)")
+        #if targetEnvironment(macCatalyst)
+        let os = "macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"
+        #else
+        let os = "iOS \(UIDevice.current.systemVersion)"
+        #endif
+        Log.d("App", "mở app \(UpdateCheck.currentVersion), \(os), \(UIDevice.current.model)")
         return true
+    }
+}
+
+/// Cửa sổ của bản Mac (Mac Catalyst): cỡ nhỏ nhất để giao diện iPad không vỡ, ẩn chữ tiêu đề (app nền tối, thanh tiêu đề trống
+/// cho gọn). Trên iPad / iPhone không làm gì.
+@MainActor
+enum MacWindow {
+    static let minimumSize = CGSize(width: 900, height: 600)
+
+    static func configure() {
+        #if targetEnvironment(macCatalyst)
+        for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
+            scene.title = "Côn Bằng TV"
+            scene.sizeRestrictions?.minimumSize = minimumSize
+            if let bar = scene.titlebar {
+                bar.titleVisibility = .hidden
+                bar.toolbar = nil
+            }
+        }
+        #endif
     }
 }
 

@@ -1224,8 +1224,13 @@ final class AppModel: ObservableObject {
             self?.updateWindow = nil
             if main?.isKeyWindow == false { main?.makeKey() }
         }
+        #if targetEnvironment(macCatalyst)
+        let how = "App tự tải bản mới, thay bản đang dùng rồi mở lại."
+        #else
+        let how = "Cài bằng TrollStore."
+        #endif
         let a = UIAlertController(title: "Có bản mới \(rel.version)",
-                                  message: "Đang dùng \(UpdateCheck.currentVersion). Cài bằng TrollStore.\n\n" + UpdateCheck.summary(rel.notes),
+                                  message: "Đang dùng \(UpdateCheck.currentVersion). \(how)\n\n" + UpdateCheck.summary(rel.notes),
                                   preferredStyle: .alert)
         a.addAction(UIAlertAction(title: "Để sau", style: .cancel) { [weak self] _ in
             close()
@@ -1244,15 +1249,28 @@ final class AppModel: ObservableObject {
     }
 
     func installUpdate(_ rel: UpdateCheck.Release) {
-        guard let url = UpdateCheck.trollStoreURL(rel.ipaUrl) else { return }
+        #if targetEnvironment(macCatalyst)
+        // Mac: app tự tải .zip, thay thư mục .app đang chạy rồi mở bản mới (MacUpdate). Không thay được → mở link tải.
+        Task { @MainActor in
+            do {
+                try await MacUpdate.install(rel) { [weak self] text in self?.showToast(text) }
+            } catch {
+                Log.d("Update", "không tự cài được: \(error)")
+                if let u = URL(string: rel.fileUrl) { _ = await UIApplication.shared.open(u) }
+                showToast("\(error.localizedDescription) Đã mở link tải bản \(rel.version) trong trình duyệt.")
+            }
+        }
+        #else
+        guard let url = UpdateCheck.trollStoreURL(rel.fileUrl) else { return }
         UIApplication.shared.open(url, options: [:]) { [weak self] ok in
             Log.d("Update", "mở TrollStore: \(ok)")
             if !ok {
                 // Không có TrollStore: mở link tải trong Safari
-                if let u = URL(string: rel.ipaUrl) { UIApplication.shared.open(u) }
+                if let u = URL(string: rel.fileUrl) { UIApplication.shared.open(u) }
                 Task { @MainActor in self?.showToast("Không mở được TrollStore — đã mở link tải .ipa trong Safari.") }
             }
         }
+        #endif
     }
 
     func snoozeUpdate(_ rel: UpdateCheck.Release) {

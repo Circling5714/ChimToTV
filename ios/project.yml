@@ -7,6 +7,9 @@ options:
     iOS: "15.0"
     macOS: "12.0"
   createIntermediateGroups: true
+  # Định dạng project của Xcode 15.3 (objectVersion 63): Mac trong nhà chỉ có Xcode 15.4 (macOS 14.4); xcodegen 2.45 mặc định
+  # sinh định dạng Xcode 16 (77) mà Xcode 15 không mở được. Xcode 16 của GitHub vẫn mở định dạng cũ.
+  projectFormat: xcode15_3
 configs:
   Debug: debug
   Beta: release
@@ -48,11 +51,15 @@ targets:
         buildPhase: resources
     dependencies:
       - package: SwiftSoup
+      # Widget chỉ cho iPad / iPhone — bản Mac (Mac Catalyst) không kèm
       - target: ConBangWidget
+        platformFilter: iOS
     info:
       path: ConBangTV/Info.plist
       properties:
         CFBundleDisplayName: $(APP_DISPLAY_NAME)
+        # Bản Mac lấy CFBundleName làm tên trên thanh menu / Dock («ConBangTV» → «Côn Bằng TV»); iPad dùng CFBundleDisplayName
+        CFBundleName: $(APP_DISPLAY_NAME)
         # Mã hồ sơ NextDNS của app (DNS mã hoá, Core/Doh.swift): secret NEXTDNS_ID của repo, CI truyền vào lúc dựng — không ghi
         # trong code; trống thì chuỗi DNS mã hoá bỏ NextDNS
         CBNextDnsId: $(NEXTDNS_ID)
@@ -92,13 +99,18 @@ targets:
         ConBangAppGroup: $(APP_GROUP)
         ConBangURLScheme: $(URL_SCHEME)
         ITSAppUsesNonExemptEncryption: false
+        # Bản Mac: mục trong Launchpad / Finder (iPad bỏ qua)
+        LSApplicationCategoryType: public.app-category.entertainment
     settings:
       base:
         # Một IPA cho cả iPhone (1) và iPad (2)
         TARGETED_DEVICE_FAMILY: "1,2"
         PRODUCT_NAME: ConBangTV
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        SUPPORTS_MACCATALYST: NO
+        # Bản Mac = chính app iPad dựng bằng Mac Catalyst (giao diện iPad, macOS 12+ — ứng với iOS 15), Intel + Apple Silicon.
+        # Mã gói giữ nguyên vn.chimto.tv (bản thử: vn.chimto.tv.debug). Đóng gói: scripts/package-mac.sh
+        SUPPORTS_MACCATALYST: YES
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         CODE_SIGN_STYLE: Manual
         # SPI của WebKit cho proxy (Player/WebKitSPI.m)
         SWIFT_OBJC_BRIDGING_HEADER: ConBangTV/Sources/Player/WebKitSPI.h
