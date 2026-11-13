@@ -1,28 +1,42 @@
+//! Côn Bằng TV cho Linux — GTK3 + WebKitGTK. Giao diện như bản TV / Windows: menu bên trái, thẻ phim, đi bằng phím mũi tên /
+//! remote, trình phát dùng chung trang phát của bản Android (app/src/main/assets).
+
+mod app;
+mod assets;
+mod card;
+mod css;
+mod images;
+mod keynav;
+mod limits;
+mod menu;
+mod pages;
+mod player;
+mod profiles;
+mod startup;
+mod ui;
+
 use gtk::prelude::*;
-use webkit2gtk::WebViewExt;
 
 fn main() {
-    gtk::init().expect("GTK");
-    let win = gtk::Window::new(gtk::WindowType::Toplevel);
-    win.set_title("Côn Bằng TV");
-    win.set_default_size(1000, 640);
-    let web = webkit2gtk::WebView::new();
-    web.load_html(
-        &format!(
-            "<body style='background:#0E1014;color:#F2F4F8;font:24px sans-serif'><h1>Côn Bằng TV {}</h1>\
-             <p>GTK {}.{}.{}</p><p id=ua></p><script>ua.textContent=navigator.userAgent</script></body>",
-            cbtv::version(),
-            gtk::major_version(),
-            gtk::minor_version(),
-            gtk::micro_version(),
-        ),
-        None,
-    );
-    win.add(&web);
-    win.connect_delete_event(|_, _| {
-        gtk::main_quit();
-        glib::Propagation::Proceed
+    cbtv::prefs::load(None);
+    cbtv::log::start();
+    cbtv::log::d("app", &format!("Côn Bằng TV {} (Linux) mở", cbtv::version()));
+    cbtv::prefs::apply_net_defaults();
+    cbtv::net::start_bridge();
+    glib::set_prgname(Some("conbangtv"));
+    glib::set_application_name("Côn Bằng TV");
+
+    // Một cửa sổ cho cả máy: mở lần nữa thì đưa cửa sổ đang có lên trước
+    let gapp = gtk::Application::new(Some("vn.chimto.tv"), gio::ApplicationFlags::default());
+    gapp.connect_activate(|g| {
+        if let Some(w) = g.windows().first() {
+            w.present();
+            return;
+        }
+        css::install();
+        let a = app::App::build(g);
+        a.start();
     });
-    win.show_all();
-    gtk::main();
+    gapp.run_with_args(&Vec::<String>::new());
+    cbtv::prefs::flush();
 }

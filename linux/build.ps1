@@ -42,13 +42,13 @@ $flag = if ($Release) { '--release' } else { '' }
 $pkg = if ($CoreOnly) { '-p conbang-core' } else { '' }
 $sw = [Diagnostics.Stopwatch]::StartNew()
 $out = Ub-Ssh "cd ~/$work/src/linux && export CARGO_TARGET_DIR=~/$work/target && cargo build $flag $pkg --color never 2>&1 | grep -vE '^\s+(Compiling|Downloaded|Downloading|Locking|Adding|Updating)\b' | tail -60; echo ""BUILD_EXIT=`${PIPESTATUS[0]}"""
-$out | Where-Object { $_ -notmatch '^BUILD_EXIT=' }
+$out | Where-Object { $_ -notmatch '^BUILD_EXIT=' -and $_ -notmatch 'unused_dependencies|consider removing the dep|^warning: unused dependency|^\s*\|\s*$|^\s+--> \S*Cargo.toml' } | Out-Host
 if (($out | Select-Object -Last 1) -ne 'BUILD_EXIT=0') { throw "Dựng lỗi ($([int]$sw.Elapsed.TotalSeconds) s)" }
 "Dựng xong bản $profile trong $([int]$sw.Elapsed.TotalSeconds) s"
 
 if ($Test) {
     $t = Ub-Ssh "cd ~/$work/src/linux && export CARGO_TARGET_DIR=~/$work/target && timeout 600 cargo test -p conbang-core --color never $TestFilter 2>&1 | grep -vE '^\s+(Compiling|Running|Doc-tests)\b|^running 0 tests|^$' | tail -80; echo ""TEST_EXIT=`${PIPESTATUS[0]}"""
-    $t | Where-Object { $_ -notmatch '^TEST_EXIT=' }
+    $t | Where-Object { $_ -notmatch '^TEST_EXIT=' } | Out-Host
     if (($t | Select-Object -Last 1) -ne 'TEST_EXIT=0') { throw 'Có test hỏng' }
 }
 
