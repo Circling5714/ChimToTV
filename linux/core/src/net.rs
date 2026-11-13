@@ -60,6 +60,16 @@ pub fn proxy() -> Option<SocksConfig> {
     })
 }
 
+/// Máy chủ Shadowsocks đang bật (None = đi thẳng / đang dùng SOCKS5).
+pub fn ss() -> Option<crate::shadowsocks::SsConfig> {
+    crate::shadowsocks::config()
+}
+
+/// Đích để «Kiểm tra proxy» SOCKS5 mở thử kết nối (cổng 443): trang phim đang dùng, không có thì github.com.
+pub fn proxy_test_target() -> String {
+    crate::site::host_of(&crate::prefs::base_url()).unwrap_or_else(|| "github.com".into())
+}
+
 /// Có đi qua proxy tới host này không (chế độ "chỉ trang phim": chỉ tên miền trong danh sách trang).
 pub fn uses_proxy(sites_only: bool, host: &str) -> bool {
     if !sites_only {
@@ -86,7 +96,7 @@ pub fn note_proxy_error(message: &str) {
 
 /// Lời nhắc thêm vào câu báo lỗi khi đang bật proxy (kèm lỗi phía proxy trong 2 phút gần đây).
 pub fn note() -> String {
-    let ss = crate::shadowsocks::config().is_some();
+    let ss = ss().is_some();
     if proxy().is_none() && !ss {
         return String::new();
     }
@@ -242,8 +252,8 @@ async fn socks_address(c: &SocksConfig, host: &str) -> Result<Vec<u8>> {
         v.extend_from_slice(b);
         return Ok(v);
     }
-    // DNS mã hoá (mặc định), hoặc Vượt chặn: DNS của máy chặn tên miền → địa chỉ qua DNS mã hoá
-    if let Some(real) = crate::doh::for_connect(host).await {
+    // DNS mã hoá (mặc định), hoặc Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → địa chỉ qua DNS mã hoá
+    if let Some(real) = crate::doh::for_connect(host).await? {
         return Ok(ip_bytes(real));
     }
     let ip = system_resolve(host, 443).await.map_err(|_| Error::Socks(4, format!("không tìm thấy tên miền {host} (DNS của máy)")))?;
@@ -277,27 +287,37 @@ pub async fn connect(host: &str, port: u16) -> Result<Conn> {
             };
         }
     }
-    if let Some(ss) = crate::shadowsocks::config() {
+    if let Some(ss) = ss() {
         if uses_proxy(ss.sites_only, host) {
-            // DNS của máy (không phải của máy chủ SS): DNS mã hoá, lỗi thì DNS của máy
-            let mut ip = None;
-            if !ss.remote_dns && host.parse::<IpAddr>().is_err() {
-                ip = match crate::doh::for_connect(host).await {
-                    Some(x) => Some(x),
-                    None => system_resolve(host, port).await.ok().map(|a| a.ip()),
-                };
+            let r = async {
+                // DNS của máy (không phải của máy chủ SS): DNS mã hoá, lỗi thì DNS của máy
+                let mut ip = host.trim_matches(|ch| ch == '[' || ch == ']').parse::<IpAddr>().ok();
+                if !ss.remote_dns && ip.is_none() {
+                    ip = Some(match crate::doh::for_connect(host).await? {
+                        Some(x) => x,
+                        None => system_resolve(host, port)
+                            .await
+                            .map_err(|_| Error::Net("Không tìm thấy tên miền (trang đổi tên miền hoặc bị chặn?).".into()))?
+                            .ip(),
+                    });
+                }
+                crate::shadowsocks::connect(&ss, host, ip, port).await
             }
-            return match crate::shadowsocks::connect(&ss, host, ip, port).await {
+            .await;
+            return match r {
                 Ok(stream) => Ok(Conn { stream, fd: None, via_proxy: true, ss: true }),
                 Err(e) => {
-                    note_proxy_error(&e.to_string());
+                    if let Error::Socks(_, m) = &e {
+                        note_proxy_error(m);
+                    }
                     Err(e)
                 }
             };
         }
     }
-    // DNS mã hoá (mặc định), hoặc Vượt chặn: DNS của máy chặn tên miền → địa chỉ hỏi qua DNS mã hoá; None = DNS của máy
-    let target = match crate::doh::for_connect(host).await {
+    // DNS mã hoá (mặc định), hoặc Vượt chặn: DNS của máy chặn tên miền (trả 0.0.0.0…) → địa chỉ hỏi qua DNS mã hoá;
+    // None = DNS của máy
+    let target = match crate::doh::for_connect(host).await? {
         Some(ip) => SocketAddr::new(ip, port),
         None => match host.trim_matches(|ch| ch == '[' || ch == ']').parse::<IpAddr>() {
             Ok(ip) => SocketAddr::new(ip, port),
@@ -392,9 +412,13 @@ async fn serve(mut client: TcpStream) {
     if client.write_all(&[5, 0, 0, 1, 0, 0, 0, 0, 0, 0]).await.is_err() {
         return;
     }
-    let up = match crate::unblock::bridge_first(&mut client, conn, &host, port).await {
-        Some(c) => c,
-        None => return,
+    // Vượt chặn: tách gói đầu của bên gọi, tự lên Mức 2 (unblock.rs). Đổi cài đặt giữa chừng thì bỏ kết nối
+    let up = tokio::select! {
+        r = crate::unblock::bridge_first(&mut client, conn, &host, port) => match r {
+            Some(c) => c,
+            None => return,
+        },
+        _ = gen_rx.changed() => return,
     };
     relay(client, up, &mut gen_rx).await;
 }
@@ -440,12 +464,32 @@ async fn accept_socks(cs: &mut TcpStream) -> std::io::Result<Option<(String, u16
     Ok(Some((host, u16::from_be_bytes(pb))))
 }
 
-/// Chuyển dữ liệu hai chiều tới khi một bên đóng (hoặc cài đặt mạng đổi).
+/// Chuyển dữ liệu hai chiều tới khi một bên đóng (chiều kia chờ thêm tối đa 2 giây), hoặc cài đặt mạng đổi.
 async fn relay(client: TcpStream, up: Conn, gen_rx: &mut tokio::sync::watch::Receiver<u64>) {
+    use futures::future::Either;
+    let ss = up.ss;
     let (mut cr, mut cw) = client.into_split();
     let (mut ur, mut uw) = tokio::io::split(up.stream);
     let to_up = async {
         let mut buf = vec![0u8; 32 * 1024];
+        // Shadowsocks: phần đầu gửi cùng dữ liệu đầu tiên của bên gọi (HTTPS: gói bắt tay). Bên gọi im quá 0,3 s (giao thức
+        // máy chủ nói trước) thì gửi phần đầu trước (ghi 0 byte — xem shadowsocks::connect) để máy chủ mở kết nối tới đích.
+        // Chờ bằng chính lần đọc (huỷ giữa chừng không mất byte), không bằng readable(): sau bắt tay SOCKS tokio còn nhớ
+        // trạng thái «đọc được» cũ nên readable() trả ngay
+        if ss {
+            match tokio::time::timeout(Duration::from_millis(300), cr.read(&mut buf)).await {
+                Err(_) => {
+                    let _started: usize = uw.write(&[]).await?;
+                }
+                Ok(r) => {
+                    let n = r?;
+                    if n == 0 {
+                        return uw.shutdown().await;
+                    }
+                    uw.write_all(&buf[..n]).await?;
+                }
+            }
+        }
         loop {
             let n = cr.read(&mut buf).await?;
             if n == 0 {
@@ -458,15 +502,32 @@ async fn relay(client: TcpStream, up: Conn, gen_rx: &mut tokio::sync::watch::Rec
     let to_client = async {
         let r = tokio::io::copy(&mut ur, &mut cw).await;
         if let Err(e) = &r {
-            if up.ss {
-                note_proxy_error(&e.to_string());
+            if let Some(m) = crate::shadowsocks::ss_error_message(e) {
+                note_proxy_error(&m);
             }
         }
         let _ = cw.shutdown().await;
         r.map(|_| ())
     };
+    let both = async {
+        match futures::future::select(Box::pin(to_up), Box::pin(to_client)).await {
+            Either::Left((_, rest)) => {
+                let _ = tokio::time::timeout(Duration::from_secs(2), rest).await;
+            }
+            Either::Right((_, rest)) => {
+                let _ = tokio::time::timeout(Duration::from_secs(2), rest).await;
+            }
+        }
+    };
     tokio::select! {
-        _ = async { let _ = tokio::join!(to_up, to_client); } => {}
+        _ = both => {}
         _ = gen_rx.changed() => {}
     }
+}
+
+/// Test của các phần mạng đổi cài đặt chung (mức vượt chặn, DNS mã hoá…) chạy lần lượt.
+#[cfg(test)]
+pub(crate) fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+    static L: Mutex<()> = Mutex::new(());
+    L.lock().unwrap_or_else(|e| e.into_inner())
 }
