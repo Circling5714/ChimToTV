@@ -274,6 +274,7 @@ impl App {
         crate::images::cleanup();
         self.rebuild_menu();
         self.show_root(crate::menu::home_page());
+        #[cfg(debug_assertions)]
         crate::debug::start();
         crate::startup::after_show();
     }

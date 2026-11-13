@@ -5,6 +5,8 @@ mod app;
 mod assets;
 mod card;
 mod css;
+// Cổng gỡ lỗi chỉ có trong bản thử (cargo build không --release); bản phát hành không có, như bản iPad / Mac / Windows
+#[cfg(debug_assertions)]
 mod debug;
 mod fonts;
 mod hooks;

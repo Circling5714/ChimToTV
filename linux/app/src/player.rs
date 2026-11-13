@@ -1862,6 +1862,7 @@ impl Player {
     }
 
     /// Cổng gỡ lỗi: tình trạng trình phát.
+    #[cfg(debug_assertions)]
     pub fn debug(&self) -> String {
         let s = self.s.borrow();
         format!(
@@ -1880,6 +1881,7 @@ impl Player {
         )
     }
 
+    #[cfg(debug_assertions)]
     /// Cổng gỡ lỗi: chạy JS trong trình phát, trả kết quả dạng chữ.
     pub fn eval(&self, code: &str, done: impl FnOnce(String) + 'static) {
         #[allow(deprecated)]
