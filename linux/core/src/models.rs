@@ -18,6 +18,31 @@ impl Imdb {
     pub fn label(&self) -> String {
         format!("IMDb {:.1}", self.score)
     }
+
+    /// Dòng thông tin ở trang phim, vd "IMDb 8.5 (378 nghìn lượt chấm)".
+    pub fn detail(&self) -> String {
+        format!("{} ({} lượt chấm)", self.label(), Imdb::votes_text(self.votes))
+    }
+
+    /// Đối tượng "imdb" của KKPhim → Imdb (None = chưa có điểm / quá ít lượt) — như api_site::imdb_of.
+    pub fn of(o: Option<&crate::json::Obj>) -> Option<Imdb> {
+        crate::api_site::imdb_of(o)
+    }
+
+    /// Số lượt chấm: "1,2 triệu", "378 nghìn", "950".
+    pub fn votes_text(v: i64) -> String {
+        if v >= 1_000_000 {
+            // Làm tròn nửa lên như "0.0" của C#
+            let x = (v as f64 / 1_000_000.0 * 10.0).round() / 10.0;
+            let s = format!("{x:.1}").replace('.', ",");
+            return format!("{} triệu", s.strip_suffix(",0").unwrap_or(&s));
+        }
+        if v >= 1000 {
+            format!("{} nghìn", v / 1000)
+        } else {
+            v.to_string()
+        }
+    }
 }
 
 /// `imdb`: điểm IMDb (None = không có / quá ít lượt chấm).

@@ -308,7 +308,8 @@ pub fn from_films(films: &[Film]) -> Vec<FeedItem> {
                 0,
                 ep_of(f.badge.as_deref()),
                 None,
-                f.imdb,
+                // như bản Windows / TV / iPad: phim từ trang web không mang điểm IMDb vào trang chủ tổng hợp
+                None,
             )
         })
         .filter(|i| seen.insert(i.url.clone()))
@@ -346,13 +347,23 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146097 + doe - 719468
 }
 
+fn days_in_month(y: i64, m: i64) -> i64 {
+    match m {
+        2 if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    }
+}
+
 /// "2026-11-08T18:55:29.000Z", "2026-11-08T21:12:36+07:00" → ms; không ghi múi giờ thì coi là giờ Việt Nam.
 pub fn time(s: Option<&str>) -> i64 {
     let Some(s) = s else { return 0 };
     let Some(g) = ISO_RX.groups(s) else { return 0 };
     let n = |i: usize| g[i].parse::<i64>().unwrap_or(0);
     let (y, mo, d, h, mi, se) = (n(1), n(2), n(3), n(4), n(5), n(6));
-    if !(1..=12).contains(&mo) || !(1..=31).contains(&d) || h > 23 || mi > 59 || se > 59 {
+    // ngày giờ sai (vd 30/02) → 0 như DateTimeOffset của bản Windows
+    if y < 1 || !(1..=12).contains(&mo) || d < 1 || d > days_in_month(y, mo) || h > 23 || mi > 59 || se > 59 {
         return 0;
     }
     let t = ((days_from_civil(y, mo, d) * 24 + h) * 60 + mi) * 60_000 + se * 1000;
@@ -626,7 +637,7 @@ fn short(e: &Error) -> String {
     match e {
         Error::Http(c) => format!("lỗi {c}"),
         Error::Timeout => "không trả lời".into(),
-        Error::Net(_) => "không kết nối được".into(),
+        Error::Net(_) | Error::Socks(..) => "không kết nối được".into(),
         other => crate::util::take_chars(&other.to_string(), 60),
     }
 }
