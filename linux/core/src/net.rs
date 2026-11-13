@@ -398,6 +398,12 @@ async fn serve(mut client: TcpStream) {
         Ok(Ok(Some(x))) => x,
         _ => return,
     };
+    // Tên miền quảng cáo / theo dõi (ad_block — như bản Windows trả 403 cho các yêu cầu này): từ chối ngay ở cổng nội bộ —
+    // cổng này là đường ra mạng duy nhất của trình phát WebKitGTK (crate webkit2gtk chưa có bộ lọc nội dung)
+    if crate::ad_block::is_ad(Some(&host)) {
+        let _ = client.write_all(&[5, 2, 0, 1, 0, 0, 0, 0, 0, 0]).await;
+        return;
+    }
     let conn = match connect(&host, port).await {
         Ok(c) => c,
         Err(e) => {
