@@ -10,6 +10,8 @@ options:
   # Định dạng project của Xcode 15.3 (objectVersion 63): Mac trong nhà chỉ có Xcode 15.4 (macOS 14.4); xcodegen 2.45 mặc định
   # sinh định dạng Xcode 16 (77) mà Xcode 15 không mở được. Xcode 16 của GitHub vẫn mở định dạng cũ.
   projectFormat: xcode15_3
+  # Ngôn ngữ chính tiếng Việt: menu hệ thống của bản Mac (Tệp, Sửa, Cửa sổ…) và menu chép / dán của iOS hiện tiếng Việt
+  developmentLanguage: vi
 configs:
   Debug: debug
   Beta: release
@@ -101,6 +103,8 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         # Bản Mac: mục trong Launchpad / Finder (iPad bỏ qua)
         LSApplicationCategoryType: public.app-category.entertainment
+        CFBundleDevelopmentRegion: vi
+        CFBundleLocalizations: [vi]
     settings:
       base:
         # Một IPA cho cả iPhone (1) và iPad (2)

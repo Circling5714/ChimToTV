@@ -294,9 +294,11 @@ mục «Bàn phím rời» của [Bản iPad](#bản-ipad)).
 
 - **Cài:** tải `ConBangTV-Mac-<bản>.zip` ở release `mac-v<bản>` (link cố định
   `…/releases/download/conbangtv_macos/ConBangTV-Mac.zip` có từ bản Mac đầu tiên), mở tệp .zip, kéo **ConBangTV** vào thư mục
-  **Applications** (Ứng dụng) rồi mở. App không mua chứng chỉ của Apple (ký ad-hoc) nên lần đầu macOS chặn: vào **Cài đặt hệ
-  thống → Quyền riêng tư & Bảo mật** → «Vẫn mở» (macOS 14 trở về trước: chuột phải vào app → Mở → Mở). Hoặc trong Terminal:
-  `xattr -dr com.apple.quarantine /Applications/ConBangTV.app`.
+  **Applications** (Ứng dụng) rồi mở. App không mua chứng chỉ của Apple (ký ad-hoc) nên lần đầu macOS chặn — đã thử đúng các bước
+  này trên macOS 14 (13/11/2026, tệp mang cờ «Safari đã tải về»): hộp «Không thể mở "ConBangTV" vì ứng dụng này đến từ một nhà phát
+  triển chưa được xác định» → **OK** → **Cài đặt hệ thống → Quyền riêng tư & Bảo mật**, kéo xuống mục Bảo mật → «"ConBangTV" đã bị
+  chặn…» → **Vẫn mở** → nhập mật khẩu máy → hộp «Bạn có chắc chắn muốn mở không?» → **Mở**. Chỉ làm một lần; các bản sau app tự cập
+  nhật. Hoặc trong Terminal: `xattr -dr com.apple.quarantine /Applications/ConBangTV.app`.
 - **Tự cập nhật:** app tìm bản mới (release `mac-v…`, tệp `.zip`) như bản iPad; bấm **Cài đặt ngay** thì app tự tải, kiểm
   (đúng mã gói, đúng số bản, chữ ký còn nguyên), thay chính nó rồi mở lại — không hỏi Gatekeeper nữa. Chỉ tự thay được khi app
   nằm ở chỗ ghi được (Applications); chạy thẳng từ Downloads thì macOS chạy bản sao tạm chỉ đọc → app báo và mở link tải.
