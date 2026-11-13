@@ -270,7 +270,9 @@ impl AddRowPage {
                 }
                 let sw = gtk::ScrolledWindow::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
                 sw.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-                sw.set_size_request(-1, px(420.0));
+                // Cao theo danh sách, tối đa 420 (danh sách dài như Thể loại mới cuộn) — đặt cứng thì danh sách ngắn thừa khoảng trống
+                sw.set_propagate_natural_height(true);
+                sw.set_max_content_height(px(420.0));
                 sw.add(&list);
                 app().dialog_width(px(820.0));
                 let rx = app().ask(&t2, "", &["Huỷ"], Some(sw.upcast()), 0);

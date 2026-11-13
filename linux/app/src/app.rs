@@ -217,6 +217,8 @@ impl App {
             }
             let away = AWAY.with(|a| a.get());
             let a = app();
+            // Ô đang chọn mất lúc cửa sổ ở dưới (trang dựng lại khi đồng bộ…) thì lúc quay lại chọn lại
+            ui::after(150, || app().refocus_if_lost());
             if away > 0 && now - away > 30 * 60_000 && a.playing().is_none() && prefs::profiles().len() > 1 {
                 let cur = prefs::current_profile();
                 if prefs::ask_profile() || cur.locked() {
@@ -231,7 +233,7 @@ impl App {
         // Lưới an toàn: ô đang chọn bị huỷ (trang dựng lại sau khi bấm) thì GTK để trống focus — người dùng remote / bàn phím không
         // thấy ô nào sáng, phím Delete / Enter không có đích. Đợi một nhịp (trang có thể tự chọn ô sau 30–60 ms) rồi chọn ô đầu trang
         // (trang chưa có ô nào thì chọn menu).
-        self.window.connect_set_focus(|w, f| {
+        self.window.connect_set_focus(|_, f| {
             let a = app();
             let cur = a.stack_pages.try_borrow().ok().and_then(|s| s.last().cloned());
             if let Some(f) = f {
@@ -243,26 +245,7 @@ impl App {
                 }
                 return;
             }
-            let w = w.clone();
-            ui::after(150, move || {
-                if w.focused_widget().is_some() || !w.is_active() {
-                    return;
-                }
-                let a = app();
-                if a.playing().is_some() || a.dialog_open() {
-                    return;
-                }
-                let Some(p) = a.current() else {
-                    a.focus_menu();
-                    return;
-                };
-                let targets = keynav::targets(p.base().body.upcast_ref());
-                match a.focus_index.get().and_then(|i| targets.get(i.min(targets.len().saturating_sub(1)))) {
-                    Some(t) => keynav::focus_and_show(t),
-                    None if p.first_target().is_some() => pages::focus_first(p.as_ref()),
-                    None => a.focus_menu(),
-                }
-            });
+            ui::after(150, || app().refocus_if_lost());
         });
         self.window.connect_delete_event(|_, _| {
             app().closing();
@@ -393,6 +376,24 @@ impl App {
             } else {
                 b.style_context().remove_class("active");
             }
+        }
+    }
+
+    /// Không ô nào được chọn (ô cũ bị huỷ khi trang dựng lại) → chọn ô cùng thứ tự trong trang / ô đầu / menu. Người dùng remote /
+    /// bàn phím phải luôn thấy một ô sáng.
+    pub fn refocus_if_lost(&self) {
+        if self.window.focused_widget().is_some() || !self.window.is_active() || self.playing().is_some() || self.dialog_open() {
+            return;
+        }
+        let Some(p) = self.current() else {
+            self.focus_menu();
+            return;
+        };
+        let targets = keynav::targets(p.base().body.upcast_ref());
+        match self.focus_index.get().and_then(|i| targets.get(i.min(targets.len().saturating_sub(1)))) {
+            Some(t) => keynav::focus_and_show(t),
+            None if p.first_target().is_some() => pages::focus_first(p.as_ref()),
+            None => self.focus_menu(),
         }
     }
 

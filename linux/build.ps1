@@ -55,12 +55,13 @@ if ($Test) {
 if ($Deb) {
     $d = Ub-Ssh "cd ~/$work/src/linux && bash packaging/make-deb.sh ~/$work/target/$profile/conbangtv ~/$work/dist thu"
     $d
-    $deb = ($d | Where-Object { $_ -match '^DEB=' } | Select-Object -Last 1) -replace '^DEB=', ''
-    if (-not $deb) { throw 'Đóng gói .deb lỗi' }
+    # Không đặt tên biến $deb: PowerShell không phân biệt hoa thường — trùng tham số [switch]$Deb
+    $debFile = ($d | Where-Object { $_ -match '^DEB=' } | Select-Object -Last 1) -replace '^DEB=', ''
+    if (-not $debFile) { throw 'Đóng gói .deb lỗi' }
     $dist = Join-Path $repo 'dist\linux'
     New-Item -ItemType Directory -Force $dist | Out-Null
-    Ub-Get $deb (Join-Path $dist (Split-Path $deb -Leaf)) | Out-Null
-    "Tệp: dist\linux\$(Split-Path $deb -Leaf)"
+    Ub-Get $debFile (Join-Path $dist (Split-Path $debFile -Leaf)) | Out-Null
+    "Tệp: dist\linux\$(Split-Path $debFile -Leaf)"
 }
 
 if ($Run) {
