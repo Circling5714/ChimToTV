@@ -485,7 +485,27 @@ impl App {
 
     /// Phim đang xem (không phải ở cửa sổ nhỏ).
     pub fn playing(&self) -> Option<Rc<crate::player::Player>> {
-        self.player.borrow().clone().filter(|p| p.is_open())
+        self.player.borrow().clone().filter(|p| p.is_open() && !p.is_mini())
+    }
+
+    /// Phim vừa ra cửa sổ nhỏ: cửa sổ app trở lại trang đang mở (phim vẫn chạy).
+    pub fn player_minimized(&self) {
+        self.stack.set_visible_child_name("shell");
+        self.window.set_title("Côn Bằng TV");
+        if let Some(p) = self.current() {
+            restore_focus(p);
+        }
+        self.rebuild_menu();
+    }
+
+    /// Phóng to phim từ cửa sổ nhỏ: cửa sổ app hiện trình phát.
+    pub fn player_restored(&self) {
+        if let Some(cur) = self.current() {
+            *cur.base().last_focus.borrow_mut() = self.window.focused_widget();
+        }
+        self.stack.set_visible_child_name("player");
+        self.window.present();
+        self.rebuild_menu();
     }
 
     /// Mở phim ở tập ep_url. resume: mở từ "Xem tiếp" (tập đã xem hết thì sang tập sau).
@@ -502,6 +522,8 @@ impl App {
             }
             slot.clone().unwrap()
         };
+        // Đang xem ở cửa sổ nhỏ mà mở phim khác: lấy trình phát về cửa sổ app
+        p.exit_mini(false);
         p.widget().show_all();
         self.stack.set_visible_child_name("player");
         p.open(film_url, ep_url, resume);

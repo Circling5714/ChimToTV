@@ -274,7 +274,7 @@ impl SettingsPage {
         b.add(&ui::dim(
             "Mũi tên: di chuyển  •  Enter: chọn  •  Esc / Backspace / Back của remote: quay lại  •  F11: toàn màn hình  •  Ctrl+F: tìm kiếm\n\
              Khi xem phim: Space / Enter / K: phát / dừng  •  ◀ ▶ (J / L): tua  •  ▲: thời gian  •  ▼ / M: menu (server, tập, tốc độ…)  •  \
-             N / P (PageDown / PageUp): tập sau / trước  •  0–9: nhảy tới 0–90%  •  F: toàn màn hình  •  Esc: thoát phim\n\
+             N / P (PageDown / PageUp): tập sau / trước  •  0–9: nhảy tới 0–90%  •  F: toàn màn hình  •  W: thu nhỏ ra cửa sổ nhỏ  •  Esc: thoát phim\n\
              Chuột: rê để hiện thanh điều khiển, bấm vào phim để phát / dừng, bấm đúp để toàn màn hình.",
         ));
         let h = ui::header("Giới thiệu");

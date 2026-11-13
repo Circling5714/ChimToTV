@@ -100,6 +100,8 @@ progressbar progress {{ background-color: {BRAND}; min-height: 4px; border: none
 .player {{ background-color: #000; }}
 .osd {{ background-image: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.85)); padding: {p46} {p26} {p18} {p26}; }}
 .topbar {{ background-image: linear-gradient(to bottom, rgba(0,0,0,0.8), rgba(0,0,0,0)); padding: {p16} {p22} {p40} {p22}; }}
+.mini-bar {{ background-color: {SURFACE}; padding: {p4} {p8}; }}
+.mini-bar button {{ padding: {p4} {p12}; font-size: {f15}; min-height: 0; }}
 .osd-time {{ font-size: {f16}; font-weight: 600; }}
 .osd-state {{ font-size: {f14}; color: rgba(255,255,255,0.7); }}
 .osd-title {{ font-size: {f20}; font-weight: 600; }}

@@ -149,6 +149,15 @@ pub struct Player {
     notice_timer: RefCell<Option<glib::SourceId>>,
     seek_timer: RefCell<Option<glib::SourceId>>,
     click_timer: RefCell<Option<glib::SourceId>>,
+    /// Cửa sổ phim nhỏ (đang thu nhỏ) — xem enter_mini().
+    mini: RefCell<Option<Mini>>,
+}
+
+/// Cửa sổ phim nhỏ: WebView chuyển sang đây, cửa sổ app trở lại các trang.
+struct Mini {
+    win: gtk::Window,
+    holder: gtk::Overlay,
+    play: gtk::Button,
 }
 
 thread_local! {
@@ -250,6 +259,7 @@ impl Player {
             glib::Propagation::Proceed
         });
         tb.pack_end(&fs, false, false, 0);
+        tb.pack_end(&osd_button("▣  Thu nhỏ", |p| p.enter_mini()), false, false, 0);
         topbar.add(&tb);
         root.add_overlay(&topbar);
 
@@ -390,6 +400,7 @@ impl Player {
             notice_timer: RefCell::new(None),
             seek_timer: RefCell::new(None),
             click_timer: RefCell::new(None),
+            mini: RefCell::new(None),
         });
         PLAYER.with(|x| *x.borrow_mut() = Some(Rc::downgrade(&p)));
         p.connect();
@@ -509,6 +520,149 @@ impl Player {
 
     pub fn is_open(&self) -> bool {
         self.open.get()
+    }
+
+    // ---- Cửa sổ phim nhỏ (bản Windows: Player/MiniWindow.cs, bản TV: MiniPlayer) ----
+
+    pub fn is_mini(&self) -> bool {
+        self.mini.borrow().is_some()
+    }
+
+    /// Tiêu đề cửa sổ đang hiện phim (cửa sổ nhỏ hoặc cửa sổ app).
+    fn set_window_title(&self, t: &str) {
+        match self.mini.borrow().as_ref() {
+            Some(m) => m.win.set_title(&format!("{t} · Côn Bằng TV")),
+            None => app().window.set_title(&format!("{t} · Côn Bằng TV")),
+        }
+    }
+
+    /// Thu nhỏ (nút «▣ Thu nhỏ», phím W): phim chạy tiếp ở cửa sổ nhỏ, cửa sổ app trở lại các trang. Thanh dưới cửa sổ nhỏ:
+    /// phát / dừng, phóng to, tắt; bấm vào phim = phát / dừng, bấm đúp = phóng to. X11: cửa sổ luôn nổi trên cùng ở góc dưới
+    /// phải; GNOME Wayland không cho app tự đặt chỗ / tự nổi trên cùng — người dùng chọn «Luôn ở trên» (Alt+Space) nếu muốn.
+    pub fn enter_mini(self: &Rc<Self>) {
+        if !self.is_open() || self.is_mini() {
+            return;
+        }
+        self.hide_panel();
+        self.exit_click_through();
+        self.osd.hide();
+        self.topbar.hide();
+        self.set_cursor(true);
+        let a = app();
+        if a.is_fullscreen() {
+            a.set_fullscreen(false);
+        }
+        let win = gtk::Window::new(gtk::WindowType::Toplevel);
+        win.set_icon_name(Some("vn.chimto.tv"));
+        let (w, h) = (px(480.0), px(270.0) + px(46.0));
+        win.set_default_size(w, h);
+        win.set_keep_above(true);
+        win.style_context().add_class("bg");
+
+        let holder = gtk::Overlay::new();
+        self.root.remove(&self.web);
+        holder.add(&self.web);
+        // Lớp bắt chuột phủ trên phim (không để chuột chạm vào trang — quảng cáo): bấm = phát / dừng, bấm đúp = phóng to
+        let hit = gtk::EventBox::new();
+        hit.set_visible_window(false);
+        hit.add_events(gdk::EventMask::BUTTON_PRESS_MASK);
+        hit.connect_button_press_event(|_, ev| {
+            if let Some(p) = me() {
+                if ev.event_type() == gdk::EventType::DoubleButtonPress {
+                    p.exit_mini(true);
+                } else if ev.event_type() == gdk::EventType::ButtonPress && ev.button() == 1 {
+                    p.toggle();
+                }
+            }
+            glib::Propagation::Stop
+        });
+        holder.add_overlay(&hit);
+
+        let bar = ui::hbox(6.0);
+        bar.style_context().add_class("mini-bar");
+        // Tên phim đã ở thanh tiêu đề cửa sổ — thanh dưới chỉ có nút, dồn sang phải
+        bar.pack_start(&ui::hbox(0.0), true, true, 0);
+        let small = |text: &str, tip: &str, f: fn(&Rc<Player>)| {
+            let b = ui::pill(text, move || {
+                if let Some(p) = me() {
+                    f(&p);
+                }
+            });
+            b.set_can_focus(false);
+            b.set_tooltip_text(Some(tip));
+            b
+        };
+        let paused = self.s.borrow().state.map(|x| x.paused).unwrap_or(false);
+        let play = small(if paused { "▶" } else { "⏸" }, "Phát / dừng (Space)", |p| p.toggle());
+        bar.pack_start(&play, false, false, 0);
+        bar.pack_start(&small("⤢", "Phóng to (Enter / bấm đúp vào phim)", |p| p.exit_mini(true)), false, false, 0);
+        bar.pack_start(&small("✕", "Tắt phim (Esc)", |p| p.close(true)), false, false, 0);
+        // Bấm đúp thanh dưới cũng phóng to (như bản Windows)
+        let bar_ev = gtk::EventBox::new();
+        bar_ev.add(&bar);
+        bar_ev.connect_button_press_event(|_, ev| {
+            if ev.event_type() == gdk::EventType::DoubleButtonPress {
+                if let Some(p) = me() {
+                    p.exit_mini(true);
+                }
+            }
+            glib::Propagation::Proceed
+        });
+
+        let vb = ui::vbox(0.0);
+        vb.pack_start(&holder, true, true, 0);
+        vb.pack_start(&bar_ev, false, false, 0);
+        win.add(&vb);
+        win.connect_key_press_event(|_, ev| {
+            use gdk::keys::constants as k;
+            let Some(p) = me() else { return glib::Propagation::Proceed };
+            let key = ev.keyval();
+            if key == k::space || key == k::k || key == k::K || key == k::AudioPlay || key == k::AudioPause {
+                p.toggle();
+            } else if key == k::Return || key == k::KP_Enter || key == k::w || key == k::W {
+                p.exit_mini(true);
+            } else if key == k::Escape {
+                p.close(true);
+            } else if key == k::Left || key == k::Right {
+                let d = p.step(0);
+                p.seek_by(if key == k::Left { -d } else { d });
+            } else {
+                return glib::Propagation::Proceed;
+            }
+            glib::Propagation::Stop
+        });
+        // Đóng bằng nút của cửa sổ / Alt+F4: tắt phim (lấy trình phát về trước)
+        win.connect_delete_event(|_, _| {
+            if let Some(p) = me() {
+                p.close(true);
+            }
+            glib::Propagation::Stop
+        });
+        // X11: góc dưới phải vùng làm việc của màn hình chính (Wayland bỏ qua)
+        if let Some(mon) = gdk::Display::default().and_then(|d| d.primary_monitor().or_else(|| d.monitor(0))) {
+            let wa = mon.workarea();
+            win.move_(wa.x() + wa.width() - w - px(24.0), wa.y() + wa.height() - h - px(24.0));
+        }
+        *self.mini.borrow_mut() = Some(Mini { win: win.clone(), holder, play });
+        self.set_window_title(&self.title.text());
+        win.show_all();
+        a.player_minimized();
+    }
+
+    /// Phóng to lại (show = hiện trình phát trong cửa sổ app); false khi tắt phim / mở phim khác.
+    pub fn exit_mini(&self, show: bool) {
+        let Some(m) = self.mini.borrow_mut().take() else { return };
+        m.holder.remove(&self.web);
+        // Con chính của Overlay luôn vẽ dưới các lớp phủ (thanh điều khiển, bảng…)
+        self.root.add(&self.web);
+        // SAFETY: cửa sổ nhỏ chỉ được giữ ở đây; WebView đã gỡ ra trước nên không bị huỷ theo
+        unsafe { m.win.destroy() };
+        if !show {
+            return;
+        }
+        self.set_window_title(&self.title.text());
+        app().player_restored();
+        self.show_osd(4000);
     }
 
     // ---- WebKit ----
@@ -645,6 +799,7 @@ impl Player {
         if !self.open.replace(false) {
             return;
         }
+        self.exit_mini(false);
         {
             let mut s = self.s.borrow_mut();
             s.token += 1;
@@ -722,7 +877,7 @@ impl Player {
         };
         let group_name = if d.groups.len() > 1 { format!(" ({})", g.name) } else { String::new() };
         self.title.set_text(&format!("{} — {}{}", d.title, ep.title, group_name));
-        app().window.set_title(&format!("{} — {} · Côn Bằng TV", d.title, ep.title));
+        self.set_window_title(&format!("{} — {}", d.title, ep.title));
         prefs::add_history(HistoryItem {
             film_url: d.url.clone(),
             title: d.title.clone(),
@@ -1060,6 +1215,9 @@ impl Player {
         if self.osd.is_visible() {
             self.update_osd();
         }
+        if let Some(m) = self.mini.borrow().as_ref() {
+            m.play.set_label(if st.paused { "▶" } else { "⏸" });
+        }
         if let Some(wp) = was_paused {
             if wp != st.paused {
                 self.show_osd(4000);
@@ -1320,6 +1478,11 @@ impl Player {
             k::Left | k::KP_Left | k::j | k::J | k::AudioRewind => self.seek_by(-self.step(rep)),
             k::Right | k::KP_Right | k::l | k::L | k::AudioForward => self.seek_by(self.step(rep)),
             k::Up | k::KP_Up | k::i | k::I => self.show_osd(6000),
+            k::w | k::W => {
+                if first {
+                    self.enter_mini();
+                }
+            }
             k::Down | k::KP_Down | k::m | k::M | k::Menu => {
                 if first {
                     self.show_panel();
@@ -1653,6 +1816,8 @@ impl Player {
             })
             .upcast_ref(),
         );
+        let me = self.clone();
+        ui::add_flow(&other, ui::pill("▣  Thu nhỏ (cửa sổ nhỏ)", move || me.enter_mini()).upcast_ref());
         let me = self.clone();
         ui::add_flow(&other, ui::pill("✕  Thoát phim", move || me.close(true)).upcast_ref());
 
