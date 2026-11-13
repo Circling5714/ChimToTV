@@ -17,6 +17,18 @@ final class ImdbTopTests: XCTestCase {
         XCTAssertEqual(Imdb.votesText(850), "850")
     }
 
+    /// Nhãn tập + nhãn IMDb ở đáy ảnh bìa (BadgeRow): chung một hàng khi đủ chỗ, không thì nhãn IMDb lên hàng trên —
+    /// cùng ca với imdbBadgeMovesAboveEpisodeBadgeWhenTheCardIsNarrow của bản TV.
+    func testImdbBadgeMovesAboveEpisodeBadgeWhenTheCardIsNarrow() {
+        XCTAssertFalse(BadgeRow.needsTwoRows(width: 150, left: 40, right: 60, gap: 4))
+        XCTAssertFalse(BadgeRow.needsTwoRows(width: 104, left: 40, right: 60, gap: 4)) // vừa khít
+        XCTAssertTrue(BadgeRow.needsTwoRows(width: 150, left: 110, right: 60, gap: 4)) // «Hoàn Tất (16/16)»
+        XCTAssertTrue(BadgeRow.needsTwoRows(width: 103, left: 40, right: 60, gap: 4)) // thẻ hẹp
+        // Chỉ có một nhãn: luôn một hàng
+        XCTAssertFalse(BadgeRow.needsTwoRows(width: 100, left: 0, right: 60, gap: 4))
+        XCTAssertFalse(BadgeRow.needsTwoRows(width: 100, left: 140, right: 0, gap: 4))
+    }
+
     func testListAndDetailCarryImdb() throws {
         let body = """
         {"status":true,"data":{"items":[

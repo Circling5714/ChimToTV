@@ -10,6 +10,7 @@ import android.os.Looper
 import android.util.AttributeSet
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
@@ -160,5 +161,48 @@ class PosterView @JvmOverloads constructor(context: Context, attrs: AttributeSet
 
     override fun requestLayout() {
         if (!settingImage) super.requestLayout()
+    }
+}
+
+/**
+ * Hai nhãn ở đáy ảnh bìa: nhãn tập (con thứ nhất, sát mép trái) và điểm IMDb (con thứ hai, sát mép phải). Đủ chỗ thì nằm
+ * chung một hàng; thẻ hẹp hoặc nhãn tập dài («Hoàn Tất (16/16)», điện thoại cầm dọc) thì nhãn IMDb lên hàng trên, vẫn sát
+ * mép phải. Trước 2.16.1 hai nhãn là hai lớp riêng trong FrameLayout nên đè lên nhau.
+ */
+class BadgeRow @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : ViewGroup(context, attrs) {
+    private val gap = (4 * resources.displayMetrics.density).roundToInt()
+    private var stacked = false
+
+    private fun shown(i: Int): View? = getChildAt(i)?.takeIf { it.visibility != GONE }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val w = MeasureSpec.getSize(widthMeasureSpec)
+        // Mỗi nhãn tối đa rộng bằng thẻ (nhãn dài hơn thì chữ bị cắt bằng dấu …), cao tuỳ chữ
+        val atMost = MeasureSpec.makeMeasureSpec(w, MeasureSpec.AT_MOST)
+        val free = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        val left = shown(0)
+        val right = shown(1)
+        left?.measure(atMost, free)
+        right?.measure(atMost, free)
+        val lh = left?.measuredHeight ?: 0
+        val rh = right?.measuredHeight ?: 0
+        stacked = needsTwoRows(w, left?.measuredWidth ?: 0, right?.measuredWidth ?: 0, gap)
+        setMeasuredDimension(w, if (stacked) lh + gap + rh else maxOf(lh, rh))
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        val w = r - l
+        val h = b - t
+        shown(0)?.let { it.layout(0, h - it.measuredHeight, it.measuredWidth, h) }
+        shown(1)?.let {
+            val top = if (stacked) 0 else h - it.measuredHeight
+            it.layout(w - it.measuredWidth, top, w, top + it.measuredHeight)
+        }
+    }
+
+    companion object {
+        /** Hai nhãn rộng [left] và [right] (0 = không có nhãn đó) có phải xếp hai hàng trong bề ngang [width] không. */
+        fun needsTwoRows(width: Int, left: Int, right: Int, gap: Int): Boolean =
+            left > 0 && right > 0 && left + gap + right > width
     }
 }

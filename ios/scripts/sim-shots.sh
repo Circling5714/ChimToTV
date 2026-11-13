@@ -92,6 +92,9 @@ for o in portrait landscape; do
     curl -s -X POST "$D/go?to=film&url=$(q "$FILM")" > /dev/null; shot "$o-3-trang-phim" 8
     curl -s -X POST "$D/go?to=back" > /dev/null; sleep 2
   fi
+  # «Điểm IMDb cao»: thẻ có cả nhãn tập lẫn nhãn IMDb — ô hẹp thì nhãn IMDb phải nằm hàng trên, không đè nhãn tập
+  curl -s -X POST "$D/go?to=menu&title=$(q "Điểm IMDb cao")"; echo
+  shot "$o-6-diem-imdb" 25
 done
 
 # Cỡ chữ lớn (dọc)

@@ -25,6 +25,20 @@ class ImdbTopTest {
         assertEquals("850", Imdb.votesText(850))
     }
 
+    /** Nhãn tập + nhãn IMDb ở đáy ảnh bìa (BadgeRow): chung một hàng khi đủ chỗ, không thì nhãn IMDb lên hàng trên. */
+    @Test
+    fun imdbBadgeMovesAboveEpisodeBadgeWhenTheCardIsNarrow() {
+        // Thẻ rộng 150, khoảng hở 4: «Full» (40) + «IMDb 8.6» (60) vừa một hàng
+        assertFalse(BadgeRow.needsTwoRows(150, 40, 60, 4))
+        assertFalse(BadgeRow.needsTwoRows(104, 40, 60, 4)) // vừa khít
+        // «Hoàn Tất (16/16)» (110) + «IMDb 8.6» (60) không vừa → hai hàng; thẻ hẹp trên điện thoại cầm dọc cũng vậy
+        assertTrue(BadgeRow.needsTwoRows(150, 110, 60, 4))
+        assertTrue(BadgeRow.needsTwoRows(103, 40, 60, 4))
+        // Chỉ có một nhãn: luôn một hàng, kể cả khi nhãn đó dài hơn thẻ (chữ bị cắt bằng dấu …)
+        assertFalse(BadgeRow.needsTwoRows(100, 0, 60, 4))
+        assertFalse(BadgeRow.needsTwoRows(100, 140, 0, 4))
+    }
+
     @Test
     fun listAndDetailCarryImdb() {
         val body = """{"status":true,"data":{"items":[

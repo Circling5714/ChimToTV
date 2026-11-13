@@ -468,9 +468,47 @@ struct FilmGridView: View {
 
 struct FilmCard: View {
     @EnvironmentObject var app: AppModel
+    @ObservedObject private var textScale = TextScale.shared
     let item: GridFilm
     /// Ô «Xem thêm» hẹp cuối dải vuốt ngang: cao bằng poster của dải (nil = ô lưới thường, tỉ lệ 2:3).
     var tileHeight: CGFloat? = nil
+
+    // MARK: Nhãn ở đáy ảnh bìa (nhãn tập + điểm IMDb — xem BadgeRow)
+
+    /// Bề ngang của một nhãn một dòng: chữ (cỡ theo Cài đặt → Cỡ chữ, như appFont) + lề trong hai bên.
+    private func labelWidth(_ text: String, size: CGFloat, weight: UIFont.Weight, padding: CGFloat) -> CGFloat {
+        let font = UIFont.systemFont(ofSize: (size * textScale.value).rounded(), weight: weight)
+        return ceil((text as NSString).size(withAttributes: [.font: font]).width) + padding * 2
+    }
+
+    private var badgeWidth: CGFloat { item.film.badge.map { labelWidth($0, size: 12, weight: .bold, padding: 7) } ?? 0 }
+    private var imdbWidth: CGFloat { item.film.imdb.map { labelWidth($0.label, size: 11, weight: .heavy, padding: 5) } ?? 0 }
+
+    @ViewBuilder private var badgeLabel: some View {
+        if let b = item.film.badge {
+            Text(b)
+                .appFont(12, .bold)
+                .lineLimit(1)
+                .foregroundColor(Theme.onBrand)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(item.follow ? Theme.focus : Theme.brand))
+        }
+    }
+
+    /// Điểm IMDb (dữ liệu KKPhim) — vàng như logo IMDb; không bao giờ bị cắt chữ (nhãn tập nhường chỗ).
+    @ViewBuilder private var imdbLabel: some View {
+        if let i = item.film.imdb {
+            Text(i.label)
+                .appFont(11, .heavy)
+                .lineLimit(1)
+                .fixedSize()
+                .foregroundColor(.black)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color(hex: 0xF5C518)))
+        }
+    }
 
     var body: some View {
         if item.topic != nil {
@@ -565,30 +603,21 @@ struct FilmCard: View {
                             RoundedRectangle(cornerRadius: 10).stroke(Theme.focus, lineWidth: 4)
                         }
                     }
-                    .overlay(alignment: .bottomLeading) {
-                        // Nhãn tập ở góc dưới bên trái như bản TV — ô hẹp (iPhone dọc) không đè nhãn nguồn ở góc trên bên phải
-                        if let b = item.film.badge {
-                            Text(b)
-                                .appFont(12, .bold)
-                                .lineLimit(1)
-                                .foregroundColor(Theme.onBrand)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(item.follow ? Theme.focus : Theme.brand))
-                                .padding(7)
-                        }
-                    }
-                    .overlay(alignment: .bottomTrailing) {
-                        // Điểm IMDb (dữ liệu KKPhim) — vàng như logo IMDb
-                        if let i = item.film.imdb {
-                            Text(i.label)
-                                .appFont(11, .heavy)
-                                .lineLimit(1)
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(RoundedRectangle(cornerRadius: 4).fill(Color(hex: 0xF5C518)))
-                                .padding(7)
+                    .overlay {
+                        // Đáy ảnh bìa: nhãn tập bên trái (như bản TV — ô hẹp không đè nhãn nguồn ở góc trên bên phải), điểm
+                        // IMDb bên phải; không đủ chỗ chung một hàng thì nhãn IMDb lên hàng trên (BadgeRow)
+                        GeometryReader { geo in
+                            let stacked = BadgeRow.needsTwoRows(width: geo.size.width - 14, left: badgeWidth, right: imdbWidth, gap: 6)
+                            VStack(alignment: .trailing, spacing: 4) {
+                                if stacked { imdbLabel }
+                                HStack(alignment: .bottom, spacing: 0) {
+                                    badgeLabel
+                                    Spacer(minLength: 6)
+                                    if !stacked { imdbLabel }
+                                }
+                            }
+                            .padding(7)
+                            .frame(width: geo.size.width, height: geo.size.height, alignment: .bottom)
                         }
                     }
                     .overlay(alignment: .topTrailing) {

@@ -19,38 +19,44 @@
             android:layout_height="wrap_content"
             android:scaleType="centerCrop" />
 
-        <TextView
-            android:id="@+id/badge"
-            android:layout_width="wrap_content"
+        <!-- Đáy ảnh bìa: nhãn tập bên trái, điểm IMDb bên phải; không đủ chỗ chung một hàng thì nhãn IMDb lên hàng trên
+             (BadgeRow) — hai nhãn không đè lên nhau trên thẻ hẹp -->
+        <vn.chimto.tv.BadgeRow
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|start"
-            android:layout_margin="5dp"
-            android:background="@drawable/bg_badge"
-            android:paddingStart="6dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="6dp"
-            android:paddingBottom="2dp"
-            android:singleLine="true"
-            android:textColor="#FFFFFF"
-            android:textSize="12sp" />
+            android:layout_gravity="bottom"
+            android:layout_margin="5dp">
 
-        <!-- Điểm IMDb (dữ liệu KKPhim) -->
-        <TextView
-            android:id="@+id/imdb"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom|end"
-            android:layout_margin="5dp"
-            android:background="@drawable/bg_imdb"
-            android:paddingStart="5dp"
-            android:paddingTop="1dp"
-            android:paddingEnd="5dp"
-            android:paddingBottom="1dp"
-            android:singleLine="true"
-            android:textColor="#000000"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+            <TextView
+                android:id="@+id/badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_badge"
+                android:ellipsize="end"
+                android:paddingStart="6dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="2dp"
+                android:singleLine="true"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+
+            <!-- Điểm IMDb (dữ liệu KKPhim) -->
+            <TextView
+                android:id="@+id/imdb"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_imdb"
+                android:paddingStart="5dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="5dp"
+                android:paddingBottom="1dp"
+                android:singleLine="true"
+                android:textColor="#000000"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </vn.chimto.tv.BadgeRow>
 
         <!-- Trang chủ tổng hợp: số nguồn có phim ("3 nguồn") / tên nguồn / "bản lưu" -->
         <TextView
