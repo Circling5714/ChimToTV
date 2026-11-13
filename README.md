@@ -620,6 +620,12 @@ cần Mac:
 - Project Xcode sinh bằng XcodeGen từ `ios/project.yml`; đọc HTML bằng SwiftSoup. IPA ký giả bằng `ldid` (không cần
   tài khoản Apple) → chỉ cài được bằng TrollStore.
 - Icon: `node design/render.mjs ios c` (icon 1024 + logo trong app, không đụng ảnh của bản Android).
+- **Dựng nhanh trên Mac trong nhà (từ 13/11/2026):** `.\ios\scripts\mac-build.ps1 [-Release] [-NoTest] [-SyncOnly]` gửi mã
+  nguồn đang sửa trong máy (cả phần chưa commit) sang Mac qua SSH, chạy test lõi, dựng và đóng gói y như job IPA của CI (cùng
+  `ios/scripts/package.sh`), kéo IPA về `dist\mac\` — không phải đẩy nhánh `ios`. Đăng nhập Mac đọc từ tệp ngoài repo
+  (`..\_May_Test_App\info.txt` hoặc biến `CONBANG_MAC_INFO`; dòng 2 = `địa-chỉ/tài-khoản/mật-khẩu`). Mac Sonoma 14.4 chỉ chạy
+  được Xcode 15.4 (Swift 5.10, SDK iOS 17.5) — cũ hơn Xcode của CI, nên mã phải dựng được trên cả hai. Bản phát hành chính thức
+  vẫn dựng trên GitHub.
 
 ## Phát hành bản mới (app tự cập nhật)
 
