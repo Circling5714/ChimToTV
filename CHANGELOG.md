@@ -6,6 +6,33 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
+Bản Mac (macOS 12+, từ 13/11/2026, cùng mã nguồn và số bản với bản iPad) ghi riêng với tiêu đề "Mac …", tag `mac-v…`.
+
+## Mac 1.17 — 13/11/2026 (bản Mac đầu tiên)
+
+- **Côn Bằng TV cho máy Mac**: macOS 12 trở lên, máy Intel và máy chip Apple (M1…). Là chính app iPad dựng bằng Mac Catalyst nên
+  có đủ tính năng của bản iPad: trang chủ tổng hợp nhiều nguồn, người xem + mã PIN + hồ sơ trẻ em, theo dõi phim, Điểm IMDb, tìm
+  cùng lúc mọi trang, đồng bộ trong nhà, proxy SOCKS5 / Shadowsocks, vượt chặn nhà mạng (tự lên Mức 2), DNS mã hoá. Dùng chuột, bàn
+  di chuột, bàn phím (phím tắt như bản iPad). Thanh menu tiếng Việt; cửa sổ nhỏ nhất 900 × 600.
+- **Tự cập nhật**: app tìm bản mới (release `mac-v…`) trên GitHub; bấm «Cài đặt ngay» thì app tự tải, kiểm, thay bản đang dùng rồi mở
+  lại — cần để app trong thư mục Applications.
+- **Cài:** tải `ConBangTV-Mac-1.17.zip` (hoặc link luôn là bản mới nhất
+  `https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_macos/ConBangTV-Mac.zip`), giải nén, kéo vào Applications.
+  App không mua chứng chỉ của Apple nên lần đầu macOS chặn: OK → Cài đặt hệ thống → Quyền riêng tư & Bảo mật → **Vẫn mở** → nhập
+  mật khẩu máy → **Mở** (chỉ một lần).
+- Khác bản iPad: không có widget; mật khẩu proxy cất trong tệp riêng của tài khoản macOS thay cho Keychain.
+- bản 1.17 (CFBundleVersion 23) · mã gói `vn.chimto.tv` · tag `mac-v1.17` (không phải "latest") · commit `c416cd5` (tính năng:
+  `24cb97b`, `c416cd5`) · `ConBangTV-Mac-1.17.zip` 7 945 079 byte · SHA-256
+  `e7726b03fbae6668d566ef961164ce09c31ddcb2cf5075c38f6e1b107ada7d7f` · Intel + Apple Silicon, ký ad-hoc · dựng trên GitHub (run
+  `43382966442`, Xcode 16.4, SDK macOS 15.5). Link cố định `conbangtv_macos` tạo lúc 14:15, cùng tệp.
+- 155 test lõi (thêm 3; đạt cả Xcode 15.4 trên Mac mini lẫn Xcode 16.4 trên GitHub). Thử trên Mac mini 2012 (Intel, macOS 14.4):
+  bản thử — trang chủ, xem phim (11 server, tua / dừng / phát / đóng), DNS mã hoá, vượt chặn với máy soi Viettel thật (lần đầu 4,6 s
+  rồi lên Mức 2, sau đó 0,5 s; HTTP thường 0,3 s), tự cập nhật (tải .zip, thay `.app`, tắt, mở bản mới), cất mật khẩu; bản chính —
+  mở lần đầu đúng các bước Gatekeeper ở trên (tệp mang cờ «Safari đã tải về»), màn miễn trừ, trang chủ, không văng. Sau khi đăng: bản
+  thử (giả đang 1.16) tự thấy «Có bản mới 1.17» từ GitHub thật; `releases/latest` vẫn `v2.17`; tệp tải từ link công khai và link
+  cố định khớp SHA-256. **Chưa thử trên máy chip Apple**; tự cập nhật thật từ GitHub sẽ thử ở bản Mac sau (bản 1.17 để sẵn trong
+  Applications của Mac mini).
+- Máy thử 2012 chạy macOS nhờ OCLP nên video rớt khung hình (WindowServer ~480% CPU, app ~6%) — giới hạn của máy, không phải app.
 
 ## Tệp APK bản TV đổi sang tên mới — 13/11/2026
 

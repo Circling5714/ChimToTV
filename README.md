@@ -24,6 +24,10 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 (link cố định) · [release `win-v1.15`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.15)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
+**Bản Mac** (macOS 12+, máy Intel và chip Apple): [tải bản mới nhất](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_macos/ConBangTV-Mac.zip)
+(link cố định) · [release `mac-v1.17`](https://github.com/Circling5714/ChimToTV/releases/tag/mac-v1.17)
+— xem mục [Bản Mac](#bản-mac) (lần đầu mở: Cài đặt hệ thống → Quyền riêng tư & Bảo mật → Vẫn mở).
+
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
 **Liên hệ**.
 
@@ -292,8 +296,8 @@ Chính app iPad dựng thành app Mac bằng **Mac Catalyst** (cùng mã nguồn
 máy Intel và máy chip Apple (M1…), giao diện và tính năng như bản iPad, dùng chuột / bàn di chuột / bàn phím (phím tắt như
 mục «Bàn phím rời» của [Bản iPad](#bản-ipad)).
 
-- **Cài:** tải `ConBangTV-Mac-<bản>.zip` ở release `mac-v<bản>` (link cố định
-  `…/releases/download/conbangtv_macos/ConBangTV-Mac.zip` có từ bản Mac đầu tiên), mở tệp .zip, kéo **ConBangTV** vào thư mục
+- **Cài:** tải bản mới nhất qua [link cố định](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_macos/ConBangTV-Mac.zip)
+  (hoặc `ConBangTV-Mac-<bản>.zip` ở release `mac-v<bản>`; bản đầu: 1.17, 13/11/2026), mở tệp .zip, kéo **ConBangTV** vào thư mục
   **Applications** (Ứng dụng) rồi mở. App không mua chứng chỉ của Apple (ký ad-hoc) nên lần đầu macOS chặn — đã thử đúng các bước
   này trên macOS 14 (13/11/2026, tệp mang cờ «Safari đã tải về»): hộp «Không thể mở "ConBangTV" vì ứng dụng này đến từ một nhà phát
   triển chưa được xác định» → **OK** → **Cài đặt hệ thống → Quyền riêng tư & Bảo mật**, kéo xuống mục Bảo mật → «"ConBangTV" đã bị
@@ -674,20 +678,21 @@ thứ đi theo release đang là **Latest**: app TV tự cập nhật (hỏi `re
 `--latest=false`. Trước khi đăng nó kiểm: ghi chú có `## Có gì mới`, tên tệp đúng số bản trong mã nguồn, code đã đẩy, tag chưa
 có; riêng APK: đúng gói, đúng số bản, đúng chứng chỉ ký. Sau khi đăng: Latest phải là bản TV mới nhất (lệch thì tự trả về), tệp
 trên GitHub khớp SHA-256 với tệp trong máy, bản TV thì tải thử qua hai link cố định. `-DryRun` chỉ in lệnh; `.\release.ps1
-<tv|windows|ipad> -Verify` kiểm lại một bản đã đăng, không sửa gì.
+<tv|windows|ipad|mac> -Verify` kiểm lại một bản đã đăng, không sửa gì.
 
-**Link tải cố định của bản Windows / iPad (từ 13/11/2026)** — luôn là bản mới nhất, như link APK:
+**Link tải cố định của bản Windows / iPad / Mac (từ 13/11/2026)** — luôn là bản mới nhất, như link APK:
 
 - `https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_windows/ConBangTV-Windows.exe`
 - `https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_ios/ConBangTV-iPad.ipa`
+- `https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_macos/ConBangTV-Mac.zip` (từ bản Mac 1.17)
 
-Bản Windows / iPad không bao giờ là Latest nên không dùng được `…/releases/latest/download/…`; thay vào đó mỗi nền tảng có một
-release «cuốn chiếu» với tag không đổi (`conbangtv_windows`, `conbangtv_ios`) và tệp tên cố định. `.\release.ps1 windows|ipad`
+Bản Windows / iPad / Mac không bao giờ là Latest nên không dùng được `…/releases/latest/download/…`; thay vào đó mỗi nền tảng có một
+release «cuốn chiếu» với tag không đổi (`conbangtv_windows`, `conbangtv_ios`, `conbangtv_macos`) và tệp tên cố định. `.\release.ps1 windows|ipad|mac`
 đăng bản có số xong thì tự chép tệp vào đó (tải lên dưới tên tạm rồi đổi tên — link chỉ gián đoạn chừng một giây), ghi vào ghi chú
-của release đang là bản nào, rồi kiểm SHA-256 và tải thử link. `.\release.ps1 windows -FixedOnly` (hoặc `ipad`) chỉ chép tệp của
-bản đã đăng vào link cố định — dùng khi link lệch. **Đừng đổi hai tag / hai tên tệp này và đừng xoá hai release đó** (link đã gửi
-cho người dùng và nằm trên trang giới thiệu). Bộ tự cập nhật không nhìn thấy chúng: TV đọc `releases/latest`, Windows / iPad chỉ
-nhận tag `win-v…` / `ios-v…`.
+của release đang là bản nào, rồi kiểm SHA-256 và tải thử link. `.\release.ps1 windows -FixedOnly` (hoặc `ipad`, `mac`) chỉ chép tệp của
+bản đã đăng vào link cố định — dùng khi link lệch. **Đừng đổi các tag / tên tệp này và đừng xoá các release đó** (link đã gửi
+cho người dùng và nằm trên trang giới thiệu). Bộ tự cập nhật không nhìn thấy chúng: TV đọc `releases/latest`, Windows / iPad / Mac chỉ
+nhận tag `win-v…` / `ios-v…` / `mac-v…`.
 
 **Mã Downloader `9192365`** (aftv.news, trỏ vào link cố định) nằm ở năm chỗ — đổi mã thì sửa cả năm: `Invite.kt` (TV: màn «Mời
 bạn bè cài app», từ 2.16), `Invite.swift` (iPad / iPhone, từ 1.16) và `Invite.cs` (Windows, từ 1.14) — Cài đặt → «Cài lên tivi / mời bạn bè»: mã to,

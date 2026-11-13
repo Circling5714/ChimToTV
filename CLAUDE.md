@@ -38,6 +38,17 @@ sang `ConBangTV…apk` từ 13/11/2026 (anh bảo), nhưng release TV vẫn kèm
 4. Kiểm: `releases/latest` vẫn là bản Android (script tự kiểm, lệch thì trả về bản TV mới nhất); release iPad có `.ipa`; tải từ
    link công khai và từ link cố định, SHA-256 khớp.
 
+## Phát hành bản Mac (Mac Catalyst từ `ios/`, từ 13/11/2026)
+
+1. Cùng số bản với iPad (`MARKETING_VERSION` trong `ios/project.yml`). Mã phải dựng được cả bằng Xcode 15.4 / Swift 5.10 (Mac mini
+   trong nhà: `.\ios\scripts\mac-build.ps1 -Mac [-Release] [-Run]`) lẫn Xcode của GitHub.
+2. `gh workflow run ios.yml --ref main -f release=true` → artifact `mac` có `ConBangTV-Mac-<bản>.zip` (Intel + Apple Silicon, ký
+   ad-hoc, mã gói `vn.chimto.tv`, không có cổng gỡ lỗi). Kiểm Info.plist, `lipo -archs`, `codesign --verify`; chạy thử trên Mac.
+3. `.\release.ps1 mac -Notes <tệp ghi chú> -File ConBangTV-Mac-<bản>.zip` — tag `mac-v<bản>`, script **luôn đặt `--latest=false`**,
+   tự chép tệp vào link cố định `conbangtv_macos`. Ghi chú cũng phải có `## Có gì mới` (app hiện trong hộp «Có bản mới»).
+4. Kiểm: `releases/latest` vẫn là bản Android; release có `.zip`; tải từ link công khai và link cố định, SHA-256 khớp; tự cập nhật
+   thật từ bản trước (bản trong `/Applications` của Mac mini).
+
 ## Phát hành bản Windows (`windows/`)
 
 1. Tăng `<Version>` trong `windows/ConBangTV/ConBangTV.csproj`.
@@ -48,12 +59,13 @@ sang `ConBangTV…apk` từ 13/11/2026 (anh bảo), nhưng release TV vẫn kèm
 4. Kiểm: `releases/latest` vẫn là bản Android; release có `.exe`; tải từ link công khai và từ link cố định, SHA-256 khớp; tự cập
    nhật thật từ bản trước (bản chép riêng).
 
-## Link tải cố định của bản Windows / iPad (từ 13/11/2026) — không đổi tag, không xoá
+## Link tải cố định của bản Windows / iPad / Mac (từ 13/11/2026) — không đổi tag, không xoá
 
-- `…/releases/download/conbangtv_windows/ConBangTV-Windows.exe` và `…/releases/download/conbangtv_ios/ConBangTV-iPad.ipa` luôn là
-  bản mới nhất (anh đặt hai tên tag này; link đã gửi cho người dùng và nằm trên trang giới thiệu). Hai release đó là release
-  «cuốn chiếu»: `release.ps1` chép đè tệp mỗi lần phát hành — **đừng đổi tag / tên tệp, đừng xoá, đừng để thành Latest**.
-- Link lệch (script `-Verify` báo) thì sửa bằng `.\release.ps1 <windows|ipad> -FixedOnly`.
+- `…/releases/download/conbangtv_windows/ConBangTV-Windows.exe`, `…/releases/download/conbangtv_ios/ConBangTV-iPad.ipa` và
+  `…/releases/download/conbangtv_macos/ConBangTV-Mac.zip` luôn là bản mới nhất (anh đặt hai tên tag đầu, tên thứ ba anh đồng ý theo
+  đề xuất; link đã gửi cho người dùng và nằm trên trang giới thiệu). Các release đó là release «cuốn chiếu»: `release.ps1` chép đè
+  tệp mỗi lần phát hành — **đừng đổi tag / tên tệp, đừng xoá, đừng để thành Latest**.
+- Link lệch (script `-Verify` báo) thì sửa bằng `.\release.ps1 <windows|ipad|mac> -FixedOnly`.
 
 ## Luật lâu dài: phát hành thành công xong thì luôn cập nhật markdown
 
