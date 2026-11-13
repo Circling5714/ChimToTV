@@ -241,7 +241,15 @@ impl Player {
         tb.pack_start(&osd_button("←  Quay lại", |p| p.close(true)), false, false, 0);
         let title = ui::label("", &["osd-title"], false);
         tb.pack_start(&title, true, true, 0);
-        tb.pack_end(&osd_button("⛶  Toàn màn hình", |_| app().toggle_fullscreen()), false, false, 0);
+        let fs = osd_button("⛶  Toàn màn hình", |_| app().toggle_fullscreen());
+        // Nhãn theo trạng thái (bật / tắt bằng F11, phím F, menu… đều đổi theo); trình phát chỉ tạo một lần nên nối một lần
+        let fs2 = fs.clone();
+        app().window.connect_window_state_event(move |_, ev| {
+            let on = ev.new_window_state().contains(gdk::WindowState::FULLSCREEN);
+            fs2.set_label(if on { "⤡  Thoát toàn màn hình" } else { "⛶  Toàn màn hình" });
+            glib::Propagation::Proceed
+        });
+        tb.pack_end(&fs, false, false, 0);
         topbar.add(&tb);
         root.add_overlay(&topbar);
 
