@@ -234,7 +234,7 @@ pub struct SearchPage {
 }
 
 pub fn search() -> Rc<dyn Page> {
-    let entry = gtk::Entry::new();
+    let entry = crate::ui::entry();
     entry.set_width_chars(36);
     entry.set_placeholder_text(Some("Tên phim…"));
     entry.set_text(&LAST_QUERY.with(|q| q.borrow().clone()));
@@ -400,7 +400,7 @@ impl FollowsPage {
         b.add(&n);
         list.sort_by_key(|f| if f.new_count() > 0 { 0 } else { 1 });
         let mut cards = Vec::new();
-        for f in list {
+        for (i, f) in list.into_iter().enumerate() {
             let me = self.clone();
             let f2 = f.clone();
             let remove: Rc<dyn Fn()> = Rc::new(move || {
@@ -414,6 +414,7 @@ impl FollowsPage {
                     crate::startup::sync_soon(0);
                     me.build();
                     app().rebuild_menu();
+                    super::focus_card_at(me.clone(), i);
                 });
             });
             let film = Film::new(f.film_url.clone(), f.title.clone(), f.poster.clone(), cbtv::util::non_empty(Some(&f.latest)));

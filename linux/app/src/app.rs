@@ -35,6 +35,8 @@ pub struct App {
     toast_label: gtk::Label,
     toast_timer: RefCell<Option<glib::SourceId>>,
     stack_pages: RefCell<Vec<Rc<dyn Page>>>,
+    /// Thứ tự ô đang chọn trong trang hiện tại (ô mất vì trang dựng lại thì chọn ô cùng chỗ).
+    focus_index: Cell<Option<usize>>,
     menu_buttons: RefCell<Vec<(String, gtk::Button)>>,
     pub categories: RefCell<Vec<cbtv::Category>>,
     active_menu: RefCell<String>,
@@ -169,6 +171,7 @@ impl App {
             toast_label,
             toast_timer: RefCell::new(None),
             stack_pages: RefCell::new(Vec::new()),
+            focus_index: Cell::new(None),
             menu_buttons: RefCell::new(Vec::new()),
             categories: RefCell::new(Vec::new()),
             active_menu: RefCell::new("home".into()),
@@ -224,6 +227,42 @@ impl App {
                 LAST_SYNC.with(|l| l.set(now));
                 crate::startup::sync_soon(1);
             }
+        });
+        // Lưới an toàn: ô đang chọn bị huỷ (trang dựng lại sau khi bấm) thì GTK để trống focus — người dùng remote / bàn phím không
+        // thấy ô nào sáng, phím Delete / Enter không có đích. Đợi một nhịp (trang có thể tự chọn ô sau 30–60 ms) rồi chọn ô đầu trang
+        // (trang chưa có ô nào thì chọn menu).
+        self.window.connect_set_focus(|w, f| {
+            let a = app();
+            let cur = a.stack_pages.try_borrow().ok().and_then(|s| s.last().cloned());
+            if let Some(f) = f {
+                // Nhớ thứ tự ô trong trang (ô trong hộp thoại / menu thì giữ số cũ)
+                if let Some(p) = cur.filter(|p| f.is_ancestor(&p.base().body)) {
+                    if let Some(i) = keynav::targets(p.base().body.upcast_ref()).iter().position(|t| t == f) {
+                        a.focus_index.set(Some(i));
+                    }
+                }
+                return;
+            }
+            let w = w.clone();
+            ui::after(150, move || {
+                if w.focused_widget().is_some() || !w.is_active() {
+                    return;
+                }
+                let a = app();
+                if a.playing().is_some() || a.dialog_open() {
+                    return;
+                }
+                let Some(p) = a.current() else {
+                    a.focus_menu();
+                    return;
+                };
+                let targets = keynav::targets(p.base().body.upcast_ref());
+                match a.focus_index.get().and_then(|i| targets.get(i.min(targets.len().saturating_sub(1)))) {
+                    Some(t) => keynav::focus_and_show(t),
+                    None if p.first_target().is_some() => pages::focus_first(p.as_ref()),
+                    None => a.focus_menu(),
+                }
+            });
         });
         self.window.connect_delete_event(|_, _| {
             app().closing();
@@ -379,6 +418,7 @@ impl App {
     }
 
     fn host(&self, p: &Rc<dyn Page>) {
+        self.focus_index.set(None);
         ui::clear(&self.page_host);
         self.page_host.pack_start(&p.base().scroller, true, true, 0);
         p.base().scroller.show_all();
@@ -392,7 +432,10 @@ impl App {
 
     pub fn push(&self, p: Rc<dyn Page>) {
         if let Some(cur) = self.current() {
-            *cur.base().last_focus.borrow_mut() = self.window.focused_widget();
+            let f = self.window.focused_widget();
+            let idx = f.as_ref().and_then(|f| keynav::targets(cur.base().body.upcast_ref()).iter().position(|w| w == f));
+            cur.base().last_index.set(idx);
+            *cur.base().last_focus.borrow_mut() = f;
         }
         self.stack_pages.borrow_mut().push(p.clone());
         self.set_active_menu(&p.base().menu_key.borrow());
@@ -672,7 +715,7 @@ impl App {
 
     /// Nhập mã PIN 4 số (đủ 4 số là tự xong). None = huỷ.
     pub async fn ask_pin(&self, title: &str, text: &str) -> Option<String> {
-        let entry = gtk::Entry::new();
+        let entry = crate::ui::entry();
         entry.set_visibility(false);
         entry.set_max_length(prefs::PIN_LENGTH as i32);
         entry.set_input_purpose(gtk::InputPurpose::Pin);
@@ -684,7 +727,12 @@ impl App {
                 app().close_dialog(0);
             }
         });
-        entry.connect_activate(|_| app().close_dialog(0));
+        // Enter khi chưa đủ số thì bỏ qua (đóng luôn là huỷ cả việc đặt mã — bấm nhầm Enter rất dễ); Esc / «Huỷ» mới là huỷ
+        entry.connect_activate(|e| {
+            if e.text().chars().count() == prefs::PIN_LENGTH {
+                app().close_dialog(0);
+            }
+        });
         let rx = self.ask(title, text, &["OK", "Huỷ"], Some(entry.clone().upcast()), 0);
         let e2 = entry.clone();
         ui::after(30, move || e2.grab_focus());
@@ -731,8 +779,14 @@ impl App {
 pub fn restore_focus(p: Rc<dyn Page>) {
     ui::after(30, move || {
         let last = p.base().last_focus.borrow().clone();
-        match last.filter(|f| f.is_visible() && f.is_mapped() && f.is_ancestor(&p.base().scroller)) {
-            Some(f) => keynav::focus_and_show(&f),
+        if let Some(f) = last.filter(|f| f.is_visible() && f.is_mapped() && f.is_ancestor(&p.base().scroller)) {
+            keynav::focus_and_show(&f);
+            return;
+        }
+        // Trang đã dựng lại: chọn ô cùng thứ tự (vd nút «Giới hạn» của đúng người xem vừa sửa)
+        let targets = keynav::targets(p.base().body.upcast_ref());
+        match p.base().last_index.get().and_then(|i| targets.get(i.min(targets.len().saturating_sub(1)))) {
+            Some(f) => keynav::focus_and_show(f),
             None => pages::focus_first(p.as_ref()),
         }
     });

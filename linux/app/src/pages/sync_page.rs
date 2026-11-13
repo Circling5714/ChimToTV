@@ -20,10 +20,10 @@ thread_local! {
 }
 
 pub fn new() -> Rc<dyn Page> {
-    let ip = gtk::Entry::new();
+    let ip = crate::ui::entry();
     ip.set_width_chars(22);
     ip.set_placeholder_text(Some("Địa chỉ IP máy kia"));
-    let code = gtk::Entry::new();
+    let code = crate::ui::entry();
     code.set_width_chars(8);
     code.set_max_length(4);
     code.set_placeholder_text(Some("Mã 4 số"));
@@ -171,7 +171,7 @@ impl SyncPage {
     fn ask_code(self: &Rc<Self>, host: String, port: u16, name: String) {
         let me = self.clone();
         ui::local(async move {
-            let e = gtk::Entry::new();
+            let e = crate::ui::entry();
             e.set_max_length(4);
             e.set_width_chars(8);
             e.set_halign(gtk::Align::Start);

@@ -167,6 +167,17 @@ impl DetailPage {
                 app().rebuild_menu();
                 crate::startup::sync_soon(0);
                 me.build(false);
+                // Dựng lại thì nút cũ mất — chọn lại nút Theo dõi mới để bấm tiếp bằng remote / bàn phím
+                let me2 = me.clone();
+                ui::after(40, move || {
+                    let fb = me2.buttons.borrow().clone();
+                    let follow = fb.into_iter().flat_map(|fb| fb.children()).filter_map(|c| c.downcast::<gtk::FlowBoxChild>().ok()?.child()).find(|w| {
+                        w.downcast_ref::<gtk::Button>().and_then(|b| b.label()).map(|l| l.contains("heo dõi")).unwrap_or(false)
+                    });
+                    if let Some(w) = follow {
+                        keynav::focus_and_show(&w);
+                    }
+                });
             })
             .upcast_ref(),
         );

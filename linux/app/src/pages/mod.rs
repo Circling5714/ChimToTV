@@ -27,13 +27,15 @@ pub struct PageBase {
     pub menu_key: RefCell<String>,
     /// Mục đang chọn lúc rời trang (quay lại thì chọn lại).
     pub last_focus: RefCell<Option<gtk::Widget>>,
+    /// Thứ tự của mục đó trong trang (trang dựng lại lúc quay về thì ô cũ mất — chọn ô cùng chỗ).
+    pub last_index: Cell<Option<usize>>,
     token: Cell<u64>,
 }
 
 impl PageBase {
     pub fn new(menu_key: &str) -> PageBase {
         let (scroller, body) = ui::scroller();
-        PageBase { scroller, body, menu_key: RefCell::new(menu_key.to_string()), last_focus: RefCell::new(None), token: Cell::new(0) }
+        PageBase { scroller, body, menu_key: RefCell::new(menu_key.to_string()), last_focus: RefCell::new(None), last_index: Cell::new(None), token: Cell::new(0) }
     }
 
     /// Lần tải mới (kết quả của lần tải cũ về muộn thì bỏ).
@@ -130,6 +132,18 @@ pub trait Page {
     fn has_input(&self) -> bool {
         false
     }
+}
+
+/// Sau khi xoá thẻ thứ idx (trang đã dựng lại): chọn thẻ đứng vào chỗ đó (xoá thẻ cuối thì thẻ trước nó); hết thẻ thì ô đầu trang.
+/// Không để focus nhảy lên nút đầu trang (vd «Xoá cả lịch sử») — lỡ bấm thêm Enter là thành việc khác.
+pub fn focus_card_at(p: Rc<dyn Page>, idx: usize) {
+    ui::after(50, move || {
+        let cards: Vec<gtk::Widget> = keynav::targets(p.base().body.upcast_ref()).into_iter().filter(|w| w.is::<gtk::DrawingArea>()).collect();
+        match cards.get(idx.min(cards.len().saturating_sub(1))) {
+            Some(c) => keynav::focus_and_show(c),
+            None => focus_first(p.as_ref()),
+        }
+    });
 }
 
 pub fn focus_first(p: &dyn Page) {

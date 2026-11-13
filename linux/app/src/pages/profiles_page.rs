@@ -193,7 +193,7 @@ impl ProfilesPage {
     }
 
     async fn ask_name(title: &str, current: &str) -> Option<String> {
-        let e = gtk::Entry::new();
+        let e = crate::ui::entry();
         e.set_text(current);
         e.set_max_length(24);
         e.set_width_chars(26);
@@ -226,16 +226,24 @@ impl ProfilesPage {
 
     /// Người có khoá: hỏi mã PIN của người đó (hoặc mã phụ huynh) trước khi sửa.
     async fn unlock(p: &Profile) -> bool {
+        Self::unlock_by(p).await.is_some()
+    }
+
+    /// Mở khoá người xem: None = huỷ / sai; Some(true) = vừa nhập đúng mã PIN phụ huynh (khỏi hỏi lại ngay sau đó).
+    async fn unlock_by(p: &Profile) -> Option<bool> {
         if !p.locked() {
-            return true;
+            return Some(false);
         }
         let a = app();
-        let Some(pin) = a.ask_pin(&format!("Mã PIN của {}", p.name), "Nhập mã PIN của người xem này (hoặc mã PIN phụ huynh).").await else { return false };
-        if prefs::check_pin(p, &pin) || (prefs::has_parent_pin() && prefs::check_parent_pin(&pin)) {
-            return true;
+        let pin = a.ask_pin(&format!("Mã PIN của {}", p.name), "Nhập mã PIN của người xem này (hoặc mã PIN phụ huynh).").await?;
+        if prefs::has_parent_pin() && prefs::check_parent_pin(&pin) {
+            return Some(true);
+        }
+        if prefs::check_pin(p, &pin) {
+            return Some(false);
         }
         a.toast("Sai mã PIN.");
-        false
+        None
     }
 
     fn rename(self: &Rc<Self>, p: Profile) {
@@ -303,25 +311,32 @@ impl ProfilesPage {
         let me = self.clone();
         ui::local(async move {
             let a = app();
-            if !Self::unlock(&p).await {
-                return;
-            }
-            if prefs::any_limits() && !a.check_parent("Đang có giới hạn giờ xem — nhập mã PIN phụ huynh để xoá người xem.").await {
+            let Some(by_parent) = Self::unlock_by(&p).await else { return };
+            if !by_parent && prefs::any_limits() && !a.check_parent("Đang có giới hạn giờ xem — nhập mã PIN phụ huynh để xoá người xem.").await {
                 return;
             }
             if !a.confirm(&format!("Xoá người xem «{}»?", p.name), "Xoá cả lịch sử, Xem tiếp, phim theo dõi và cài đặt riêng của người này.", "Xoá", "Huỷ").await {
                 return;
             }
             let was_current = p.id == prefs::profile_id();
+            let old_site = prefs::base_url();
             if was_current {
                 if let Some(pl) = a.player.borrow().clone() {
                     pl.close(false);
                 }
+                crate::limits::flush_and_reset();
             }
             prefs::delete_profile(&p.id);
             if was_current {
-                a.set_categories(Vec::new());
                 a.toast(&format!("Đang xem: {}.", prefs::current_profile().name));
+                // Mục trang phim trong menu đi theo trang của người xem: người mới dùng trang khác thì về Trang chủ để nạp lại
+                // (như khi đổi người xem); cùng trang thì giữ menu, ở lại trang này
+                if prefs::base_url() != old_site {
+                    a.set_categories(Vec::new());
+                    a.show_root(crate::menu::home_page());
+                    return;
+                }
+                a.rebuild_menu();
             }
             me.rebuild();
         });

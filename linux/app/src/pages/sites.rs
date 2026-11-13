@@ -18,7 +18,7 @@ pub struct SitesPage {
 }
 
 pub fn new() -> Rc<dyn Page> {
-    let add = gtk::Entry::new();
+    let add = crate::ui::entry();
     add.set_width_chars(30);
     add.set_placeholder_text(Some("vd yanhh3d.ee"));
     let p = Rc::new(SitesPage { base: PageBase::new("sites"), checks: RefCell::new(HashMap::new()), add });

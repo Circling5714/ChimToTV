@@ -31,7 +31,7 @@ pub struct ProxyPage {
 }
 
 fn entry(chars: i32, text: &str, secret: bool) -> gtk::Entry {
-    let e = gtk::Entry::new();
+    let e = crate::ui::entry();
     e.set_width_chars(chars);
     e.set_text(text);
     if secret {

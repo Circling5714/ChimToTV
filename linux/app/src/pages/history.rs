@@ -43,7 +43,7 @@ impl HistoryPage {
         note.set_margin_bottom(crate::css::px(16.0));
         b.add(&note);
         let mut cards = Vec::new();
-        for h in list {
+        for (i, h) in list.into_iter().enumerate() {
             let (fu, eu) = (h.film_url.clone(), h.ep_url.clone());
             let me = self.clone();
             let h2 = h.clone();
@@ -57,7 +57,7 @@ impl HistoryPage {
                     prefs::remove_history(&h2.film_url);
                     crate::startup::sync_soon(0);
                     me.build();
-                    super::focus_first(me.as_ref());
+                    super::focus_card_at(me.clone(), i);
                 });
             });
             let film = Film::new(h.film_url.clone(), h.title.clone(), h.poster.clone(), cbtv::site::host_of(&h.film_url));

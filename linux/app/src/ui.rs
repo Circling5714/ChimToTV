@@ -38,6 +38,13 @@ pub fn after(ms: u64, f: impl FnOnce() + 'static) -> glib::SourceId {
     glib::timeout_add_local_once(std::time::Duration::from_millis(ms), f)
 }
 
+/// Ô chữ một dòng: dán đoạn nhiều dòng thì chỉ lấy dòng đầu (GTK mặc định giữ dấu xuống dòng, hiện thành «↵»).
+pub fn entry() -> gtk::Entry {
+    let e = gtk::Entry::new();
+    e.set_truncate_multiline(true);
+    e
+}
+
 pub fn label(text: &str, class: &[&str], wrap: bool) -> gtk::Label {
     let l = gtk::Label::new(Some(text));
     l.set_xalign(0.0);
