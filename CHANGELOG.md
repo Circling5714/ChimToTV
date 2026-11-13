@@ -7,6 +7,67 @@ Mọi bản ký cùng một khoá (chứng chỉ SHA-256 `949ef2b52f3cf895d7fe5f
 Bản iPad / iPhone (iOS / iPadOS 15+, cài bằng TrollStore; có bản iPhone từ 1.3) ghi riêng với tiêu đề "iPad …", tag `ios-v…`.
 Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề "Windows …", tag `win-v…`.
 
+## Tệp APK bản TV đổi sang tên mới — 13/11/2026
+
+- Từ bản 2.17 tệp APK mang tên mới: **`ConBangTV-<phiên bản>.apk`**, link cố định mới
+  `https://github.com/Circling5714/ChimToTV/releases/latest/download/ConBangTV.apk` (trang giới thiệu đã dùng link này).
+- Tệp tên cũ **`ChimToTV.apk` vẫn có trong mọi bản TV** (bản sao giống hệt): mã Downloader **9192365** trỏ vào link tên cũ, và màn
+  «Cài lên tivi» của các bản đã cài (TV 2.16–2.17, iPad 1.16–1.17, Windows 1.14–1.15) in link đó — cả hai link tải cùng một tệp.
+- Release `v2.17` đã sửa sau khi đăng (10:33): thêm `ConBangTV-2.17.apk` + `ConBangTV.apk`, bỏ `ChimToTV-2.17.apk`, giữ
+  `ChimToTV.apk` — ba tệp cùng SHA-256 `663dc083…1206`. Tự cập nhật không bị ảnh hưởng: mọi bản từ 1.3 lấy tệp `.apk` đầu tiên của
+  bản mới nhất, không xét tên. Đã kiểm: hai link cố định tải về đúng bản 2.17, trang chuyển hướng của mã 9192365 vẫn trỏ link tên
+  cũ.
+- Trong app (có hiệu lực từ bản sau 2.17 / iPad 1.17 / Windows 1.15): màn «Cài lên tivi / mời bạn bè» in link tên mới.
+  `build.ps1` dựng ra `dist\ConBangTV-<phiên bản>.apk`; `release.ps1 tv` đính kèm ba tệp và kiểm cả hai link.
+
+## iPad 1.17 — 13/11/2026
+
+- **Vượt chặn nhà mạng tự lên Mức 2:** đang ở Mức 1 mà một trang vẫn bị chặn (gửi gói bắt tay đã chia nhỏ mà trang im 4 giây
+  hoặc cắt kết nối), app tự kết nối lại theo Mức 2 cho riêng trang đó và nhớ 7 ngày — không phải vào Cài đặt đổi mức. Chỉ lần đầu
+  chậm khoảng 4 giây.
+- **Vượt chặn chia nhỏ cả yêu cầu HTTP thường** (dòng `Host:`), không chỉ HTTPS.
+- **DNS:** nhận ra thêm kiểu chặn bằng địa chỉ trang cảnh báo của nhà mạng (vd DNS Viettel trả 127.0.0.1; cùng một địa chỉ trả
+  cho hai trang khác nhau) và tự hỏi lại qua DNS mã hoá. Chi tiết: README mục «Vượt chặn nhà mạng» và «DNS mã hoá».
+- bản 1.17 (CFBundleVersion 23) · mã gói `vn.chimto.tv` · tag `ios-v1.17` (không phải "latest") · commit `c52e32f` (tính năng:
+  `c474288`) · `ConBangTV-iPad-1.17.ipa` 4 501 255 byte · SHA-256
+  `5ca703428bd7003d68be236438dcc2195f9b3f72fe2bc89264eab8ed7572746d`
+- 153 test lõi trên macOS (thêm 5). IPA: Info.plist đúng (mã gói, tên, bản 1.17 / 23), không có cổng gỡ lỗi, danh sách thư viện
+  nạp giống hệt 1.16.1. iPhone thật iOS 15.8.3, bản thử 139 (cùng mã nguồn): máy soi Viettel thật, giả «Mức 1 không lọt» —
+  lần đầu 4,6 s rồi lọt ở Mức 2, lần sau 0,57 s; HTTP thường tới trang bị chặn 0,32 s; trình phát mở bình thường (đo trên bản thử
+  137 cùng mã). Bản chính thức cài đè 1.16.1: mở được, không có báo cáo văng. Link cố định `conbangtv_ios` đã chép sang 1.17, tệp
+  tải từ link công khai và link cố định khớp SHA-256; `releases/latest` vẫn là bản TV. Chưa thử trên iPad (máy thử không bật).
+
+## Windows 1.15 — 13/11/2026
+
+- **Vượt chặn nhà mạng tự lên Mức 2:** như bản TV 2.17 — Mức 1 mà trang im / cắt kết nối thì tự thử lại theo Mức 2 cho riêng
+  trang đó và nhớ 7 ngày; áp dụng cho cả trang phim (WebView2) lẫn kết nối riêng của app (đọc danh sách phim, trình phát).
+- **Vượt chặn chia nhỏ cả yêu cầu HTTP thường**, không chỉ HTTPS.
+- **DNS:** nhận ra địa chỉ trang cảnh báo của nhà mạng, tự hỏi lại qua DNS mã hoá.
+- bản 1.15.0 · tag `win-v1.15` (không phải "latest") · commit `c52e32f` (tính năng: `c474288`) · `ConBangTV-Windows-1.15.exe`
+  72 930 621 byte · SHA-256 `3de526fb96dabe13e74f01fbc1c5e908e3041270a736d2df045966db4b1233c1`
+- 135 test lõi (thêm 4). Lỗi tìm ra khi thử bản gỡ lỗi và đã sửa trước phát hành: SslStream của .NET 8 đọc 0 byte trước để chờ
+  dữ liệu — bị coi là «trang im» nên kết nối nào cũng lên Mức 2; có test. Máy soi Viettel thật (bản gỡ lỗi): cổng nội bộ 4,3 s →
+  0,3 s, HttpClient 4,2 s. Tệp đóng gói: mở bản 1.15, trang chủ đủ 5 nguồn, không có cổng gỡ lỗi. **Tự cập nhật thật 1.14 → 1.15**
+  (bản chép riêng) lúc 10:21:56 → mở lại bản 1.15 lúc 10:22:09; hộp cập nhật hiện mục «Có gì mới». Link cố định
+  `conbangtv_windows` chép đè sang 1.15 (lần chép đè thật đầu tiên — chỉ còn một tệp, khớp SHA-256); `releases/latest` vẫn là
+  bản TV.
+
+## 2.17 — 13/11/2026
+
+- **Vượt chặn nhà mạng tự lên Mức 2:** đang ở Mức 1 mà một trang vẫn bị chặn (gửi gói bắt tay đã chia nhỏ mà trang im 4 giây
+  hoặc cắt kết nối — máy soi đã ghép được các mẩu), app tự kết nối lại theo Mức 2 cho riêng trang đó và nhớ 7 ngày. Không phải
+  vào Cài đặt đổi mức; chỉ lần đầu chậm khoảng 4 giây.
+- **Vượt chặn chia nhỏ cả yêu cầu HTTP thường** (dòng `Host:`), không chỉ HTTPS — trang mở bằng `http://` cũng không còn treo.
+- **DNS:** nhận ra thêm kiểu chặn bằng địa chỉ trang cảnh báo của nhà mạng (DNS Viettel trả 127.0.0.1 cho trang bị chặn; cùng một
+  địa chỉ trả cho hai trang khác nhau) và tự hỏi lại qua DNS mã hoá — dùng khi bật Vượt chặn mà tắt DNS mã hoá.
+- versionCode 41 · tag `v2.17` · commit `c52e32f` (tính năng: `c474288`) · `ChimToTV-2.17.apk` 1 250 817 byte · SHA-256
+  `663dc0830a0550c8cb5cf1a75d839b78a47b5bd990bd0ed6b8100b7b06f21206` · kèm `ChimToTV.apk` (bản sao giống hệt, cho link cố định).
+- 163 test (thêm 7). Máy soi Viettel thật, bản gỡ lỗi trên TV box (giả «Mức 1 không lọt»): lần đầu 4,4 s rồi lọt ở Mức 2, sau đó
+  0,3 s; HTTP thường tới 3 trang bị chặn 0,3–0,6 s (gửi thẳng từ máy tính: treo 15 s); giả DNS trả địa chỉ cảnh báo cho 2 trang →
+  đi qua DNS mã hoá; trình phát vẫn phát bình thường. Bản chính thức trên TV box: trang bị chặn (HTTPS và HTTP) qua cổng nội bộ
+  0,3–0,7 s, trang chủ tải đủ, phát được phim. Đăng bằng `release.ps1`: Latest = `v2.17`, hai tệp `.apk` cùng SHA-256, link cố
+  định của Downloader tải đúng bản 2.17. **Cập nhật tự động thật 2.16.1 → 2.17** trên TV box lúc 10:20.
+
 ## Link tải cố định cho bản Windows và iPad / iPhone — 13/11/2026
 
 Như link APK của bản TV, hai link này **luôn tải bản mới nhất** và không bao giờ đổi (trang giới thiệu

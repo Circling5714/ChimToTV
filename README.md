@@ -17,11 +17,11 @@ Dữ liệu (danh sách phim, tập, server) đọc trực tiếp từ trang, n�
 [Cài trên Android TV bằng Downloader](#cài-trên-android-tv-bằng-downloader).
 
 **Bản iPad / iPhone** (iOS / iPadOS 15+, cài bằng TrollStore): [tải bản mới nhất](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_ios/ConBangTV-iPad.ipa)
-(link cố định) · [release `ios-v1.16.1`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.16.1)
+(link cố định) · [release `ios-v1.17`](https://github.com/Circling5714/ChimToTV/releases/tag/ios-v1.17)
 — xem mục [Bản iPad](#bản-ipad). TV và iPad / iPhone đồng bộ được với nhau — xem [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22).
 
 **Bản Windows** (Windows 10 / 11, một tệp `.exe` chạy ngay): [tải bản mới nhất](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_windows/ConBangTV-Windows.exe)
-(link cố định) · [release `win-v1.14`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.14)
+(link cố định) · [release `win-v1.15`](https://github.com/Circling5714/ChimToTV/releases/tag/win-v1.15)
 — xem mục [Bản Windows](#bản-windows). Đồng bộ được với TV và iPad / iPhone.
 
 **Liên hệ** (góp ý, báo lỗi, hỏi đáp): nhóm Telegram [t.me/tivikit](https://t.me/tivikit) — trong app: **Cài đặt** →
@@ -160,7 +160,8 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | VSMOV — vsmov.com (từ 2.7 / iPad 1.7 / Windows 1.4) | không đọc trang: API `/api/…` kiểu KKPhim (khác đường dẫn) | app đọc luồng `.m3u8` trong trang trình phát rồi tự phát (cắt ảnh PNG ngụy trang trước dữ liệu); trình phát VSMOV → iframe |
 | CLB Phim Xưa — sc.k-20.xyz (từ 2.7 / iPad 1.7 / Windows 1.4) | add-on Stremio «K20 Phim Tổng Hợp» (`catalog` / `meta` / `stream`), chỉ lấy mục CLB Phim Xưa | tệp MP4 (qua máy chủ trung gian của k-20) → `<video>` |
 
-**Tìm kiếm** (từ 1.9.1) tìm cùng lúc trên mọi trang trong danh sách, mỗi trang một nhóm, trang đang dùng đứng đầu.
+**Tìm kiếm** (từ 1.9.1) tìm cùng lúc trên mọi trang trong danh sách (tối đa 3 trang một lúc, trang đang dùng được hỏi trước),
+mỗi trang một nhóm — trang nào trả lời trước thì hiện trước, không chờ trang chậm / không vào được.
 
 mephim.ddns.net (từ 2.5): trang tổng hợp nguồn KKPhim — hoạt hình Trung Quốc, phim bộ / lẻ, TV Shows, thuyết minh / lồng
 tiếng; menu cố định + **Thể loại…** / **Quốc gia…**. Máy chủ của trang hay báo lỗi 500 khi nguồn chậm → app gọi thẳng
@@ -203,8 +204,10 @@ loại trên menu của trang, và **Thể loại…** / **Quốc gia…** (từ
 
 ## Cài lên tivi
 
-- Tải `ChimToTV-<phiên bản>.apk` ở [Releases](https://github.com/Circling5714/ChimToTV/releases/latest), chép vào USB /
-  dùng app "Send Files to TV" rồi mở bằng trình quản lý file trên tivi.
+- Tải `ConBangTV-<phiên bản>.apk` ở [Releases](https://github.com/Circling5714/ChimToTV/releases/latest) (hoặc thẳng
+  [`ConBangTV.apk`](https://github.com/Circling5714/ChimToTV/releases/latest/download/ConBangTV.apk) — luôn là bản mới nhất),
+  chép vào USB / dùng app "Send Files to TV" rồi mở bằng trình quản lý file trên tivi. Bản 2.17 trở về trước tên
+  `ChimToTV-<phiên bản>.apk` (tên cũ của app) — cùng một app, cài đè lên nhau được.
 - Qua mạng (tivi/box bật gỡ lỗi ADB): `.\build.ps1 -Install <IP-tivi>` (dựng từ mã nguồn rồi cài).
 - Đã có bản 1.3 trở lên thì không cần cài tay nữa: app tự tìm bản mới và hỏi cài.
 
@@ -225,10 +228,14 @@ mở đúng mục hướng dẫn này — khách chụp bằng điện thoại l
 (từ 1.14) cũng có: Cài đặt → **Cài lên tivi / mời bạn bè** — mã to, ba bước, nút gửi / chép sẵn tin nhắn hướng dẫn.
 
 - Trên trình duyệt: `aftv.news/9192365` (tải cùng tệp; trang thông tin của mã: `aftv.news/9192365+`).
-- **Link cố định** (mã trên trỏ vào đây): `https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk`
+- **Link cố định:** `https://github.com/Circling5714/ChimToTV/releases/latest/download/ConBangTV.apk`
+- Link cố định tên cũ (mã Downloader trên trỏ vào đây, vẫn dùng được mãi):
+  `https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk`
 
-Link này luôn tải thẳng APK của bản TV mới nhất (tệp `ChimToTV.apk` — bản sao giống hệt `ChimToTV-<phiên bản>.apk`, có trong mọi
-release TV từ 2.15). Cài xong, các bản sau app tự cập nhật. Link đi theo release đang được đánh dấu **Latest** nên bản TV luôn là
+Hai link này luôn tải thẳng APK của bản TV mới nhất — cùng một tệp: `ConBangTV.apk` và `ChimToTV.apk` là bản sao giống hệt
+`ConBangTV-<phiên bản>.apk`. Mọi release TV có `ChimToTV.apk` từ 2.15 và có thêm `ConBangTV.apk` từ 2.17 (13/11/2026 đổi sang tên
+mới; tệp tên cũ giữ lại vì mã Downloader và màn «Cài lên tivi» của các bản đã cài trỏ vào nó). Cài xong, các bản sau app tự cập
+nhật. Link đi theo release đang được đánh dấu **Latest** nên bản TV luôn là
 Latest, bản Windows / iPad thì không — xem [Phát hành bản mới](#phát-hành-bản-mới-app-tự-cập-nhật). GitHub đôi lúc lỗi tải tệp (đã gặp
 11/2026): thử lại sau, hoặc cài theo mục trên.
 
@@ -470,6 +477,15 @@ thật — app không hỏi máy chủ khác để lách. Nhà mạng không đ�
 Tắt DNS mã hoá mà vẫn bật Vượt chặn: DNS của máy trả 0.0.0.0 / :: (bị chặn) hoặc không trả lời thì app vẫn hỏi lại qua chuỗi
 trên — vd ảnh bìa CLB Phim Xưa (`clbphimxua.com`) bị bộ lọc DNS trong nhà chặn.
 
+**Nhận ra địa chỉ trang cảnh báo (từ 2.17 / iPad 1.17 / Windows 1.15):** có nhà mạng chặn bằng DNS theo kiểu trả về địa chỉ
+của trang cảnh báo / 127.0.0.1 thay cho địa chỉ thật (đo 13/11/2026: DNS Viettel trả đúng 127.0.0.1 cho các trang bị chặn). Khi
+Vượt chặn bật mà DNS mã hoá tắt, app (1) xét **mọi** địa chỉ trong câu trả lời — có một địa chỉ bị chặn (0.0.0.0, 127.x, ::…)
+là coi cả câu trả lời bị chặn; (2) nhớ địa chỉ DNS máy trả cho từng tên miền gốc — cùng một địa chỉ mà trả cho **hai trang khác
+nhau** thì nhiều khả năng là trang cảnh báo: hỏi lại qua DNS mã hoá cho trang thứ hai, và cả trang đầu ở lần sau. Hai trang thật
+dùng chung máy chủ (CDN) cũng bị hỏi lại — chỉ chậm thêm một lần hỏi, kết quả vẫn đúng. Code: `Socks5.blockedAnswer` /
+`sharedAnswer` (TV), `Doh.Unblocked` / `SharedAnswer` (Windows), `Doh.unblocked` / `sharedAnswer` (iPad); bản thử:
+`/dnsblock?hosts=a,b&ip=203.0.113.9` giả DNS trả cùng một địa chỉ cảnh báo.
+
 ## Vượt chặn nhà mạng (từ 2.1)
 
 **Cài đặt → Vượt chặn nhà mạng** (iPad từ 1.2; **bật sẵn mức 1 từ 2.11 / iPad 1.11 / Windows 1.8** — máy đang dùng cũng tự bật
@@ -493,6 +509,19 @@ lại đúng byte bị mất), nên làm như bản TV thì gói gửi lại ch�
 trong khi Mức 1 qua. Từ 1.13 bản Windows gửi theo nhịp riêng: byte đầu (TTL 1), ba byte kế mỗi byte một gói, **chờ trang xác
 nhận** (lúc đó Windows đã gửi lại 4 byte đầu, chưa có tên trang), rồi mới gửi phần còn lại như Mức 1. Chậm thêm khoảng 0,1 giây
 mỗi kết nối mới. Windows 1.12 trở về trước: dùng Mức 1, hoặc cập nhật.
+
+**Tự lên Mức 2 (từ 2.17 / iPad 1.17 / Windows 1.15):** đang ở Mức 1, đi thẳng (không qua proxy), app gửi gói bắt tay đã chia
+nhỏ rồi chờ trang trả lời byte đầu tiên tối đa 4 giây. Trang im lặng hoặc cắt kết nối (dấu hiệu máy soi vẫn ghép được tên trang)
+thì app tự kết nối lại và gửi lại theo **Mức 2 cho riêng trang đó** (chờ tối đa 20 giây); lọt thì nhớ tên miền gốc 7 ngày
+(`unblock_l2` trong cài đặt của app), các lần sau đi Mức 2 ngay — không phải vào Cài đặt đổi mức. Chỉ lần đầu chậm khoảng 4
+giây; đo 13/11/2026 với máy soi Viettel (giả «Mức 1 không lọt»): lần đầu 4,4–4,6 s, các lần sau 0,3–0,6 s trên TV, Windows,
+iPhone. Mức 2 gửi được thật (TTL 1 đặt được) mới nhớ. Windows: cả kết nối của WebView2 (qua cổng nội bộ) lẫn kết nối riêng của
+app (HttpClient). Bản thử: `/unblockhang?hosts=…` (lần thử Mức 1 gửi nguyên gói — như máy soi ghép mẩu), `/level2` xem / `?clear=1`
+xoá danh sách trang đã nhớ.
+
+**Cắt cả HTTP thường (từ 2.17 / iPad 1.17 / Windows 1.15):** trang mở bằng `http://` cũng bị máy soi đọc dòng `Host:` — app
+chia yêu cầu HTTP đầu tiên quanh dòng đó (byte đầu riêng, «Ho» / «st:» cùng dấu cách tách nhau, tên trang từng mẩu 2 byte). Đo 13/11/2026:
+HTTP thường tới trang bị chặn qua app 0,3–0,7 s, gửi thẳng từ máy tính thì treo 15 s.
 
 iPad / iPhone: app nằm nền lâu thì iOS có thể thu hồi cổng nội bộ (vượt chặn / proxy) — từ 1.8.2 quay lại app là tự mở lại
 cổng, đúng số cổng cũ (trước đó phải tắt app mở lại mới vào được trang). Code: `AppProxy.revive` (lúc app `active`),
@@ -600,18 +629,20 @@ Lần đầu Android hỏi cho phép Côn Bằng TV "cài ứng dụng không r�
 Android luôn yêu cầu bấm xác nhận cài; riêng Android 12+ thì từ lần thứ hai trở đi cập nhật hoàn toàn tự động.
 
 1. Tăng `versionCode` / `versionName` trong `app/build.gradle.kts`.
-2. `.\build.ps1` → `dist\ChimToTV-<phiên bản>.apk` (ký bằng `keys\` — phải cùng khoá thì app mới nhận).
-3. `git push`, rồi `.\release.ps1 tv -Notes ghi-chu.md` — tạo release tag `v<phiên bản>`, **đánh dấu Latest**, đính kèm hai
-   tệp giống hệt nhau: `ChimToTV-<phiên bản>.apk` và `ChimToTV.apk` (tên cố định, cho
-   [link Downloader](#cài-trên-android-tv-bằng-downloader)). Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập
+2. `.\build.ps1` → `dist\ConBangTV-<phiên bản>.apk` (ký bằng `keys\` — phải cùng khoá thì app mới nhận; bản 2.17 trở về
+   trước: `ChimToTV-<phiên bản>.apk`).
+3. `git push`, rồi `.\release.ps1 tv -Notes ghi-chu.md` — tạo release tag `v<phiên bản>`, **đánh dấu Latest**, đính kèm ba
+   tệp giống hệt nhau: `ConBangTV-<phiên bản>.apk`, `ConBangTV.apk` và `ChimToTV.apk` (hai tên cố định, cho
+   [link Downloader](#cài-trên-android-tv-bằng-downloader) — **đừng bỏ tên cũ** `ChimToTV.apk`: mã 9192365 trỏ vào nó). Bộ tự
+   cập nhật lấy tệp `.apk` đầu tiên, tên nào cũng được. Mục `## Có gì mới` trong ghi chú được hiện trong hộp thoại cập
    nhật trên TV.
 
 **`release.ps1` (từ 12/11/2026) — không gọi `gh release create` tay nữa.** Ba nền tảng dùng chung một trang Releases, và hai
-thứ đi theo release đang là **Latest**: app TV tự cập nhật (hỏi `releases/latest` rồi lấy tệp `.apk`) và link cố định
-`…/releases/latest/download/ChimToTV.apk`. Script đặt sẵn cờ theo nền tảng: `tv` luôn `--latest`, `windows` / `ipad` luôn
+thứ đi theo release đang là **Latest**: app TV tự cập nhật (hỏi `releases/latest` rồi lấy tệp `.apk`) và hai link cố định
+`…/releases/latest/download/ConBangTV.apk` / `…/ChimToTV.apk`. Script đặt sẵn cờ theo nền tảng: `tv` luôn `--latest`, `windows` / `ipad` luôn
 `--latest=false`. Trước khi đăng nó kiểm: ghi chú có `## Có gì mới`, tên tệp đúng số bản trong mã nguồn, code đã đẩy, tag chưa
 có; riêng APK: đúng gói, đúng số bản, đúng chứng chỉ ký. Sau khi đăng: Latest phải là bản TV mới nhất (lệch thì tự trả về), tệp
-trên GitHub khớp SHA-256 với tệp trong máy, bản TV thì tải thử qua link cố định. `-DryRun` chỉ in lệnh; `.\release.ps1
+trên GitHub khớp SHA-256 với tệp trong máy, bản TV thì tải thử qua hai link cố định. `-DryRun` chỉ in lệnh; `.\release.ps1
 <tv|windows|ipad> -Verify` kiểm lại một bản đã đăng, không sửa gì.
 
 **Link tải cố định của bản Windows / iPad (từ 13/11/2026)** — luôn là bản mới nhất, như link APK:
