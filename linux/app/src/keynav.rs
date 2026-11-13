@@ -218,7 +218,21 @@ fn reveal(adj: &gtk::Adjustment, a: f64, b: f64) {
     adj.set_value(target.clamp(adj.lower(), max));
 }
 
-/// Mục có tên (widget_name) là name trong root — chọn lại ô sau khi dựng lại trang.
+/// Mục có tên (widget_name) là name trong root — chọn lại ô sau khi dựng lại trang. Không đòi đã hiện (dựng xong chưa kịp
+/// xếp chỗ vẫn tìm được).
 pub fn find_named(root: &gtk::Widget, name: &str) -> Option<gtk::Widget> {
-    targets(root).into_iter().find(|t| t.widget_name() == name)
+    fn walk(w: &gtk::Widget, name: &str) -> Option<gtk::Widget> {
+        if w.widget_name() == name && w.can_focus() {
+            return Some(w.clone());
+        }
+        if let Some(c) = w.downcast_ref::<gtk::Container>() {
+            for ch in c.children() {
+                if let Some(x) = walk(&ch, name) {
+                    return Some(x);
+                }
+            }
+        }
+        None
+    }
+    walk(root, name)
 }
