@@ -3,7 +3,7 @@
 #   .\ios\scripts\mac-build.ps1 -Release    thêm bản chính (Release)
 #   .\ios\scripts\mac-build.ps1 -Mac        bản Mac (Mac Catalyst) thay cho IPA: bản thử chỉ dựng cho Intel (nhanh), bản chính
 #                                           (-Release) dựng Intel + Apple Silicon
-#   .\ios\scripts\mac-build.ps1 -Mac -Run   … rồi chép bản Mac thử vào ~/ConBangTV/apps trên Mac và mở (cổng gỡ lỗi 8790)
+#   .\ios\scripts\mac-build.ps1 -Mac -Run   … rồi chép bản Mac thử vào ~/TestLab/ConBangTV/apps trên Mac và mở (cổng gỡ lỗi 8790)
 #   .\ios\scripts\mac-build.ps1 -NoTest     bỏ test lõi
 #   .\ios\scripts\mac-build.ps1 -SyncOnly   chỉ gửi mã nguồn + dựng project (xcodegen), không biên dịch
 # Mã nguồn lấy từ thư mục làm việc của máy này (cả phần chưa commit): ios\ và app\src\main\assets\ (trình phát dùng chung).
@@ -14,8 +14,10 @@
 # Đăng nhập: tệp $env:CONBANG_MAC_INFO, mặc định ..\_May_Test_App\info.txt (ngoài repo, danh sách các máy thử): dòng tên máy có
 # chữ «Mac», rồi dòng địa-chỉ/tài-khoản/mật-khẩu.
 # Mật khẩu chỉ nằm trong biến môi trường của tiến trình này; mã NextDNS (keys\nextdns.txt) đi qua stdin của ssh, không nằm trên
-# dòng lệnh. Trên Mac: ~/ConBangTV/ChimToTV (mã nguồn, xoá và chép lại mỗi lần — tên thư mục không được là «src»: xcodegen ghép nhầm nhóm ../app/src/main/assets), ~/ConBangTV/dd (DerivedData giữ lại → lần sau chỉ
-# dựng lại phần đổi), ~/ConBangTV/cai-xcode.log (nhật ký cài Xcode).
+# dòng lệnh. Trên Mac (máy test chung, mỗi dự án một thư mục ~/TestLab/<dự án>): ~/TestLab/ConBangTV/ChimToTV (mã nguồn, xoá
+# và chép lại mỗi lần — tên thư mục không được là «src»: xcodegen ghép nhầm nhóm ../app/src/main/assets), ~/TestLab/ConBangTV/
+# dd.noindex (DerivedData giữ lại → lần sau chỉ dựng lại phần đổi; đuôi .noindex để Spotlight bỏ qua), ~/TestLab/_setup/
+# cai-xcode.log (nhật ký cài Xcode).
 param([switch]$Release, [switch]$NoTest, [switch]$SyncOnly, [switch]$Mac, [switch]$Run)
 $ErrorActionPreference = "Stop"
 $OutputEncoding = New-Object Text.UTF8Encoding $false
@@ -62,7 +64,8 @@ try {
     & "$env:SystemRoot\System32\tar.exe" -cf $tar -T $listFile
     if ($LASTEXITCODE) { throw "Đóng gói mã nguồn lỗi" }
     Write-Host ("Mã nguồn: {0} tệp, {1:N0} KB → {2}@{3}" -f $files.Count, ((Get-Item $tar).Length / 1KB), $macUser, $macHost)
-    & scp.exe @opts $tar "${macUser}@${macHost}:ConBangTV/src.tar"
+    & ssh.exe @opts "$macUser@$macHost" "mkdir -p ~/TestLab/ConBangTV"
+    & scp.exe @opts $tar "${macUser}@${macHost}:TestLab/ConBangTV/src.tar"
     if ($LASTEXITCODE) { throw "Không gửi được mã nguồn sang Mac (scp mã $LASTEXITCODE)" }
 
     # ---- 2. Dựng trên Mac (kịch bản đi qua stdin, mã NextDNS nằm trong đó) ----
@@ -71,40 +74,40 @@ try {
     $script = $flags + "`n" + @'
 set -euo pipefail
 export PATH=/usr/local/bin:$PATH
-B="$HOME/ConBangTV"
+B="$HOME/TestLab/ConBangTV"
 rm -rf "$B/ChimToTV"; mkdir -p "$B/ChimToTV"; tar -xf "$B/src.tar" -C "$B/ChimToTV"; rm -f "$B/src.tar"
 cd "$B/ChimToTV/ios"
 xcodegen generate --quiet
 echo "xcodegen: đã dựng ConBangTV.xcodeproj"
 [ "$SYNCONLY" = 1 ] && exit 0
 if ! xcode-select -p | grep -q '^/Applications/Xcode'; then
-  echo "Mac chưa có Xcode — xem ~/ConBangTV/cai-xcode.log"; exit 3
+  echo "Mac chưa có Xcode — xem ~/TestLab/_setup/cai-xcode.log"; exit 3
 fi
 xcodebuild -version | head -1
 beautify() { xcbeautify --quiet --disable-colored-output; }
 if [ "$TEST" = 1 ]; then
   echo "== Test lõi (macOS)"
-  xcodebuild test -project ConBangTV.xcodeproj -scheme CoreTests -destination 'platform=macOS' -derivedDataPath "$B/dd-test" \
+  xcodebuild test -project ConBangTV.xcodeproj -scheme CoreTests -destination 'platform=macOS' -derivedDataPath "$B/dd-test.noindex" \
     CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO | beautify
 fi
 nosign="CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="
 if [ "$MAC" = 1 ]; then
   # Bản Mac (Mac Catalyst). package-mac.sh đóng gói mọi cấu hình có .app — bỏ bản của lần trước để không đóng gói nhầm
-  rm -rf "$B/dd/Build/Products/Release-maccatalyst" "$B/dd/Build/Products/Beta-maccatalyst/ConBangTV.app"
+  rm -rf "$B/dd.noindex/Build/Products/Release-maccatalyst" "$B/dd.noindex/Build/Products/Beta-maccatalyst/ConBangTV.app"
   dest='generic/platform=macOS,variant=Mac Catalyst'
   echo "== Bản Mac thử (Beta, Intel), build $BUILD"
   xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Beta -destination "$dest" \
-    -derivedDataPath "$B/dd" ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO CURRENT_PROJECT_VERSION="$BUILD" NEXTDNS_ID="$NEXTDNS_ID" \
+    -derivedDataPath "$B/dd.noindex" ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO CURRENT_PROJECT_VERSION="$BUILD" NEXTDNS_ID="$NEXTDNS_ID" \
     $nosign | beautify
   if [ "$RELEASE" = 1 ]; then
     echo "== Bản Mac chính (Release, Intel + Apple Silicon)"
     xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Release -destination "$dest" \
-      -derivedDataPath "$B/dd" ARCHS="x86_64 arm64" ONLY_ACTIVE_ARCH=NO NEXTDNS_ID="$NEXTDNS_ID" $nosign | beautify
+      -derivedDataPath "$B/dd.noindex" ARCHS="x86_64 arm64" ONLY_ACTIVE_ARCH=NO NEXTDNS_ID="$NEXTDNS_ID" $nosign | beautify
   fi
-  ln -sfn "$B/dd" build
+  ln -sfn "$B/dd.noindex" build
   bash scripts/package-mac.sh
   if [ "$RUN" = 1 ]; then
-    # Bản thử chạy từ ~/ConBangTV/apps (không đụng /Applications); tắt bản thử cũ trước
+    # Bản thử chạy từ ~/TestLab/ConBangTV/apps (không đụng /Applications); tắt bản thử cũ trước
     pkill -f "$B/apps/ConBangTV.app/Contents/MacOS/ConBangTV" 2>/dev/null && sleep 1 || true
     rm -rf "$B/apps/ConBangTV.app"; mkdir -p "$B/apps"
     ditto "build/Build/Products/Beta-maccatalyst/ConBangTV.app" "$B/apps/ConBangTV.app"
@@ -113,23 +116,23 @@ if [ "$MAC" = 1 ]; then
   exit 0
 fi
 # package.sh đóng gói mọi cấu hình có .app — bỏ bản chính của lần trước để không đóng gói nhầm
-rm -rf "$B/dd/Build/Products/Release-iphoneos" "$B/dd/Build/Products/Beta-iphoneos/ConBangTV.app"
+rm -rf "$B/dd.noindex/Build/Products/Release-iphoneos" "$B/dd.noindex/Build/Products/Beta-iphoneos/ConBangTV.app"
 echo "== Bản thử (Beta), build $BUILD"
 xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Beta -sdk iphoneos \
-  -destination 'generic/platform=iOS' -derivedDataPath "$B/dd" CURRENT_PROJECT_VERSION="$BUILD" \
+  -destination 'generic/platform=iOS' -derivedDataPath "$B/dd.noindex" CURRENT_PROJECT_VERSION="$BUILD" \
   NEXTDNS_ID="$NEXTDNS_ID" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= | beautify
 if [ "$RELEASE" = 1 ]; then
   echo "== Bản chính (Release)"
   xcodebuild build -project ConBangTV.xcodeproj -scheme ConBangTV -configuration Release -sdk iphoneos \
-    -destination 'generic/platform=iOS' -derivedDataPath "$B/dd" NEXTDNS_ID="$NEXTDNS_ID" \
+    -destination 'generic/platform=iOS' -derivedDataPath "$B/dd.noindex" NEXTDNS_ID="$NEXTDNS_ID" \
     CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= | beautify
 fi
-ln -sfn "$B/dd" build
+ln -sfn "$B/dd.noindex" build
 bash scripts/package.sh
 '@
     $script.Replace("`r`n", "`n") | & ssh.exe @opts "$macUser@$macHost" "bash -s"
     $rc = $LASTEXITCODE
-    if ($rc -eq 3) { throw "Mac chưa có Xcode (nhật ký cài: ~/ConBangTV/cai-xcode.log trên Mac)" }
+    if ($rc -eq 3) { throw "Mac chưa có Xcode (nhật ký cài: ~/TestLab/_setup/cai-xcode.log trên Mac)" }
     if ($rc) { throw "Dựng trên Mac lỗi (mã $rc) — xem các dòng ở trên" }
     if ($SyncOnly) { Write-Host "Đã gửi mã nguồn + dựng project trên Mac." -ForegroundColor Green; return }
 
@@ -137,7 +140,7 @@ bash scripts/package.sh
     $out = Join-Path $root "dist\mac"
     New-Item -ItemType Directory -Force $out | Out-Null
     $ext = if ($Mac) { "zip" } else { "ipa" }
-    & scp.exe @opts "${macUser}@${macHost}:ConBangTV/ChimToTV/ios/dist/*.$ext" $out
+    & scp.exe @opts "${macUser}@${macHost}:TestLab/ConBangTV/ChimToTV/ios/dist/*.$ext" $out
     if ($LASTEXITCODE) { throw "Không lấy được tệp .$ext về" }
     Get-ChildItem $out -Filter "*.$ext" | Where-Object { $_.LastWriteTime -ge $started.AddMinutes(-1) } | ForEach-Object {
         Write-Host ("{0}  {1:N0} byte  SHA-256 {2}" -f $_.FullName, $_.Length, (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())
