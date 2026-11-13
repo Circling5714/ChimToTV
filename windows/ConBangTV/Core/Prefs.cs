@@ -661,6 +661,13 @@ public static class Prefs
         }
     }
 
+    /// Trang (tên miền gốc) đã tự lên Vượt chặn Mức 2 → lúc ghi nhận (ms) — Unblock.Level2Memo. Dùng chung cả nhà.
+    public static Dictionary<string, long> Level2Hosts
+    {
+        get => Get<Dictionary<string, long>>("unblock_l2") ?? new();
+        set => Set("unblock_l2", value);
+    }
+
     /// DNS mã hoá (xem Doh: DoH rồi DoT, NextDNS → Cloudflare → Google, lỗi hết thì DNS của máy). Từ 1.7.1 bật sẵn: khoá
     /// "doh" = "AUTO" / "OFF", cùng khoá bản TV.
     public static bool SecureDns

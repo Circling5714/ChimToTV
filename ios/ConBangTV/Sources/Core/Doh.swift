@@ -301,11 +301,15 @@ enum Doh {
     }
 
     #if DEVTOOLS
-    static func setDebugBlock(_ hosts: Set<String>) {
+    private static var debugBlockAddr = IPAddr([0, 0, 0, 0])!
+
+    static func setDebugBlock(_ hosts: Set<String>, ip: IPAddr? = nil) {
         lock.lock()
         debugBlock = hosts
+        debugBlockAddr = ip ?? IPAddr([0, 0, 0, 0])!
         cache = [:]
         lock.unlock()
+        forgetAnswers()
     }
 
     static func setDebugFail(_ labels: Set<String>) {
@@ -337,13 +341,61 @@ enum Doh {
         #endif
     }
 
-    /// DNS của máy không trả lời / chỉ trả địa chỉ chặn → địa chỉ qua DNS mã hoá; nil = cứ dùng DNS của máy.
+    /// DNS của máy không trả lời / trả địa chỉ chặn / trả địa chỉ đáng ngờ → địa chỉ qua DNS mã hoá; nil = cứ dùng DNS của máy.
+    /// Xét mọi địa chỉ trong câu trả lời (có một địa chỉ chặn là cả câu trả lời không dùng được — đo DNS Viettel 13/11/2026: tên
+    /// miền bị chặn trả 127.0.0.1).
     static func unblocked(_ host: String) -> IPAddr? {
         let name = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]")).trimmingSuffix(".")
         if IPAddr(text: name) != nil || name == "localhost" { return nil }
-        let device = debugBlocked(name) ? [IPAddr([0, 0, 0, 0])!] : ((try? Socks5.resolveAll(name)) ?? [])
-        if device.contains(where: { !blocked($0) }) { return nil }
+        let device = debugBlocked(name) ? [debugBlockIP] : ((try? Socks5.resolveAll(name)) ?? [])
+        if !device.isEmpty && !device.contains(where: blocked) && !sharedAnswer(name, device) { return nil }
         return try? resolve(name)
+    }
+
+    private static var answeredFor: [String: String] = [:] // địa chỉ → tên miền gốc đầu tiên nhận địa chỉ đó
+    private static var suspects: Set<String> = [] // địa chỉ đã thấy trả cho hai tên miền gốc khác nhau
+
+    /// Trang cảnh báo của nhà mạng: DNS chặn trả cùng một địa chỉ (máy chủ trang cảnh báo) cho mọi trang bị chặn. Câu trả lời có
+    /// địa chỉ đã trả cho một tên miền gốc khác thì đáng ngờ → Vượt chặn hỏi lại DNS mã hoá cho chắc; từ đó mọi trang nhận địa
+    /// chỉ ấy (kể cả trang đầu tiên) cũng vậy. Hai trang dùng chung CDN cũng trùng — DNS mã hoá trả địa chỉ đúng, không hại gì.
+    static func sharedAnswer(_ host: String, _ all: [IPAddr]) -> Bool {
+        let base = baseDomain(host)
+        lock.lock()
+        defer { lock.unlock() }
+        if answeredFor.count > 512 { answeredFor = [:] }
+        var shared = false
+        for a in all {
+            let k = a.text
+            if suspects.contains(k) {
+                shared = true
+            } else if let prev = answeredFor[k] {
+                if prev != base {
+                    suspects.insert(k)
+                    shared = true
+                }
+            } else {
+                answeredFor[k] = base
+            }
+        }
+        return shared
+    }
+
+    static func forgetAnswers() {
+        lock.lock()
+        answeredFor = [:]
+        suspects = []
+        lock.unlock()
+    }
+
+    /// Chỉ bản thử (/dnsblock?ip=…): địa chỉ DNS của máy giả trả cho các tên miền bị giả chặn (mặc định 0.0.0.0).
+    private static var debugBlockIP: IPAddr {
+        #if DEVTOOLS
+        lock.lock()
+        defer { lock.unlock() }
+        return debugBlockAddr
+        #else
+        return IPAddr([0, 0, 0, 0])!
+        #endif
     }
 
     /// Địa chỉ cho một kết nối mà máy tự phân giải (đi thẳng, hoặc proxy dùng «DNS của máy»): DNS mã hoá nếu bật, không

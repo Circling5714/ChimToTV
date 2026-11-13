@@ -315,9 +315,10 @@ public sealed class SettingsPage : Page
             ("Tắt", Prefs.UnblockLevel == 0, (Action)(() => SetUnblock(0))),
             ("Mức 1", Prefs.UnblockLevel == 1, () => SetUnblock(1)),
             ("Mức 2", Prefs.UnblockLevel == 2, () => SetUnblock(2)),
-        }, "Trang không vào được / quá thời gian chờ (nhà mạng chặn theo tên trang, vd phimmois.fun): bật Mức 1. " +
-           "Vẫn bị chặn thì thử Mức 2. Trang / ảnh bìa bị chặn bằng DNS (DNS trả 0.0.0.0) thì app tự hỏi lại địa chỉ qua DNS mã hoá. " +
-           "Không cần VPN.");
+        }, "Trang không vào được / quá thời gian chờ (nhà mạng chặn theo tên trang, vd phimmois.fun): bật Mức 1 — app chia nhỏ " +
+           "gói bắt tay HTTPS (cả yêu cầu HTTP thường). Ở Mức 1 mà trang vẫn không trả lời thì app tự thử Mức 2 cho riêng trang đó và " +
+           "nhớ 7 ngày. Trang / ảnh bìa bị chặn bằng DNS (trả 0.0.0.0, 127.0.0.1 hay địa chỉ trang cảnh báo) thì app tự hỏi lại địa " +
+           "chỉ qua DNS mã hoá. Không cần VPN.");
         Body.Children.Add(Ui.Row(Ui.Pill(Prefs.ShadowsocksConfig() is { } sc ? $"Proxy Shadowsocks: {sc.Host}:{sc.Port}"
             : Prefs.ProxyConfig() is { } pc ? $"Proxy SOCKS5: {pc.Host}:{pc.Port}" : "Proxy: tắt",
             () => Main.Push(new ProxyPage()))));

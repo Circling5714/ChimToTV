@@ -18,6 +18,20 @@ public class DohTests
         foreach (var a in new[] { "104.21.35.220", "2606:4700:3035::6815:23dc", "10.0.0.1" }) Assert.False(Doh.Blocked(IPAddress.Parse(a)), a);
     }
 
+    /// Trang cảnh báo của nhà mạng: cùng một địa chỉ cho hai tên miền gốc khác nhau → đáng ngờ, kể cả với trang đầu tiên.
+    [Fact]
+    public void SameAnswerForDifferentSitesIsSuspicious()
+    {
+        Doh.ForgetAnswers();
+        var warn = new[] { IPAddress.Parse("203.0.113.9") };
+        Assert.False(Doh.SharedAnswer("phimmoi.test", warn));
+        Assert.False(Doh.SharedAnswer("img.phimmoi.test", warn)); // cùng tên miền gốc
+        Assert.True(Doh.SharedAnswer("www.kkphim.test", warn));
+        Assert.True(Doh.SharedAnswer("phimmoi.test", warn)); // từ giờ trang đầu tiên cũng hỏi lại DNS mã hoá
+        Assert.False(Doh.SharedAnswer("khac.test", new[] { IPAddress.Parse("198.51.100.7") }));
+        Doh.ForgetAnswers();
+    }
+
     [Fact]
     public void QueryForA()
     {

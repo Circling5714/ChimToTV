@@ -368,7 +368,9 @@ public static class Doh
     public static bool Blocked(IPAddress a) =>
         a.Equals(IPAddress.Any) || a.Equals(IPAddress.IPv6Any) || IPAddress.IsLoopback(a);
 
-    /// DNS của máy không trả lời / chỉ trả địa chỉ chặn → địa chỉ qua DNS mã hoá; null = cứ dùng DNS của máy.
+    /// DNS của máy không trả lời / trả địa chỉ chặn / trả địa chỉ đáng ngờ → địa chỉ qua DNS mã hoá; null = cứ dùng DNS của máy.
+    /// Xét mọi địa chỉ trong câu trả lời (có một địa chỉ chặn là cả câu trả lời không dùng được — đo DNS Viettel 13/11/2026: tên
+    /// miền bị chặn trả 127.0.0.1).
     public static async Task<IPAddress?> Unblocked(string host, CancellationToken ct)
     {
         var name = host.Trim('[', ']').TrimEnd('.').ToLowerInvariant();
@@ -376,7 +378,10 @@ public static class Doh
         try
         {
             var list = await Dns.GetHostAddressesAsync(name, ct);
-            if (list.Any(a => !Blocked(a))) return null;
+#if DEBUG
+            if (DebugDnsBlock.Contains(name)) list = new[] { DebugDnsBlockIp };
+#endif
+            if (list.Length > 0 && !list.Any(Blocked) && !SharedAnswer(name, list)) return null;
         }
         catch (SocketException)
         {
@@ -384,6 +389,50 @@ public static class Doh
         }
         return await Resolve(name, ct);
     }
+
+    private static readonly object AnswerLock = new();
+    private static readonly Dictionary<string, string> AnsweredFor = new(); // địa chỉ → tên miền gốc đầu tiên nhận địa chỉ đó
+    private static readonly HashSet<string> Suspects = new(); // địa chỉ đã thấy trả cho hai tên miền gốc khác nhau
+
+    /// Trang cảnh báo của nhà mạng: DNS chặn trả cùng một địa chỉ (máy chủ trang cảnh báo) cho mọi trang bị chặn. Câu trả lời có
+    /// địa chỉ đã trả cho một tên miền gốc khác thì đáng ngờ → Vượt chặn hỏi lại DNS mã hoá cho chắc; từ đó mọi trang nhận địa
+    /// chỉ ấy (kể cả trang đầu tiên) cũng vậy. Hai trang dùng chung CDN cũng trùng — DNS mã hoá trả địa chỉ đúng, không hại gì.
+    public static bool SharedAnswer(string host, IEnumerable<IPAddress> all)
+    {
+        var bas = Unblock.BaseDomain(host);
+        var shared = false;
+        lock (AnswerLock)
+        {
+            if (AnsweredFor.Count > 512) AnsweredFor.Clear();
+            foreach (var a in all)
+            {
+                var k = a.ToString();
+                if (Suspects.Contains(k)) shared = true;
+                else if (!AnsweredFor.TryGetValue(k, out var prev)) AnsweredFor[k] = bas;
+                else if (prev != bas)
+                {
+                    Suspects.Add(k);
+                    shared = true;
+                }
+            }
+        }
+        return shared;
+    }
+
+    public static void ForgetAnswers()
+    {
+        lock (AnswerLock)
+        {
+            AnsweredFor.Clear();
+            Suspects.Clear();
+        }
+    }
+
+#if DEBUG
+    /// Chỉ bản gỡ lỗi (cổng /dnsblock): coi DNS của máy trả DebugDnsBlockIp cho các tên miền này, để thử Vượt chặn.
+    public static HashSet<string> DebugDnsBlock = new();
+    public static IPAddress DebugDnsBlockIp = IPAddress.Any;
+#endif
 
     /// Địa chỉ cho một kết nối mà máy tự phân giải (đi thẳng, hoặc proxy dùng «DNS của máy»): DNS mã hoá nếu bật, không thì
     /// Vượt chặn DNS; null = dùng DNS của máy như thường.

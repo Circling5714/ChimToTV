@@ -224,6 +224,97 @@ public class SiteTests
         }
     }
 
+    /// Yêu cầu HTTP thường: tách quanh tên trang trong dòng Host (như bản TV); mức 2 vẫn 4 byte đầu rồi điểm chờ.
+    [Fact]
+    public void UnblockSplitsHttpRequestAroundHost()
+    {
+        var req = System.Text.Encoding.ASCII.GetBytes("GET /phim HTTP/1.1\r\nHost: phim.test\r\nAccept: */*\r\n\r\n");
+        string Parts(int level) => string.Join("|", Unblock.HelloChunks(req, "phim.test", level)
+            .Select(x => System.Text.Encoding.ASCII.GetString(req, x.Start, x.Length)));
+        Assert.Equal("G|ET /phim HTTP/1.1\r\nHo|st: |ph|im|.t|es|t|\r\nAccept: */*\r\n\r\n", Parts(1));
+        Assert.Equal("G|E|T| |/phim HTTP/1.1\r\nHo|st: |ph|im|.t|es|t|\r\nAccept: */*\r\n\r\n", Parts(2));
+        Assert.Single(Unblock.HelloChunks(System.Text.Encoding.ASCII.GetBytes("SSH-2.0-x\r\n"), "phim.test", 1));
+    }
+
+    [Fact]
+    public void UnblockBaseDomainsAndLevel2Memo()
+    {
+        Assert.Equal("phimmoi.net", Unblock.BaseDomain("img.phimmoi.net"));
+        Assert.Equal("abc.com.vn", Unblock.BaseDomain("www.abc.com.vn"));
+        Assert.Equal("1.2.3.4", Unblock.BaseDomain("1.2.3.4"));
+        Unblock.Level2Memo.Persist = false;
+        const long now = 1_000_000_000_000;
+        Unblock.Level2Memo.Load(new() { ["phimmoi.test"] = now - Unblock.Level2Memo.KeepMs - 1, ["kkphim.test"] = now - 1000 }, now);
+        Assert.False(Unblock.Level2Memo.Needs("phimmoi.test", now)); // quá 7 ngày: về Mức 1
+        Assert.True(Unblock.Level2Memo.Needs("www.kkphim.test", now)); // theo tên miền gốc
+        Unblock.Level2Memo.Clear();
+    }
+
+    /// Máy đích giả nhà mạng chặn ở Mức 1: kết nối đầu nhận gói bắt tay nhưng không trả lời; kết nối sau trả lời ngay.
+    /// HelloSplit (luồng của HttpClient) phải tự kết nối lại, gửi lại gói bắt tay theo Mức 2 — bên đọc nhận trả lời như thường.
+    [Fact]
+    public async Task UnblockHangAtLevel1RetriesAtLevel2()
+    {
+        var hello = new byte[] { 0x16, 0x03, 0x01, 0x00, 0x20, 1, 2, 3 }.Concat(System.Text.Encoding.ASCII.GetBytes("phim.test")).Concat(new byte[] { 9, 9 }).ToArray();
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var seen = new System.Collections.Concurrent.ConcurrentQueue<int>();
+        var accepts = 0;
+        _ = Task.Run(async () =>
+        {
+            while (true)
+            {
+                System.Net.Sockets.Socket s;
+                try { s = await listener.AcceptSocketAsync(); } catch { return; }
+                var first = Interlocked.Increment(ref accepts) == 1;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var b = new byte[256];
+                        var n = 0;
+                        while (n < hello.Length) n += s.Receive(b, n, b.Length - n, System.Net.Sockets.SocketFlags.None);
+                        seen.Enqueue(n);
+                        if (first) await Task.Delay(3000);
+                        else s.Send(System.Text.Encoding.ASCII.GetBytes("hello-back"));
+                        await Task.Delay(200);
+                    }
+                    catch { }
+                    s.Dispose();
+                });
+            }
+        });
+        var oldMs = Unblock.FirstReplyMs;
+        Unblock.Level2Memo.Persist = false;
+        Unblock.Level2Memo.Clear();
+        Unblock.FirstReplyMs = 500;
+        try
+        {
+            var sock = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp) { NoDelay = true };
+            await sock.ConnectAsync(listener.LocalEndpoint);
+            using var st = new Unblock.HelloSplit(new System.Net.Sockets.NetworkStream(sock, true), sock, "phim.test", 1, false, async ct =>
+            {
+                var s2 = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp) { NoDelay = true };
+                await s2.ConnectAsync(listener.LocalEndpoint, ct);
+                return s2;
+            });
+            st.Write(hello);
+            // Như SslStream (.NET 8): đọc 0 byte để chờ dữ liệu trước — không được coi là «trang im»
+            Assert.Equal(0, await st.ReadAsync(Memory<byte>.Empty));
+            var got = new byte[10];
+            var m = await st.ReadAsync(got);
+            Assert.Equal("hello-back", System.Text.Encoding.ASCII.GetString(got, 0, m));
+            Assert.Equal(new[] { hello.Length, hello.Length }, seen.ToArray()); // gửi lại đủ gói bắt tay ở kết nối thứ hai
+            Assert.True(Unblock.Level2Memo.Needs("phim.test")); // Windows hỏi được trạng thái TCP → Mức 2 thật → nhớ trang
+        }
+        finally
+        {
+            Unblock.FirstReplyMs = oldMs;
+            Unblock.Level2Memo.Clear();
+            listener.Stop();
+        }
+    }
+
     [Fact]
     public void FormEncodedLikeJava()
     {

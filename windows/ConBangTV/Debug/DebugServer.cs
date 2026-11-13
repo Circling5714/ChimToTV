@@ -108,6 +108,27 @@ public static class DebugServer
                     Net.SettingsChanged(); // đóng kết nối đang giữ (HttpClient dùng lại) → kết nối mới phải hỏi DNS lại
                     body = Text(string.Join(" → ", Doh.Servers.Select(x => x.Label + (Doh.DebugFail.Contains(x.Label) ? " (giả chặn)" : ""))));
                     break;
+                case "/dnsblock":
+                    // Giả DNS của máy chặn: /dnsblock?hosts=a.com,b.com (trống = bỏ)&ip=203.0.113.9 (mặc định 0.0.0.0)
+                    Doh.DebugDnsBlock = (q["hosts"] ?? "").Split(',').Select(x => x.Trim().ToLowerInvariant()).Where(x => x.Length > 0).ToHashSet();
+                    Doh.DebugDnsBlockIp = IPAddress.Parse(string.IsNullOrWhiteSpace(q["ip"]) ? "0.0.0.0" : q["ip"]!);
+                    Doh.ForgetAnswers();
+                    Net.SettingsChanged();
+                    body = Text(string.Join(",", Doh.DebugDnsBlock) + " → " + Doh.DebugDnsBlockIp);
+                    break;
+                case "/unblockhang":
+                    // Giả nhà mạng ghép được các mẩu ở Mức 1 (gửi nguyên gói bắt tay) cho các trang này: /unblockhang?hosts=phimmoir.fun
+                    Unblock.DebugWholeHello = (q["hosts"] ?? "").Split(',').Select(x => x.Trim().ToLowerInvariant()).Where(x => x.Length > 0).ToHashSet();
+                    Net.SettingsChanged();
+                    body = Text(string.Join(",", Unblock.DebugWholeHello));
+                    break;
+                case "/level2":
+                    // Trang đã tự lên Mức 2: /level2 (xem), /level2?clear=1 (quên hết)
+                    if (q["clear"] == "1") Unblock.Level2Memo.Clear();
+                    body = Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(
+                        new { hosts = Unblock.Level2Memo.All(), autoLevel2 = Unblock.Level2Memo.AutoCount, bridge = Net.BridgePort }));
+                    type = "application/json; charset=utf-8";
+                    break;
                 case "/play":
                     await _w!.Dispatcher.InvokeAsync(() => _w.Play(q["film"]!, q["ep"]!));
                     body = Text("ok");

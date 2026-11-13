@@ -138,6 +138,14 @@ object Prefs {
         get() = sp.getInt("unblock_level", 1).coerceIn(1, 2)
         set(value) = sp.edit().putInt("unblock_level", value).apply()
 
+    /** Trang (tên miền gốc) đã tự lên Vượt chặn Mức 2 → lúc ghi nhận (Level2Memo); dùng chung cả nhà. */
+    var level2Hosts: Map<String, Long>
+        get() = runCatching {
+            val o = JSONObject(sp.getString("unblock_l2", null) ?: "{}")
+            o.keys().asSequence().associateWith { o.getLong(it) }
+        }.getOrDefault(emptyMap())
+        set(value) = sp.edit().putString("unblock_l2", JSONObject(value as Map<*, *>).toString()).apply()
+
     // ---- Người xem (hồ sơ) ----
 
     const val MAX_PROFILES = 8

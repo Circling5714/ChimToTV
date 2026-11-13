@@ -44,6 +44,11 @@ object AppProxy {
      * Http.kt buộc phải kết nối lại theo cài đặt mới ngay (không dùng lại kết nối keep-alive đi theo cài đặt cũ).
      */
     fun apply() {
+        if (Level2Memo.save == null) {
+            // Trang đã tự lên Mức 2 (các lần mở app trước): nạp lại, ghi xuống máy mỗi lần nhớ thêm
+            Level2Memo.load(Prefs.level2Hosts)
+            Level2Memo.save = { Prefs.level2Hosts = it }
+        }
         val c = RouteConfig(Prefs.proxyConfig(), Prefs.secureDns, Prefs.unblock, Prefs.unblock && Prefs.unblockLevel >= 2, Prefs.ssConfig())
             .takeIf { it.proxied || it.dns || it.split }
         if (c == bridgeConfig && (c == null) == (bridge == null)) return
@@ -57,6 +62,9 @@ object AppProxy {
 
     /** Số gói bắt tay đã gửi đảo thứ tự (Vượt chặn mức 2) từ lúc mở cổng nội bộ — để thử. */
     val disorderCount: Int get() = bridge?.disorderCount ?: 0
+
+    /** Số lần tự lên Mức 2 (trang không trả lời ở Mức 1) từ lúc mở cổng nội bộ — để thử. */
+    val autoLevel2Count: Int get() = bridge?.autoLevel2 ?: 0
 
     /** Lỗi proxy trong 30 giây gần đây, để ghép vào thông báo lỗi (vd "proxy báo sai tên đăng nhập / mật khẩu"). */
     fun recentError(): String? = if (bridgeConfig != null && bridge == null) "không mở được cổng nội bộ"

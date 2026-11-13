@@ -185,6 +185,86 @@ final class Socks5Tests: XCTestCase {
         XCTAssertEqual(try roundTrip(s, "sau đó chuyển bình thường"), "sau đó chuyển bình thường")
     }
 
+    /// Ghép các đoạn của splitPlan thành chữ, ngăn bằng «|» — cùng ca với Socks5BridgeTest.kt / SiteTests.cs.
+    private func plan(_ text: String, _ host: String) -> String {
+        let b = Array(text.utf8)
+        return Socks5Bridge.splitPlan(b, host: host).map { String(decoding: b[$0.start..<($0.start + $0.len)], as: UTF8.self) }.joined(separator: "|")
+    }
+
+    func testHttpRequestIsSplitAroundHost() {
+        let req = "GET /phim HTTP/1.1\r\nHost: phim.test\r\nAccept: */*\r\n\r\n"
+        XCTAssertEqual(plan(req, "phim.test"), "G|ET /phim HTTP/1.1\r\nHo|st: |ph|im|.t|es|t|\r\nAccept: */*\r\n\r\n")
+        XCTAssertEqual(plan("SSH-2.0-x\r\n", "phim.test"), "SSH-2.0-x\r\n")
+    }
+
+    func testTlsHelloIsSplitAroundName() {
+        var hello = [UInt8](repeating: 0, count: 80)
+        hello[0] = 0x16; hello[1] = 0x03; hello[2] = 0x01; hello[4] = 75
+        hello.replaceSubrange(40..<49, with: Array("phim.test".utf8))
+        let p = Socks5Bridge.splitPlan(hello, host: "phim.test")
+        XCTAssertEqual(p.first?.start, 0)
+        XCTAssertEqual(p.first?.len, 1)
+        XCTAssertEqual(p.filter { (40...48).contains($0.start) }.map { $0.len }, [2, 2, 2, 2, 1])
+        XCTAssertEqual(p.reduce(0) { $0 + $1.len }, hello.count)
+    }
+
+    func testBaseDomainsAndLevel2Memo() {
+        XCTAssertEqual(baseDomain("img.phimmoi.net"), "phimmoi.net")
+        XCTAssertEqual(baseDomain("www.abc.com.vn"), "abc.com.vn")
+        XCTAssertEqual(baseDomain("1.2.3.4"), "1.2.3.4")
+        let now: Int64 = 1_000_000_000_000
+        Level2Memo.load(["phimmoi.test": now - Level2Memo.keepMs - 1, "kkphim.test": now - 1000], now: now)
+        XCTAssertFalse(Level2Memo.needs("phimmoi.test", now: now)) // quá 7 ngày: về Mức 1
+        XCTAssertTrue(Level2Memo.needs("www.kkphim.test", now: now)) // theo tên miền gốc
+        Level2Memo.clear()
+    }
+
+    /// Trang cảnh báo của nhà mạng: cùng một địa chỉ cho hai tên miền gốc khác nhau → đáng ngờ, kể cả với trang đầu tiên.
+    func testSameAnswerForDifferentSitesIsSuspicious() {
+        Doh.forgetAnswers()
+        let warn = [IPAddr(text: "203.0.113.9")!]
+        XCTAssertFalse(Doh.sharedAnswer("phimmoi.test", warn))
+        XCTAssertFalse(Doh.sharedAnswer("img.phimmoi.test", warn))
+        XCTAssertTrue(Doh.sharedAnswer("www.kkphim.test", warn))
+        XCTAssertTrue(Doh.sharedAnswer("phimmoi.test", warn))
+        XCTAssertFalse(Doh.sharedAnswer("khac.test", [IPAddr(text: "198.51.100.7")!]))
+        Doh.forgetAnswers()
+    }
+
+    /// Máy đích giả nhà mạng chặn ở Mức 1: kết nối đầu nhận gói bắt tay nhưng không trả lời; kết nối sau trả lời ngay. Cổng nội
+    /// bộ phải tự mở lại và gửi lại gói đó — bên gọi nhận được trả lời như không có gì.
+    func testHangingAtLevel1RetriesAtLevel2() throws {
+        var hello = [UInt8](repeating: 0, count: 80)
+        hello[0] = 0x16; hello[1] = 0x03; hello[2] = 0x01; hello[4] = 75
+        hello.replaceSubrange(40..<49, with: Array("localhost".utf8))
+        let lock = NSLock()
+        var accepted = 0
+        var seen: [Int] = []
+        let target = Server { s in
+            lock.lock(); accepted += 1; let first = accepted == 1; lock.unlock()
+            s.setReadTimeout(5)
+            guard let got = try? s.readFully(80) else { return s.close() }
+            lock.lock(); seen.append(got.count); lock.unlock()
+            if first { usleep(3_000_000) } else { try? s.write(Array("hello-back".utf8)); usleep(200_000) }
+            s.close()
+        }
+        defer { target.close() }
+        Level2Memo.clear()
+        let oldWait = Socks5Bridge.firstReplySeconds
+        Socks5Bridge.firstReplySeconds = 1
+        defer { Socks5Bridge.firstReplySeconds = oldWait; Level2Memo.clear() }
+        let bridge = try Socks5Bridge(socks: nil, split: true, siteHosts: { [] })
+        defer { bridge.close() }
+        let s = try Socks5.connect(SocksConfig(host: "127.0.0.1", port: bridge.port), host: "localhost", ip: nil, port: target.port)
+        defer { s.close() }
+        try s.write(hello)
+        s.setReadTimeout(8)
+        XCTAssertEqual(String(decoding: try s.readFully(10), as: UTF8.self), "hello-back")
+        lock.lock()
+        XCTAssertEqual(seen, [80, 80]) // gửi lại đủ gói bắt tay ở kết nối thứ hai
+        lock.unlock()
+    }
+
     func testFindName() {
         var bytes = Array("xxPhimMoir.funyy".utf8)
         let at = bytes.withUnsafeMutableBufferPointer { Socks5Bridge.find(Array("phimmoir.fun".utf8), in: $0.baseAddress!, from: 1, to: $0.count) }

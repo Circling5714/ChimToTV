@@ -316,7 +316,7 @@ struct SecureDnsSection: View {
     }
 }
 
-/// Cài đặt → Vượt chặn nhà mạng (dùng chung cả nhà): chia nhỏ gói bắt tay HTTPS (Socks5Bridge.writeHello).
+/// Cài đặt → Vượt chặn nhà mạng (dùng chung cả nhà): chia nhỏ gói bắt tay HTTPS (Socks5Bridge.writeSplit).
 struct UnblockSection: View {
     @EnvironmentObject var app: AppModel
     @State private var on = Prefs.unblock
@@ -347,7 +347,7 @@ struct UnblockSection: View {
                     .foregroundColor(Theme.dim)
             }
         } header: { Text("Vượt chặn nhà mạng") } footer: {
-            Text("Một số nhà mạng chặn trang phim (vd phimmoir.fun) bằng cách đọc tên trang trong gói bắt tay HTTPS: trang mở mãi không được, dùng VPN thì vào được. Bật mục này: app chia nhỏ gói đó nên nhà mạng không đọc được tên trang — không cần VPN hay proxy. Trang / ảnh bìa bị chặn bằng DNS (DNS trả 0.0.0.0) thì app tự hỏi lại địa chỉ qua DNS mã hoá. Mức 2 (khi mức 1 không còn lọt): thêm gửi đảo thứ tự — mẩu đầu đặt TTL thấp để chết giữa đường trong nhà, hệ thống tự gửi lại sau, nên máy soi của nhà mạng thấy gói bắt tay thiếu đầu. Trên iOS 15–16, lúc bật app không giữ cookie của trang web sau khi tắt app.")
+            Text("Một số nhà mạng chặn trang phim (vd phimmoir.fun) bằng cách đọc tên trang trong gói bắt tay HTTPS: trang mở mãi không được, dùng VPN thì vào được. Bật mục này: app chia nhỏ gói đó (cả yêu cầu HTTP thường) nên nhà mạng không đọc được tên trang — không cần VPN hay proxy. Ở Mức 1 mà trang vẫn không trả lời thì app tự thử Mức 2 cho riêng trang đó và nhớ 7 ngày. Trang / ảnh bìa bị chặn bằng DNS (trả 0.0.0.0, 127.0.0.1 hay địa chỉ trang cảnh báo) thì app tự hỏi lại địa chỉ qua DNS mã hoá. Mức 2 (khi mức 1 không còn lọt): thêm gửi đảo thứ tự — mẩu đầu đặt TTL thấp để chết giữa đường trong nhà, hệ thống tự gửi lại sau, nên máy soi của nhà mạng thấy gói bắt tay thiếu đầu. Trên iOS 15–16, lúc bật app không giữ cookie của trang web sau khi tắt app.")
         }
     }
 }

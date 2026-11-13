@@ -57,6 +57,11 @@ enum AppProxy {
     /// cổng nội bộ mới và đóng cổng cũ cùng mọi kết nối đang giữ: URLSession / WebKit buộc phải kết nối lại theo cài đặt
     /// mới (không dùng lại kết nối keep-alive đi theo cài đặt cũ).
     static func apply() {
+        if Level2Memo.save == nil {
+            // Trang đã tự lên Vượt chặn Mức 2 (các lần mở app trước): nạp lại, ghi xuống máy mỗi lần nhớ thêm
+            Level2Memo.load(Prefs.level2Hosts)
+            Level2Memo.save = { Prefs.level2Hosts = $0 }
+        }
         let c = Prefs.proxyConfig()
         let q = Prefs.ssConfig()
         let h = (Prefs.sites + [Prefs.baseUrl]).compactMap { Site.hostOf($0)?.lowercased() }

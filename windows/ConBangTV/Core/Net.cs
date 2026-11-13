@@ -228,16 +228,28 @@ public static class Net
     /// nối dùng lại — không đóng thì vẫn đi đường cũ).
     public static async ValueTask<Stream> HttpConnect(SocketsHttpConnectionContext ctx, CancellationToken ct)
     {
-        var (s, via, ss) = await Connect(ctx.DnsEndPoint.Host, ctx.DnsEndPoint.Port, ct);
+        var host = ctx.DnsEndPoint.Host;
+        var port = ctx.DnsEndPoint.Port;
+        var (s, via, ss) = await Connect(host, port, ct);
+        Track(s);
+        if (ss != null) return ss; // qua Shadowsocks: nhà mạng chỉ thấy dữ liệu đã mã hoá — khỏi chia nhỏ gói bắt tay
+        var ns = new NetworkStream(s, true);
+        var level = Unblock.Level;
+        // Vượt chặn: tách gói bắt tay TLS / yêu cầu HTTP thường; đi thẳng thì có thể tự lên Mức 2 (kết nối lại tới cùng trang)
+        return level > 0
+            ? new Unblock.HelloSplit(ns, s, host, level, via, via ? null : async c2 => Track((await Connect(host, port, c2)).Socket))
+            : ns;
+    }
+
+    /// Ghi lại kết nối để đổi cài đặt thì đóng (HttpClient / trình phát giữ kết nối dùng lại).
+    private static Socket Track(Socket s)
+    {
         lock (Open)
         {
             Open.RemoveWhere(x => x.SafeHandle.IsClosed);
             Open.Add(s);
         }
-        if (ss != null) return ss; // qua Shadowsocks: nhà mạng chỉ thấy dữ liệu đã mã hoá — khỏi chia nhỏ gói bắt tay
-        var ns = new NetworkStream(s, true);
-        var level = Unblock.Level;
-        return level > 0 && ctx.DnsEndPoint.Port == 443 ? new Unblock.HelloSplit(ns, s, ctx.DnsEndPoint.Host, level, via) : ns;
+        return s;
     }
 
     /// Lời nhắc thêm vào câu báo lỗi khi đang bật proxy (kèm lỗi phía proxy trong 2 phút gần đây).
@@ -361,9 +373,60 @@ public static class Net
             await cs.WriteAsync(new byte[] { 5, 0, 0, 1, 0, 0, 0, 0, 0, 0 });
             Stream us = (Stream?)ss ?? new NetworkStream(up, false);
             var level = Unblock.Level;
-            // Qua Shadowsocks: nhà mạng chỉ thấy dữ liệu đã mã hoá, không đọc được tên trang — khỏi chia nhỏ
-            var helloPending = port == 443 && level > 0 && ss == null;
+            // Vượt chặn (qua Shadowsocks thì khỏi: nhà mạng chỉ thấy dữ liệu đã mã hoá, không đọc được tên trang): gói đầu của
+            // bên gọi (gói bắt tay TLS / yêu cầu HTTP thường) được tách. Bên gọi im quá 0,3 s (giao thức máy chủ nói trước) thì
+            // thôi. Đi thẳng + gói bắt tay TLS ở Mức 1: trang im / cắt kết nối → kết nối mới, gửi lại theo Mức 2 (như bản TV)
+            if (ss == null && level > 0 && client.Poll(300_000, SelectMode.SelectRead))
+            {
+                var first = new byte[17 * 1024];
+                var n0 = await Unblock.ReadFirst(cs, first, t.Token);
+                if (n0 <= 0) return;
+                if (via || !Unblock.IsTlsHello(first.AsSpan(0, n0)))
+                {
+                    Unblock.WriteHello(up, first.AsSpan(0, n0), host, level, via);
+                }
+                else
+                {
+                    var sent = Unblock.SendHello(up, first.AsSpan(0, n0), host, level);
+                    var reply = new byte[16 * 1024];
+                    var m = await Unblock.FirstReply(us, reply, sent >= 2 ? Unblock.Level2ReplyMs : Unblock.FirstReplyMs, CancellationToken.None);
+                    if (m <= 0 && sent < 2)
+                    {
+                        // Mức 1 không lọt: kết nối mới, gửi lại theo Mức 2
+                        Socket up2;
+                        try
+                        {
+                            using var t2 = new CancellationTokenSource(15_000);
+                            (up2, _, _) = await Connect(host, port, t2.Token);
+                        }
+                        catch (Exception)
+                        {
+                            return;
+                        }
+                        lock (Open)
+                        {
+                            Open.Remove(up);
+                            Open.Add(up2);
+                        }
+                        up.Dispose();
+                        up = up2;
+                        us = new NetworkStream(up2, false);
+                        var applied = Unblock.WriteHello(up2, first.AsSpan(0, n0), host, 2);
+                        m = await Unblock.FirstReply(us, reply, Unblock.Level2ReplyMs, CancellationToken.None);
+                        Log.D("net", $"vượt chặn: {host} không trả lời ở mức 1 → mức 2: {(m > 0 ? "lọt" : "vẫn không được")}" +
+                            (applied >= 2 ? "" : " (không hỏi được trạng thái TCP)"));
+                        if (m > 0 && applied >= 2)
+                        {
+                            Unblock.Level2Memo.Remember(host);
+                            Interlocked.Increment(ref Unblock.Level2Memo.AutoCount);
+                        }
+                    }
+                    if (m <= 0) return;
+                    await cs.WriteAsync(reply.AsMemory(0, m));
+                }
+            }
             var upSocket = up;
+            var upStream = us;
             var toUp = Task.Run(async () =>
             {
                 var buf = new byte[32 * 1024];
@@ -371,22 +434,14 @@ public static class Net
                 // Shadowsocks: phần đầu gửi cùng dữ liệu đầu tiên của bên gọi (HTTPS: gói bắt tay). Bên gọi im quá 0,3 s (giao
                 // thức máy chủ nói trước) thì gửi phần đầu trước để máy chủ mở kết nối tới đích
                 if (ss != null && !client.Poll(300_000, SelectMode.SelectRead)) await ss.StartAsync();
-                while ((n = await cs.ReadAsync(buf)) > 0)
-                {
-                    if (helloPending)
-                    {
-                        helloPending = false;
-                        Unblock.WriteHello(upSocket, buf.AsSpan(0, n), host, level, via);
-                    }
-                    else await us.WriteAsync(buf.AsMemory(0, n));
-                }
+                while ((n = await cs.ReadAsync(buf)) > 0) await upStream.WriteAsync(buf.AsMemory(0, n));
                 upSocket.Shutdown(SocketShutdown.Send);
             });
             var toClient = Task.Run(async () =>
             {
                 try
                 {
-                    await us.CopyToAsync(cs, 64 * 1024);
+                    await upStream.CopyToAsync(cs, 64 * 1024);
                 }
                 catch (SsError e)
                 {

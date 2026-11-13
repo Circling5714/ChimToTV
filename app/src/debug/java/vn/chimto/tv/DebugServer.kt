@@ -299,10 +299,25 @@ object DebugServer {
                     text(out, if (ok) 200 else 404, if (ok) "ok" else "không thấy nút ${q["id"]}")
                 }
                 "/dnsblock" -> {
-                    // Giả DNS thiết bị chặn (trả 0.0.0.0) để thử Vượt chặn: /dnsblock?hosts=a.com,b.com (trống = bỏ)
+                    // Giả DNS thiết bị chặn để thử Vượt chặn: /dnsblock?hosts=a.com,b.com (trống = bỏ); &ip=203.0.113.9 = trả
+                    // địa chỉ đó (giả trang cảnh báo của nhà mạng) thay cho 0.0.0.0
                     Socks5.debugDnsBlock = q["hosts"].orEmpty().split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+                    Socks5.debugDnsBlockIp = java.net.InetAddress.getByName(q["ip"]?.takeIf { it.isNotBlank() } ?: "0.0.0.0")
+                    Socks5.forgetAnswers()
                     Doh.clearCache()
-                    text(out, 200, Socks5.debugDnsBlock.joinToString(",").ifEmpty { "(trống)" })
+                    text(out, 200, Socks5.debugDnsBlock.joinToString(",").ifEmpty { "(trống)" } + " → " + Socks5.debugDnsBlockIp.hostAddress)
+                }
+                "/unblockhang" -> {
+                    // Giả nhà mạng ghép được các mẩu ở Mức 1 (gửi nguyên gói bắt tay) cho các trang này, để thử tự lên Mức 2:
+                    // /unblockhang?hosts=phimmois.fun (trống = bỏ)
+                    Socks5.debugWholeHello = q["hosts"].orEmpty().split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+                    text(out, 200, Socks5.debugWholeHello.joinToString(",").ifEmpty { "(trống)" })
+                }
+                "/level2" -> {
+                    // Trang đã tự lên Mức 2: /level2 (xem), /level2?clear=1 (quên hết)
+                    if (q["clear"] == "1") Level2Memo.clear()
+                    json(out, org.json.JSONObject().put("hosts", org.json.JSONObject(Level2Memo.all() as Map<*, *>))
+                        .put("autoLevel2", AppProxy.autoLevel2Count).put("disorder", AppProxy.disorderCount))
                 }
                 "/dohfail" -> {
                     // Giả máy chủ DNS mã hoá bị chặn: /dohfail?labels=DoH NextDNS,DoT NextDNS (trống = bỏ); trả thứ tự máy chủ
@@ -310,7 +325,7 @@ object DebugServer {
                     Doh.clearCache()
                     text(out, 200, Doh.servers.joinToString(" → ") { it.label + if (it.label in Doh.debugFail) " (giả chặn)" else "" })
                 }
-                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /play /js /settext /click /dnsblock /dohfail")
+                else -> text(out, 404, "các lệnh: /info /shot /views /tap /tapText /swipe /key /orient /open /play /js /settext /click /dnsblock /unblockhang /level2 /dohfail")
             }
         } catch (e: Throwable) {
             runCatching { text(out, 500, e.toString()) }

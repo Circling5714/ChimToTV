@@ -315,10 +315,65 @@ enum Socks5 {
     }
 }
 
+/// Tên miền gốc, để nhớ theo trang chứ không theo từng tên con: img.phimmoi.net → phimmoi.net, www.abc.com.vn → abc.com.vn.
+/// Địa chỉ IP giữ nguyên. Như baseDomain của bản TV.
+func baseDomain(_ host: String) -> String {
+    let h = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]")).trimmingSuffix(".")
+    if IPAddr(text: h) != nil { return h }
+    let labels = h.split(separator: ".").map(String.init)
+    guard labels.count > 2 else { return h }
+    let secondLevel: Set<String> = ["com", "net", "org", "edu", "gov", "co", "ac", "info", "biz", "name", "pro", "int", "health"]
+    let three = labels[labels.count - 1].count == 2 && secondLevel.contains(labels[labels.count - 2])
+    return labels.suffix(three ? 3 : 2).joined(separator: ".")
+}
+
+/// Vượt chặn tự lên Mức 2 (11/2026, như bản TV): đang Mức 1 mà trang không trả lời gói bắt tay (nhà mạng đã ghép được các
+/// mẩu và chặn) thì cổng nội bộ tự thử lại theo Mức 2 (Socks5Bridge.opening); lọt thì nhớ trang (tên miền gốc) dùng Mức 2
+/// trong 7 ngày — các kết nối sau đi Mức 2 ngay, khỏi chờ. Nhà mạng thôi chặn thì sau 7 ngày tự về Mức 1.
+enum Level2Memo {
+    static let keepMs: Int64 = 7 * 24 * 3600 * 1000
+    private static let lock = NSLock()
+    private static var hosts: [String: Int64] = [:]
+    /// Lưu xuống máy (AppProxy gắn vào Prefs); nil = chỉ giữ trong bộ nhớ (test).
+    static var save: (([String: Int64]) -> Void)?
+
+    static func nowMs() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
+
+    static func load(_ saved: [String: Int64], now: Int64 = nowMs()) {
+        lock.lock()
+        hosts = saved.filter { now - $0.value >= 0 && now - $0.value < keepMs }
+        lock.unlock()
+    }
+
+    static func needs(_ host: String, now: Int64 = nowMs()) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let t = hosts[baseDomain(host)] else { return false }
+        return now - t >= 0 && now - t < keepMs
+    }
+
+    static func remember(_ host: String, now: Int64 = nowMs()) {
+        lock.lock()
+        hosts[baseDomain(host)] = now
+        let copy = hosts
+        lock.unlock()
+        save?(copy)
+    }
+
+    static var all: [String: Int64] { lock.lock(); defer { lock.unlock() }; return hosts }
+
+    static func clear() {
+        lock.lock()
+        hosts = [:]
+        lock.unlock()
+        save?([:])
+    }
+}
+
 /// Cổng SOCKS5 nội bộ (chỉ nghe 127.0.0.1, không mật khẩu) đứng giữa app và proxy thật — xem AppProxy.
 /// socks = proxy của cổng này (nil = đi thẳng; đổi cài đặt thì AppProxy mở cổng mới); siteHosts() = tên miền các
 /// trang phim, đọc lại mỗi kết nối (chế độ "chỉ trang phim": đích khác đi thẳng). Proxy lỗi thì trả lỗi cho bên gọi,
-/// không tự đi thẳng. split = vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS đầu tiên của mỗi kết nối (writeHello).
+/// không tự đi thẳng. split = vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS đầu tiên của mỗi kết nối (writeSplit, opening).
 final class Socks5Bridge {
     let port: Int
     let socks: SocksConfig?
@@ -327,7 +382,7 @@ final class Socks5Bridge {
     let split: Bool
     /// DNS mã hoá (Doh: DoH rồi DoT, lỗi hết thì DNS của máy) cho tên miền máy tự phân giải.
     let dns: Bool
-    /// Vượt chặn mức 2: byte đầu của gói bắt tay gửi với TTL 1 (đảo thứ tự) — xem writeHello.
+    /// Vượt chặn mức 2: byte đầu của gói bắt tay gửi với TTL 1 (đảo thứ tự) — xem writeSplit.
     let disorder: Bool
     private let server: Int32
     private let siteHosts: () -> [String]
@@ -521,7 +576,12 @@ final class Socks5Bridge {
             try reply(client, 0)
             client.setReadTimeout(0)
             // Qua Shadowsocks: nhà mạng chỉ thấy dữ liệu đã mã hoá, không đọc được tên trang — khỏi chia nhỏ
-            relay(client, u, hello: split && !(viaProxy && ss != nil) ? (host, viaProxy, disorder) : nil)
+            let hello: (host: String, viaProxy: Bool, disorder: Bool)? = split && !(viaProxy && ss != nil) ? (host, viaProxy, disorder) : nil
+            guard let h = hello, let t = u as? TcpSocket else { return relay(client, u, hello: hello) }
+            guard let opened = try opening(client, t, host: host, ip: ip, port: port, viaProxy: viaProxy) else { return }
+            let ready = opened.0
+            if ready !== t { up = ready }
+            relay(client, ready, hello: opened.1 ? h : nil)
         } catch {
             // bên gọi đóng giữa chừng, hoặc proxy vừa bị tắt — bỏ qua
         }
@@ -576,43 +636,172 @@ final class Socks5Bridge {
 
     private func reply(_ c: TcpSocket, _ code: UInt8) throws { try c.write([5, code, 0, 1, 0, 0, 0, 0, 0, 0]) }
 
-    /// Vượt chặn theo tên trang (SNI): nhà mạng đọc tên trang trong gói bắt tay HTTPS đầu tiên (TLS ClientHello) để chặn
-    /// (vd phimmoir.fun — kết nối được nhưng bắt tay treo 15 giây rồi đứt). Đo trên mạng nhà: gửi nguyên hoặc cắt 2–3
-    /// mẩu lớn đều bị chặn; gửi riêng byte đầu là lọt. Ở đây: byte đầu riêng, tên trang thành từng mẩu 2 byte, rồi phần
-    /// còn lại — mỗi lần ghi là một gói (TCP_NODELAY). Qua proxy: chờ chút sau byte đầu để proxy cũng gửi nó thành gói
-    /// riêng. Không phải gói bắt tay TLS thì gửi nguyên.
-    ///
-    /// Mức 2 (disorder, đi thẳng): byte đầu gửi với TTL 1 — chết ở router đầu tiên (trong nhà), không tới nhà mạng; phần
-    /// còn lại đi bình thường, trang giữ chờ phần thiếu; hệ điều hành thấy byte đầu chưa được xác nhận thì tự gửi lại với TTL
-    /// đã trả về như cũ → byte đầu tới sau. Đo trên TV (Linux): gửi lại sau ~11 ms. Qua proxy thì không dùng.
-    static func writeHello(_ to: TcpSocket, _ p: UnsafeMutableRawPointer, _ n: Int, host: String, viaProxy: Bool,
-                           disorder: Bool = false) throws {
-        let b = p.assumingMemoryBound(to: UInt8.self)
-        guard n > 5, b[0] == 0x16, b[1] == 0x03 else { return try to.write(p, n) }
-        let old = disorder && !viaProxy ? to.ttl() : (v4: nil, v6: nil)
-        if (old.v4 != nil || old.v6 != nil) && to.setTTL(v4: old.v4 == nil ? nil : 1, v6: old.v6 == nil ? nil : 1) {
-            defer { to.setTTL(v4: old.v4, v6: old.v6) } // gói gửi lại (và mọi gói sau) đi với TTL cũ
-            try to.write(p, 1) // TCP_NODELAY: hệ điều hành gửi ngay trong lúc ghi, với TTL 1
-            disorderLock.lock()
-            disorderCount += 1
-            disorderLock.unlock()
-        } else {
-            try to.write(p, 1)
-        }
-        if viaProxy { usleep(40_000) }
-        var i = 1
-        let name = Array(host.lowercased().utf8)
-        if name.count >= 2, n - name.count > 1, let s = find(name, in: b, from: 1, to: n) {
-            if s > i { try to.write(p + i, s - i) }
-            var k = s
-            while k < s + name.count {
-                let len = min(2, s + name.count - k)
-                try to.write(p + k, len)
-                k += len
+    // MARK: - Vượt chặn: cắt gói đầu, tự lên Mức 2
+
+    /// Gói đầu của bên gọi là gói bắt tay TLS (ClientHello).
+    static func isTlsHello(_ b: [UInt8]) -> Bool { b.count > 5 && b[0] == 0x16 && b[1] == 0x03 }
+
+    private static let httpMethods = ["GET ", "POST ", "HEAD ", "PUT ", "DELETE ", "OPTIONS ", "PATCH "].map { Array($0.utf8) }
+
+    /// Gói đầu là một yêu cầu HTTP thường (không mã hoá).
+    static func isHttpRequest(_ b: [UInt8]) -> Bool { httpMethods.contains { m in b.count > m.count && Array(b[0..<m.count]) == m } }
+
+    /// Cách cắt gói đầu của bên gọi để nhà mạng không đọc được tên trang: danh sách đoạn (đầu, dài), mỗi đoạn gửi thành một gói
+    /// TCP (TCP_NODELAY). Gói bắt tay TLS: byte đầu riêng, phần trước tên trang, tên trang thành từng mẩu 2 byte, phần còn lại.
+    /// Yêu cầu HTTP thường (từ 11/2026 — trước chỉ cắt TLS): byte đầu riêng, tới giữa chữ «Host», phần còn lại của «Host: », giá
+    /// trị Host thành từng mẩu 2 byte, phần còn lại. Gói khác: một đoạn (gửi nguyên). Như splitPlan của bản TV.
+    static func splitPlan(_ b: [UInt8], host: String) -> [(start: Int, len: Int)] {
+        var out: [(start: Int, len: Int)] = []
+        func add(_ s: Int, _ e: Int) { if e > s { out.append((s, e - s)) } }
+        func pieces(_ s: Int, _ e: Int) { var k = s; while k < e { add(k, min(k + 2, e)); k += 2 } }
+        let n = b.count
+        guard n > 0 else { return [] }
+        return b.withUnsafeBufferPointer { p -> [(start: Int, len: Int)] in
+            let base = UnsafeMutablePointer(mutating: p.baseAddress!)
+            if isTlsHello(b) {
+                add(0, 1)
+                let name = Array(host.lowercased().utf8)
+                if name.count >= 2, let s = find(name, in: base, from: 1, to: n) {
+                    add(1, s)
+                    pieces(s, s + name.count)
+                    add(s + name.count, n)
+                } else {
+                    add(1, n)
+                }
+            } else if isHttpRequest(b) {
+                add(0, 1)
+                if let h = find(Array("\r\nhost:".utf8), in: base, from: 0, to: n) {
+                    let k = h + 2 // chữ «Host»
+                    var v = k + 5
+                    while v < n && (b[v] == 0x20 || b[v] == 0x09) { v += 1 }
+                    var e = v
+                    while e < n && b[e] != 0x0D && b[e] != 0x0A { e += 1 }
+                    add(1, k + 2)
+                    add(k + 2, v)
+                    pieces(v, e)
+                    add(e, n)
+                } else {
+                    add(1, n)
+                }
+            } else {
+                add(0, n)
             }
-            i = s + name.count
+            return out
         }
-        if i < n { try to.write(p + i, n - i) }
+    }
+
+    /// Vượt chặn theo tên trang (SNI): nhà mạng đọc tên trang trong gói bắt tay HTTPS đầu tiên (TLS ClientHello) để chặn
+    /// (vd phimmoir.fun — kết nối được nhưng bắt tay treo 15 giây rồi đứt). Đo trên mạng nhà: gửi nguyên hoặc cắt 2–3 mẩu lớn
+    /// đều bị chặn; gửi riêng byte đầu là lọt. Gửi từng đoạn của splitPlan — mỗi lần ghi là một gói (TCP_NODELAY). Qua proxy:
+    /// chờ chút sau byte đầu để proxy cũng gửi nó thành gói riêng.
+    ///
+    /// Mức 2 (disorder, đi thẳng): đoạn đầu (1 byte) gửi với TTL 1 — chết ở router đầu tiên (trong nhà), không tới nhà mạng;
+    /// phần còn lại đi bình thường, trang giữ chờ phần thiếu; hệ điều hành thấy byte đầu chưa được xác nhận thì tự gửi lại với
+    /// TTL đã trả về như cũ → byte đầu tới sau. Đo trên TV (Linux): gửi lại sau ~11 ms. Qua proxy thì không dùng. Gói không cắt
+    /// được (một đoạn) thì gửi nguyên. Trả về true nếu đã gửi đảo thứ tự.
+    @discardableResult
+    static func writeSplit(_ to: TcpSocket, _ b: [UInt8], plan: [(start: Int, len: Int)], viaProxy: Bool, disorder: Bool) throws -> Bool {
+        var applied = false
+        try b.withUnsafeBytes { raw in
+            let p = raw.baseAddress!
+            for (i, seg) in plan.enumerated() {
+                let old = i == 0 && plan.count > 1 && disorder && !viaProxy ? to.ttl() : (v4: nil, v6: nil)
+                if (old.v4 != nil || old.v6 != nil) && to.setTTL(v4: old.v4 == nil ? nil : 1, v6: old.v6 == nil ? nil : 1) {
+                    defer { to.setTTL(v4: old.v4, v6: old.v6) } // gói gửi lại (và mọi gói sau) đi với TTL cũ
+                    try to.write(p + seg.start, seg.len) // TCP_NODELAY: hệ điều hành gửi ngay trong lúc ghi, với TTL 1
+                    applied = true
+                    disorderLock.lock()
+                    disorderCount += 1
+                    disorderLock.unlock()
+                } else {
+                    try to.write(p + seg.start, seg.len)
+                }
+                if i == 0 && plan.count > 1 && viaProxy { usleep(40_000) }
+            }
+        }
+        return applied
+    }
+
+    /// Ở Mức 1, chờ trang trả lời gói bắt tay bao nhiêu giây thì coi là bị chặn và thử Mức 2 (test đặt ngắn).
+    static var firstReplySeconds = 4
+    /// Ở Mức 2 (cách cuối cùng): chờ lâu hơn lúc nhà mạng giữ kết nối treo (đo: 15 giây).
+    static let level2ReplySeconds = 20
+
+    /// Số lần tự lên Mức 2 vì trang không trả lời ở Mức 1 — cho cổng gỡ lỗi.
+    private(set) static var autoLevel2 = 0
+
+    #if DEVTOOLS
+    /// Chỉ bản thử (cổng gỡ lỗi /unblockhang): ở Mức 1, gửi nguyên gói bắt tay tới các trang này — như nhà mạng ghép được các
+    /// mẩu — để thử tự lên Mức 2 với chính máy soi của nhà mạng.
+    static var debugWholeHello: Set<String> = []
+    #endif
+
+    /// Gói đầu của bên gọi (đi kèm Vượt chặn): đọc trọn (gói bắt tay TLS có thể dài hơn một lần đọc), cắt nhỏ rồi gửi. Đi thẳng,
+    /// gói bắt tay TLS, đang Mức 1: gửi xong mà trang im quá firstReplySeconds hoặc cắt kết nối trước khi trả byte nào → kết nối
+    /// mới, gửi lại theo Mức 2; lọt thì nhớ trang (Level2Memo). Bên gọi chưa nhận byte nào của trang nên gửi lại không sai.
+    /// Trả về (kết nối dùng tiếp, còn gói chờ cắt — bên gọi chưa gửi gì vì giao thức để máy chủ nói trước); nil = không mở được.
+    private func opening(_ client: TcpSocket, _ u: TcpSocket, host: String, ip: IPAddr?, port: Int, viaProxy: Bool) throws -> (TcpSocket, Bool)? {
+        guard let b = try readFirst(client) else { return nil }
+        if b.isEmpty { return (u, true) }
+        let plan = Self.splitPlan(b, host: host)
+        if viaProxy || !Self.isTlsHello(b) {
+            try Self.writeSplit(u, b, plan: plan, viaProxy: viaProxy, disorder: disorder)
+            return (u, false)
+        }
+        let level2 = disorder || Level2Memo.needs(host)
+        var whole = false
+        #if DEVTOOLS
+        whole = !level2 && Self.debugWholeHello.contains(host.lowercased().trimmingSuffix("."))
+        #endif
+        if whole { try u.write(b) } else { try Self.writeSplit(u, b, plan: plan, viaProxy: false, disorder: level2) }
+        if try firstReply(u, client, seconds: level2 ? Self.level2ReplySeconds : Self.firstReplySeconds) { return (u, false) }
+        if level2 { return nil }
+        // Mức 1 không lọt: kết nối mới, gửi lại theo Mức 2
+        untrack(u)
+        guard let u2 = (try? route(host, ip, port, viaProxy: false)) as? TcpSocket, track(u2) else { return nil }
+        let applied = try Self.writeSplit(u2, b, plan: plan, viaProxy: false, disorder: true)
+        let ok = try firstReply(u2, client, seconds: Self.level2ReplySeconds)
+        Log.d("Proxy", "vượt chặn: \(host) không trả lời ở mức 1 → mức 2: \(ok ? "lọt" : "vẫn không được")" + (applied ? "" : " (không đặt được TTL)"))
+        guard ok else {
+            untrack(u2)
+            return nil
+        }
+        if applied {
+            Level2Memo.remember(host)
+            Self.disorderLock.lock()
+            Self.autoLevel2 += 1
+            Self.disorderLock.unlock()
+        }
+        return (u2, false)
+    }
+
+    /// Đọc gói đầu của bên gọi: im quá 0,3 s thì [] (máy chủ nói trước); gói bắt tay TLS thì đọc trọn bản ghi đầu; nil = đã đóng.
+    private func readFirst(_ client: TcpSocket) throws -> [UInt8]? {
+        guard client.waitReadable(ms: 300) else { return [] }
+        let size = 17 * 1024
+        var b = [UInt8](repeating: 0, count: size)
+        var n = try b.withUnsafeMutableBytes { try client.read($0.baseAddress!, size) }
+        if n == 0 { return nil }
+        if n >= 5 && b[0] == 0x16 && b[1] == 0x03 {
+            let need = min(size, 5 + (Int(b[3]) << 8 | Int(b[4])))
+            while n < need && client.waitReadable(ms: 2000) {
+                let m = try b.withUnsafeMutableBytes { try client.read($0.baseAddress! + n, need - n) }
+                if m == 0 { break }
+                n += m
+            }
+        }
+        return Array(b[0..<n])
+    }
+
+    /// Chờ trang trả lời (tối đa seconds giây); có thì chuyển ngay cho bên gọi. false = trang im / cắt kết nối.
+    private func firstReply(_ u: TcpSocket, _ client: TcpSocket, seconds: Int) throws -> Bool {
+        let size = 16 * 1024
+        var b = [UInt8](repeating: 0, count: size)
+        guard u.waitReadable(ms: seconds * 1000) else { return false }
+        let m = (try? b.withUnsafeMutableBytes { try u.read($0.baseAddress!, size) }) ?? 0
+        guard m > 0 else { return false }
+        try client.write(Array(b[0..<m])) // lỗi ở đây: bên gọi đã đóng → handle đóng hết
+        return true
     }
 
     /// Số gói bắt tay đã gửi đảo thứ tự (mức 2) — cho cổng gỡ lỗi.
@@ -664,7 +853,8 @@ final class Socks5Bridge {
                 if n == 0 { break }
                 if let h = first, let t = to as? TcpSocket {
                     first = nil
-                    try Self.writeHello(t, buf, n, host: h.host, viaProxy: h.viaProxy, disorder: h.disorder)
+                    let b = Array(UnsafeBufferPointer(start: buf.assumingMemoryBound(to: UInt8.self), count: n))
+                    try Self.writeSplit(t, b, plan: Self.splitPlan(b, host: h.host), viaProxy: h.viaProxy, disorder: h.disorder)
                     continue
                 }
                 try to.write(buf, n)

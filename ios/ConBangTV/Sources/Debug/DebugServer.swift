@@ -369,10 +369,23 @@ enum DebugRoutes {
             o["savedPassword"] = !Prefs.proxyPass.isEmpty // mật khẩu proxy đã lưu còn đọc được (đổi quyền Keychain)
             return .json(o)
         case "/dnsblock":
-            // Giả DNS của máy chặn (trả 0.0.0.0) để thử Vượt chặn: /dnsblock?hosts=a.com,b.com (trống = bỏ)
+            // Giả DNS của máy chặn để thử Vượt chặn: /dnsblock?hosts=a.com,b.com (trống = bỏ); &ip=203.0.113.9 = trả địa chỉ đó
+            // (giả trang cảnh báo của nhà mạng) thay cho 0.0.0.0
             let hosts = Set((q["hosts"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
-            Doh.setDebugBlock(hosts)
+            let ip = (q["ip"]).flatMap { IPAddr(text: $0) }
+            Doh.setDebugBlock(hosts, ip: ip)
+            return .json(["hosts": hosts.sorted(), "ip": ip?.text ?? "0.0.0.0"])
+        case "/unblockhang":
+            // Giả nhà mạng ghép được các mẩu ở Mức 1 (gửi nguyên gói bắt tay) cho các trang này, để thử tự lên Mức 2:
+            // /unblockhang?hosts=phimmoir.fun (trống = bỏ)
+            let hosts = Set((q["hosts"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }.filter { !$0.isEmpty })
+            Socks5Bridge.debugWholeHello = hosts
             return .json(["hosts": hosts.sorted()])
+        case "/level2":
+            // Trang đã tự lên Mức 2: /level2 (xem), /level2?clear=1 (quên hết)
+            if q["clear"] == "1" { Level2Memo.clear() }
+            return .json(["hosts": Level2Memo.all.mapValues { Double($0) }, "autoLevel2": Socks5Bridge.autoLevel2,
+                          "disorder": Socks5Bridge.disorderCount, "port": AppProxy.debugState()["port"] ?? NSNull()])
         case "/dohfail":
             // Giả máy chủ DNS mã hoá bị chặn: /dohfail?labels=DoH NextDNS,DoT NextDNS (trống = bỏ); trả thứ tự máy chủ
             let labels = Set((q["labels"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })

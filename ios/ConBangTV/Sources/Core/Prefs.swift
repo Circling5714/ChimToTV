@@ -648,7 +648,7 @@ enum Prefs {
         set { store.set(newValue, forKey: "proxy_sites_only") }
     }
 
-    /// Vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS để nhà mạng không đọc được tên trang (xem Socks5Bridge.writeHello).
+    /// Vượt chặn nhà mạng: chia nhỏ gói bắt tay HTTPS để nhà mạng không đọc được tên trang (xem Socks5Bridge.writeSplit).
     static var unblock: Bool {
         get { store.object(forKey: "unblock") == nil ? true : store.bool(forKey: "unblock") } // từ 1.10.1 bật sẵn
         set { store.set(newValue, forKey: "unblock") }
@@ -658,6 +658,12 @@ enum Prefs {
     static var unblockLevel: Int {
         get { min(2, max(1, store.object(forKey: "unblock_level") as? Int ?? 1)) }
         set { store.set(newValue, forKey: "unblock_level") }
+    }
+
+    /// Trang (tên miền gốc) đã tự lên Vượt chặn Mức 2 → lúc ghi nhận (ms) — Level2Memo. Dùng chung cả nhà.
+    static var level2Hosts: [String: Int64] {
+        get { (store.dictionary(forKey: "unblock_l2") ?? [:]).compactMapValues { ($0 as? NSNumber)?.int64Value } }
+        set { store.set(newValue.mapValues { NSNumber(value: $0) }, forKey: "unblock_l2") }
     }
 
     /// DNS mã hoá (xem Doh: DoH rồi DoT, NextDNS → Cloudflare → Google, lỗi hết thì DNS của máy). Từ 1.10.1 bật sẵn: khoá
