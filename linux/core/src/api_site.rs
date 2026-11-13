@@ -388,7 +388,7 @@ pub fn parse_detail(root: &Obj, url: &str) -> Result<FilmDetail> {
         jstr(m, "lang"),
         names(json::arr(Some(m), "country")),
         year,
-        imdb_of(json::obj(Some(m), "imdb")).map(|i| imdb_detail(&i)).unwrap_or_default(),
+        imdb_of(json::obj(Some(m), "imdb")).map(|i| i.detail()).unwrap_or_default(),
         names(json::arr(Some(m), "category")),
     ]
     .into_iter()
@@ -663,25 +663,6 @@ pub fn imdb_of(o: Option<&Obj>) -> Option<Imdb> {
     (s > 0.0 && s <= 10.0 && v >= Imdb::MIN_VOTES).then_some(Imdb { score: s, votes: v })
 }
 
-/// Dòng thông tin ở trang phim, vd "IMDb 8.5 (378 nghìn lượt chấm)" (Imdb.Detail của bản Windows).
-fn imdb_detail(i: &Imdb) -> String {
-    format!("{} ({} lượt chấm)", i.label(), votes_text(i.votes))
-}
-
-/// Imdb.VotesText: "1,2 triệu", "378 nghìn", "950".
-fn votes_text(v: i64) -> String {
-    if v >= 1_000_000 {
-        // Làm tròn nửa lên như "0.0" của C#
-        let x = (v as f64 / 1_000_000.0 * 10.0).round() / 10.0;
-        let s = format!("{x:.1}").replace('.', ",");
-        return format!("{} triệu", s.strip_suffix(",0").unwrap_or(&s));
-    }
-    if v >= 1000 {
-        format!("{} nghìn", v / 1000)
-    } else {
-        v.to_string()
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -803,11 +784,11 @@ mod tests {
         assert_eq!(title("000"), "Tập 0");
         assert_eq!(title("Full"), "Full");
         let i = imdb_of(Some(&obj(r#"{"vote_average":8.5,"vote_count":"378000"}"#))).expect("có điểm");
-        assert_eq!(imdb_detail(&i), "IMDb 8.5 (378 nghìn lượt chấm)");
+        assert_eq!(i.detail(), "IMDb 8.5 (378 nghìn lượt chấm)");
         assert!(imdb_of(Some(&obj(r#"{"vote_average":10,"vote_count":3}"#))).is_none());
-        assert_eq!(votes_text(1_250_000), "1,3 triệu");
-        assert_eq!(votes_text(2_000_000), "2 triệu");
-        assert_eq!(votes_text(950), "950");
+        assert_eq!(Imdb::votes_text(1_250_000), "1,3 triệu");
+        assert_eq!(Imdb::votes_text(2_000_000), "2 triệu");
+        assert_eq!(Imdb::votes_text(950), "950");
         assert_eq!(genre_name("vo-thuat"), "võ thuật");
         assert_eq!(country_name("trung-quoc"), "Trung Quốc");
         assert_eq!(genre_name("la-la"), "la la");
