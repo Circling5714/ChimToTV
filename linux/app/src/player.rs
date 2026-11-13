@@ -1596,7 +1596,9 @@ impl Player {
         let me = self.clone();
         ui::add_flow(&other, ui::pill("✕  Thoát phim", move || me.close(true)).upcast_ref());
 
-        self.panel.show_all();
+        // bảng đặt no_show_all (ẩn sẵn) → show_all() không có tác dụng: hiện con trước, rồi bảng
+        self.panel_stack.show_all();
+        self.panel.show();
         self.set_cursor(true);
         self.show_osd(4000);
         if let Some(f) = focus {
