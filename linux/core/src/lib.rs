@@ -14,6 +14,12 @@ pub mod doh;
 pub mod unblock;
 pub mod shadowsocks;
 pub mod site;
+pub mod sync_data;
+pub mod sync_service;
+pub mod watch_limit;
+pub mod update_check;
+pub mod invite;
+pub mod disclaimer;
 
 pub use models::*;
 pub use util::{Error, Result};

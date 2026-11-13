@@ -36,6 +36,8 @@ socket2 = { version = "0.5", features = ["all"] }
 dirs = "5"
 html-escape = "0.2"
 unicode-normalization = "0.1"
+# Đồng bộ trong nhà: quảng bá / tìm máy `_conbangtv._tcp` (mDNS)
+mdns-sd = "0.21"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }
