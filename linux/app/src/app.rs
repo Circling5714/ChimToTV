@@ -22,7 +22,6 @@ pub struct App {
     pub window: gtk::ApplicationWindow,
     stack: gtk::Stack,
     menu_box: gtk::Box,
-    menu_scroll: gtk::ScrolledWindow,
     site_name: gtk::Label,
     page_host: gtk::Box,
     shell: gtk::Box,
@@ -157,7 +156,6 @@ impl App {
             window,
             stack,
             menu_box,
-            menu_scroll,
             site_name,
             page_host,
             shell,
@@ -201,6 +199,31 @@ impl App {
                 return glib::Propagation::Stop;
             }
             glib::Propagation::Proceed
+        });
+        // Rời app hơn 30 phút (không xem phim): hỏi lại ai đang xem; quay lại app (vd vừa xem trên tivi): đồng bộ, tối đa 1 phút
+        // một lần
+        self.window.connect_is_active_notify(|w| {
+            thread_local! {
+                static AWAY: Cell<i64> = const { Cell::new(0) };
+                static LAST_SYNC: Cell<i64> = const { Cell::new(0) };
+            }
+            let now = cbtv::util::now_ms();
+            if !w.is_active() {
+                AWAY.with(|a| a.set(now));
+                return;
+            }
+            let away = AWAY.with(|a| a.get());
+            let a = app();
+            if away > 0 && now - away > 30 * 60_000 && a.playing().is_none() && prefs::profiles().len() > 1 {
+                let cur = prefs::current_profile();
+                if prefs::ask_profile() || cur.locked() {
+                    crate::profiles::pick_profile(!cur.locked());
+                }
+            }
+            if now - LAST_SYNC.with(|l| l.get()) > 60_000 {
+                LAST_SYNC.with(|l| l.set(now));
+                crate::startup::sync_soon(1);
+            }
         });
         self.window.connect_delete_event(|_, _| {
             app().closing();
@@ -697,10 +720,6 @@ impl App {
         }
         self.toast("Sai mã PIN phụ huynh.");
         false
-    }
-
-    pub fn menu_scroll(&self) -> &gtk::ScrolledWindow {
-        &self.menu_scroll
     }
 
     pub fn stack(&self) -> &gtk::Stack {

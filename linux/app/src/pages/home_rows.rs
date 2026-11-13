@@ -125,7 +125,7 @@ impl RowsPage {
             row.pack_start(&t, false, false, 0);
             if !hf::HEAD_ROWS.contains(&id.as_str()) {
                 let at = others.iter().position(|x| x == id).unwrap_or(0);
-                let mut cell = |text: &str, uid: String, enabled: bool, f: Box<dyn Fn()>| {
+                let cell = |text: &str, uid: String, enabled: bool, f: Box<dyn Fn()>| {
                     let c = ui::pill(text, f);
                     c.set_widget_name(&uid);
                     c.set_sensitive(enabled);

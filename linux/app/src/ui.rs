@@ -38,11 +38,6 @@ pub fn after(ms: u64, f: impl FnOnce() + 'static) -> glib::SourceId {
     glib::timeout_add_local_once(std::time::Duration::from_millis(ms), f)
 }
 
-/// Chờ (trong luồng giao diện async).
-pub async fn sleep(ms: u64) {
-    glib::timeout_future(std::time::Duration::from_millis(ms)).await;
-}
-
 pub fn label(text: &str, class: &[&str], wrap: bool) -> gtk::Label {
     let l = gtk::Label::new(Some(text));
     l.set_xalign(0.0);
@@ -104,11 +99,6 @@ pub fn pill_tag(text: &str, tag: Option<&str>, on_click: impl Fn() + 'static) ->
         b.style_context().add_class(t);
     }
     b
-}
-
-/// Đổi chữ của nút.
-pub fn set_text(b: &gtk::Button, text: &str) {
-    b.set_label(text);
 }
 
 /// Hàng nút tự xuống dòng.
@@ -313,7 +303,3 @@ pub fn copy_text(text: &str) {
     cb.store();
 }
 
-/// Đường dẫn tới tệp giao diện dùng chung (trang phát…): cạnh tệp chạy (bản dựng thử) hoặc /usr/share/conbangtv.
-pub fn asset(name: &str) -> Option<String> {
-    crate::assets::get(name)
-}

@@ -9,6 +9,7 @@ pub const HLS_JS: &str = include_str!("../../../app/src/main/assets/hls.light.mi
 /// Logo (鵬) — biểu tượng cửa sổ và góc menu.
 pub const LOGO_PNG: &[u8] = include_bytes!("../../../design/logo-512.png");
 
+#[allow(dead_code)]
 pub fn get(name: &str) -> Option<String> {
     Some(
         match name {

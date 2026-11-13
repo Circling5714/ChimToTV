@@ -41,7 +41,6 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
 rustls-native-certs = "0.8"
 dirs = "5"
-html-escape = "0.2"
 unicode-normalization = "0.1"
 # Đồng bộ trong nhà: quảng bá / tìm máy `_conbangtv._tcp` (mDNS)
 mdns-sd = "0.21"

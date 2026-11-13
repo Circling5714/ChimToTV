@@ -15,7 +15,6 @@ pub mod home_mix;
 pub mod home_rows;
 pub mod invite;
 pub mod lists;
-pub mod placeholder;
 pub mod profiles_page;
 pub mod proxy;
 pub mod settings;

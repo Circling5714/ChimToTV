@@ -130,8 +130,6 @@ pub struct Player {
     loading_text: gtk::Label,
     notice_box: gtk::Box,
     notice_text: gtk::Label,
-    hud_box: gtk::Box,
-    hud_text: gtk::Label,
     osd: gtk::EventBox,
     time_text: gtk::Label,
     state_text: gtk::Label,
@@ -142,14 +140,12 @@ pub struct Player {
     panel: gtk::Box,
     panel_title: gtk::Label,
     panel_stack: gtk::Box,
-    panel_scroll: gtk::ScrolledWindow,
     btn_done: gtk::Button,
     open: Cell<bool>,
     s: RefCell<St>,
     poll_timer: RefCell<Option<glib::SourceId>>,
     osd_timer: RefCell<Option<glib::SourceId>>,
     notice_timer: RefCell<Option<glib::SourceId>>,
-    hud_timer: RefCell<Option<glib::SourceId>>,
     seek_timer: RefCell<Option<glib::SourceId>>,
     click_timer: RefCell<Option<glib::SourceId>>,
 }
@@ -267,16 +263,6 @@ impl Player {
         root.add_overlay(&notice_box);
         root.set_overlay_pass_through(&notice_box, true);
 
-        // Chữ lớn giữa màn (tua / tốc độ)
-        let hud_box = ui::hbox(0.0);
-        hud_box.style_context().add_class("hud");
-        hud_box.set_halign(gtk::Align::Center);
-        hud_box.set_valign(gtk::Align::Center);
-        let hud_text = ui::text("");
-        hud_box.pack_start(&hud_text, false, false, 0);
-        root.add_overlay(&hud_box);
-        root.set_overlay_pass_through(&hud_box, true);
-
         // Thanh dưới: thời gian, thanh tua, nút
         let osd = gtk::EventBox::new();
         osd.set_visible_window(false);
@@ -345,10 +331,10 @@ impl Player {
         btn_done.set_margin_top(px(14.0));
         root.add_overlay(&btn_done);
 
-        for w in [loading_box.upcast_ref::<gtk::Widget>(), notice_box.upcast_ref(), hud_box.upcast_ref(), panel.upcast_ref(), btn_done.upcast_ref()] {
+        for w in [loading_box.upcast_ref::<gtk::Widget>(), notice_box.upcast_ref(), panel.upcast_ref(), btn_done.upcast_ref()] {
             w.set_no_show_all(true);
         }
-        for w in [&loading_box, &notice_box, &hud_box, &panel] {
+        for w in [&loading_box, &notice_box, &panel] {
             for c in w.children() {
                 c.show_all();
             }
@@ -366,8 +352,6 @@ impl Player {
             loading_text,
             notice_box,
             notice_text,
-            hud_box,
-            hud_text,
             osd,
             time_text,
             state_text,
@@ -378,14 +362,12 @@ impl Player {
             panel,
             panel_title,
             panel_stack,
-            panel_scroll,
             btn_done,
             open: Cell::new(false),
             s: RefCell::new(St { rate: 1.0, ..Default::default() }),
             poll_timer: RefCell::new(None),
             osd_timer: RefCell::new(None),
             notice_timer: RefCell::new(None),
-            hud_timer: RefCell::new(None),
             seek_timer: RefCell::new(None),
             click_timer: RefCell::new(None),
         });
