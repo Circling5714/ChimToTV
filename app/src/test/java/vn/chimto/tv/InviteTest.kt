@@ -17,7 +17,7 @@ class InviteTest {
         assertTrue("mã Downloader là dãy số", Invite.CODE.matches(Regex("\\d{5,9}")))
         assertEquals("aftv.news/${Invite.CODE}", Invite.SHORT_URL)
         // Link cố định: release đang là Latest, tệp tên cố định (release.ps1 đính kèm ở mọi bản TV)
-        assertTrue(Invite.APK_URL.endsWith("/releases/latest/download/ChimToTV.apk"))
+        assertTrue(Invite.APK_URL.endsWith("/releases/latest/download/ConBangTV.apk"))
         assertTrue(Invite.GUIDE_URL.startsWith("https://github.com/Circling5714/ChimToTV/"))
     }
 

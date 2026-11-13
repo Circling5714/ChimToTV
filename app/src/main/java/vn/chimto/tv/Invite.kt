@@ -16,16 +16,17 @@ import android.widget.TextView
 import android.widget.Toast
 
 /**
- * Cài app lên tivi khác bằng app Downloader (AFTVnews): người mới chỉ cần cài Downloader trên tivi rồi nhập CODE. Mã do
- * aftv.news cấp, trỏ vào APK_URL — link cố định luôn tải bản TV mới nhất (mỗi release TV đính kèm tệp tên ChimToTV.apk,
- * xem release.ps1). Đổi mã / link thì sửa đủ năm chỗ: ở đây, bản iPad (Invite.swift), bản Windows (Invite.cs), release.ps1 và
- * README (mục «Cài trên Android TV bằng Downloader»).
+ * Cài app lên tivi khác bằng app Downloader (AFTVnews): người mới chỉ cần cài Downloader trên tivi rồi nhập CODE. APK_URL:
+ * link cố định luôn tải bản TV mới nhất (mỗi release TV đính kèm tệp tên ConBangTV.apk, xem release.ps1). Mã do aftv.news cấp
+ * trỏ vào link tên cũ …/ChimToTV.apk (tạo trước khi đổi tên tệp, 13/11/2026) — mọi release TV vẫn đính kèm cả tệp đó, link nào
+ * cũng tải cùng một tệp. Đổi mã / link thì sửa đủ năm chỗ: ở đây, bản iPad (Invite.swift), bản Windows (Invite.cs),
+ * release.ps1 và README (mục «Cài trên Android TV bằng Downloader»).
  */
 object Invite {
     const val TITLE = "Mời bạn bè cài app"
     const val CODE = "9192365"
     const val SHORT_URL = "aftv.news/$CODE"
-    const val APK_URL = "https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk"
+    const val APK_URL = "https://github.com/Circling5714/ChimToTV/releases/latest/download/ConBangTV.apk"
 
     /** Trang hướng dẫn tiếng Việt (mục Downloader của README) — mã QR trên màn mở trang này. */
     const val GUIDE_URL = "https://github.com/Circling5714/ChimToTV/blob/main/README.md#downloader"

@@ -1,7 +1,8 @@
 # Côn Bằng TV — hướng dẫn cho Claude
 
 App Android TV (Kotlin, WebView) xem phim hoạt hình 3D từ các trang web, điều khiển bằng remote / bàn phím.
-Trước đây tên là ChimTo TV: chỉ đổi tên hiển thị / logo — mã gói `vn.chimto.tv`, repo `ChimToTV`, tên tệp APK giữ nguyên.
+Trước đây tên là ChimTo TV: chỉ đổi tên hiển thị / logo — mã gói `vn.chimto.tv`, repo `ChimToTV` giữ nguyên. Tên tệp APK đổi
+sang `ConBangTV…apk` từ 13/11/2026 (anh bảo), nhưng release TV vẫn kèm bản sao `ChimToTV.apk` (xem dưới).
 Đọc `README.md` để biết cấu trúc và cách phát video; `CHANGELOG.md` để biết các bản đã phát hành.
 
 ## Cách làm việc với anh
@@ -13,13 +14,14 @@ Trước đây tên là ChimTo TV: chỉ đổi tên hiển thị / logo — mã
 ## Phát hành một bản
 
 1. Tăng `versionCode` / `versionName` trong `app/build.gradle.kts`.
-2. `.\build.ps1` → `dist\ChimToTV-<bản>.apk`, ký bằng `keys\` (không có trong git — mất là app trên mọi TV không nhận
+2. `.\build.ps1` → `dist\ConBangTV-<bản>.apk`, ký bằng `keys\` (không có trong git — mất là app trên mọi TV không nhận
    bản cập nhật OTA nữa).
 3. Kiểm APK: `apksigner verify --print-certs` (chứng chỉ SHA-256 `949ef2b5…177b`), `aapt2 dump badging` (đúng bản).
 4. `git push`, rồi `.\release.ps1 tv -Notes <tệp ghi chú>` — **không gọi `gh release create` tay**. Script đăng `v<bản>`, luôn
-   đánh dấu Latest, kèm **hai tệp giống hệt nhau**: `ChimToTV-<bản>.apk` và `ChimToTV.apk` (tên cố định — link Downloader
-   `…/releases/latest/download/ChimToTV.apk` cần tệp này trong mọi bản TV), rồi tự kiểm (Latest đúng tag, hai tệp cùng SHA-256
-   với tệp trong máy, link cố định tải về đúng tệp). Ghi chú phải có mục `## Có gì mới` — app hiện mục này trong hộp thoại cập
+   đánh dấu Latest, kèm **ba tệp giống hệt nhau**: `ConBangTV-<bản>.apk`, `ConBangTV.apk` (link cố định chính
+   `…/releases/latest/download/ConBangTV.apk`) và `ChimToTV.apk` (tên cũ — **không bỏ**: mã Downloader 9192365 và màn «Cài
+   lên tivi» của các app đã cài trỏ vào `…/latest/download/ChimToTV.apk`), rồi tự kiểm (Latest đúng tag, ba tệp cùng SHA-256
+   với tệp trong máy, hai link cố định tải về đúng tệp). Ghi chú phải có mục `## Có gì mới` — app hiện mục này trong hộp thoại cập
    nhật trên TV. `-DryRun` để xem lệnh trước.
 5. Kiểm sau phát hành: API `releases/latest` trả đúng tag + có tệp `.apk`; tải từ link công khai, SHA-256 khớp
    (`.\release.ps1 tv -Verify` chạy lại các bước kiểm này bất cứ lúc nào).

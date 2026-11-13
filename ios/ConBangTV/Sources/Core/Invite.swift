@@ -1,12 +1,13 @@
 import Foundation
 
-/// Cài bản TV lên tivi bằng app Downloader (AFTVnews): người mới chỉ cần cài Downloader trên tivi rồi nhập `code`. Mã do
-/// aftv.news cấp, trỏ vào `apkUrl` — link cố định luôn tải bản TV mới nhất. Cùng giá trị với bản TV (Invite.kt), Windows
-/// (Invite.cs), release.ps1 và README (mục «Cài trên Android TV bằng Downloader») — đổi mã / link thì sửa đủ các chỗ đó.
+/// Cài bản TV lên tivi bằng app Downloader (AFTVnews): người mới chỉ cần cài Downloader trên tivi rồi nhập `code`. `apkUrl`:
+/// link cố định luôn tải bản TV mới nhất (tệp ConBangTV.apk); mã do aftv.news cấp trỏ vào link tên cũ …/ChimToTV.apk — mọi
+/// release TV vẫn đính kèm cả tệp đó. Cùng giá trị với bản TV (Invite.kt), Windows (Invite.cs), release.ps1 và README (mục «Cài
+/// trên Android TV bằng Downloader») — đổi mã / link thì sửa đủ các chỗ đó.
 enum Invite {
     static let code = "9192365"
     static let shortUrl = "aftv.news/\(code)"
-    static let apkUrl = "https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk"
+    static let apkUrl = "https://github.com/Circling5714/ChimToTV/releases/latest/download/ConBangTV.apk"
 
     /// Trang hướng dẫn tiếng Việt (mục Downloader của README).
     static let guideUrl = "https://github.com/Circling5714/ChimToTV/blob/main/README.md#downloader"

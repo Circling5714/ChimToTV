@@ -6,7 +6,7 @@ final class InviteTests: XCTestCase {
         XCTAssertNotNil(Invite.code.range(of: "^\\d{5,9}$", options: .regularExpression))
         XCTAssertEqual(Invite.shortUrl, "aftv.news/\(Invite.code)")
         // Link cố định: release đang là Latest, tệp tên cố định (release.ps1 đính kèm ở mọi bản TV)
-        XCTAssertTrue(Invite.apkUrl.hasSuffix("/releases/latest/download/ChimToTV.apk"))
+        XCTAssertTrue(Invite.apkUrl.hasSuffix("/releases/latest/download/ConBangTV.apk"))
         XCTAssertTrue(Invite.guideUrl.hasPrefix("https://github.com/Circling5714/ChimToTV/"))
     }
 

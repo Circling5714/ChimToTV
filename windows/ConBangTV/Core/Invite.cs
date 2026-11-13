@@ -1,13 +1,14 @@
 namespace ConBangTV.Core;
 
-/// Cài bản TV lên tivi bằng app Downloader (AFTVnews): người mới chỉ cần cài Downloader trên tivi rồi nhập Code. Mã do aftv.news
-/// cấp, trỏ vào ApkUrl — link cố định luôn tải bản TV mới nhất. Cùng giá trị với bản TV (Invite.kt), iPad (Invite.swift),
-/// release.ps1 và README (mục «Cài trên Android TV bằng Downloader») — đổi mã / link thì sửa đủ các chỗ đó.
+/// Cài bản TV lên tivi bằng app Downloader (AFTVnews): người mới chỉ cần cài Downloader trên tivi rồi nhập Code. ApkUrl: link cố
+/// định luôn tải bản TV mới nhất (tệp ConBangTV.apk); mã do aftv.news cấp trỏ vào link tên cũ …/ChimToTV.apk — mọi release TV
+/// vẫn đính kèm cả tệp đó. Cùng giá trị với bản TV (Invite.kt), iPad (Invite.swift), release.ps1 và README (mục «Cài trên
+/// Android TV bằng Downloader») — đổi mã / link thì sửa đủ các chỗ đó.
 public static class Invite
 {
     public const string Code = "9192365";
     public const string ShortUrl = "aftv.news/" + Code;
-    public const string ApkUrl = "https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk";
+    public const string ApkUrl = "https://github.com/Circling5714/ChimToTV/releases/latest/download/ConBangTV.apk";
 
     /// Trang hướng dẫn tiếng Việt (mục Downloader của README).
     public const string GuideUrl = "https://github.com/Circling5714/ChimToTV/blob/main/README.md#downloader";

@@ -26,8 +26,9 @@ import java.security.MessageDigest
  * là bên cài bản đang chạy — lúc đó cập nhật được hoàn toàn tự động).
  *
  * Phát hành bản mới: build.ps1 dựng tệp .apk, release.ps1 tạo release tag "vX.Y" (luôn là "latest") trên GitHub. Từ 2.15 mỗi
- * release TV đính kèm HAI tệp .apk giống hệt nhau: ChimToTV-X.Y.apk và ChimToTV.apk (tên cố định cho link tải
- * …/releases/latest/download/ChimToTV.apk của app Downloader). latest() lấy tệp .apk đầu tiên — tệp nào cũng được: download
+ * release TV đính kèm nhiều tệp .apk giống hệt nhau — từ 13/11/2026 (bản 2.17): ConBangTV-X.Y.apk, ConBangTV.apk và ChimToTV.apk
+ * (tên cố định cho link tải …/releases/latest/download/<tên>.apk của app Downloader; trước đó ChimToTV-X.Y.apk + ChimToTV.apk).
+ * latest() lấy tệp .apk đầu tiên — tệp nào cũng được (mọi bản từ 1.3 đều vậy, nên đổi tên tệp không làm hỏng OTA): download
  * lưu bằng tên tự đặt, verify chỉ xét mã gói + chữ ký + số hiệu, không dựa vào tên tệp / cỡ / hash.
  */
 object Updater {
@@ -76,7 +77,7 @@ object Updater {
     fun download(context: Context, rel: Release): File {
         val dir = File(context.cacheDir, "update").apply { mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
-        val file = File(dir, "ChimToTV-${rel.version}.apk")
+        val file = File(dir, "ConBangTV-${rel.version}.apk")
         var lastError: IOException? = null
         val sources = listOfNotNull(
             rel.apkUrl to emptyMap(),

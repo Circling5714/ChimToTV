@@ -12,7 +12,7 @@ public class InviteTests
         Assert.Matches(@"^\d{5,9}$", Invite.Code);
         Assert.Equal("aftv.news/" + Invite.Code, Invite.ShortUrl);
         // Link cố định: release đang là Latest, tệp tên cố định (release.ps1 đính kèm ở mọi bản TV)
-        Assert.EndsWith("/releases/latest/download/ChimToTV.apk", Invite.ApkUrl);
+        Assert.EndsWith("/releases/latest/download/ConBangTV.apk", Invite.ApkUrl);
         Assert.StartsWith("https://github.com/Circling5714/ChimToTV/", Invite.GuideUrl);
     }
 

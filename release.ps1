@@ -1,16 +1,19 @@
 ﻿# Đăng một bản ĐÃ DỰNG lên GitHub Releases. Cờ "Latest" đặt sẵn theo nền tảng — không phải nhớ tay:
 #
-#   tv       tag v<bản>       ChimToTV-<bản>.apk + ChimToTV.apk (bản sao giống hệt, tên cố định)   LUÔN là Latest
+#   tv       tag v<bản>       ConBangTV-<bản>.apk + ConBangTV.apk + ChimToTV.apk (hai bản sao giống hệt,   LUÔN là Latest
+#                             tên cố định)
 #   windows  tag win-v<bản>   ConBangTV-Windows-<bản>.exe                                         KHÔNG BAO GIỜ là Latest
 #   ipad     tag ios-v<bản>   ConBangTV-iPad-<bản>.ipa                                            KHÔNG BAO GIỜ là Latest
 #
 # Vì sao phải đúng — hai thứ đi theo bản đang là Latest:
-#   1. app TV tự cập nhật: Updater.kt hỏi .../releases/latest rồi lấy tệp .apk;
+#   1. app TV tự cập nhật: Updater.kt hỏi .../releases/latest rồi lấy tệp .apk đầu tiên (tên nào cũng được — từ bản 1.3);
 #   2. link tải cố định cho app Downloader trên Android TV (chỉ tải đúng một địa chỉ, không đọc được API):
-#        https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk
-#      Link này cần tệp tên ChimToTV.apk có trong MỌI bản TV — nên bản TV đính kèm hai tệp. Mã Downloader 9192365 trỏ vào
-#      link này; ghi chú của bản TV được thêm mục "## Cài mới trên Android TV" ghi mã đó.
-# Bản Windows / iPad mà thành Latest thì mọi TV hết thấy bản mới và link trên trả 404.
+#        https://github.com/Circling5714/ChimToTV/releases/latest/download/ConBangTV.apk      (tên mới, từ 13/11/2026)
+#        https://github.com/Circling5714/ChimToTV/releases/latest/download/ChimToTV.apk       (tên cũ — vẫn phải có)
+#      Hai link này cần tệp tên ConBangTV.apk / ChimToTV.apk có trong MỌI bản TV — nên bản TV đính kèm ba tệp. ĐỪNG bỏ tệp tên
+#      cũ: mã Downloader 9192365 (aftv.news) trỏ vào link cũ, và màn «Cài lên tivi» của TV 2.16–2.17 / iPad 1.16–1.17 /
+#      Windows 1.14–1.15 đã cài in link cũ. Ghi chú của bản TV được thêm mục "## Cài mới trên Android TV" ghi mã Downloader.
+# Bản Windows / iPad mà thành Latest thì mọi TV hết thấy bản mới và hai link trên trả 404.
 #
 # Link tải cố định của bản Windows / iPad (luôn là bản mới nhất, như link APK ở trên) — mỗi nền tảng một release "cuốn chiếu"
 # với tag không bao giờ đổi và tệp tên cố định; mỗi lần đăng bản mới script chép đè tệp vào đó:
@@ -30,8 +33,8 @@
 # Số bản đọc từ app\build.gradle.kts (tv), windows\ConBangTV\ConBangTV.csproj (windows), ios\project.yml (ipad).
 #
 # Kiểm sau khi đăng (và khi -Verify): Latest là bản TV — lúc đăng mà lệch thì script tự trả về bản TV mới nhất; tệp trên
-# GitHub khớp SHA-256 với tệp trong máy; bản TV: tải thử qua link cố định và so SHA-256; bản Windows / iPad mới nhất: tệp ở
-# link cố định khớp SHA-256 và link tải được.
+# GitHub khớp SHA-256 với tệp trong máy; bản TV: tải thử qua hai link cố định (tên mới, tên cũ) và so SHA-256; bản Windows /
+# iPad mới nhất: tệp ở link cố định khớp SHA-256 và link tải được.
 param(
     [Parameter(Mandatory = $true, Position = 0)][ValidateSet("tv", "windows", "ipad")][string]$Platform,
     [string]$Notes = "",
@@ -55,10 +58,13 @@ if ($File) {
 Set-Location $PSScriptRoot
 
 $repo = "Circling5714/ChimToTV"
-$fixedName = "ChimToTV.apk"
+# Tên cố định của APK bản TV: tên mới (link chính) và tên cũ (giữ cho mã Downloader + app đã cài — xem đầu tệp)
+$fixedName = "ConBangTV.apk"
+$legacyName = "ChimToTV.apk"
 $fixedLink = "https://github.com/$repo/releases/latest/download/$fixedName"
-# Mã của app Downloader (aftv.news) trỏ vào $fixedLink, và trang hướng dẫn — cùng giá trị với Invite.kt (TV), Invite.swift
-# (iPad), Invite.cs (Windows) và README
+$legacyLink = "https://github.com/$repo/releases/latest/download/$legacyName"
+# Mã của app Downloader (aftv.news, trỏ vào $legacyLink — tạo trước khi đổi tên tệp) và trang hướng dẫn — cùng giá trị với
+# Invite.kt (TV), Invite.swift (iPad), Invite.cs (Windows) và README
 $downloaderCode = "9192365"
 $guideUrl = "https://github.com/$repo/blob/main/README.md#downloader"
 $certSha256 = "949ef2b52f3cf895d7fe5ff9db495f273e6fd35d02b23b4a521df43957a0177b"
@@ -102,7 +108,7 @@ function LatestTag { ("" + (Gh api "repos/$repo/releases/latest" --jq ".tag_name
 switch ($Platform) {
     "tv" {
         $ver = (Select-String -Path app\build.gradle.kts -Pattern 'versionName = "(.+)"').Matches[0].Groups[1].Value
-        $tag = "v$ver"; $title = "Côn Bằng TV $ver"; $latest = $true; $name = "ChimToTV-$ver.apk"
+        $tag = "v$ver"; $title = "Côn Bằng TV $ver"; $latest = $true; $name = "ConBangTV-$ver.apk"
     }
     "windows" {
         $full = ([xml](Get-Content windows\ConBangTV\ConBangTV.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
@@ -119,9 +125,9 @@ if (-not $File) {
     if (-not (Test-Path $File)) { throw "Không thấy $File — dựng bản $ver trước (tv: .\build.ps1 · windows: .\windows\build.ps1 · ipad: tải artifact rồi dùng -File)" }
 }
 if ((Split-Path $File -Leaf) -ne $name) { throw "Tệp phải tên $name (bản $ver đọc từ mã nguồn), đang là $(Split-Path $File -Leaf)" }
-# Tên các tệp của bản này trên GitHub — bản TV có thêm bản sao tên cố định
+# Tên các tệp của bản này trên GitHub — bản TV có thêm hai bản sao tên cố định (tên mới, tên cũ)
 $assetNames = @($name)
-if ($Platform -eq "tv") { $assetNames += $fixedName }
+if ($Platform -eq "tv") { $assetNames += $fixedName, $legacyName }
 
 $tags = @(Gh api "repos/$repo/releases?per_page=100" --jq '.[].tag_name')
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ("chimto-release-" + [Guid]::NewGuid().ToString("N"))
@@ -151,17 +157,19 @@ function Test-Published([bool]$heal) {
         Write-Host ("{0}: {1:N0} byte, {2}" -f $leaf, $up.size, $up.digest)
     }
 
-    # 3. Bản TV đang là Latest: link cố định (Downloader) phải tải về đúng tệp này
+    # 3. Bản TV đang là Latest: hai link cố định (tên mới; tên cũ của mã Downloader) phải tải về đúng tệp này
     if ($Platform -eq "tv" -and $now -eq $tag) {
-        $got = Join-Path $tmp "tai-ve.apk"
-        $ok = $false
-        foreach ($wait in 0, 5, 15) {
-            Start-Sleep -Seconds $wait
-            & curl.exe -sL -m 300 -o $got $fixedLink
-            if ($LASTEXITCODE -eq 0 -and (Test-Path $got) -and (Sha256 $got) -eq $local) { $ok = $true; break }
+        foreach ($link in $fixedLink, $legacyLink) {
+            $got = Join-Path $tmp "tai-ve.apk"
+            $ok = $false
+            foreach ($wait in 0, 5, 15) {
+                Start-Sleep -Seconds $wait
+                & curl.exe -sL -m 300 -o $got $link
+                if ($LASTEXITCODE -eq 0 -and (Test-Path $got) -and (Sha256 $got) -eq $local) { $ok = $true; break }
+            }
+            if (-not $ok) { throw "Link cố định chưa trả đúng tệp bản ${ver}: $link" }
+            Write-Host "Link cố định tải về đúng bản ${ver}: $link"
         }
-        if (-not $ok) { throw "Link cố định chưa trả đúng tệp bản ${ver}: $fixedLink" }
-        Write-Host "Link cố định tải về đúng bản ${ver}: $fixedLink"
     }
 
     # 4. Bản Windows / iPad mới nhất: tệp ở link cố định phải chính là tệp này, và link phải tải được
@@ -246,7 +254,7 @@ try {
     # ---- Chỉ chép tệp của bản đã đăng vào link cố định (lần đầu tạo link / sửa link lệch) ----
     if ($FixedOnly) {
         $r = $rolling[$Platform]
-        if (-not $r) { throw "Bản TV không cần -FixedOnly: link cố định của bản TV đi theo Latest ($fixedLink)" }
+        if (-not $r) { throw "Bản TV không cần -FixedOnly: hai link cố định của bản TV đi theo Latest ($fixedLink, $legacyLink)" }
         if ($tags -notcontains $tag) { throw "Chưa có release $tag trên GitHub — đăng bản $ver trước" }
         $pub = ((Gh api "repos/$repo/releases/tags/$tag") -join "`n") | ConvertFrom-Json
         $up = $pub.assets | Where-Object { $_.name -eq $name }
@@ -292,13 +300,15 @@ try {
     }
     if ($tags -contains $tag) { Stop-OrWarn "Release $tag đã có trên GitHub — tăng số bản trước khi đăng" }
 
-    # ---- Tệp đính kèm: bản TV thêm bản sao tên cố định ----
+    # ---- Tệp đính kèm: bản TV thêm hai bản sao tên cố định ----
     $assets = @($File)
     if ($Platform -eq "tv") {
-        $copy = Join-Path $tmp $fixedName
-        Copy-Item $File $copy
-        if ((Sha256 $copy) -ne (Sha256 $File)) { throw "Bản sao $fixedName không giống tệp gốc" }
-        $assets += $copy
+        foreach ($fixed in $fixedName, $legacyName) {
+            $copy = Join-Path $tmp $fixed
+            Copy-Item $File $copy
+            if ((Sha256 $copy) -ne (Sha256 $File)) { throw "Bản sao $fixed không giống tệp gốc" }
+            $assets += $copy
+        }
     }
     # Bản TV: thêm cuối ghi chú cách cài mới bằng Downloader (người vào trang Releases thấy ngay mã). Hộp cập nhật trên TV chỉ
     # lấy mục "## Có gì mới" tới tiêu đề "## " kế tiếp, nên mục thêm này không làm hộp dài ra.
