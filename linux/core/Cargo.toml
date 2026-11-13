@@ -5,6 +5,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+# build.rs: đóng mã hồ sơ NextDNS (keys/nextdns.txt, không có trên git) vào tệp chạy — như bản Windows
+build = "build.rs"
+
 [lib]
 name = "cbtv"
 path = "src/lib.rs"
@@ -33,6 +36,10 @@ base64 = "0.22"
 rand = "0.8"
 libc = "0.2"
 socket2 = { version = "0.5", features = ["all"] }
+# DNS mã hoá (doh.rs): TLS tới máy chủ DoH / DoT — cùng rustls (ring) với reqwest, chứng chỉ gốc của máy
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
+rustls-native-certs = "0.8"
 dirs = "5"
 html-escape = "0.2"
 unicode-normalization = "0.1"
