@@ -58,16 +58,28 @@ pub fn new() -> Rc<dyn Page> {
         sites_only: Cell::new(prefs::proxy_sites_only()),
         result: RefCell::new(String::new()),
     });
+    for e in [&p.host, &p.port, &p.user, &p.pass, &p.ss_link, &p.ss_host, &p.ss_port, &p.ss_key] {
+        p.base.keep(e);
+    }
     p.ss_link.set_placeholder_text(Some("ss://…"));
     // Dán link ss:// (3X-UI: nút Copy / QR của người dùng) là tự điền các ô
     let weak = Rc::downgrade(&p);
+    // Đọc khi ngừng gõ 0,6 giây (dán là đọc gần như ngay): đọc ở mỗi phím thì trang dựng lại liên tục, báo lỗi link dở dang
+    let gen = Rc::new(Cell::new(0u32));
     p.ss_link.connect_changed(move |e| {
-        if e.text().trim().to_lowercase().starts_with("ss://") {
-            if let Some(p) = weak.upgrade() {
-                let p2 = p.clone();
-                ui::after(10, move || p2.read_link());
-            }
+        let g = gen.get().wrapping_add(1);
+        gen.set(g);
+        if !e.text().trim().to_lowercase().starts_with("ss://") {
+            return;
         }
+        let (weak, gen) = (weak.clone(), gen.clone());
+        ui::after(600, move || {
+            if gen.get() == g {
+                if let Some(p) = weak.upgrade() {
+                    p.read_link();
+                }
+            }
+        });
     });
     p
 }
@@ -96,6 +108,11 @@ fn hrow(items: &[&gtk::Widget]) -> gtk::Box {
 impl ProxyPage {
     fn build(self: &Rc<Self>) {
         let text = ui::focused_label();
+        // Ô chữ đang gõ: dựng lại xong chọn lại đúng ô đó (không thì chữ gõ tiếp rơi mất)
+        let typing = [&self.host, &self.port, &self.user, &self.pass, &self.ss_link, &self.ss_host, &self.ss_port, &self.ss_key]
+            .into_iter()
+            .find(|e| e.has_focus())
+            .cloned();
         let b = &self.base;
         b.clear();
         b.add(&ui::header("Proxy (SOCKS5 / Shadowsocks)"));
@@ -200,7 +217,13 @@ impl ProxyPage {
             l.set_margin_top(px(6.0));
             b.add(&l);
         }
-        ui::refocus_label(b.body.upcast_ref(), text);
+        match typing.filter(|e| e.parent().is_some()) {
+            Some(e) => {
+                e.grab_focus_without_selecting();
+                e.set_position(-1);
+            }
+            None => ui::refocus_label(b.body.upcast_ref(), text),
+        }
     }
 
     /// Đổi kiểu: mỗi kiểu giữ máy chủ / khoá riêng (đang bật thì đổi luôn đường đi).

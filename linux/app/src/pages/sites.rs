@@ -22,6 +22,7 @@ pub fn new() -> Rc<dyn Page> {
     add.set_width_chars(30);
     add.set_placeholder_text(Some("vd yanhh3d.ee"));
     let p = Rc::new(SitesPage { base: PageBase::new("sites"), checks: RefCell::new(HashMap::new()), add });
+    p.base.keep(&p.add);
     let weak = Rc::downgrade(&p);
     p.add.connect_activate(move |_| {
         if let Some(p) = weak.upgrade() {

@@ -29,13 +29,15 @@ pub struct PageBase {
     pub last_focus: RefCell<Option<gtk::Widget>>,
     /// Thứ tự của mục đó trong trang (trang dựng lại lúc quay về thì ô cũ mất — chọn ô cùng chỗ).
     pub last_index: Cell<Option<usize>>,
+    /// Ô dùng lại qua các lần dựng (ô chữ, lưới kết quả…) — xem keep().
+    kept: RefCell<Vec<gtk::Widget>>,
     token: Cell<u64>,
 }
 
 impl PageBase {
     pub fn new(menu_key: &str) -> PageBase {
         let (scroller, body) = ui::scroller();
-        PageBase { scroller, body, menu_key: RefCell::new(menu_key.to_string()), last_focus: RefCell::new(None), last_index: Cell::new(None), token: Cell::new(0) }
+        PageBase { scroller, body, menu_key: RefCell::new(menu_key.to_string()), last_focus: RefCell::new(None), last_index: Cell::new(None), kept: RefCell::new(Vec::new()), token: Cell::new(0) }
     }
 
     /// Lần tải mới (kết quả của lần tải cũ về muộn thì bỏ).
@@ -48,7 +50,22 @@ impl PageBase {
         self.token.get()
     }
 
+    /// Ô trang giữ lại để gắn vào lần dựng sau (giữ chữ đang gõ). Bắt buộc đăng ký: clear() gỡ hàng cũ khỏi trang, hàng không còn
+    /// ai giữ thì GTK huỷ nó cùng mọi ô con — ô chữ bị huỷ là mất chữ (lỗi trang Proxy: đọc link ss:// xong các ô trống trơn).
+    pub fn keep(&self, w: &impl IsA<gtk::Widget>) {
+        let w = w.clone().upcast::<gtk::Widget>();
+        let mut k = self.kept.borrow_mut();
+        if !k.contains(&w) {
+            k.push(w);
+        }
+    }
+
     pub fn clear(&self) {
+        for w in self.kept.borrow().iter() {
+            if let Some(p) = w.parent().and_then(|p| p.downcast::<gtk::Container>().ok()) {
+                p.remove(w);
+            }
+        }
         ui::clear(&self.body);
     }
 

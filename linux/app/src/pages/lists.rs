@@ -245,6 +245,9 @@ pub fn search() -> Rc<dyn Page> {
         scope: ui::pill("", || {}),
         token: Cell::new(0),
     });
+    p.base.keep(&p.entry);
+    p.base.keep(&p.scope);
+    p.base.keep(&p.results);
     let weak = Rc::downgrade(&p);
     p.entry.connect_activate(move |_| {
         if let Some(p) = weak.upgrade() {

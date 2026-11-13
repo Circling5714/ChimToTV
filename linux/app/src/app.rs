@@ -31,8 +31,8 @@ pub struct App {
     dialog_extra: gtk::Box,
     dialog_buttons: gtk::Box,
     dialog_box: gtk::Box,
-    toast_box: gtk::Box,
-    toast_label: gtk::Label,
+    pub(crate) toast_box: gtk::Box,
+    pub(crate) toast_label: gtk::Label,
     toast_timer: RefCell<Option<glib::SourceId>>,
     stack_pages: RefCell<Vec<Rc<dyn Page>>>,
     /// Thứ tự ô đang chọn trong trang hiện tại (ô mất vì trang dựng lại thì chọn ô cùng chỗ).

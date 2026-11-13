@@ -28,6 +28,8 @@ pub fn new() -> Rc<dyn Page> {
     code.set_max_length(4);
     code.set_placeholder_text(Some("Mã 4 số"));
     let p = Rc::new(SyncPage { base: PageBase::new("sync"), ip, code });
+    p.base.keep(&p.ip);
+    p.base.keep(&p.code);
     let weak = Rc::downgrade(&p);
     p.code.connect_activate(move |_| {
         if let Some(p) = weak.upgrade() {

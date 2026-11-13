@@ -94,6 +94,10 @@ fn describe(w: &gtk::Widget) -> String {
         return format!("nút {}", w.widget_name());
     }
     if let Ok(e) = w.clone().downcast::<gtk::Entry>() {
+        // Ô mật khẩu / khoá: không in nội dung (cổng gỡ lỗi đọc qua mạng nội bộ, nhật ký thử…)
+        if !gtk::prelude::EntryExt::is_visible(&e) {
+            return format!("ô chữ ẩn ({} ký tự)", e.text_length());
+        }
         return format!("ô chữ: {}", e.text());
     }
     if w.is::<gtk::DrawingArea>() {
@@ -107,13 +111,14 @@ fn info() -> String {
     let f = a.window.focused_widget();
     let (w, h) = a.window.size();
     format!(
-        "page={} fullscreen={} size={w}x{h}\nfocus={}\nplayer={}\nsite={}\nprofile={}\n",
+        "page={} fullscreen={} size={w}x{h}\nfocus={}\nplayer={}\nsite={}\nprofile={}\ntoast={}\n",
         a.current().map(|p| p.base().menu_key.borrow().clone()).unwrap_or_default(),
         a.is_fullscreen(),
         f.as_ref().map(describe).unwrap_or_default(),
         a.player.borrow().as_ref().map(|p| p.debug()).unwrap_or_else(|| "chưa mở".into()),
         cbtv::prefs::base_url(),
-        cbtv::prefs::current_profile().name
+        cbtv::prefs::current_profile().name,
+        if a.toast_box.is_visible() { a.toast_label.text().to_string() } else { String::new() }
     )
 }
 
@@ -161,6 +166,31 @@ fn handle(r: Req) {
             send("ok".into());
         }
         "/prefs" => send(cbtv::prefs::debug_dump()),
+        "/labels" => {
+            // Chữ đang hiện trong trang (kiểm kết quả mà không cần chụp màn hình)
+            fn walk(w: &gtk::Widget, out: &mut Vec<String>) {
+                if !w.is_visible() {
+                    return;
+                }
+                if let Some(l) = w.downcast_ref::<gtk::Label>() {
+                    let t = l.text().to_string();
+                    if !t.trim().is_empty() {
+                        out.push(t);
+                    }
+                }
+                if let Some(c) = w.downcast_ref::<gtk::Container>() {
+                    for ch in c.children() {
+                        walk(&ch, out);
+                    }
+                }
+            }
+            let mut out = Vec::new();
+            if let Some(p) = app().current() {
+                walk(p.base().body.upcast_ref(), &mut out);
+            }
+            send(out.join("
+"));
+        }
         "/click" => {
             let text = r.q.get("text").cloned().unwrap_or_default().to_lowercase();
             let n: usize = r.q.get("n").and_then(|s| s.parse().ok()).unwrap_or(0);

@@ -1038,6 +1038,17 @@ mod tests {
     }
 
     #[test]
+    fn parse_3xui_aes128_multi_user_link() {
+        // Dạng link nút Copy của 3X-UI (SS 2022 nhiều người dùng): khoá-máy-chủ:khoá-người-dùng mã hoá %, không có "/" trước "?"
+        let enc = |k: &[u8]| b64(k).replace('+', "%2B").replace('/', "%2F").replace('=', "%3D");
+        let (sk, uk) = ([7u8; 16], [9u8; 16]);
+        let link = format!("ss://2022-blake3-aes-128-gcm:{}:{}@vpn.example.com:31000?type=tcp&security=none#T%C3%AAn%20m%C3%A1y", enc(&sk), enc(&uk));
+        let c = parse_link(&link, true, false).expect("đọc được");
+        assert_eq!((c.host.as_str(), c.port, c.method.as_str()), ("vpn.example.com", 31000, "2022-blake3-aes-128-gcm"));
+        assert_eq!(c.password, format!("{}:{}", b64(&sk), b64(&uk)));
+    }
+
+    #[test]
     fn parse_rejects_bad_keys() {
         let e = parse_link(&format!("ss://2022-blake3-aes-256-gcm:{}@h:1", b64(&[0u8; 16])), true, false).unwrap_err();
         assert!(msg(e).contains("32 byte"));
