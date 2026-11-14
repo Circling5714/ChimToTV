@@ -59,8 +59,8 @@ public static class SyncService
 
     private sealed class HostPort
     {
-        public string Host = "";
-        public int Port;
+        public string Host { get; set; } = "";
+        public int Port { get; set; }
     }
 
     public static string? PairCode => Native.Sync<string?>("sync.pairCode");

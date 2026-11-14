@@ -205,8 +205,17 @@ public sealed class PlayerView : UserControl
 
     private async Task InitWeb()
     {
-        var env = await App.WebEnv();
-        await _web.EnsureCoreWebView2Async(env);
+        Log.D("player", $"Khởi tạo WebView2 (khung {_web.Visibility}, {_web.ActualWidth:0}x{_web.ActualHeight:0})");
+        try
+        {
+            var env = await App.WebEnv();
+            await _web.EnsureCoreWebView2Async(env);
+        }
+        catch (Exception e)
+        {
+            Log.D("player", "Khởi tạo WebView2 lỗi: " + e.Message);
+            throw;
+        }
         var c = _web.CoreWebView2;
         var st = c.Settings;
         st.AreDefaultContextMenusEnabled = false;
@@ -292,7 +301,12 @@ public sealed class PlayerView : UserControl
     /// Nạp trang (html != null: trả lời bằng trang bọc của app tại địa chỉ url).
     private async Task Navigate(string url, string? html, int start)
     {
-        await EnsureWeb();
+        var init = EnsureWeb();
+        // 14/11/2026 gặp một lần WebView2 không khởi tạo xong (chưa tái hiện được): ghi lại để lần sau biết lúc đó khung ra sao
+        if (await Task.WhenAny(init, Task.Delay(15_000)) != init)
+            Log.D("player", $"WebView2 chưa sẵn sàng sau 15 giây (khung {_web.Visibility}, {_web.ActualWidth:0}x{_web.ActualHeight:0}, " +
+                            $"đã nạp {_web.IsLoaded}, trình phát {(IsMini ? "nhỏ" : "lớn")})");
+        await init;
         var c = _web.CoreWebView2;
         if (_scriptId != null) c.RemoveScriptToExecuteOnDocumentCreated(_scriptId);
         var js = $"window.__chimtoStart={start};if(window.top===window)window.__chimtoLoad={_pageLoad};\n" + StyleShim + _agentJs;
@@ -652,8 +666,8 @@ public sealed class PlayerView : UserControl
 
     private sealed class Opened
     {
-        public string Url = "";
-        public string? Subtitle;
+        public string Url { get; set; } = "";
+        public string? Subtitle { get; set; }
     }
 
     /// Phát src (luồng .m3u8 / tệp video / data:…mpegurl) bằng mpv qua cổng phát nội bộ của lõi; hls = biết chắc là luồng HLS dù
@@ -832,7 +846,12 @@ public sealed class PlayerView : UserControl
             PollNative();
             return;
         }
-        if (_web.CoreWebView2 == null) return;
+        if (_web.CoreWebView2 == null)
+        {
+            // WebView2 chưa sẵn sàng: vẫn chạy phần «video chưa chạy? → đổi server» để người xem không phải chờ mãi
+            OnState(null);
+            return;
+        }
         _polling = true;
         string? raw;
         try
@@ -906,6 +925,13 @@ public sealed class PlayerView : UserControl
                 ShowError($"{_server?.Label ?? "Server"} không phát được video ({err}).\nNhấn ▼ để chọn server khác.");
                 ShowPanel();
             }
+        }
+        // Trình phát nhúng tự phát mà ExtractJs không lấy được link (vd trang dùng Artplayer + link blob:) → thôi chờ, giữ trình phát
+        // của trang
+        if (_extract && _started && now - _loadStartedAt > 35_000)
+        {
+            _extract = false;
+            Log.D("native", "Không lấy được link luồng từ trình phát nhúng — giữ trình phát của trang");
         }
         WatchLimit.Tick(_started && !st.Paused && !st.Waiting, now);
         if (CheckLimit()) return;
@@ -1530,7 +1556,9 @@ public sealed class PlayerView : UserControl
     public string Debug() =>
         $"native={(_nativeOn && _native != null ? "on " + _native.Debug() : _extract ? "đang lấy link từ trình phát nhúng" : $"off (forceWeb={_forceWeb})")} " +
         $"open={IsOpen} pageMode={_pageMode} started={_started} server={_server?.Label} ep={_episodeUrl} t={_state?.T:0.0} d={_state?.D:0.0} " +
-        $"paused={_state?.Paused} embed={_embedUrl} hls={_hlsUrl} load={_pageLoad}";
+        $"paused={_state?.Paused} embed={_embedUrl} hls={_hlsUrl} load={_pageLoad} " +
+        $"web={(_web.CoreWebView2 != null ? "sẵn sàng" : _init == null ? "chưa tạo" : "đang tạo " + _init.Status)} " +
+        $"webVis={_web.Visibility} webSize={_web.ActualWidth:0}x{_web.ActualHeight:0} webLoaded={_web.IsLoaded}";
 
     /// Cổng gỡ lỗi: giả mpv báo lỗi giữa chừng (thử đường tự chuyển sang WebView2).
     public string DebugNativeFail()

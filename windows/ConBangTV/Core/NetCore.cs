@@ -180,8 +180,8 @@ public static class Unblock
     {
         private sealed class State
         {
-            public Dictionary<string, long> Hosts = new();
-            public long AutoLevel2;
+            public Dictionary<string, long> Hosts { get; set; } = new();
+            public long AutoLevel2 { get; set; }
         }
 
         public static Dictionary<string, long> All() => Native.Sync<State>("unblock.level2").Hosts;
@@ -226,8 +226,8 @@ public static class SsLink
 {
     private sealed class HostPort
     {
-        public string Host = "";
-        public int Port;
+        public string Host { get; set; } = "";
+        public int Port { get; set; }
     }
 
     public static SsConfig Parse(string link, bool remoteDns, bool sitesOnly)
