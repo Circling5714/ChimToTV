@@ -9,6 +9,26 @@ Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề
 Bản Mac (macOS 12+, từ 13/11/2026, cùng mã nguồn và số bản với bản iPad) ghi riêng với tiêu đề "Mac …", tag `mac-v…`.
 Bản Linux (Ubuntu 22.04+ / Linux Mint 21+ / Debian 12+, từ 13/11/2026, tệp `.deb`) ghi riêng với tiêu đề "Linux …", tag `linux-v…`.
 
+## Linux 1.2 — 14/11/2026 (đọc trang bật chống bot)
+
+- **Xem lại được hoathinh3d.pw:** trang vừa bật lớp chống bot của Cloudflare (403 «Just a moment…» với mọi trình tải không phải
+  trình duyệt). Lõi nhận ra lớp chặn và nhờ app đọc hộ bằng một **WebKitGTK ẩn** (`linux/app/src/webfetch.rs`, cửa sổ ngoài màn hình,
+  cùng WebContext / cookie / cổng SOCKS nội bộ với trình phát): mở trang chủ cho trình duyệt tự qua lớp chặn (~1,6–1,8 giây), đứng ở
+  robots.txt rồi mỗi yêu cầu là `fetch()` trong trang (`web-fetch.js`, dùng chung với bản Windows). Ảnh bìa đi qua lõi nên tự được đọc
+  hộ. Phát phim bằng trình phát của trang được luôn (WebKitGTK của trình phát dùng chung cookie). Trang đòi bấm xác nhận / chặn hẳn
+  WebKit thì báo lỗi; 5 phút không dùng thì đóng WebKit ẩn.
+- **Lên bản mới thì bỏ tạm nghỉ của các nguồn trang chủ** (một lần): bản cũ lỗi liên tục với trang bị chặn → nguồn bị nghỉ tới 6 giờ;
+  bản mới thử lại ngay (`feed::clear_rest_on_upgrade`, bản Windows cũng có từ bản sau).
+- bản 1.2.0 · tag `linux-v1.2` (không phải "latest") · commit `bbc4d05` · `ConBangTV-Linux-1.2.deb` 5 461 388 byte · SHA-256
+  `1416ac1c451ff5f8e3bd353bde0ba55782643af4d324e561614ab0e23b2c1da1` · glibc ≥ 2.34 (dựng trong Ubuntu 22.04)
+- Thử: bản thử trên máy Ubuntu 26.04 (trang chủ, menu của trang, danh sách «Huyền Huyễn» + ảnh bìa, trang phim, tìm kiếm, phát tập 1);
+  gói: `conbangtv` 1.2.0 amd64, không có cổng gỡ lỗi, cài bằng `apt-get install`, mở từ biểu tượng (`gio launch …vn.chimto.tv.desktop`).
+  Lỗi tìm ra khi thử và đã sửa: `fetch()` chạy lúc tài liệu đang bị thay («Load failed» — chỉ báo sẵn sàng khi chính robots.txt nạp
+  xong); bộ dò qua lớp chặn chạy hai lần; đăng ký đọc hộ sau khi dựng app làm menu của trang trống.
+- Đăng lúc 13:44:43 bằng `release.ps1 linux` (Latest vẫn là `v2.18`; link cố định `conbangtv_linux` chép đè sang 1.2, khớp SHA-256).
+  **Tự cập nhật thật 1.1 → 1.2** (máy Ubuntu thử): hộp «Có bản mới: Côn Bằng TV 1.2» → «Cập nhật ngay» 13:45:58 → `pkexec apt-get
+  install` mã 0 (13:46:03) → mở lại 1.2.0 `--updated` 13:46:04 → WebKit qua lớp chặn 1,7 s, trang chủ hoathinh3d.pw 20 phim.
+
 ## 2.18 — 14/11/2026 (đọc trang bật chống bot bằng engine Firefox)
 
 - **Xem lại được hoathinh3d.pw:** từ 14/11/2026 Cloudflare của trang chặn hẳn WebView của Android («Attention Required! … you have
