@@ -9,6 +9,33 @@ Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề
 Bản Mac (macOS 12+, từ 13/11/2026, cùng mã nguồn và số bản với bản iPad) ghi riêng với tiêu đề "Mac …", tag `mac-v…`.
 Bản Linux (Ubuntu 22.04+ / Linux Mint 21+ / Debian 12+, từ 13/11/2026, tệp `.deb`) ghi riêng với tiêu đề "Linux …", tag `linux-v…`.
 
+## 2.18 — 14/11/2026 (đọc trang bật chống bot bằng engine Firefox)
+
+- **Xem lại được hoathinh3d.pw:** từ 14/11/2026 Cloudflare của trang chặn hẳn WebView của Android («Attention Required! … you have
+  been blocked») và bắt thử thách mọi trình tải khác. App gói kèm **GeckoView 141** (engine của Firefox, MPL 2.0) và chỉ dùng nó cho
+  trang bị chặn: lần đầu gặp, một phiên Gecko ẩn mở trang chủ cho trình duyệt tự qua lớp chặn (~6–12 giây trên TX3), rồi mọi yêu cầu
+  (trang, API, ảnh bìa, POST) đi qua mạng của Gecko — chung cookie, vẫn theo proxy / Shadowsocks / DNS mã hoá / vượt chặn của app (qua
+  cổng SOCKS nội bộ riêng). Trang bình thường vẫn như cũ (HttpURLConnection + WebView). Trang bị chặn được nhớ 12 giờ.
+- Phát phim của trang đó: «Trình phát của trang» (WebView) không mở được trang tập nên app tự chọn server KKPhim / NguonC, không gợi ý
+  lại «Trình phát của trang» khi phim giật.
+- Màn «Mời bạn bè cài app» in link tải mới `…/releases/latest/download/ConBangTV.apk`.
+- Bộ đọc «Có gì mới» bỏ BOM đầu ghi chú.
+- **APK ~143 MB** (trước 1,25 MB): thư viện native của GeckoView cho armeabi-v7a + arm64-v8a (anh chọn gói cả 64-bit để máy chỉ chạy
+  64-bit vẫn cài được). Gecko chỉ khởi động khi gặp trang bị chặn; lúc đó thêm ~150 MB RAM trong tiến trình app + ~75 MB tiến trình
+  `crashhelper` (đã tắt tiến trình GPU, không giữ tiến trình trang sau khi qua lớp chặn). Tiến trình con của Gecko không khởi tạo app
+  (`App.onCreate` chỉ ở tiến trình chính — WebView không cho hai tiến trình dùng chung thư mục dữ liệu).
+- Đã thử: Firefox Focus (GeckoView) trên TX3 vào được trang trong khi WebView bị chặn hẳn; bản debug + bản release (R8: giữ lớp
+  `org.mozilla.**` — mã native gọi qua JNI, lần đầu bản release văng SIGSEGV) trên TX3 (32-bit): trang chủ, danh sách «Đánh Giá Cao»
+  (API wp-json), ảnh bìa, trang phim, phát tập qua KKPhim; S10e (Android 14, 64-bit): danh sách, trang phim, tìm kiếm. 4 test mới.
+- **Google Play Protect** hiện chặn tệp 2.17 chính thức («Đã chặn ứng dụng có hại», thấy trên TX3 và S10e khi bật quét) trong khi tệp
+  2.18 cài được và quét sạch — Google xét theo từng tệp, không nêu lý do; đã soạn khiếu nại để anh gửi.
+- bản 2.18 · versionCode 42 · tag `v2.18` (Latest) · commit `6d86d14` · `ConBangTV-2.18.apk` = `ConBangTV.apk` = `ChimToTV.apk`
+  150 133 290 byte · SHA-256 `794c177f2fae3530da90cdf8fabbc56a3dedc954ae9307d0ae2ef63b68231121`
+- Đăng lúc 13:00:30 bằng `release.ps1 tv` (Latest = `v2.18`, ba tệp cùng SHA-256, hai link cố định tải về đúng 2.18; `-Verify` đạt).
+  **Tự cập nhật thật 2.17 → 2.18 trên TX3:** Cài đặt → «Kiểm tra cập nhật» → hộp «Có bản mới 2.18» (chỉ mục «Có gì mới») → «Cài
+  đặt ngay» 13:03:51 → tải xong 13:04:04 → màn cài của hệ thống (▼ → HỦY, ▶ → CÀI ĐẶT, OK) → cài xong 13:05:17; mở lại: Gecko qua lớp
+  chặn 7,7 s, trang chủ hoathinh3d.pw 200. Play Protect (đang bật trên TX3) không chặn bản 2.18.
+
 ## Windows 1.16 — 14/11/2026 (lõi Rust, trình phát native, đọc trang bật chống bot)
 
 - **Trình phát native (mpv)** như bản Linux 1.1 — luồng phim trực tiếp (KKPhim, VSMOV, CLB Phim Xưa, server dự phòng KKPhim…)
