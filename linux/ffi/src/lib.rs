@@ -70,6 +70,15 @@ pub extern "C" fn cbtv_init(data_dir: *const c_char, cb: Callback) -> i32 {
         cbtv::prefs::load(if dir.is_empty() { None } else { Some(std::path::PathBuf::from(&dir)) });
         cbtv::log::start();
         dispatch::init();
+        // iOS 6 (bản ConBangTV_Legacy, armv7): việc app đẩy vào từ ngoài (cbtv_call) có lúc không đánh thức luồng nào của tokio —
+        // ngăn xếp lúc kẹt: mọi luồng ngủ ở park_condvar / Driver::turn, việc nằm chờ tới khi một bộ hẹn giờ khác hết hạn (có lúc
+        // 20 giây; đóng phim rồi mở phim khác là gặp). Nhịp 50 ms giữ cho luồng thức dậy xem hàng đợi.
+        #[cfg(target_os = "ios")]
+        cbtv::rt().spawn(async {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+        });
     });
     if r.is_ok() {
         0
