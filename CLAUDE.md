@@ -53,7 +53,10 @@ sang `ConBangTV…apk` từ 13/11/2026 (anh bảo), nhưng release TV vẫn kèm
 
 1. Tăng `<Version>` trong `windows/ConBangTV/ConBangTV.csproj`.
 2. `.\windows\build.ps1` → chạy test rồi đóng gói `dist\ConBangTV-Windows-<bản>.exe`. Chạy thử tệp đóng gói (thư mục dữ liệu riêng:
-   `CONBANG_DATA_DIR`).
+   `CONBANG_DATA_DIR`). Từ 1.16 app dùng **lõi Rust chung với bản Linux** (`linux/core` → `conbang_core.dll` qua `linux/ffi`) và
+   trình phát native **libmpv** (bản LGPL của zhongfly/mpv-winbuild, `build.ps1` tự tải đúng SHA-256 vào `windows\vendor`): máy dựng
+   cần Rust (rustup, MSVC), Visual Studio Build Tools (C++), 7-Zip. Bản thử thì truyền `-Version` (vd `-Version 1.16.0`) —
+   `build.ps1` không kèm số bản sẽ lấy số trong `.csproj` và ghi đè tệp `dist\` của bản đã phát hành.
 3. `git push`, rồi `.\release.ps1 windows -Notes <tệp ghi chú>` — tag `win-v<bản>`, script **luôn đặt `--latest=false`**. Ghi chú
    cũng phải có `## Có gì mới`. Script tự chép tệp vào link cố định (xem dưới).
 4. Kiểm: `releases/latest` vẫn là bản Android; release có `.exe`; tải từ link công khai và từ link cố định, SHA-256 khớp; tự cập
