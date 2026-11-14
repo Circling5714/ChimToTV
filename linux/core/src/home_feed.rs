@@ -28,7 +28,8 @@ const FRESH_NEW: i64 = 7 * DAY;
 const ROW_MAX: usize = 40;
 
 /// Thẻ phim của trang chủ tổng hợp. links: các nguồn có phim này, nguồn mở trước đứng đầu.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Card {
     pub film: Film,
     pub chip: Option<String>,
@@ -37,7 +38,8 @@ pub struct Card {
 
 /// Một hàng. more: địa chỉ danh sách đầy đủ (None = «Xem thêm» hiện mọi phim đã có trong cards); slot: loại hàng trong cài
 /// đặt của người xem (ROWS: "similar", "interest", "newest"…; "custom-&lt;id&gt;" = hàng tự thêm; "topics" = bản cũ).
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FeedRow {
     pub id: String,
     pub title: String,
@@ -55,11 +57,13 @@ impl FeedRow {
 /// Hàng người xem tự thêm (Cài đặt → Trang chủ → Các hàng): chủ đề có sẵn (topic — TOPICS) hoặc lọc theo loại phim
 /// (hoathinh / series / single / tvshows) + nước + thể loại (slug KKPhim, rỗng = mọi) + ngôn ngữ (thuyet-minh / long-tieng).
 /// Lưu JSON như bản Windows: {"id", "topic", "type", "country", "genre", "lang"}.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CustomRow {
     pub id: String,
     pub topic: Option<String>,
     /// Loại phim (khoá JSON "type").
+    #[serde(rename = "type")]
     pub kind: String,
     pub country: String,
     pub genre: String,
@@ -115,7 +119,8 @@ impl CustomRow {
 }
 
 /// Phim đang xem dở vừa có tập mới (key: tên đã chuẩn hoá; ep: số tập mới nhất).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FreshCard {
     pub card: Card,
     pub key: String,
@@ -413,7 +418,8 @@ pub fn set_home_topics(value: &HashSet<String>) {
 // ---- Nguồn ----
 
 /// Nguồn trong danh sách trang (gốc địa chỉ); web: trang web đang dùng + trang hay xem gần đây.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Sources {
     pub kk: Option<String>,
     pub nc: Option<String>,

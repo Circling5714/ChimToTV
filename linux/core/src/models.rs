@@ -167,6 +167,8 @@ impl FilmDetail {
 #[serde(rename_all = "camelCase")]
 pub struct Server {
     pub label: String,
+    /// Loại server (JSON "type" như Server.Type của bản Windows)
+    #[serde(rename = "type")]
     pub kind: String,
 }
 

@@ -13,10 +13,12 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 /// Thể loại / quốc gia / loại phim theo slug của KKPhim (hanh-dong, trung-quoc; loại: hoathinh, series, single, tvshows).
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Tags {
     pub genres: Vec<String>,
     pub countries: Vec<String>,
+    #[serde(rename = "type")]
     pub kind: Option<String>,
 }
 
@@ -67,7 +69,8 @@ impl Tags {
 
 /// Một phim trong danh sách của một nguồn. names: tên đã chuẩn hoá (kk_phim::norm) để gộp phim trùng; updated: lúc nguồn cập
 /// nhật (ms; 0 = không ghi); ep: số tập mới nhất.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FeedItem {
     pub url: String,
     pub title: String,

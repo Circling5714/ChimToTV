@@ -72,10 +72,10 @@ public sealed class HomePage : Page
         }
         var plan = await Task.Run(() => HomeFeed.MakePlan());
         if (run != _run) return;
-        SetNote($"Đang làm mới {plan.Src.Count} nguồn…");
+        SetNote($"Đang làm mới {plan.SrcCount} nguồn…");
         if (!shown)
         {
-            Loading($"Đang tải trang chủ từ {plan.Src.Count} nguồn…");
+            Loading($"Đang tải trang chủ từ {plan.SrcCount} nguồn…");
             if (await Task.Run(() => HomeFeed.Cached(plan)) is { } c && run == _run) shown = Show(c);
         }
         var snap = await Task.Run(() => HomeFeed.Load(plan));

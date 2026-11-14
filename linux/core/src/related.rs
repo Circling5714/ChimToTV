@@ -16,7 +16,8 @@ use std::collections::HashSet;
 pub const MAX: usize = 12;
 
 /// Một hàng: id "series" (cùng bộ) / "similar" (cùng thể loại).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Row {
     pub id: String,
     pub title: String,

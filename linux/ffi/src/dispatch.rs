@@ -39,6 +39,9 @@ fn err(e: cbtv::util::Error) -> String {
 
 /// Hàm nhanh (chạy ngay trong luồng gọi). None = không có trong bảng này.
 pub fn sync(m: &str, a: &Value) -> Option<Res> {
+    if let Some(r) = crate::sites::sync(m, a) {
+        return Some(r);
+    }
     let (group, name) = m.split_once('.')?;
     match group {
         "prefs" => prefs_fn(name, a),
@@ -119,6 +122,9 @@ fn app_fn(name: &str, a: &Value) -> Option<Res> {
 /// Hàm chạy nền (mạng…). Hàm nhanh cũng gọi được theo cách này.
 pub async fn call(id: u64, m: &str, a: Value) -> Res {
     if let Some(r) = sync(m, &a) {
+        return r;
+    }
+    if let Some(r) = crate::sites::call(m, &a).await {
         return r;
     }
     match m {
