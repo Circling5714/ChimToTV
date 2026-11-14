@@ -155,28 +155,7 @@ public class ProfilesTests : PrefsTest
         Assert.Equal(("Bé Na", 6), (nb.Name, nb.Color));
     }
 
-    [Fact]
-    public void SyncCarriesEveryProfile()
-    {
-        Prefs.AddHistory(History("tien-nghich"));
-        var na = Prefs.AddProfile("Bé Na");
-        var payload = SyncService.Payload();
-        Assert.Equal(new[] { "Cả nhà", "Bé Na" }, payload.Profiles.Select(p => p.Name));
-        // Máy kia (TV) có người xem "bé na" (khác id) xem phim x → vào đúng người xem ở máy này
-        var remote = new SyncPayload
-        {
-            Device = "tv", Profiles = new()
-            {
-                new SyncProfile { Id = "", Name = "Cả nhà" },
-                new SyncProfile { Id = "p7", Name = " bé na ", History = new() { new SyncHistory("x", "X", "", "Tập 2", "x/2", 50) } },
-            },
-            Sites = Prefs.SyncSitesData,
-        };
-        Assert.True(SyncService.Absorb(remote));
-        Assert.Equal(new[] { "tien-nghich" }, Prefs.History.Select(h => h.Title));
-        Prefs.SwitchProfile(na.Id);
-        Assert.Equal(new[] { "X" }, Prefs.History.Select(h => h.Title));
-    }
+    // Đồng bộ nhiều người xem: lõi Rust (linux/core/tests/profiles.rs — sync_carries_every_profile)
 }
 
 /// Giới hạn giờ xem — cùng ca với WatchLimitTests.swift.

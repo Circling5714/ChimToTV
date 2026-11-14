@@ -53,7 +53,8 @@ public static class Prefs
             // Bản thử: cổng đồng bộ 8792 (chạy song song bản chính trên cùng máy) — lõi đọc biến này
             Environment.SetEnvironmentVariable("CONBANG_DEBUG", "1");
 #endif
-            Native.Init(DataDir);
+            if (Native.Ready) Native.SyncVoid("prefs.load", new { dir = DataDir }); // đổi thư mục (test)
+            else Native.Init(DataDir);
             // Số bản Windows cho lõi (lời chào đồng bộ…)
             Native.SyncVoid("app.setVersion", new { version = UpdateCheck.CurrentVersion });
             InvalidateCaches();

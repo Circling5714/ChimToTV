@@ -18,4 +18,10 @@
     <ProjectReference Include="..\ConBangTV\ConBangTV.csproj" />
   </ItemGroup>
 
+  <!-- Lõi Rust (Prefs, giới hạn giờ xem… chạy qua conbang_core.dll) -->
+  <ItemGroup>
+    <None Include="..\..\linux\target\release\conbang_core.dll" Link="conbang_core.dll" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('..\..\linux\target\release\conbang_core.dll')" />
+  </ItemGroup>
+
 </Project>

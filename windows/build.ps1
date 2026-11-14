@@ -16,6 +16,23 @@ $proj = Join-Path $here "ConBangTV\ConBangTV.csproj"
 if (-not $Version) { $Version = ([xml](Get-Content $proj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1 }
 $short = $Version -replace '\.0$', ''
 
+# Lõi Rust dùng chung với bản Linux (linux\core) → conbang_core.dll (linux\ffi): chạy test của lõi rồi dựng bản release; dự án
+# WPF chép / gói DLL vào .exe. Cần Rust (rustup, bản MSVC) + Visual Studio Build Tools (C++).
+$cargo = Join-Path $env:USERPROFILE ".cargo\bin\cargo.exe"
+if (-not (Test-Path $cargo)) { throw "Chưa có Rust: cài rustup (winget install Rustlang.Rustup) + Visual Studio Build Tools (C++)" }
+$linux = Join-Path (Split-Path $here -Parent) "linux"
+Push-Location $linux
+try {
+    Write-Host "Test lõi Rust…"
+    & $cargo test -p conbang-core --quiet --color never
+    if ($LASTEXITCODE -ne 0) { throw "Test lõi Rust lỗi" }
+    Write-Host "Dựng lõi Rust (conbang_core.dll)…"
+    & $cargo build -p conbang-ffi --release --quiet --color never
+    if ($LASTEXITCODE -ne 0) { throw "Dựng lõi Rust lỗi" }
+}
+finally {
+    Pop-Location
+}
 Write-Host "Chạy test…"
 dotnet test (Join-Path $here "ConBangTV.Tests\ConBangTV.Tests.csproj") -c Release --nologo -v q
 if ($LASTEXITCODE -ne 0) { throw "Test lỗi" }

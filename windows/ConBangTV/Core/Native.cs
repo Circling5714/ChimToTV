@@ -44,6 +44,9 @@ public static class Native
     private static long _next;
     private static bool _ready;
 
+    /// Đã mở lõi chưa.
+    public static bool Ready => _ready;
+
     private sealed record Pending(TaskCompletionSource<JsonNode?> Tcs, Action<JsonNode?>? Part);
 
     /// Sự kiện của lõi (tên, dữ liệu) — gọi từ luồng của lõi, bên nhận tự chuyển sang luồng giao diện nếu cần.

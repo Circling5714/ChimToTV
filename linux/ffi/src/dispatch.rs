@@ -82,6 +82,11 @@ fn prefs_fn(name: &str, a: &Value) -> Option<Res> {
             cbtv::secret::set(&s(a, "name"), &s(a, "value"));
             Ok(Value::Null)
         }
+        // Nạp kho ở thư mục khác (test của app WPF đổi thư mục dữ liệu giữa các ca)
+        "load" => {
+            prefs::load(Some(std::path::PathBuf::from(s(a, "dir"))));
+            Ok(Value::Null)
+        }
         "flush" => {
             prefs::flush();
             Ok(Value::Null)
