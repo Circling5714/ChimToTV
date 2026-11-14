@@ -135,6 +135,10 @@ fn handle(r: Req) {
             let skip = lines.len().saturating_sub(n);
             send(format!("#{last}\n{}", lines[skip..].join("\n")));
         }
+        "/web" => {
+            // Đọc hộ trang bật chống bot: phiên WebKit ẩn + trang lõi đang nhớ là chặn
+            send(format!("{}\nlõi nhớ: {}", crate::webfetch::describe(), cbtv::web_fetch::hosts().join(", ")));
+        }
         "/js" => {
             let code = r.q.get("code").cloned().unwrap_or(r.body);
             match app().player.borrow().clone() {

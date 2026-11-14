@@ -2208,7 +2208,7 @@ fn has_gpu() -> bool {
         .unwrap_or(false)
 }
 
-fn web_user_agent() -> String {
+pub(crate) fn web_user_agent() -> String {
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15".to_string()
 }
 

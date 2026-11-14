@@ -10,7 +10,7 @@ default-members = ["core", "app"]
 
 [workspace.package]
 # Số hiệu bản Linux (tag linux-v<bản>)
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 license = "MIT"
 

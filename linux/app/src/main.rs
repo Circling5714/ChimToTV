@@ -21,6 +21,7 @@ mod player;
 mod profiles;
 mod startup;
 mod ui;
+mod webfetch;
 
 use gtk::prelude::*;
 
@@ -40,6 +41,10 @@ fn main() {
     cbtv::log::start();
     cbtv::log::d("app", &format!("Côn Bằng TV {} (Linux) mở", cbtv::version()));
     cbtv::prefs::apply_net_defaults();
+    // Bản mới: thử lại ngay các nguồn trang chủ bản cũ lỗi liên tục (đang tạm nghỉ)
+    if cbtv::feed::clear_rest_on_upgrade(cbtv::version()) {
+        cbtv::log::d("app", "Bản mới — bỏ tạm nghỉ của các nguồn trang chủ");
+    }
     cbtv::net::start_bridge();
     fonts::install();
     glib::set_prgname(Some("conbangtv"));
@@ -53,6 +58,9 @@ fn main() {
             return;
         }
         css::install();
+        // Trang bật chống bot của Cloudflare: lõi nhờ WebKitGTK ẩn đọc hộ — đăng ký trước khi dựng app (menu của trang đọc ngay lúc
+        // dựng; đăng ký sau thì lần đọc đầu gặp lớp chặn mà chưa ai đọc hộ → menu trống)
+        webfetch::install();
         let a = app::App::build(g);
         a.start();
     });

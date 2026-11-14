@@ -764,6 +764,19 @@ pub fn clear_rest() {
     crate::prefs::set_feed_health("{}");
 }
 
+/// App vừa lên bản mới (hoặc mới cài): bỏ tạm nghỉ của mọi nguồn một lần — bản mới có thể đọc được trang mà bản cũ lỗi liên
+/// tục (vd trang bật chống bot của Cloudflare, đọc hộ từ Linux 1.2 / Windows 1.17), khỏi chờ tới 6 giờ mới thấy lại trên trang chủ.
+/// true = vừa bỏ.
+pub fn clear_rest_on_upgrade(version: &str) -> bool {
+    let seen = crate::prefs::get_raw("feed_rest_ver").and_then(|v| v.as_str().map(|s| s.to_string()));
+    if seen.as_deref() == Some(version) {
+        return false;
+    }
+    clear_rest();
+    crate::prefs::set_raw("feed_rest_ver", Some(json!(version)));
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

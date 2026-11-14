@@ -135,6 +135,10 @@ fn app_fn(name: &str, a: &Value) -> Option<Res> {
         "version" => ok(cbtv::version()),
         "setVersion" => {
             cbtv::set_app_version(&s(a, "version"));
+            // Bản mới: thử lại ngay các nguồn trang chủ bản cũ lỗi liên tục (đang tạm nghỉ)
+            if cbtv::feed::clear_rest_on_upgrade(&s(a, "version")) {
+                cbtv::log::d("app", "Bản mới — bỏ tạm nghỉ của các nguồn trang chủ");
+            }
             Ok(Value::Null)
         }
         "userAgent" => ok(http::user_agent()),
