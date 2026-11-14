@@ -227,6 +227,25 @@ enum DebugRoutes {
             ])
         case "/frames":
             return .json(PlayerModel.current?.frames.map { $0.url } ?? [])
+        case "/web":
+            // Đọc hộ trang bật chống bot (WebFetch): ?forget=1 quên các trang đã nhớ, ?remember=<tên miền> giả trang đó vừa bật
+            // chống bot (thử đường WebView khi Cloudflare không chặn máy này), ?fetch=<url> tải thử qua Http.get
+            if q["forget"] == "1" { WebFetch.forgetAll() }
+            if let h = q["remember"], !h.isEmpty { WebFetch.remember(h) }
+            if let u = q["fetch"] {
+                let t0 = Date()
+                do {
+                    let r = try await Http.get(u)
+                    return .json(["code": r.code, "url": r.url, "bytes": r.data.count, "type": r.contentType ?? "",
+                                  "ms": Int(Date().timeIntervalSince(t0) * 1000), "head": String(r.body.prefix(160)),
+                                  "hosts": WebFetch.rememberedHosts, "sessions": WebFetcher.shared.describe])
+                } catch {
+                    return .json(["err": error.localizedDescription, "hosts": WebFetch.rememberedHosts,
+                                  "sessions": WebFetcher.shared.describe])
+                }
+            }
+            return .json(["hosts": WebFetch.rememberedHosts, "sessions": WebFetcher.shared.describe,
+                          "provider": WebFetch.provider != nil])
         case "/log":
             let since = Int(q["since"] ?? "0") ?? 0
             let l = Log.since(since)

@@ -68,23 +68,47 @@ enum Http {
     }
 
     static func get(_ url: String, headers: [String: String] = [:]) async throws -> Response {
+        let web = WebFetch.Request(url: url, method: "GET", body: nil, headers: headers)
+        // Trang bật chống bot của Cloudflare (đã nhớ): đọc thẳng qua WebView ẩn
+        if WebFetch.provider != nil && WebFetch.needs(url) { return try await WebFetch.fetch(web) }
         do {
-            return try await send(request(url, headers: headers))
-        } catch let e as URLError where e.code == .networkConnectionLost {
-            // Kết nối giữ lại từ lần trước bị ngắt ngầm → thử lại một lần (bản Android: "unexpected end of stream")
-            var h = headers
-            h["Connection"] = "close"
-            return try await send(request(url, headers: h))
+            do {
+                return try await send(request(url, headers: headers))
+            } catch let e as URLError where e.code == .networkConnectionLost {
+                // Kết nối giữ lại từ lần trước bị ngắt ngầm → thử lại một lần (bản Android: "unexpected end of stream")
+                var h = headers
+                h["Connection"] = "close"
+                return try await send(request(url, headers: h))
+            }
+        } catch let e as WebFetch.ChallengeError {
+            return try await viaWeb(web, e)
         }
     }
 
     /// POST dạng form (admin-ajax.php của WordPress).
     static func post(_ url: String, form: [String: String], headers: [String: String] = [:]) async throws -> Response {
+        let body = form.map { "\($0.key.formEncoded)=\($0.value.formEncoded)" }.joined(separator: "&")
+        var webHeaders = headers
+        webHeaders["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
+        let web = WebFetch.Request(url: url, method: "POST", body: body, headers: webHeaders)
+        if WebFetch.provider != nil && WebFetch.needs(url) { return try await WebFetch.fetch(web) }
         var r = try request(url, headers: headers)
         r.httpMethod = "POST"
         r.setValue("application/x-www-form-urlencoded; charset=UTF-8", forHTTPHeaderField: "Content-Type")
-        r.httpBody = form.map { "\($0.key.formEncoded)=\($0.value.formEncoded)" }.joined(separator: "&").data(using: .utf8)
-        return try await send(r)
+        r.httpBody = body.data(using: .utf8)
+        do {
+            return try await send(r)
+        } catch let e as WebFetch.ChallengeError {
+            return try await viaWeb(web, e)
+        }
+    }
+
+    /// Vừa gặp lớp chống bot của Cloudflare: nhớ trang, app có WebView thì đọc hộ (không thì báo lỗi «chống bot»).
+    private static func viaWeb(_ web: WebFetch.Request, _ e: WebFetch.ChallengeError) async throws -> Response {
+        WebFetch.remember(e.host)
+        guard WebFetch.provider != nil else { throw e }
+        Log.d("Web", "\(e.host) bật chống bot của Cloudflare — đọc qua WebView")
+        return try await WebFetch.fetch(web)
     }
 
     static func request(_ url: String, headers: [String: String] = [:]) throws -> URLRequest {
@@ -101,7 +125,14 @@ enum Http {
         let (data, resp) = try await session.data(for: r)
         let h = resp as? HTTPURLResponse
         let code = h?.statusCode ?? 200
-        if code >= 400 { throw HttpError(code: code) }
+        if code >= 400 {
+            // Lớp chống bot của Cloudflare (WebFetch): báo riêng để bên gọi nhờ WebView đọc hộ
+            if (code == 403 || code == 503),
+               WebFetch.isChallenge(code: code, cfMitigated: h?.value(forHTTPHeaderField: "cf-mitigated"), body: data) {
+                throw WebFetch.ChallengeError(host: (resp.url?.host ?? r.url?.host ?? "").lowercased())
+            }
+            throw HttpError(code: code)
+        }
         return Response(url: resp.url?.absoluteString ?? r.url?.absoluteString ?? "", code: code, data: data,
                         contentType: h?.value(forHTTPHeaderField: "Content-Type"))
     }

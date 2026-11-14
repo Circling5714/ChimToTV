@@ -67,6 +67,10 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         Prefs.applyNetDefaults()
         AppProxy.apply()
         WebSetup.prepare()
+        // Trang bật chống bot của Cloudflare: đọc hộ bằng WKWebView ẩn (Player/WebFetcher.swift)
+        WebFetcher.install()
+        // Bản mới: bỏ tạm nghỉ của các nguồn trang chủ (lỗi cũ có thể đã được bản này sửa)
+        if Feed.clearRestOnUpgrade(UpdateCheck.currentVersion) { Log.d("Feed", "bản mới — bỏ tạm nghỉ các nguồn trang chủ") }
         #if DEVTOOLS
         DebugServer.shared.start()
         #endif

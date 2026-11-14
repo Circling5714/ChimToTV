@@ -479,4 +479,14 @@ enum Feed {
         healthLock.lock(); defer { healthLock.unlock() }
         Prefs.feedHealth = "{}"
     }
+
+    /// App vừa lên bản mới (hoặc mới cài): bỏ tạm nghỉ của mọi nguồn một lần — bản mới có thể đọc được trang mà bản cũ lỗi liên
+    /// tục (vd trang bật chống bot của Cloudflare, đọc hộ từ iPad / Mac 1.18), khỏi chờ tới 6 giờ. true = vừa bỏ. Như lõi Rust.
+    @discardableResult
+    static func clearRestOnUpgrade(_ version: String) -> Bool {
+        guard Prefs.feedRestVersion != version else { return false }
+        clearRest()
+        Prefs.feedRestVersion = version
+        return true
+    }
 }

@@ -76,7 +76,9 @@ enum UpdateCheck {
 
     /// Ghi chú phát hành (markdown) → vài dòng chữ thường cho hộp thoại; có mục "Có gì mới" thì chỉ lấy mục đó.
     static func summary(_ notes: String) -> String {
-        let lines = notes.components(separatedBy: .newlines).map { $0.trimmed }
+        // Ghi chú lỡ lưu kèm BOM (Windows 1.16, 14/11/2026) thì dòng «## Có gì mới» không bắt đầu bằng "#"
+        let clean = notes.hasPrefix("\u{FEFF}") ? String(notes.dropFirst()) : notes
+        let lines = clean.components(separatedBy: .newlines).map { $0.trimmed }
         let start = lines.firstIndex { $0.hasPrefix("#") && $0.lowercased().contains("có gì mới") }
         var section = lines
         if let s = start {

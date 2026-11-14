@@ -968,6 +968,12 @@ enum Prefs {
         set { store.set(newValue, forKey: "feed_health") }
     }
 
+    /// Bản app lần cuối bỏ tạm nghỉ nguồn trang chủ (Feed.clearRestOnUpgrade).
+    static var feedRestVersion: String {
+        get { store.string(forKey: "feed_rest_ver") ?? "" }
+        set { store.set(newValue, forKey: "feed_rest_ver") }
+    }
+
     /// Thể loại / quốc gia của phim đã xem (FilmTags) — chung cả máy.
     static var filmTags: String {
         get { store.string(forKey: "film_tags") ?? "{}" }
