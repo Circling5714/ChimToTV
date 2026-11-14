@@ -160,7 +160,7 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | yanhh3d.ee | yanhh3d (`flw-item`) | `player.php` → iframe |
 | hoathinh3d.ee | HaLim, chia Việt Sub / Thuyết Minh | `player.php` → iframe |
 | hhkungfu.ee | HaLim, chia Vietsub / Thuyết Minh | `player.php` → iframe |
-| hoathinh3d.pw | HaLimMovies (Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Đánh Giá Cao đọc qua API JSON của trang, từ 2.2) | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
+| hoathinh3d.pw | HaLimMovies (Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Đánh Giá Cao đọc qua API JSON của trang, từ 2.2). Từ 14/11/2026 trang bật lớp chống bot của Cloudflare — bản Windows 1.16+ đọc qua WebView ẩn (xem [Bản Windows](#bản-windows)); bản TV / iPad / Linux / Mac chưa đọc được | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
 | phimmois.fun (trước là phimmoir.fun; từ 06/11/2026 tự chuyển sang phimmoiw.fun — app tự đổi theo) | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
 | mephim.ddns.net (từ 2.5 / iPad 1.5) | ứng dụng React — đọc API JSON `/api/movies/…` của trang (nguồn KKPhim), chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
 | KKPhim — www.kkphim.com (từ 2.6 / iPad 1.6 / Windows 1.3) | không đọc trang: gọi thẳng API công khai `phimapi.com`, chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
@@ -320,14 +320,31 @@ mục «Bàn phím rời» của [Bản iPad](#bản-ipad)).
 
 ## Bản Windows
 
-App cho máy tính và mini PC cắm tivi chạy Windows 10 / 11 (thư mục `windows/`, C# .NET 8 + WPF + WebView2), dùng được
-cả chuột lẫn bàn phím / remote:
+App cho máy tính và mini PC cắm tivi chạy Windows 10 / 11 (thư mục `windows/`, C# .NET 8 + WPF + WebView2; từ 1.16 phần lõi —
+đọc trang, trang chủ tổng hợp, cài đặt, mạng, đồng bộ — là **lõi Rust dùng chung với bản Linux** `linux/core`, gói thành
+`conbang_core.dll` qua `linux/ffi`; giao diện WPF giữ nguyên), dùng được cả chuột lẫn bàn phím / remote:
 
 - **Cài:** tải bản mới nhất qua
   [link cố định](https://github.com/Circling5714/ChimToTV/releases/download/conbangtv_windows/ConBangTV-Windows.exe) (hoặc
   `ConBangTV-Windows-<bản>.exe` ở release `win-v<bản>`), để vào thư mục nào cũng được rồi mở — không cần cài .NET. Lần đầu Windows báo «Windows protected your PC» (app chưa có chữ ký số): **More info → Run anyway**. Cần Microsoft
   Edge WebView2 Runtime (Windows 10 / 11 cập nhật thường có sẵn; máy chưa có thì app báo và mở trang tải). Dữ liệu ở
-  `%LOCALAPPDATA%\ConBangTV`. Bản sau tự cập nhật (Cài đặt → **Kiểm tra cập nhật**; tự hỏi tối đa 2 giờ một lần).
+  `%LOCALAPPDATA%\ConBangTV`. Bản sau tự cập nhật (Cài đặt → **Kiểm tra cập nhật**; tự hỏi tối đa 2 giờ một lần). Từ 1.16 tệp
+  khoảng 114 MB vì kèm trình phát mpv.
+- **Trình phát native (từ 1.16; Cài đặt → «Trình phát (thử nghiệm)»: Native (mpv) / Web (WebView2), mặc định Native):** luồng
+  `.m3u8` / tệp video trực tiếp (KKPhim, VSMOV, CLB Phim Xưa, server dự phòng KKPhim…) phát bằng **libmpv** vẽ thẳng vào cửa sổ app
+  (Direct3D 11, giải mã bằng card — `hwdec=auto-safe`), tải qua cổng phát nội bộ của lõi như bản Linux (bỏ quảng cáo, DNS mã
+  hoá, vượt chặn, proxy). Trình phát nhúng của trang (JW Player) thì app thử lấy link luồng rồi chuyển sang mpv; luồng có mã hoá
+  riêng (yanhh3d / streamfree, NguonC) vẫn phát bằng trang. mpv lỗi / 20 giây chưa chạy → tự quay về trình phát web, đúng chỗ đang
+  xem. Đo khi xem phim KK 1080p: 1 tiến trình, ~520 MB, CPU ~0,3% một nhân (WebView2: 8 tiến trình, ~920 MB, 1,3–1,9%). Cửa sổ
+  phim nhỏ, toàn màn hình, tốc độ, đổi bản / tập / server như cũ.
+  **Giấy phép:** `libmpv-2.dll` là bản dựng LGPL của [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild) (tag
+  `2026-11-12-fe753a7824`, `windows/build.ps1` tải đúng SHA-256) từ [mpv](https://github.com/mpv-player/mpv) — LGPL 2.1 trở lên;
+  mã nguồn mpv / FFmpeg ở các link đó.
+- **Trang bật lớp chống bot của Cloudflare** (từ 1.16 — hoathinh3d.pw từ 14/11/2026 trả «Just a moment…» / 403 cho mọi trình tải
+  không phải trình duyệt, cả trang, API lẫn ảnh): lõi nhận ra lớp chặn (`cf-mitigated: challenge`) và nhờ app đọc hộ bằng một
+  **WebView2 ẩn** (`Player/WebFetch.cs`, cùng cookie với trình phát): mở trang chủ cho trình duyệt tự qua lớp chặn (~0,4–1 giây),
+  rồi mỗi yêu cầu là `fetch()` ngay trong trang đó (`app/src/main/assets/web-fetch.js`); ảnh bìa cũng qua đây. Nhớ trang bị chặn
+  12 giờ; 5 phút không dùng thì đóng WebView ẩn. App không giả / không giải hộ lớp chặn — trang đòi bấm xác nhận thì báo lỗi.
 - **Màn chính:** menu bên trái (Người xem, Trang chủ, Tìm kiếm, Xem tiếp / Lịch sử, Theo dõi, các mục của trang, Thể loại… /
   Quốc gia…, Đổi trang phim, Đồng bộ trong nhà, Cài đặt), lưới phim; chi tiết phim có Xem tiếp, Xem từ đầu, Mới nhất, Theo dõi, các bản
   (Vietsub / Thuyết Minh) và danh sách tập (tập đã xem màu xanh).
@@ -351,7 +368,10 @@ cả chuột lẫn bàn phím / remote:
   «Phóng to phim đang xem» / «Tắt phim thu nhỏ».
 - **Đồng bộ trong nhà** (từ 1.2): menu «⇄ Đồng bộ trong nhà» — như mục [Đồng bộ trong nhà](#đồng-bộ-trong-nhà-từ-22): hiện mã
   ghép của máy tính, tìm máy trong mạng, ghép bằng mã hoặc IP của máy kia. Lần đầu Windows hỏi cho dùng mạng: **Cho phép** (mạng
-  riêng) — không thì TV / iPad không gọi sang máy tính được (máy tính vẫn tự gọi sang TV / iPad).
+  riêng) — không thì TV / iPad không gọi sang máy tính được (máy tính vẫn tự gọi sang TV / iPad). Từ 1.16 máy tính **tự đồng bộ 3
+  phút một lần** khi app đang mở (trừ lúc thu nhỏ / đang xem phim; mở lại cửa sổ hay thoát phim là đồng bộ ngay) — mỗi lần đồng bộ
+  là hai chiều, nên không cho phép (hoặc Windows không hỏi) thì thay đổi trên TV vẫn sang máy tính chậm nhất 3 phút; nên ghép từ
+  phía máy tính (gõ mã đang hiện trên TV).
 - **DNS mã hoá** (từ 1.8, bật sẵn): như bản TV — xem [DNS mã hoá](#dns-mã-hoá-doh--dot-bật-sẵn-từ-211).
 - **Cài lên tivi / mời bạn bè** (từ 1.14): Cài đặt → Giới thiệu → «Cài lên tivi / mời bạn bè — mã Downloader 9192365» hiện mã
   Downloader thật to và ba bước cài bản TV; nút «Chép hướng dẫn để gửi bạn bè» (dán vào Zalo, tin nhắn), «Chép mã», «Mở trang

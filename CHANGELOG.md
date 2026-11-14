@@ -9,6 +9,37 @@ Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề
 Bản Mac (macOS 12+, từ 13/11/2026, cùng mã nguồn và số bản với bản iPad) ghi riêng với tiêu đề "Mac …", tag `mac-v…`.
 Bản Linux (Ubuntu 22.04+ / Linux Mint 21+ / Debian 12+, từ 13/11/2026, tệp `.deb`) ghi riêng với tiêu đề "Linux …", tag `linux-v…`.
 
+## Windows 1.16 — 14/11/2026 (lõi Rust, trình phát native, đọc trang bật chống bot)
+
+- **Trình phát native (mpv)** như bản Linux 1.1 — luồng phim trực tiếp (KKPhim, VSMOV, CLB Phim Xưa, server dự phòng KKPhim…)
+  phát bằng **libmpv** vẽ thẳng vào cửa sổ app, giải mã bằng card đồ hoạ (Direct3D 11). Trình phát nhúng của trang (JW Player) thì
+  app thử lấy link luồng rồi chuyển sang mpv; luồng có mã hoá riêng của trang (yanhh3d / streamfree, NguonC) vẫn phát bằng trang.
+  mpv lỗi / 20 giây chưa chạy → tự quay về trình phát web đúng chỗ đang xem. Cài đặt → «Trình phát (thử nghiệm)»: Native / Web.
+  Đo khi xem KK 1080p: 1 tiến trình ~520 MB, CPU ~0,3% một nhân (trước: 8 tiến trình ~920 MB, 1,3–1,9%).
+- **Xem lại được hoathinh3d.pw:** từ 14/11/2026 trang bật lớp chống bot của Cloudflare (403 «Just a moment…» với mọi trình tải
+  không phải trình duyệt — cả trang, API, ảnh). App đọc hộ bằng một WebView2 ẩn: trình duyệt tự qua lớp chặn (~0,4–1 giây), rồi
+  mỗi yêu cầu là `fetch()` ngay trong trang. Áp dụng cho mọi trang bật lớp chặn này; trang đòi bấm xác nhận thì báo lỗi.
+- **Đồng bộ trong nhà:** máy tính tự đồng bộ 3 phút một lần khi app đang mở — tường lửa Windows chặn tivi gọi vào thì thay đổi
+  trên tivi vẫn sang máy tính (chậm nhất 3 phút); màn Đồng bộ khuyên ghép từ phía máy tính.
+- **Lõi app mới:** phần đọc trang, trang chủ tổng hợp, cài đặt, mạng (DNS mã hoá, vượt chặn, proxy / Shadowsocks), đồng bộ là
+  **lõi Rust dùng chung với bản Linux** (`conbang_core.dll`), thay ~8 000 dòng lõi C#; giao diện giữ nguyên. Dữ liệu, mật khẩu proxy
+  / khoá Shadowsocks (DPAPI) của bản cũ đọc được nguyên.
+- Sửa thêm: kết nối DNS mã hoá cũ treo lại sau khi bật proxy (cả bản Linux, bản sau); trình phát nhúng không lấy được link thì
+  không chờ mãi.
+- Tệp lớn hơn (~114 MB) vì kèm libmpv — bản dựng LGPL của zhongfly/mpv-winbuild (mpv: LGPL 2.1+).
+- bản 1.16.0 · tag `win-v1.16` (không phải "latest") · commit `d0531d4` · `ConBangTV-Windows-1.16.exe` 119 812 848 byte ·
+  SHA-256 `6f99d472c96cef9a231e1a2f45d8259de9395bf06104427faec1b5d2936847e8`
+- 211 test lõi + 27 test C#. Thử trước phát hành (bản Debug + tệp đóng gói): proxy SOCKS5 (sai / đúng mật khẩu, proxy tắt thì báo
+  lỗi chứ không đi thẳng), Shadowsocks thật (chỉ đi qua máy chủ SS), vượt chặn Mức 1 / 2 với nhà mạng thật, đồng bộ với TV (ghép,
+  gộp lịch sử, xoá, theo dõi; TV → máy tính qua lượt 3 phút), người xem / PIN / giới hạn giờ xem, hàng trang chủ tự thêm, phim liên
+  quan, trình phát (tốc độ, tập trước / sau, đổi bản / server, cửa sổ nhỏ, toàn màn hình), hoathinh3d.pw (trang chủ, menu, API,
+  lịch chiếu, trang phim, tìm kiếm, «Đo», ảnh bìa, phát tập). Tự cập nhật thật (GitHub giả trên máy) 1.15 → 1.16 và 1.16 → 1.17
+  (tải qua lõi mới); tệp đóng gói không có cổng gỡ lỗi.
+- Đăng lúc 11:08:27 bằng `release.ps1 windows` (`releases/latest` vẫn là bản TV v2.17; link cố định `conbangtv_windows` chép đè sang
+  1.16, khớp SHA-256; `-Verify` đạt). **Tự cập nhật thật 1.15 → 1.16 qua GitHub** (bản chép riêng): bấm «Cập nhật ngay» 11:09:35 →
+  tải xong, mở lại bản 1.16 lúc 11:09:54. Ghi chú phát hành lúc đầu có BOM ở đầu tệp nên hộp «Có bản mới» hiện cả mục «Lưu ý» — đã
+  sửa ghi chú trên GitHub (`gh release edit`), các bản sau bộ đọc ghi chú tự bỏ BOM.
+
 ## Linux 1.1 — 14/11/2026 (trình phát native)
 
 - **Trình phát native (thử nghiệm)** — luồng phim trực tiếp phát bằng **mpv** thay cho trang web: KKPhim (cả trang KKPhim, mephim,
