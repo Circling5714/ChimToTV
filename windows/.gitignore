@@ -1,0 +1,3 @@
+
+# Thư viện ngoài tải lúc dựng (libmpv cho trình phát native — build.ps1 tự tải, kiểm SHA-256)
+/vendor/

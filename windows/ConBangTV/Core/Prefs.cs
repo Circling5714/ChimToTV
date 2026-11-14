@@ -899,6 +899,13 @@ public static class Prefs
         set => Set(K("video_fill"), value);
     }
 
+    /// Trình phát native (mpv) cho luồng .m3u8 / tệp video — cài đặt của máy (không theo người xem), mặc định bật; như bản Linux.
+    public static bool NativePlayer
+    {
+        get => !Has("native_player") || Get<bool>("native_player");
+        set => Set("native_player", value);
+    }
+
     // ---- Vị trí đang xem từng tập (giây) ----
 
     public sealed class Position

@@ -129,6 +129,10 @@ public static class DebugServer
                         new { hosts = Unblock.Level2Memo.All(), autoLevel2 = Unblock.Level2Memo.AutoCount, bridge = Net.BridgePort }));
                     type = "application/json; charset=utf-8";
                     break;
+                case "/native":
+                    // Thử đường tự chuyển của trình phát native: /native?fail=1 (mpv báo lỗi giữa chừng)
+                    body = Text(await _w!.Dispatcher.InvokeAsync(() => q["fail"] == "1" ? _w.OpenPlayer?.DebugNativeFail() ?? "trình phát chưa mở" : "ok"));
+                    break;
                 case "/play":
                     await _w!.Dispatcher.InvokeAsync(() => _w.Play(q["film"]!, q["ep"]!));
                     body = Text("ok");

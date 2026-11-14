@@ -266,6 +266,14 @@ public sealed class SettingsPage : Page
             ("Bật", Prefs.AutoNext, (Action)(() => Prefs.AutoNext = true)),
             ("Tắt", !Prefs.AutoNext, () => Prefs.AutoNext = false),
         });
+        Option("Trình phát (thử nghiệm)", new[]
+        {
+            ("Native (mpv)", Prefs.NativePlayer, (Action)(() => Prefs.NativePlayer = true)),
+            ("Web (WebView2)", !Prefs.NativePlayer, () => Prefs.NativePlayer = false),
+        }, Player.NativeVideo.Available
+            ? "Native: luồng phim trực tiếp (KKPhim, VSMOV, CLB Phim Xưa…) phát bằng mpv thay cho trang web — nhẹ hơn, giải mã bằng card đồ hoạ. " +
+              "Trình phát nhúng có mã hoá riêng (yanhh3d, NguonC…) vẫn phát bằng trang; luồng nào mpv không mở được thì app tự chuyển sang trình phát web."
+            : "Bản này thiếu libmpv — đang phát bằng trình phát web.");
         Option("Server dự phòng KKPhim", new[]
         {
             ("Bật", Prefs.KkBackup, (Action)(() => Prefs.KkBackup = true)),

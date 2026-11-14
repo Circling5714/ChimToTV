@@ -47,6 +47,13 @@
           CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\..\linux\target\release\conbang_core.dll')" />
   </ItemGroup>
 
+  <!-- Trình phát native (Player/NativeVideo.cs): libmpv-2.dll — build.ps1 tải bản dựng của shinchiro/mpv-winbuild-cmake (đúng
+       SHA-256) vào windows\vendor\mpv. Không có thì app phát bằng WebView2 như trước. -->
+  <ItemGroup>
+    <None Include="..\vendor\mpv\x\libmpv-2.dll" Link="libmpv-2.dll" CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\vendor\mpv\x\libmpv-2.dll')" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="ConBangTV.Tests" />
   </ItemGroup>

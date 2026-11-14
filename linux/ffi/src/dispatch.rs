@@ -50,6 +50,9 @@ pub fn sync(m: &str, a: &Value) -> Option<Res> {
     if let Some(r) = crate::syncfn::sync(m, a) {
         return Some(r);
     }
+    if let Some(r) = crate::media::sync(m, a) {
+        return Some(r);
+    }
     let (group, name) = m.split_once('.')?;
     match group {
         "prefs" => prefs_fn(name, a),
@@ -154,6 +157,9 @@ pub async fn call(id: u64, m: &str, a: Value) -> Res {
         return r;
     }
     if let Some(r) = crate::syncfn::call(m, &a).await {
+        return r;
+    }
+    if let Some(r) = crate::media::call(m, &a).await {
         return r;
     }
     match m {

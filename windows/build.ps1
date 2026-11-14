@@ -33,6 +33,34 @@ try {
 finally {
     Pop-Location
 }
+# Trình phát native (Player\NativeVideo.cs): libmpv-2.dll bản LGPL của zhongfly/mpv-winbuild — chốt đúng tệp + SHA-256, tải một
+# lần vào windows\vendor\mpv (không đưa lên git), giải nén bằng 7-Zip. Dự án WPF gói DLL vào .exe.
+$mpvTag = "2026-11-12-fe753a7824"
+$mpvFile = "mpv-dev-lgpl-x86_64-20261112-git-fe753a7824.7z"
+$mpvSha = "9b9f903e08a216d6636280042b98ee20b972a7321735ab3d1710c00881f47dcc"
+$vendor = Join-Path $here "vendor\mpv"
+$mpvDll = Join-Path $vendor "x\libmpv-2.dll"
+$mpvStamp = Join-Path $vendor "x\nguon.txt"
+if (-not (Test-Path $mpvDll) -or -not (Test-Path $mpvStamp) -or (Get-Content $mpvStamp -Raw).Trim() -ne $mpvFile) {
+    New-Item -ItemType Directory -Force $vendor | Out-Null
+    $arc = Join-Path $vendor $mpvFile
+    if (-not (Test-Path $arc)) {
+        Write-Host "Tải libmpv ($mpvFile)…"
+        Invoke-WebRequest -UseBasicParsing "https://github.com/zhongfly/mpv-winbuild/releases/download/$mpvTag/$mpvFile" -OutFile $arc
+    }
+    if ((Get-FileHash $arc -Algorithm SHA256).Hash.ToLower() -ne $mpvSha) {
+        Remove-Item $arc -Force
+        throw "libmpv tải về sai SHA-256"
+    }
+    $7z = (Get-Command 7z -ErrorAction SilentlyContinue).Source
+    if (-not $7z) { $7z = "C:\Program Files\7-Zip\7z.exe" }
+    if (-not (Test-Path $7z)) { throw "Cần 7-Zip để giải nén libmpv (winget install 7zip.7zip)" }
+    $x = Join-Path $vendor "x"
+    if (Test-Path $x) { Remove-Item $x -Recurse -Force }
+    & $7z x $arc "-o$x" -y | Out-Null
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $mpvDll)) { throw "Giải nén libmpv lỗi" }
+    Set-Content $mpvStamp $mpvFile -Encoding utf8
+}
 Write-Host "Chạy test…"
 dotnet test (Join-Path $here "ConBangTV.Tests\ConBangTV.Tests.csproj") -c Release --nologo -v q
 if ($LASTEXITCODE -ne 0) { throw "Test lỗi" }

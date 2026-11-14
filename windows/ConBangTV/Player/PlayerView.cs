@@ -34,10 +34,52 @@ public sealed class PlayerView : UserControl
         "s.textContent=css;(document.head||document.documentElement).appendChild(s);}catch(e){}}" +
         "if(document.documentElement)add();document.addEventListener('DOMContentLoaded',add);})();\n";
 
+    /// Trình phát native: trình phát nhúng (JW Player) tự dựng link luồng — đọc link đó trong khung nhúng rồi báo lên khung trên
+    /// cùng (window.__chimtoSrc = {u: link, p: trang của khung, s: phụ đề, h: là HLS}); app kiểm trước, phát được thì chuyển sang
+    /// mpv (như bản Linux — app/src/player.rs).
+    private const string ExtractJs = """
+        (function(){
+          if (window.__chimtoExtract) return; window.__chimtoExtract = 1;
+          if (window.top === window) {
+            window.addEventListener('message', function (e) { if (e.data && e.data.chimtoSrc && !window.__chimtoSrc) window.__chimtoSrc = e.data.chimtoSrc; });
+          }
+          var n = 0, ok = /^data:application\/(vnd\.apple\.mpegurl|x-mpegurl)[;,]/i, file = /\.(m3u8|mp4)(\?|#|$)/i;
+          var t = setInterval(function () {
+            if (++n > 150) { clearInterval(t); return; }
+            try {
+              var p = window.jwplayer && window.jwplayer(), it = p && p.getPlaylistItem && p.getPlaylistItem();
+              var f = it && (it.file || (it.sources && it.sources[0] && it.sources[0].file));
+              var hls = !!(it && /hls|m3u8/i.test(String(it.type || ((it.sources && it.sources[0]) || {}).type || ''))) ||
+                !!(p && p.getProvider && /hls/i.test((p.getProvider() || {}).name || ''));
+              if (!f || typeof f !== 'string') {
+                var v = document.querySelector('video'), s = v && (v.currentSrc || v.src);
+                if (s && /^https?:/.test(s) && file.test(s)) f = s; else return;
+              }
+              if (!ok.test(f) && !file.test(f) && !(hls && /^https?:/.test(f))) return;
+              clearInterval(t);
+              var msg = { u: /^data:/.test(f) ? f : new URL(f, location.href).href, p: location.href, h: hls ? 1 : 0 };
+              try { var tr = ((it && it.tracks) || []).filter(function (x) { return x.kind === 'captions' || x.kind === 'subtitles'; })[0];
+                if (tr && tr.file) msg.s = new URL(tr.file, location.href).href; } catch (x) {}
+              if (window.top === window) window.__chimtoSrc = msg; else window.top.postMessage({ chimtoSrc: msg }, '*');
+            } catch (x) {}
+          }, 200);
+        })();
+
+        """;
+
     private static PlayerView? _instance;
 
     private readonly MainWindow _main;
     private readonly WebView2 _web;
+    /// Khung hình: WebView2 (trang phát) hoặc trình phát native (mpv) — cửa sổ phim nhỏ mang cả khung này đi.
+    private readonly System.Windows.Controls.Grid _stage = new() { Background = Brushes.Black };
+    /// Trình phát native (libmpv) — tạo khi cần, tắt phim thì huỷ.
+    private NativeVideo? _native;
+    /// Đang phát bằng mpv / đang mở trình phát nhúng chỉ để lấy link luồng / mpv lỗi với server này (phát bằng WebView2 tới khi
+    /// đổi tập / đổi server).
+    private bool _nativeOn, _extract, _forceWeb;
+    /// mpv quá chừng này (ms) chưa chạy được mà cũng không báo lỗi → chuyển sang WebView2 (như bản Linux).
+    private const long NativeStallMs = 20_000;
     private readonly PlayerOverlay _ov;
     private Task? _init;
     private readonly string _agentJs, _focusJs, _wrapperHtml, _hlsHtml;
@@ -113,7 +155,8 @@ public sealed class PlayerView : UserControl
         Background = Brushes.Black;
         Focusable = false;
         _web = new WebView2 { DefaultBackgroundColor = System.Drawing.Color.Black, Focusable = false };
-        Content = _web;
+        _stage.Children.Add(_web);
+        Content = _stage;
 
         _agentJs = Res("player-agent.js");
         _focusJs = Res("page-focus.js");
@@ -253,6 +296,7 @@ public sealed class PlayerView : UserControl
         var c = _web.CoreWebView2;
         if (_scriptId != null) c.RemoveScriptToExecuteOnDocumentCreated(_scriptId);
         var js = $"window.__chimtoStart={start};if(window.top===window)window.__chimtoLoad={_pageLoad};\n" + StyleShim + _agentJs;
+        if (_extract) js += ExtractJs;
         _scriptId = await c.AddScriptToExecuteOnDocumentCreatedAsync(js);
         _serveUrl = html != null ? url : null;
         _serveHtml = html;
@@ -270,6 +314,11 @@ public sealed class PlayerView : UserControl
 
     private void Cmd(string name, double? arg = null)
     {
+        if (_nativeOn)
+        {
+            _native?.Cmd(name, arg);
+            return;
+        }
         if (_web.CoreWebView2 == null) return;
         var a = arg?.ToString(CultureInfo.InvariantCulture) ?? "null";
         _ = _web.CoreWebView2.ExecuteScriptAsync($"window.chimtoCmd&&chimtoCmd('{name}',{a})");
@@ -387,6 +436,8 @@ public sealed class PlayerView : UserControl
         _token++;
         _loadToken++;
         StopVideo();
+        // Trả bộ nhớ của trình phát native (mpv) khi không xem phim; lần xem sau tạo lại
+        DropNative();
         WatchLimit.Flush();
         _poll.Stop();
         _clickTimer.Stop();
@@ -446,6 +497,7 @@ public sealed class PlayerView : UserControl
             return;
         }
         _index = i;
+        _forceWeb = false;
         var t = ++_token;
         StopVideo();
         _episodeUrl = ep.Url;
@@ -525,6 +577,16 @@ public sealed class PlayerView : UserControl
             _loadStartedAt = Util.NowMs();
             _startHint = StartFor();
             var isHls = v.File || Uri.TryCreate(v.Url, UriKind.Absolute, out var vu) && vu.AbsolutePath.EndsWith(".m3u8");
+            var native = NativeAllowed;
+            // Trình phát native: luồng .m3u8 / tệp video phát thẳng bằng mpv
+            if (isHls && native)
+            {
+                _hlsUrl = v.Url;
+                if (PlayNative(v.Url, v.Subtitle, src.EpUrl, _startHint, false)) return;
+                _hlsUrl = null;
+            }
+            // Trình phát nhúng: mở như cũ, đọc link luồng trong JW Player rồi chuyển sang mpv (ExtractJs)
+            _extract = native && !isHls;
             string page;
             if (isHls)
             {
@@ -550,9 +612,145 @@ public sealed class PlayerView : UserControl
         }
     }
 
+    // ---- Trình phát native (libmpv) ----
+
+    /// Được dùng trình phát native cho lần phát này: đã bật trong cài đặt, có libmpv, server này chưa lỗi với mpv.
+    private bool NativeAllowed => Prefs.NativePlayer && !_forceWeb && NativeVideo.Available;
+
+    private NativeVideo? NativeInstance()
+    {
+        if (_native != null) return _native;
+        _native = NativeVideo.Create();
+        if (_native == null) return null;
+        _native.Host.Visibility = Visibility.Collapsed;
+        _stage.Children.Add(_native.Host);
+        return _native;
+    }
+
+    private void DropNative()
+    {
+        var n = _native;
+        if (n == null) return;
+        _native = null;
+        _stage.Children.Remove(n.Host);
+        n.Dispose();
+        try
+        {
+            Native.SyncVoid("media.closeAll");
+        }
+        catch (Exception)
+        {
+        }
+        Log.D("native", "Đã tắt trình phát native");
+    }
+
+    private void ShowNative(bool on)
+    {
+        if (_native != null) _native.Host.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        _web.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private sealed class Opened
+    {
+        public string Url = "";
+        public string? Subtitle;
+    }
+
+    /// Phát src (luồng .m3u8 / tệp video / data:…mpegurl) bằng mpv qua cổng phát nội bộ của lõi; hls = biết chắc là luồng HLS dù
+    /// link không có đuôi .m3u8. false = không dùng được (bên gọi tự phát bằng WebView2).
+    private bool PlayNative(string src, string? sub, string page, int start, bool hls)
+    {
+        if (NativeInstance() is not { } n) return false;
+        Opened? o;
+        try
+        {
+            o = Native.Sync<Opened?>("media.open", new { src, sub, page, hls });
+        }
+        catch (Exception e)
+        {
+            Log.D("native", "Cổng phát nội bộ lỗi: " + e.Message);
+            return false;
+        }
+        if (o == null) return false;
+        Log.D("native", $"Phát native {(src.StartsWith("data:") ? "data:… (link do trình phát nhúng giải mã)" : src)} (trang {page}, bắt đầu {start}s)");
+        _nativeOn = true;
+        _extract = false;
+        _loadStartedAt = Util.NowMs();
+        // Trang nhúng (nếu đang mở để lấy link) không cần nữa: tắt cho đỡ tốn, khỏi phát tiếng
+        Blank();
+        ShowNative(true);
+        n.Load(o.Url, start, o.Subtitle);
+        return true;
+    }
+
+    /// Đọc trạng thái mpv, đưa vào cùng đường xử lý với trạng thái của player-agent.js. mpv hỏng thì phát lại bằng WebView2
+    /// (cùng server, đúng chỗ đang xem): lỗi trước khi phát / lỗi giữa chừng / quá NativeStallMs chưa chạy mà không báo lỗi.
+    private void PollNative()
+    {
+        if (_native is not { } n) return;
+        var st = n.Read();
+        if (st.Err is { } e)
+        {
+            NativeFallback($"mpv lỗi ({e}){(_started ? " giữa chừng" : "")}");
+            return;
+        }
+        var waited = Util.NowMs() - _loadStartedAt;
+        if (!_started && waited > NativeStallMs)
+        {
+            NativeFallback($"mpv chưa chạy được sau {waited / 1000} giây");
+            return;
+        }
+        var o = new Dictionary<string, object?>
+        {
+            ["t"] = st.T, ["d"] = st.D, ["paused"] = st.Paused, ["ended"] = st.Ended, ["waiting"] = st.Waiting, ["ready"] = st.Ready, ["err"] = "",
+        };
+        OnState(JsonSerializer.Serialize(JsonSerializer.Serialize(new object[] { _pageLoad, o })));
+    }
+
+    /// Link luồng của trình phát nhúng: luồng có lớp bảo vệ riêng của trang (streamfree: SAMPLE-AES + khoá gói kín; NguonC: cả
+    /// danh sách mã hoá AES-GCM) thì không vượt — trình phát của trang phát như trước; HLS thường / tệp video thì chuyển sang mpv.
+    private async Task ProbeAndPlay(string u, string page, string sub, bool hls)
+    {
+        if (u.Length == 0 || page.Length == 0) return;
+        var t = _token;
+        bool ok;
+        try
+        {
+            ok = await Native.Call<bool>("media.probe", new { src = u, page, hls });
+        }
+        catch (Exception)
+        {
+            ok = false;
+        }
+        if (t != _token || !IsOpen) return;
+        if (!ok)
+        {
+            Log.D("native", "Luồng của trình phát nhúng có lớp bảo vệ riêng — giữ trình phát của trang");
+            return;
+        }
+        // Trang đã kịp phát thì mpv bắt đầu đúng chỗ đang xem
+        PlayNative(u, sub.Length > 0 ? sub : null, page, CurrentTime() ?? _startHint, hls);
+    }
+
+    private void NativeFallback(string why)
+    {
+        Log.D("native", why + " — chuyển sang trình phát web");
+        Notice("Trình phát native không phát được — chuyển sang trình phát web.", 5000);
+        if (CurrentTime() is { } t) _resumeAt = t;
+        _forceWeb = true;
+        _ = PlayServer(_server);
+    }
+
     private void StopVideo()
     {
         SavePosition();
+        if (_nativeOn)
+        {
+            _native?.Stop();
+            ShowNative(false);
+        }
+        _nativeOn = false;
+        _extract = false;
         _pageMode = false;
         _embedUrl = null;
         _hlsUrl = null;
@@ -576,6 +774,7 @@ public sealed class PlayerView : UserControl
         if (src == null) return;
         Prefs.SetServer(Site.HostOf(src.EpUrl), s.Type, s.Label);
         if (CurrentTime() is { } t) _resumeAt = t;
+        _forceWeb = false;
         HidePanel();
         _ = PlayServer(s);
     }
@@ -627,12 +826,18 @@ public sealed class PlayerView : UserControl
 
     private async Task Poll()
     {
-        if (!IsOpen || _polling || _web.CoreWebView2 == null) return;
+        if (!IsOpen || _polling) return;
+        if (_nativeOn)
+        {
+            PollNative();
+            return;
+        }
+        if (_web.CoreWebView2 == null) return;
         _polling = true;
         string? raw;
         try
         {
-            raw = await _web.CoreWebView2.ExecuteScriptAsync("JSON.stringify([window.__chimtoLoad||0,window.__chimtoState||null])");
+            raw = await _web.CoreWebView2.ExecuteScriptAsync("JSON.stringify([window.__chimtoLoad||0,window.__chimtoState||null,window.__chimtoSrc||null])");
         }
         catch (Exception)
         {
@@ -651,8 +856,16 @@ public sealed class PlayerView : UserControl
         try
         {
             if (raw != null && JsonSerializer.Deserialize<string>(raw) is { } s && JsonScan.Parse(s) is List<object?> arr &&
-                arr.Count == 2 && arr[0] is long load && load == _pageLoad)
+                arr.Count >= 2 && arr[0] is long load && load == _pageLoad)
+            {
                 o = arr[1] as Dictionary<string, object?>;
+                // Trình phát nhúng đã lộ link luồng (ExtractJs): kiểm trước (trang vẫn mở) rồi mới chuyển sang mpv
+                if (_extract && arr.Count >= 3 && arr[2] is Dictionary<string, object?> found)
+                {
+                    _extract = false;
+                    _ = ProbeAndPlay(J.Str(found, "u"), J.Str(found, "p"), J.Str(found, "s"), found.TryGetValue("h", out var h) && h is long hv && hv > 0);
+                }
+            }
         }
         catch (Exception e)
         {
@@ -783,7 +996,7 @@ public sealed class PlayerView : UserControl
         _ov.Hide();
         Content = null;
         _miniWin = new MiniWindow(Toggle, () => ExitMini(true), () => Close());
-        _miniWin.Host.Content = _web;
+        _miniWin.Host.Content = _stage;
         _miniWin.Update(_ov.TitleText.Text, _state?.Paused);
         var mw = _miniWin;
         mw.Closed += (_, _) =>
@@ -792,7 +1005,7 @@ public sealed class PlayerView : UserControl
             if (_miniWin != mw) return;
             _miniWin = null;
             mw.Host.Content = null;
-            Content = _web;
+            Content = _stage;
             Dispatcher.BeginInvoke(() => Close());
         };
         _miniWin.Show();
@@ -806,7 +1019,7 @@ public sealed class PlayerView : UserControl
         if (w == null) return;
         _miniWin = null;
         w.Host.Content = null;
-        Content = _web;
+        Content = _stage;
         w.Close();
         if (!show) return;
         _main.PlayerRestored();
@@ -1315,8 +1528,17 @@ public sealed class PlayerView : UserControl
     public async Task<string> Js(string code) => _web.CoreWebView2 == null ? "null" : await _web.CoreWebView2.ExecuteScriptAsync(code);
 
     public string Debug() =>
+        $"native={(_nativeOn && _native != null ? "on " + _native.Debug() : _extract ? "đang lấy link từ trình phát nhúng" : $"off (forceWeb={_forceWeb})")} " +
         $"open={IsOpen} pageMode={_pageMode} started={_started} server={_server?.Label} ep={_episodeUrl} t={_state?.T:0.0} d={_state?.D:0.0} " +
         $"paused={_state?.Paused} embed={_embedUrl} hls={_hlsUrl} load={_pageLoad}";
+
+    /// Cổng gỡ lỗi: giả mpv báo lỗi giữa chừng (thử đường tự chuyển sang WebView2).
+    public string DebugNativeFail()
+    {
+        if (!_nativeOn || _native == null) return "không đang phát native";
+        _native.DebugFail();
+        return "ok";
+    }
 
     public PlayerOverlay Overlay => _ov;
 #endif

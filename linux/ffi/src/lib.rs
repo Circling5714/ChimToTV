@@ -10,6 +10,7 @@
 //! Panic trong lõi không làm sập app: trả {"err": …}.
 
 mod dispatch;
+mod media;
 mod netfn;
 mod syncfn;
 mod sites;
