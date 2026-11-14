@@ -129,6 +129,18 @@ public static class DebugServer
                         new { hosts = Unblock.Level2Memo.All(), autoLevel2 = Unblock.Level2Memo.AutoCount, bridge = Net.BridgePort }));
                     type = "application/json; charset=utf-8";
                     break;
+                case "/web":
+                    // Đọc hộ trang bật chống bot: /web (phiên WebView ẩn + trang lõi đang nhớ là chặn), /web?url=… (đọc thử một địa chỉ)
+                    if (q["url"] is { } wu)
+                    {
+                        var r = await _w!.Dispatcher.InvokeAsync(() => Player.WebFetch.Fetch(wu, "GET", null, new Dictionary<string, string>())).Task.Unwrap();
+                        body = Text($"{r.Code} {r.Url} {r.Type} cf={r.Cf} {r.Data.Length} byte\n" +
+                                    System.Text.Encoding.UTF8.GetString(r.Data, 0, Math.Min(400, r.Data.Length)));
+                        break;
+                    }
+                    body = Text(await _w!.Dispatcher.InvokeAsync(() => Player.WebFetch.Debug()) + "\nlõi nhớ: " +
+                                string.Join(", ", Native.Sync<List<string>>("web.hosts")));
+                    break;
                 case "/native":
                     // Thử đường tự chuyển của trình phát native: /native?fail=1 (mpv báo lỗi giữa chừng)
                     body = Text(await _w!.Dispatcher.InvokeAsync(() => q["fail"] == "1" ? _w.OpenPlayer?.DebugNativeFail() ?? "trình phát chưa mở" : "ok"));

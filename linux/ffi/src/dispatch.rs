@@ -53,6 +53,9 @@ pub fn sync(m: &str, a: &Value) -> Option<Res> {
     if let Some(r) = crate::media::sync(m, a) {
         return Some(r);
     }
+    if let Some(r) = crate::webfn::sync(m, a) {
+        return Some(r);
+    }
     let (group, name) = m.split_once('.')?;
     match group {
         "prefs" => prefs_fn(name, a),

@@ -20,6 +20,8 @@ pub enum Error {
     Timeout,
     /// Lỗi mạng khác (câu báo đã dịch)
     Net(String),
+    /// Trang bật lớp chống bot của Cloudflare mà app chưa đọc hộ được (web_fetch) — tên máy
+    Challenge(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -125,6 +127,9 @@ pub fn friendly(e: &Error) -> String {
         Error::Socks(_, m) => format!("Lỗi proxy: {m}."),
         Error::Timeout => format!("Trang không trả lời (quá thời gian chờ).{}", unblock_hint()),
         Error::Net(m) => m.clone(),
+        Error::Challenge(h) => format!(
+            "Trang {h} đang bật lớp chống bot của Cloudflare — app chưa đọc được (thử lại sau, hoặc xem phim này ở nguồn khác)."
+        ),
     }
 }
 

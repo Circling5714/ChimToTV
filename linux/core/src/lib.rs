@@ -31,6 +31,7 @@ pub mod update_check;
 pub mod invite;
 pub mod disclaimer;
 pub mod media_proxy;
+pub mod web_fetch;
 
 pub use models::*;
 pub use util::{Error, Result};

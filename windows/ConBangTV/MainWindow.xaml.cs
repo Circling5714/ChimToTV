@@ -95,6 +95,8 @@ public partial class MainWindow : Window
         SyncService.Message += m => Dispatcher.BeginInvoke(() => Toast(m));
         SyncService.AppStarted();
         StartSyncTimer();
+        // Trang bật chống bot của Cloudflare: lõi nhờ WebView2 ẩn đọc hộ
+        global::ConBangTV.Player.WebFetch.Start(this);
         // Lần đầu mở app (hoặc vừa cập nhật lên bản có hộp này): miễn trừ trách nhiệm — «Đồng ý» mới vào, «Thoát» / Esc là đóng app.
         // Hỏi cập nhật / «Ai đang xem?» chờ sau đó (hộp thoại mới sẽ đóng hộp đang mở).
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, async () =>

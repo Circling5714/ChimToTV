@@ -96,21 +96,48 @@ public static class ImageLoader
             if (File.Exists(file)) bytes = await File.ReadAllBytesAsync(file);
             if (bytes == null)
             {
-                await Gate.WaitAsync();
-                try
+                // Trang bật chống bot của Cloudflare (lõi đã nhớ): ảnh cũng phải lấy qua WebView ẩn
+                if (Player.WebFetch.Needs(url))
                 {
-                    using var req = new HttpRequestMessage(HttpMethod.Get, url);
-                    req.Headers.TryAddWithoutValidation("User-Agent", Http.UserAgent);
-                    req.Headers.TryAddWithoutValidation("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8");
-                    // Nhiều CDN ảnh chỉ cho trang của mình lấy ảnh (chống lấy trộm theo Referer)
-                    req.Headers.TryAddWithoutValidation("Referer", Prefs.BaseUrl + "/");
-                    using var resp = await Client.SendAsync(req);
-                    if (!resp.IsSuccessStatusCode) return null;
-                    bytes = await resp.Content.ReadAsByteArrayAsync();
+                    bytes = await Player.WebFetch.GetBytes(url, Prefs.BaseUrl + "/");
+                    if (bytes == null) return null;
                 }
-                finally
+                else
                 {
-                    Gate.Release();
+                    await Gate.WaitAsync();
+                    try
+                    {
+                        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                        req.Headers.TryAddWithoutValidation("User-Agent", Http.UserAgent);
+                        req.Headers.TryAddWithoutValidation("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8");
+                        // Nhiều CDN ảnh chỉ cho trang của mình lấy ảnh (chống lấy trộm theo Referer)
+                        req.Headers.TryAddWithoutValidation("Referer", Prefs.BaseUrl + "/");
+                        using var resp = await Client.SendAsync(req);
+                        if (resp.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.ServiceUnavailable &&
+                            resp.Headers.TryGetValues("cf-mitigated", out var cf) && cf.Any(v => v.Trim().Equals("challenge", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            // Lớp chống bot (lần đầu gặp ở ảnh): nhớ trang, lấy qua WebView
+                            Native.SyncVoid("web.remember", new { url });
+                            bytes = null;
+                        }
+                        else if (!resp.IsSuccessStatusCode)
+                        {
+                            return null;
+                        }
+                        else
+                        {
+                            bytes = await resp.Content.ReadAsByteArrayAsync();
+                        }
+                    }
+                    finally
+                    {
+                        Gate.Release();
+                    }
+                    if (bytes == null)
+                    {
+                        bytes = await Player.WebFetch.GetBytes(url, Prefs.BaseUrl + "/");
+                        if (bytes == null) return null;
+                    }
                 }
                 try
                 {

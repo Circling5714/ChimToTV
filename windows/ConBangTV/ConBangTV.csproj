@@ -36,6 +36,7 @@
     <EmbeddedResource Include="..\..\app\src\main\assets\player.html" LogicalName="player.html" />
     <EmbeddedResource Include="..\..\app\src\main\assets\hls.html" LogicalName="hls.html" />
     <EmbeddedResource Include="..\..\app\src\main\assets\hls.light.min.js" LogicalName="hls.light.min.js" />
+    <EmbeddedResource Include="..\..\app\src\main\assets\web-fetch.js" LogicalName="web-fetch.js" />
     <Resource Include="logo.png" />
     <Resource Include="app.ico" />
   </ItemGroup>

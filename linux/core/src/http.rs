@@ -101,6 +101,15 @@ async fn send(make: impl Fn() -> reqwest::RequestBuilder) -> Result<Response> {
     };
     let code = resp.status().as_u16();
     if code >= 400 {
+        // Lớp chống bot của Cloudflare (web_fetch): báo riêng để bên gọi nhờ WebView đọc hộ
+        if code == 403 || code == 503 {
+            let host = resp.url().host_str().unwrap_or_default().to_lowercase();
+            let cf = resp.headers().get("cf-mitigated").and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            let body = resp.bytes().await.map(|b| b.to_vec()).unwrap_or_default();
+            if crate::web_fetch::is_challenge(code, cf.as_deref(), &body) {
+                return Err(Error::Challenge(host));
+            }
+        }
         return Err(Error::Http(code));
     }
     let url = resp.url().to_string();
@@ -109,10 +118,30 @@ async fn send(make: impl Fn() -> reqwest::RequestBuilder) -> Result<Response> {
     Ok(Response { url, code, data, content_type: ct })
 }
 
+/// Trang bật chống bot (đã nhớ, hoặc vừa gặp): app có WebView thì đọc hộ (web_fetch), không thì báo lỗi «chống bot».
+async fn via_web(req: crate::web_fetch::WebRequest, first: Result<Response>) -> Result<Response> {
+    match first {
+        Err(Error::Challenge(host)) => {
+            crate::web_fetch::remember(&host);
+            if !crate::web_fetch::available() {
+                return Err(Error::Challenge(host));
+            }
+            crate::log::d("web", &format!("{host} bật chống bot của Cloudflare — đọc qua WebView"));
+            crate::web_fetch::fetch(req).await
+        }
+        r => r,
+    }
+}
+
 pub async fn get(url: &str, headers: &[(&str, &str)]) -> Result<Response> {
     check_url(url)?;
+    let req = || crate::web_fetch::request("GET", url, None, headers);
+    if crate::web_fetch::available() && crate::web_fetch::needs(url) {
+        return crate::web_fetch::fetch(req()).await;
+    }
     let c = client();
-    send(|| apply(c.get(url), headers)).await
+    let r = send(|| apply(c.get(url), headers)).await;
+    via_web(req(), r).await
 }
 
 /// POST dạng form (admin-ajax.php của WordPress).
@@ -123,13 +152,18 @@ pub async fn post(url: &str, form: &[(&str, &str)], headers: &[(&str, &str)]) ->
         .map(|(k, v)| format!("{}={}", crate::util::form_encoded(k), crate::util::form_encoded(v)))
         .collect::<Vec<_>>()
         .join("&");
+    let ct = ("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+    let req = || {
+        let mut h = headers.to_vec();
+        h.push(ct);
+        crate::web_fetch::request("POST", url, Some(body.clone()), &h)
+    };
+    if crate::web_fetch::available() && crate::web_fetch::needs(url) {
+        return crate::web_fetch::fetch(req()).await;
+    }
     let c = client();
-    send(|| {
-        apply(c.post(url), headers)
-            .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-            .body(body.clone())
-    })
-    .await
+    let r = send(|| apply(c.post(url), headers).header(ct.0, ct.1).body(body.clone())).await;
+    via_web(req(), r).await
 }
 
 /// Tải tệp lớn (bản cập nhật) vào tệp, báo tiến độ (0..1).
