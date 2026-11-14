@@ -22,6 +22,15 @@ class WebFetchTest {
     }
 
     @Test
+    fun detectsCloudflareBlockPage() {
+        val block = "<!DOCTYPE html><head><title>Attention Required! | Cloudflare</title></head><div id=\"cf-error-details\">".toByteArray()
+        assertTrue(WebFetch.isBlockPage(403, block))
+        assertFalse(WebFetch.isBlockPage(200, block))
+        assertFalse(WebFetch.isBlockPage(403, "<title>Just a moment...</title>".toByteArray()))
+        assertFalse(WebFetch.isBlockPage(403, null))
+    }
+
+    @Test
     fun remembersBlockedHostsFor12Hours() {
         val now = 1_800_000_000_000L
         WebFetch.remember("HoatHinh3D.pw", now)

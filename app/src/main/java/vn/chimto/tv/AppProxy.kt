@@ -38,6 +38,9 @@ object AppProxy {
 
     fun javaProxy(): Proxy? = localPort()?.let { Proxy(Proxy.Type.SOCKS, InetSocketAddress("127.0.0.1", it)) }
 
+    /** Cài đặt mạng hiện tại (null = đi thẳng) — cổng SOCKS riêng của Gecko (WebFetch) đọc mỗi lần mở kết nối. */
+    fun currentConfig(): RouteConfig? = bridgeConfig
+
     /**
      * Áp dụng cài đặt trong Prefs — lúc mở app và mỗi lần đổi trong Cài đặt. Gọi ở luồng chính.
      * Cài đặt khác đi thì mở cổng nội bộ mới (cổng khác) và đóng cổng cũ cùng mọi kết nối đang giữ: WebView và

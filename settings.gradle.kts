@@ -10,6 +10,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // GeckoView (engine của Firefox) — chỉ dùng cho trang bật chống bot chặn WebView (WebFetch.kt)
+        maven("https://maven.mozilla.org/maven2/") { content { includeGroup("org.mozilla.geckoview") } }
     }
 }
 rootProject.name = "ChimToTV"

@@ -653,14 +653,21 @@ class PlayerActivity : BaseActivity() {
             r.onSuccess { src ->
                 source = src
                 buildServerButtons(src)
-                if (src.pageOnly) {
+                // Trang bật chống bot chặn WebView (đọc qua Gecko — WebFetch): «Trình phát của trang» không mở được trong
+                // trình phát → chọn server khác (KKPhim / NguonC dự phòng)
+                val blocked = WebFetch.needs(src.epUrl)
+                val servers = if (blocked) src.servers.filter { it.type != PAGE_SERVER } else src.servers
+                if (src.pageOnly || servers.isEmpty()) {
+                    if (blocked) notice.show("Trang ${Site.hostOf(src.epUrl)} chặn trình phát trong app — trang tập có thể không mở được.", 8000)
                     playPage(src)
                 } else {
                     val host = Site.hostOf(src.epUrl)
                     val stats = AppProxy.statsHost(host)
-                    val usual = src.servers.firstOrNull { it.type == Prefs.serverType(host) } ?: src.servers.firstOrNull()
-                    val pick = PlayStats.choose(stats, src.servers, usual)
-                    if (usual != null && pick != usual) {
+                    val usual = servers.firstOrNull { it.type == Prefs.serverType(host) } ?: servers.firstOrNull()
+                    val pick = PlayStats.choose(stats, servers, usual)
+                    if (blocked && Prefs.serverType(host) == PAGE_SERVER) {
+                        notice.show("Trang $host chặn trình phát trong app — mở ${pick?.label} (▼ để đổi server).", 6000)
+                    } else if (usual != null && pick != usual) {
                         val why = PlayStats.score(stats, usual.type).label ?: "hay giật"
                         notice.show("${usual.label} $why gần đây — mở ${pick?.label} (▼ để đổi server).", 6000)
                     }

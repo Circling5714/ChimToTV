@@ -32,6 +32,9 @@ android {
         val nextDnsId = rootProject.file("keys/nextdns.txt").takeIf { it.exists() }?.readText()?.trim().orEmpty()
         require(nextDnsId.matches(Regex("[a-z0-9]*"))) { "keys/nextdns.txt: mã NextDNS chỉ gồm chữ thường và số" }
         buildConfigField("String", "NEXTDNS_ID", "\"$nextDnsId\"")
+
+        // GeckoView có thư viện native lớn: chỉ gói bản ARM 32-bit (TV box; máy ARM 64-bit vẫn chạy được) — APK ~ +60 MB
+        ndk { abiFilters += "armeabi-v7a" }
     }
     signingConfigs {
         if (kyFile.exists()) {
@@ -76,6 +79,8 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.1")
     // ProxyController: cho WebView đi qua proxy SOCKS5 (1.14 là bản cuối còn chạy Android 5; 1.15+ cần Android 6+)
     implementation("androidx.webkit:webkit:1.14.0")
+    // Engine Gecko (Firefox) cho trang bật lớp chống bot của Cloudflare chặn WebView (WebFetch.kt) — chỉ chạy khi gặp trang đó
+    implementation("org.mozilla.geckoview:geckoview-armeabi-v7a:141.0.20250806102122")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
     testImplementation("junit:junit:4.13.2")
     // org.json của Android trong test JVM chỉ là vỏ rỗng — NextSite đọc JSON nên test cần bản thật
