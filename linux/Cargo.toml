@@ -4,7 +4,9 @@
 #   app/  — giao diện GTK3 + trình phát WebKitGTK (dùng chung trang phát app/src/main/assets của bản Android).
 [workspace]
 resolver = "2"
-members = ["core", "app"]
+members = ["core", "app", "ffi"]
+# Dựng mặc định (máy Linux, container bản phát hành): lõi + app GTK. Bản Windows dựng riêng `cargo build -p conbang-ffi`.
+default-members = ["core", "app"]
 
 [workspace.package]
 # Số hiệu bản Linux (tag linux-v<bản>)

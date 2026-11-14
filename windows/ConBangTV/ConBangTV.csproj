@@ -43,6 +43,13 @@
     <Resource Include="app.ico" />
   </ItemGroup>
 
+  <!-- Lõi Rust dùng chung với bản Linux (Core/Native.cs): crate conbang-ffi trong linux\ffi, dựng bản release bằng cargo
+       (build.ps1 tự dựng). Đóng gói một tệp: nằm trong .exe, .NET tự giải nén lúc chạy (IncludeNativeLibrariesForSelfExtract). -->
+  <ItemGroup>
+    <None Include="..\..\linux\target\release\conbang_core.dll" Link="conbang_core.dll" CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" Condition="Exists('..\..\linux\target\release\conbang_core.dll')" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="ConBangTV.Tests" />
   </ItemGroup>

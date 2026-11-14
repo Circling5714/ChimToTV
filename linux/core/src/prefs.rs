@@ -221,6 +221,34 @@ pub fn remove(key: &str) {
     set::<Value>(key, None);
 }
 
+/// Bản Windows (app WPF đọc / ghi kho cài đặt của lõi qua conbang_core.dll — Prefs.cs giữ các hàm nhỏ, lõi giữ tệp
+/// prefs.json): đọc thô một khoá.
+pub fn get_raw(key: &str) -> Option<Value> {
+    st().store.get(key).filter(|v| !v.is_null()).cloned()
+}
+
+/// Mọi khoá đang có (Prefs.cs: khoá riêng của một người xem).
+pub fn keys() -> Vec<String> {
+    st().store.keys().cloned().collect()
+}
+
+/// Ghi thô một khoá (None = xoá). Xoá bộ nhớ đệm người xem / lịch sử / vị trí xem — app ghi thẳng các khoá đó cũng thấy ngay.
+pub fn set_raw(key: &str, value: Option<Value>) {
+    let mut s = st();
+    match value.filter(|v| !v.is_null()) {
+        None => {
+            s.store.remove(key);
+        }
+        Some(v) => {
+            s.store.insert(key.to_string(), v);
+        }
+    }
+    s.pid = None;
+    s.history = None;
+    s.positions = None;
+    changed(&mut s);
+}
+
 /// Cổng gỡ lỗi: đặt một khoá bằng JSON (thử giới hạn giờ xem…).
 pub fn debug_set(key: &str, json: &str) {
     let mut s = st();

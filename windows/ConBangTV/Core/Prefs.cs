@@ -37,108 +37,65 @@ public static class Prefs
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ConBangTV");
 
     private static readonly object Lock = new();
-    private static JsonObject _store = new();
-    private static string _file = "";
-    private static Timer? _saveTimer;
 
     /// Tên khoá trong JSON viết kiểu camelCase như bản Android / iPad (filmUrl, epTitle…), để sau này đồng bộ được.
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    /// Gọi một lần lúc mở app (thử nghiệm: thư mục riêng).
+    /// Gọi một lần lúc mở app (thử nghiệm: thư mục riêng). Kho cài đặt nằm trong lõi Rust (Native — prefs.json, ghi lại sau
+    /// mỗi lần đổi, gộp các lần đổi liền nhau); lõi tự thêm trang mẫu của bản sau (AddedSites) lúc mở.
     public static void Load(string? dir = null)
     {
         lock (Lock)
         {
             if (dir != null) DataDir = dir;
             Directory.CreateDirectory(DataDir);
-            _file = Path.Combine(DataDir, "prefs.json");
-            try
-            {
-                _store = File.Exists(_file) ? JsonNode.Parse(File.ReadAllText(_file)) as JsonObject ?? new() : new();
-            }
-            catch (Exception)
-            {
-                // Tệp hỏng (mất điện lúc ghi): giữ bản hỏng để xem lại, bắt đầu mới
-                try { File.Copy(_file, _file + ".bad", true); } catch (Exception) { }
-                _store = new();
-            }
+            Native.Init(DataDir);
+            InvalidateCaches();
+        }
+    }
+
+    /// Bỏ bộ nhớ đệm (lịch sử, vị trí xem, người xem) — lõi vừa đổi dữ liệu (đồng bộ trong nhà…).
+    public static void InvalidateCaches()
+    {
+        lock (Lock)
+        {
             _historyCache = null;
             _positionsCache = null;
             _pidCache = null;
-        }
-        AddNewPresets();
-    }
-
-    /// Trang mẫu thêm ở bản sau (AddedSites): người đã có danh sách trang thì thêm một lần.
-    private static void AddNewPresets()
-    {
-        foreach (var url in AddedSites)
-        {
-            var key = "preset_added@" + url;
-            if (Get<bool>(key)) continue;
-            if (Get<List<string>>("sites") is { } list && !list.Contains(url)) Sites = list.Append(url).ToList();
-            Set(key, true);
         }
     }
 
     private static void Changed()
     {
-        _saveTimer ??= new Timer(_ => Flush());
-        _saveTimer.Change(400, Timeout.Infinite);
     }
 
     /// Ghi ngay (lúc thoát app).
-    public static void Flush()
-    {
-        string text;
-        lock (Lock)
-        {
-            if (_file.Length == 0) return;
-            text = _store.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
-        }
-        try
-        {
-            var tmp = _file + ".tmp";
-            File.WriteAllText(tmp, text);
-            File.Move(tmp, _file, true);
-        }
-        catch (Exception)
-        {
-        }
-    }
+    public static void Flush() => Native.SyncVoid("prefs.flush");
 
     // ---- Đọc / ghi khoá ----
 
     private static T? Get<T>(string key)
     {
-        lock (Lock)
+        var n = Native.SyncNode("prefs.get", new { key });
+        if (n == null) return default;
+        try
         {
-            if (!_store.TryGetPropertyValue(key, out var n) || n == null) return default;
-            try
-            {
-                return n.Deserialize<T>(Json);
-            }
-            catch (Exception)
-            {
-                return default;
-            }
+            return n.Deserialize<T>(Json);
+        }
+        catch (Exception)
+        {
+            return default;
         }
     }
 
-    private static void Set<T>(string key, T? value)
-    {
-        lock (Lock)
-        {
-            if (value == null) _store.Remove(key);
-            else _store[key] = JsonSerializer.SerializeToNode(value, Json);
-        }
-        Changed();
-    }
+    private static void Set<T>(string key, T? value) =>
+        Native.SyncVoid("prefs.set", new { key, value = value == null ? null : JsonSerializer.SerializeToNode(value, Json) });
 
-    private static bool Has(string key)
-    {
-        lock (Lock) return _store.ContainsKey(key);
-    }
+    private static bool Has(string key) => Native.Sync<bool>("prefs.has", new { key });
+
+    private static JsonNode? Raw(string key) => Native.SyncNode("prefs.get", new { key });
+
+    private static void SetRaw(string key, JsonNode? value) => Native.SyncVoid("prefs.set", new { key, value });
 
     public static void Remove(string key) => Set<object>(key, null);
 
@@ -146,10 +103,8 @@ public static class Prefs
     /// Cổng gỡ lỗi: đặt một khoá bằng JSON (thử giới hạn giờ xem…).
     public static void DebugSet(string key, string json)
     {
-        lock (Lock) _store[key] = JsonNode.Parse(json);
-        _historyCache = null;
-        _positionsCache = null;
-        Changed();
+        SetRaw(key, JsonNode.Parse(json));
+        InvalidateCaches();
     }
 #endif
 
@@ -213,7 +168,7 @@ public static class Prefs
         lock (Lock)
         {
             var outList = new List<(string, string)>();
-            foreach (var key in _store.Select(kv => kv.Key).ToList())
+            foreach (var key in Native.Sync<List<string>>("prefs.keys"))
             {
                 string? b = id.Length == 0 ? (key.Contains('#') ? null : key) : key.EndsWith("#" + id) ? key[..^(id.Length + 1)] : null;
                 if (b != null && IsProfileKey(b)) outList.Add((key, b));
@@ -270,9 +225,9 @@ public static class Prefs
             foreach (var (key, b) in OwnKeys(ProfileId))
             {
                 if (!CopiedKeys.Contains(b) && !ProfilePrefixes.Any(b.StartsWith)) continue;
-                if (_store.TryGetPropertyValue(key, out var v)) _store[$"{b}#{id}"] = v?.DeepClone();
+                if (Raw(key) is { } v) SetRaw($"{b}#{id}", v);
             }
-            _store[$"base_url#{id}"] = BaseUrl;
+            Set($"base_url#{id}", BaseUrl);
             var p = new Profile { Id = id, Name = name.Trim(), Color = color };
             list.Add(p);
             SaveProfiles(list);
@@ -325,7 +280,7 @@ public static class Prefs
         {
             var list = Profiles;
             if (list.Count <= 1 || list.All(p => p.Id != id)) return;
-            foreach (var (key, _) in OwnKeys(id)) _store.Remove(key);
+            foreach (var (key, _) in OwnKeys(id)) Remove(key);
             var rest = list.Where(p => p.Id != id).ToList();
             SaveProfiles(rest);
             if (ProfileId == id) SwitchProfile(rest[0].Id);
@@ -715,8 +670,9 @@ public static class Prefs
     /// Mật khẩu lưu đã mã hoá (DPAPI, chỉ tài khoản Windows này giải được) — khoá riêng của bản Windows.
     public static string ProxyPass
     {
-        get => Secret.Unprotect(Get<string>("proxy_pass_dpapi"));
-        set => Set("proxy_pass_dpapi", Secret.Protect(value));
+        // DPAPI trong lõi (secret.rs — cùng cách mã hoá, cùng khoá proxy_pass_dpapi như bản C# cũ)
+        get => Native.Sync<string>("prefs.secret", new { name = "proxy_pass" }) ?? "";
+        set => Native.SyncVoid("prefs.setSecret", new { name = "proxy_pass", value });
     }
 
     /// DNS của proxy (gửi tên miền cho proxy) — mặc định; tắt = máy tự phân giải.
@@ -769,8 +725,8 @@ public static class Prefs
     /// Khoá / mật khẩu Shadowsocks — mã hoá bằng tài khoản Windows (DPAPI) như mật khẩu proxy.
     public static string SsKey
     {
-        get => Secret.Unprotect(Get<string>("ss_key_dpapi"));
-        set => Set("ss_key_dpapi", Secret.Protect(value));
+        get => Native.Sync<string>("prefs.secret", new { name = "ss_key" }) ?? "";
+        set => Native.SyncVoid("prefs.setSecret", new { name = "ss_key", value });
     }
 
     /// Máy chủ Shadowsocks đang dùng; null = proxy tắt / đang chọn SOCKS5 / chưa nhập đủ.

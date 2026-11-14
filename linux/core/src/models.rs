@@ -46,7 +46,8 @@ impl Imdb {
 }
 
 /// `imdb`: điểm IMDb (None = không có / quá ít lượt chấm).
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct Film {
     pub url: String,
     pub title: String,
@@ -61,13 +62,15 @@ impl Film {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct FilmSection {
     pub title: String,
     pub films: Vec<Film>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Category {
     pub title: String,
     pub url: String,
@@ -80,14 +83,16 @@ impl Category {
 }
 
 /// Đo nhanh một trang: thời gian tải trang chủ (ms) và số phim đọc được (0 = có thể là trang chặn của nhà mạng).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SiteCheck {
     pub ms: i64,
     pub films: usize,
 }
 
 /// `moved_to`: trang đã chuyển sang tên miền khác (theo chuyển hướng) → gốc mới.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct Home {
     pub sections: Vec<FilmSection>,
     pub categories: Vec<Category>,
@@ -95,14 +100,16 @@ pub struct Home {
 }
 
 /// `sections`: trang chia nhóm (vd lịch chiếu theo ngày) — khi có thì hiển thị thay cho `films`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct FilmPage {
     pub films: Vec<Film>,
     pub next_url: Option<String>,
     pub sections: Vec<FilmSection>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Episode {
     pub title: String,
     pub url: String,
@@ -115,13 +122,15 @@ impl Episode {
 }
 
 /// Một danh sách tập, vd "Việt Sub" / "Thuyết Minh".
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EpisodeGroup {
     pub name: String,
     pub episodes: Vec<Episode>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct FilmDetail {
     pub url: String,
     pub title: String,
@@ -154,7 +163,8 @@ impl FilmDetail {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Server {
     pub label: String,
     pub kind: String,
@@ -168,7 +178,8 @@ impl Server {
 
 /// Link phát của một server: iframe trình phát / trang tập, hoặc luồng .m3u8 (kèm phụ đề rời nếu có).
 /// `file`: tệp video phát thẳng bằng <video> (MP4 của CLB Phim Xưa), không phải trang trình phát.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct Video {
     pub url: String,
     pub subtitle: Option<String>,
@@ -182,7 +193,8 @@ impl Video {
 }
 
 /// Cách phát một tập: player.php → iframe; `page_mode` → mở thẳng trang tập; `next` → trang Next.js / trang API.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 pub struct EpisodeSource {
     pub ep_url: String,
     pub servers: Vec<Server>,

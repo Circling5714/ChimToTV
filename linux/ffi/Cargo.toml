@@ -1,0 +1,18 @@
+[package]
+name = "conbang-ffi"
+description = "conbang_core.dll — lõi Rust cho app WPF bản Windows (thay lõi C# windows/ConBangTV/Core), giao tiếp bằng JSON"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "conbang_core"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+conbang-core = { path = "../core" }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "io-util", "sync", "macros"] }
+futures = "0.3"

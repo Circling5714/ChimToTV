@@ -396,6 +396,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "conbang-ffi"
+version = "1.1.0"
+dependencies = [
+ "conbang-core",
+ "futures",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "conbangtv"
 version = "1.1.0"
 dependencies = [
