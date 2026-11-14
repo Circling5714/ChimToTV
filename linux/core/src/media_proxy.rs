@@ -662,7 +662,9 @@ async fn segment<W: AsyncWrite + Unpin>(url: &str, referer: Option<&str>, w: &mu
 
 /// Tệp video thường: chuyển tiếp yêu cầu Range (tua) và trả lời của máy chủ gốc.
 async fn file<W: AsyncWrite + Unpin>(url: &str, referer: Option<&str>, range: Option<&str>, w: &mut W, head_only: bool) -> bool {
-    let mut resp = match fetch(url, referer, range, true).await {
+    // Trình phát không xin Range (tải cả tệp): vẫn xin «bytes=0-» lên máy chủ — máy chủ trả từng khúc (k-20) mà không có Range thì
+    // chỉ trả khúc đầu với mã 200, trình phát tưởng cả tệp chỉ dài một khúc
+    let mut resp = match fetch(url, referer, Some(range.unwrap_or("bytes=0-")), true).await {
         Ok(r) => r,
         Err(e) => {
             crate::log::d("media", &format!("tệp video lỗi ({e}): {}", short(url)));
@@ -680,17 +682,26 @@ async fn file<W: AsyncWrite + Unpin>(url: &str, referer: Option<&str>, range: Op
     let upstream_range = get(reqwest::header::CONTENT_RANGE).and_then(|cr| parse_content_range(&cr));
     // Máy chủ chỉ trả từng khúc (k-20: 8 MB mỗi lần) dù trình phát xin tới hết tệp: nối các khúc thành một luồng liền — trình
     // phát khỏi báo «luồng kết thúc sớm» rồi kết nối lại mỗi 8 MB
-    let open_ended = range.map(|r| r.trim_end().ends_with('-')).unwrap_or(true);
+    // Nối tới byte cuối trình phát xin: «bytes=a-» (libmpv) = tới hết tệp; «bytes=a-b» (AVPlayer của iOS xin tới hết tệp theo
+    // kiểu này) = tới b — trước đây chỉ nối kiểu mở nên AVPlayer nhận khúc 8 MB thay vì đoạn đã xin và báo lỗi.
+    let wanted_end = range
+        .and_then(|r| r.trim().strip_prefix("bytes="))
+        .and_then(|r| r.split(',').next())
+        .and_then(|r| r.split_once('-'))
+        .and_then(|(_, e)| e.trim().parse::<u64>().ok());
     let stitch = match upstream_range {
-        Some((a, b, total)) if code == 206 && open_ended && b + 1 < total => Some((a, total)),
+        Some((a, b, total)) if code == 206 && b + 1 < total => {
+            let end = wanted_end.map(|e| e.min(total - 1)).unwrap_or(total - 1);
+            (b < end).then_some((a, end + 1, total))
+        }
         _ => None,
     };
     let (status, len) = match (stitch, upstream_range) {
-        (Some((a, total)), _) => {
+        (Some((a, stop, total)), _) => {
             if range.is_some() {
-                hs.push(("Content-Range", format!("bytes {a}-{}/{total}", total - 1)));
+                hs.push(("Content-Range", format!("bytes {a}-{}/{total}", stop - 1)));
             }
-            (if range.is_some() { 206 } else { 200 }, Some(total - a))
+            (if range.is_some() { 206 } else { 200 }, Some(stop - a))
         }
         (None, Some((a, b, total))) => {
             hs.push(("Content-Range", format!("bytes {a}-{b}/{total}")));
@@ -702,6 +713,8 @@ async fn file<W: AsyncWrite + Unpin>(url: &str, referer: Option<&str>, range: Op
         hs.push(("Content-Length", n.to_string()));
     }
     let keep = len.is_some();
+    crate::log::d("media", &format!("tệp video: Range {} → {status}, {} byte{}", range.unwrap_or("(không)"),
+        len.map(|n| n.to_string()).unwrap_or_else(|| "?".into()), if head_only { " (HEAD)" } else { "" }));
     if write_head(w, status, &hs, keep).await.is_err() {
         return false;
     }
@@ -718,12 +731,12 @@ async fn file<W: AsyncWrite + Unpin>(url: &str, referer: Option<&str>, range: Op
                 pos += c.len() as u64;
             }
             Ok(None) => {
-                let Some((_, total)) = stitch else { break };
-                if pos >= total {
+                let Some((_, stop, _)) = stitch else { break };
+                if pos >= stop {
                     break;
                 }
-                // Khúc sau
-                let next = format!("bytes={pos}-");
+                // Khúc sau (tới byte cuối đã xin)
+                let next = format!("bytes={pos}-{}", stop - 1);
                 resp = match fetch(url, referer, Some(&next), true).await {
                     Ok(r) if r.status().as_u16() == 206 => r,
                     _ => {
