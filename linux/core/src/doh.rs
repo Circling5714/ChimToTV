@@ -497,6 +497,9 @@ async fn talk(s: &Server, c: &mut DnsConn, query: &[u8]) -> io::Result<(Option<V
 pub fn clear_cache() {
     lock(&CACHE).clear();
     lock(&DOWN_UNTIL).clear();
+    // Đóng cả kết nối đang nghỉ: bật proxy (DNS hỏi qua proxy) / tắt DNS mã hoá thì không còn lần hỏi nào lấy chúng ra, máy
+    // chủ đóng phía bên kia → socket nằm CloseWait tới lúc tắt app
+    lock(&IDLE).clear();
 }
 
 // ---- Vượt chặn khi tắt DNS mã hoá ----
