@@ -72,6 +72,8 @@ android {
     dependenciesInfo { includeInApk = false; includeInBundle = false }
     // Test JVM gọi Site.parse* — các lớp Android (LruCache…) trả về giá trị mặc định
     testOptions { unitTests.isReturnDefaultValues = true }
+    // Bộ kiểm tra LiveData của androidx.lifecycle (kéo theo GeckoView) văng trên AGP 8.7 — app không dùng LiveData
+    lint { disable += "NullSafeMutableLiveData" }
 }
 
 dependencies {

@@ -241,10 +241,12 @@ object WebFetch {
             }
             val t0 = System.currentTimeMillis()
             var title = ""
+            var titleAt = t0
             var stopped = false
             val s = GeckoSession(GeckoSessionSettings.Builder().usePrivateMode(false).build())
             s.contentDelegate = object : GeckoSession.ContentDelegate {
                 override fun onTitleChange(session: GeckoSession, t: String?) {
+                    if (t.orEmpty() != title) titleAt = System.currentTimeMillis()
                     title = t.orEmpty()
                 }
             }
@@ -275,7 +277,11 @@ object WebFetch {
                         blockedUntil[host] = System.currentTimeMillis() + BLOCKED_MS
                         done(BlockedError(host))
                     }
-                    stopped && title.isNotEmpty() && !title.startsWith("Just a moment", ignoreCase = true) -> {
+                    // Tiêu đề của trang thật đã hiện (cookie qua lớp chặn đặt trước khi trang chặn nạp lại): tải xong, hoặc tiêu
+                    // đề đứng yên 1,5 giây (trang còn tải quảng cáo / mã khác thì onPageStop có khi không tới) — yêu cầu đầu tiên
+                    // vẫn kiểm lại (còn lớp chặn thì qua lại một lần)
+                    title.isNotEmpty() && !title.startsWith("Just a moment", ignoreCase = true) && !title.startsWith("http") &&
+                        !title.equals(host, ignoreCase = true) && (stopped || System.currentTimeMillis() - titleAt > 1500) -> {
                         Log.d(TAG, "$host: Gecko đã qua lớp chống bot ($ms ms, «$title»)")
                         done(null)
                     }

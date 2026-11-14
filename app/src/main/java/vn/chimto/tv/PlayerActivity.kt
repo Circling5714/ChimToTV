@@ -790,7 +790,9 @@ class PlayerActivity : BaseActivity() {
         suggested = true // mỗi lần phát chỉ gợi ý một lần (không có server khác thì thôi)
         val src = source?.takeIf { !it.pageOnly } ?: return
         val cur = server ?: return
-        val (alt, score) = PlayStats.alternative(AppProxy.statsHost(Site.hostOf(src.epUrl)), src.servers, cur) ?: return
+        // Trang bật chống bot chặn WebView: «Trình phát của trang» không mở được → không gợi ý
+        val candidates = if (WebFetch.needs(src.epUrl)) src.servers.filter { it.type != PAGE_SERVER } else src.servers
+        val (alt, score) = PlayStats.alternative(AppProxy.statsHost(Site.hostOf(src.epUrl)), candidates, cur) ?: return
         suggestion = alt
         suggestionUntil = now + 15_000
         val why = score.summary?.let { " ($it)" } ?: ""
