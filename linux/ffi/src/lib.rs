@@ -11,6 +11,7 @@
 
 mod dispatch;
 mod netfn;
+mod syncfn;
 mod sites;
 
 use serde_json::{json, Value};

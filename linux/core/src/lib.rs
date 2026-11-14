@@ -37,8 +37,16 @@ pub use util::{Error, Result};
 
 use std::sync::OnceLock;
 
+static APP_VERSION: OnceLock<String> = OnceLock::new();
+
+/// Số bản của app đang dùng lõi (bản Windows đặt số bản của app WPF lúc mở — lời chào đồng bộ, User-Agent…). Không đặt thì là
+/// số bản Linux (workspace).
+pub fn set_app_version(v: &str) {
+    let _ = APP_VERSION.set(v.to_string());
+}
+
 pub fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
+    APP_VERSION.get().map(|s| s.as_str()).unwrap_or(env!("CARGO_PKG_VERSION"))
 }
 
 /// Bộ chạy việc nền (mạng, đọc trang) dùng chung cả app.

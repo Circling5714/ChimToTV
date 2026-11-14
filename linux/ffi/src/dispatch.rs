@@ -7,7 +7,9 @@ use cbtv::{http, log, net, prefs};
 use serde_json::{json, Value};
 
 /// Việc làm một lần lúc mở lõi.
-pub fn init() {}
+pub fn init() {
+    crate::syncfn::init();
+}
 
 // ---- Đọc tham số ----
 
@@ -45,6 +47,9 @@ pub fn sync(m: &str, a: &Value) -> Option<Res> {
     if let Some(r) = crate::netfn::sync(m, a) {
         return Some(r);
     }
+    if let Some(r) = crate::syncfn::sync(m, a) {
+        return Some(r);
+    }
     let (group, name) = m.split_once('.')?;
     match group {
         "prefs" => prefs_fn(name, a),
@@ -65,6 +70,12 @@ fn prefs_fn(name: &str, a: &Value) -> Option<Res> {
         }
         "has" => ok(prefs::has(&s(a, "key"))),
         "keys" => ok(prefs::keys()),
+        // Dấu xoá (lịch sử, theo dõi, trang) — giới hạn số dấu như khi đồng bộ
+        "setStamps" => {
+            let m: std::collections::BTreeMap<String, i64> = serde_json::from_value(a.get("map").cloned().unwrap_or(Value::Null)).unwrap_or_default();
+            prefs::set_stamps(&s(a, "key"), m);
+            Ok(Value::Null)
+        }
         // Mật khẩu proxy / khoá Shadowsocks (Windows: DPAPI, khoá <tên>_dpapi)
         "secret" => ok(cbtv::secret::get(&s(a, "name"))),
         "setSecret" => {
@@ -111,6 +122,10 @@ fn net_fn(name: &str, _a: &Value) -> Option<Res> {
 fn app_fn(name: &str, a: &Value) -> Option<Res> {
     Some(match name {
         "version" => ok(cbtv::version()),
+        "setVersion" => {
+            cbtv::set_app_version(&s(a, "version"));
+            Ok(Value::Null)
+        }
         "userAgent" => ok(http::user_agent()),
         "setUserAgent" => {
             http::set_user_agent(&s(a, "ua"));
@@ -131,6 +146,9 @@ pub async fn call(id: u64, m: &str, a: Value) -> Res {
         return r;
     }
     if let Some(r) = crate::netfn::call(m, &a).await {
+        return r;
+    }
+    if let Some(r) = crate::syncfn::call(m, &a).await {
         return r;
     }
     match m {

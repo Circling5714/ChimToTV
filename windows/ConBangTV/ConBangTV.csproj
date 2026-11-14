@@ -25,7 +25,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AngleSharp" Version="1.8.5" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
     <PackageReference Include="SkiaSharp" Version="4.153.1" />
   </ItemGroup>
@@ -33,8 +32,6 @@
   <!-- Dùng chung tệp của bản Android (một nguồn duy nhất để sửa) -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\app\src\main\assets\player-agent.js" LogicalName="player-agent.js" />
-    <!-- Mã hồ sơ NextDNS của app (DNS mã hoá, xem Core/Doh.cs) — tệp không đưa lên git; không có thì bỏ NextDNS -->
-    <EmbeddedResource Include="..\..\keys\nextdns.txt" LogicalName="nextdns.txt" Condition="Exists('..\..\keys\nextdns.txt')" />
     <EmbeddedResource Include="..\..\app\src\main\assets\page-focus.js" LogicalName="page-focus.js" />
     <EmbeddedResource Include="..\..\app\src\main\assets\player.html" LogicalName="player.html" />
     <EmbeddedResource Include="..\..\app\src\main\assets\hls.html" LogicalName="hls.html" />

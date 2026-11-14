@@ -49,7 +49,13 @@ public static class Prefs
         {
             if (dir != null) DataDir = dir;
             Directory.CreateDirectory(DataDir);
+#if DEBUG
+            // Bản thử: cổng đồng bộ 8792 (chạy song song bản chính trên cùng máy) — lõi đọc biến này
+            Environment.SetEnvironmentVariable("CONBANG_DEBUG", "1");
+#endif
             Native.Init(DataDir);
+            // Số bản Windows cho lõi (lời chào đồng bộ…)
+            Native.SyncVoid("app.setVersion", new { version = UpdateCheck.CurrentVersion });
             InvalidateCaches();
         }
     }
@@ -948,7 +954,7 @@ public static class Prefs
     /// Mốc thời gian theo khoá (lúc xoá / lúc thêm): {"khoá": ms}.
     public static Dictionary<string, long> Stamps(string key) => Get<Dictionary<string, long>>(key) ?? new();
 
-    public static void SetStamps(string key, Dictionary<string, long> m) => Set(key, SyncMerge.Tombstones(m, new()));
+    public static void SetStamps(string key, Dictionary<string, long> m) => Native.SyncVoid("prefs.setStamps", new { key, map = m });
 
     /// Mã máy (ngẫu nhiên, tạo lần đầu) — máy kia nhận ra máy này qua mã này.
     public static string DeviceId
@@ -962,68 +968,6 @@ public static class Prefs
                 Set("device_id", n);
                 return n;
             }
-        }
-    }
-
-    /// Dữ liệu đồng bộ của người xem p.
-    public static SyncProfile SyncProfileData(Profile p)
-    {
-        lock (Lock)
-        {
-            var id = p.Id;
-            var hist = Get<List<HistoryItem>>(Pk(id, "history")) ?? new();
-            var pos = Get<List<Position>>(Pk(id, "positions_v2")) ?? new();
-            var fol = Get<List<Follow>>(Pk(id, "follows")) ?? new();
-            return new SyncProfile
-            {
-                Id = id, Name = p.Name,
-                History = hist.Select(h => new SyncHistory(h.FilmUrl, h.Title, h.Poster ?? "", h.EpTitle, h.EpUrl, h.Time)).ToList(),
-                HistDel = Stamps(Pk(id, "hist_del")),
-                Pos = pos.Select(x => new SyncPos(x.Ep, x.Sec, x.Film, x.T ?? 0)).ToList(),
-                Follows = fol.Select(f => new SyncFollow(f.FilmUrl, f.Title, f.Poster ?? "", f.Count, f.Latest, f.Seen, f.T ?? 0)).ToList(),
-                FollowDel = Stamps(Pk(id, "follow_del")),
-            };
-        }
-    }
-
-    /// Ghi dữ liệu đã gộp cho người xem s.Id. true = có thay đổi.
-    public static bool ApplySync(SyncProfile s)
-    {
-        lock (Lock)
-        {
-            var p = Profiles.FirstOrDefault(x => x.Id == s.Id);
-            if (p == null || SyncProfileData(p).SameAs(s)) return false;
-            var id = s.Id;
-            Set(Pk(id, "history"), s.History.Select(h => new HistoryItem
-            {
-                FilmUrl = h.Film, Title = h.Title, Poster = h.Poster.NonEmpty(), EpTitle = h.Ep, EpUrl = h.EpUrl, Time = h.Time,
-            }).ToList());
-            Set(Pk(id, "positions_v2"), s.Pos.Select(x => new Position { Ep = x.Ep, Sec = x.Sec, Film = x.Film, T = x.T == 0 ? null : x.T }).ToList());
-            Set(Pk(id, "follows"), s.Follows.Select(f => new Follow
-            {
-                FilmUrl = f.Film, Title = f.Title, Poster = f.Poster.NonEmpty(), Count = f.Count, Latest = f.Latest, Seen = f.Seen,
-                T = f.T == 0 ? null : f.T,
-            }).ToList());
-            SetStamps(Pk(id, "hist_del"), s.HistDel);
-            SetStamps(Pk(id, "follow_del"), s.FollowDel);
-            _historyCache = null;
-            _positionsCache = null;
-            return true;
-        }
-    }
-
-    public static SyncSites SyncSitesData => new() { List = Sites, Add = Stamps("sites_add"), Del = Stamps("sites_del") };
-
-    /// Ghi danh sách trang đã gộp (không ghi lại mốc thêm / bỏ như khi người xem tự sửa). true = có thay đổi.
-    public static bool ApplySites(SyncSites s)
-    {
-        lock (Lock)
-        {
-            if (s.List.Count == 0 || s.SameAs(SyncSitesData)) return false;
-            SetStamps("sites_add", s.Add);
-            SetStamps("sites_del", s.Del);
-            Set("sites", s.List);
-            return true;
         }
     }
 
