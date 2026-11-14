@@ -782,7 +782,8 @@ pub const SYNC_SOON_SECONDS: f64 = 3.0;
 
 /// Đồng bộ sau một lúc (gộp các lần gọi sát nhau: thoát phim, theo dõi phim…). Tắt «Tự đồng bộ» hoặc chưa ghép thì thôi.
 /// Bản Windows gọi: mở app (2 s, trong `app_started`), thoát phim / quay lại cửa sổ sau hơn 1 phút (1 s), theo dõi / bỏ
-/// theo dõi, xoá phim / xoá cả lịch sử, thêm người xem (mặc định 3 s).
+/// theo dõi, xoá phim / xoá cả lịch sử, thêm người xem (mặc định 3 s), và hẹn 3 phút một lần (tường lửa Windows hay chặn
+/// tivi gọi vào: máy tính tự hỏi — MainWindow.StartSyncTimer).
 pub fn sync_soon(seconds: f64) {
     if !prefs::sync_auto() || peers().is_empty() {
         return;

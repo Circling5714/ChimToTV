@@ -95,10 +95,13 @@ public sealed class SyncPage : Page
             row.Children.Add(Ui.Text("Mã ghép:  ", 18));
             row.Children.Add(Ui.Text(code, 30, Ui.Res("Focus"), FontWeights.Bold));
             Body.Children.Add(row);
-            Body.Children.Add(Ui.Dim("Trên tivi: Cài đặt → Đồng bộ với iPad / iPhone… → chọn máy này (hoặc nhập địa chỉ ở trên) → nhập mã. " +
-                                     "iPad / iPhone: Cài đặt → Đồng bộ trong nhà. Mã đổi sau mỗi lần ghép.", 13.5, new Thickness(0, 0, 0, 6)));
-            Body.Children.Add(Ui.Dim("Lần đầu Windows có thể hỏi cho phép Côn Bằng TV dùng mạng: chọn Cho phép (mạng riêng / Private).",
-                13.5, new Thickness(0, 0, 0, 10)));
+            Body.Children.Add(Ui.Dim("Dễ nhất là ghép từ máy tính này: chọn tivi / iPad ở «Máy trong mạng» bên dưới (hoặc nhập địa chỉ của " +
+                                     "máy đó) rồi gõ mã 4 số đang hiện trên màn Đồng bộ của máy đó. Làm ngược lại cũng được: trên tivi vào " +
+                                     "Cài đặt → Đồng bộ với iPad / iPhone… → chọn máy này → nhập mã ở trên. Mã đổi sau mỗi lần ghép.",
+                13.5, new Thickness(0, 0, 0, 6)));
+            Body.Children.Add(Ui.Dim("Windows hỏi cho phép Côn Bằng TV dùng mạng thì chọn Cho phép (mạng riêng / Private). Không cho phép " +
+                                     "(hoặc Windows không hỏi) vẫn đồng bộ được: máy tính này tự hỏi các máy đã ghép vài phút một lần, chỉ là " +
+                                     "tivi không gửi sang ngay được và không tự ghép vào máy này được.", 13.5, new Thickness(0, 0, 0, 10)));
         }
 
         // Máy đã ghép
@@ -133,7 +136,8 @@ public sealed class SyncPage : Page
                 Prefs.SyncAuto = !Prefs.SyncAuto;
                 Rebuild();
             })));
-        Body.Children.Add(Ui.Dim("Tự đồng bộ: lúc mở app, thoát phim, theo dõi / bỏ theo dõi, xoá lịch sử.", 13.5, new Thickness(0, 0, 0, 8)));
+        Body.Children.Add(Ui.Dim("Tự đồng bộ: lúc mở app / quay lại cửa sổ app, thoát phim, theo dõi / bỏ theo dõi, xoá lịch sử, và 3 phút " +
+                                 "một lần khi app đang mở (trừ lúc đang xem phim).", 13.5, new Thickness(0, 0, 0, 8)));
 
         // Máy trong mạng
         Body.Children.Add(Ui.Text("Máy trong mạng", 17, weight: FontWeights.SemiBold, margin: new Thickness(0, 12, 0, 6)));

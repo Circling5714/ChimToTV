@@ -94,6 +94,7 @@ public partial class MainWindow : Window
         SyncService.DataChanged += () => Dispatcher.BeginInvoke(SyncApplied);
         SyncService.Message += m => Dispatcher.BeginInvoke(() => Toast(m));
         SyncService.AppStarted();
+        StartSyncTimer();
         // Lần đầu mở app (hoặc vừa cập nhật lên bản có hộp này): miễn trừ trách nhiệm — «Đồng ý» mới vào, «Thoát» / Esc là đóng app.
         // Hỏi cập nhật / «Ai đang xem?» chờ sau đó (hộp thoại mới sẽ đóng hộp đang mở).
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, async () =>
@@ -150,6 +151,28 @@ public partial class MainWindow : Window
     private long _deactivatedAt;
 
     private long _lastActiveSync;
+
+    /// Tường lửa Windows chặn tivi / iPad gọi vào máy này khi người dùng không bấm «Cho phép» (hoặc Windows không hỏi): máy này
+    /// tự hỏi các máy đã ghép vài phút một lần. Mỗi lần đồng bộ là hai chiều (gửi dữ liệu máy này, nhận lại bản đã gộp), nên thay
+    /// đổi trên tivi sang đây chậm nhất một khoảng hẹn — không cần mở cổng. Bỏ qua khi cửa sổ thu nhỏ (mở lại là đồng bộ ngay —
+    /// Activated) và khi đang xem phim (thoát phim là đồng bộ — PlayerClosed). Chưa ghép / tắt «Tự đồng bộ»: lõi tự bỏ qua.
+    private readonly DispatcherTimer _syncTimer = new() { Interval = TimeSpan.FromMinutes(3) };
+
+    private void StartSyncTimer()
+    {
+#if DEBUG
+        // Thử trên máy: CONBANG_SYNC_EVERY=<giây>
+        if (int.TryParse(Environment.GetEnvironmentVariable("CONBANG_SYNC_EVERY"), out var sec) && sec > 0)
+            _syncTimer.Interval = TimeSpan.FromSeconds(sec);
+#endif
+        _syncTimer.Tick += (_, _) =>
+        {
+            if (WindowState == WindowState.Minimized || OpenPlayer != null) return;
+            _lastActiveSync = Util.NowMs();
+            SyncService.SyncSoon(1);
+        };
+        _syncTimer.Start();
+    }
 
     /// Đồng bộ trong nhà vừa đổi dữ liệu máy này: vẽ lại menu và trang đang mở (không đụng trang đang có ô nhập).
     private void SyncApplied()
