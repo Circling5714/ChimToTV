@@ -65,6 +65,40 @@ const DIAG_JS: &str = r#"
 })();
 "#;
 
+/// Trình phát native: trình phát nhúng (JW Player của streamfree, NguonC…) tự dựng link luồng (streamfree giải mã ra
+/// `data:application/vnd.apple.mpegurl;base64,…`) — đọc link đó từ JW Player trong khung nhúng rồi báo lên khung trên cùng
+/// (window.__chimtoSrc = {u: link, p: trang của khung, s: phụ đề}); app tắt trang, phát bằng mpv.
+const EXTRACT_JS: &str = r#"
+(function(){
+  if (window.__chimtoExtract) return; window.__chimtoExtract = 1;
+  if (window.top === window) {
+    window.addEventListener('message', function (e) { if (e.data && e.data.chimtoSrc && !window.__chimtoSrc) window.__chimtoSrc = e.data.chimtoSrc; });
+  }
+  var n = 0, ok = /^data:application\/(vnd\.apple\.mpegurl|x-mpegurl)[;,]/i, file = /\.(m3u8|mp4)(\?|#|$)/i;
+  var t = setInterval(function () {
+    if (++n > 150) { clearInterval(t); return; }
+    try {
+      var p = window.jwplayer && window.jwplayer(), it = p && p.getPlaylistItem && p.getPlaylistItem();
+      var f = it && (it.file || (it.sources && it.sources[0] && it.sources[0].file));
+      // JW Player tự biết luồng HLS dù link không có đuôi .m3u8 (NguonC / streamc: link là token mã hoá) — kiểu ghi trong
+      // playlist (type: 'hls') hoặc bộ phát đang dùng hls.js
+      var hls = !!(it && /hls|m3u8/i.test(String(it.type || ((it.sources && it.sources[0]) || {}).type || ''))) ||
+        !!(p && p.getProvider && /hls/i.test((p.getProvider() || {}).name || ''));
+      if (!f || typeof f !== 'string') {
+        var v = document.querySelector('video'), s = v && (v.currentSrc || v.src);
+        if (s && /^https?:/.test(s) && file.test(s)) f = s; else return;
+      }
+      if (!ok.test(f) && !file.test(f) && !(hls && /^https?:/.test(f))) return;
+      clearInterval(t);
+      var msg = { u: /^data:/.test(f) ? f : new URL(f, location.href).href, p: location.href, h: hls ? 1 : 0 };
+      try { var tr = ((it && it.tracks) || []).filter(function (x) { return x.kind === 'captions' || x.kind === 'subtitles'; })[0];
+        if (tr && tr.file) msg.s = new URL(tr.file, location.href).href; } catch (x) {}
+      if (window.top === window) window.__chimtoSrc = msg; else window.top.postMessage({ chimtoSrc: msg }, '*');
+    } catch (x) {}
+  }, 200);
+})();
+"#;
+
 #[derive(Debug, Clone, Copy, Default)]
 struct PlayState {
     t: f64,
@@ -117,11 +151,21 @@ struct St {
     /// Số lần app tự gửi lệnh phát (JW Player trên WebKitGTK không tự phát — đứng «idle» chờ bấm)
     nudges: u32,
     last_nudge: i64,
+    /// Đang phát bằng trình phát native (libmpv)
+    native_on: bool,
+    /// Đang mở trình phát nhúng chỉ để lấy link luồng (rồi phát native)
+    extract: bool,
+    /// Trình phát native lỗi với server này → phát bằng WebView tới khi đổi tập / server
+    force_web: bool,
 }
 
 pub struct Player {
     root: gtk::Overlay,
+    /// Khung hình: WebView (trang phát) hoặc ô của trình phát native — cửa sổ phim nhỏ mang cả khung này đi
+    stage: gtk::Stack,
     web: WebView,
+    /// Trình phát native (libmpv) — tạo khi cần, tắt phim thì huỷ
+    native: RefCell<Option<Rc<crate::native::Native>>>,
     ucm: UserContentManager,
     hit: gtk::EventBox,
     topbar: gtk::EventBox,
@@ -233,7 +277,9 @@ impl Player {
         // ---- Lớp phủ ----
         let root = gtk::Overlay::new();
         root.style_context().add_class("player");
-        root.add(&web);
+        let stage = gtk::Stack::new();
+        stage.add_named(&web, "web");
+        root.add(&stage);
 
         let hit = gtk::EventBox::new();
         hit.set_visible_window(false);
@@ -372,7 +418,9 @@ impl Player {
 
         let p = Rc::new(Player {
             root,
+            stage,
             web,
+            native: RefCell::new(None),
             ucm,
             hit,
             topbar,
@@ -422,6 +470,12 @@ impl Player {
             }
         });
         self.web.connect_web_process_terminated(|_, r| {
+            use webkit2gtk::WebProcessTerminationReason as R;
+            // App tự tắt (terminate_web — trả bộ nhớ) thì không phải lỗi
+            if !matches!(r, R::Crashed | R::ExceededMemoryLimit) {
+                cbtv::log::d("player", "Đã tắt tiến trình WebKit của trình phát (trả bộ nhớ)");
+                return;
+            }
             cbtv::log::d("player", &format!("Trình duyệt lỗi: {r:?}"));
             if let Some(p) = me() {
                 if p.is_open() {
@@ -560,8 +614,8 @@ impl Player {
         win.style_context().add_class("bg");
 
         let holder = gtk::Overlay::new();
-        self.root.remove(&self.web);
-        holder.add(&self.web);
+        self.root.remove(&self.stage);
+        holder.add(&self.stage);
         // Lớp bắt chuột phủ trên phim (không để chuột chạm vào trang — quảng cáo): bấm = phát / dừng, bấm đúp = phóng to
         let hit = gtk::EventBox::new();
         hit.set_visible_window(false);
@@ -652,10 +706,10 @@ impl Player {
     /// Phóng to lại (show = hiện trình phát trong cửa sổ app); false khi tắt phim / mở phim khác.
     pub fn exit_mini(&self, show: bool) {
         let Some(m) = self.mini.borrow_mut().take() else { return };
-        m.holder.remove(&self.web);
+        m.holder.remove(&self.stage);
         // Con chính của Overlay luôn vẽ dưới các lớp phủ (thanh điều khiển, bảng…)
-        self.root.add(&self.web);
-        // SAFETY: cửa sổ nhỏ chỉ được giữ ở đây; WebView đã gỡ ra trước nên không bị huỷ theo
+        self.root.add(&self.stage);
+        // SAFETY: cửa sổ nhỏ chỉ được giữ ở đây; khung hình đã gỡ ra trước nên không bị huỷ theo
         unsafe { m.win.destroy() };
         if !show {
             return;
@@ -710,6 +764,9 @@ impl Player {
         if std::env::var_os("CONBANG_DEBUG").is_some() {
             js.push_str(DIAG_JS);
         }
+        if self.s.borrow().extract {
+            js.push_str(EXTRACT_JS);
+        }
         let script = UserScript::new(&js, UserContentInjectedFrames::AllFrames, UserScriptInjectionTime::Start, &[], &[]);
         self.ucm.add_script(&script);
         self.s.borrow_mut().expect_nav = Some(url.to_string());
@@ -720,11 +777,21 @@ impl Player {
     }
 
     fn blank(&self) {
+        // WebView chưa từng mở trang (chỉ phát native) / đã trống: khỏi nạp — nạp about:blank cũng sinh tiến trình WebKit (~45 MB)
+        if self.web.uri().map(|u| u.is_empty() || u == "about:blank").unwrap_or(true) {
+            return;
+        }
         self.s.borrow_mut().expect_nav = Some("about:blank".into());
         self.web.load_uri("about:blank");
     }
 
     fn cmd(&self, name: &str, arg: Option<f64>) {
+        if self.s.borrow().native_on {
+            if let Some(n) = self.native.borrow().as_ref() {
+                n.cmd(name, arg);
+            }
+            return;
+        }
         let a = arg.map(|x| format!("{x}")).unwrap_or_else(|| "null".into());
         self.js(&format!("window.chimtoCmd&&chimtoCmd('{name}',{a})"));
     }
@@ -806,6 +873,9 @@ impl Player {
             s.load_token += 1;
         }
         self.stop_video();
+        // Trả bộ nhớ khi không xem phim: trình phát native (mpv) và tiến trình WebKit của trình phát; lần xem sau tạo lại
+        self.drop_native();
+        self.terminate_web();
         crate::limits::flush();
         self.stop_poll();
         if let Some(id) = self.click_timer.borrow_mut().take() {
@@ -871,6 +941,7 @@ impl Player {
             s.token += 1;
             s.episode_url = ep.url.clone();
             s.source = None;
+            s.force_web = false;
             s.resume_at = prefs::position_of(&ep.url);
             s.intro_done = false;
             s.token
@@ -961,6 +1032,17 @@ impl Player {
                     let start = me.start_for();
                     me.s.borrow_mut().start_hint = start;
                     let is_hls = v.file || url::Url::parse(&v.url).map(|u| u.path().ends_with(".m3u8")).unwrap_or(false);
+                    let native = me.native_allowed();
+                    // Trình phát native: luồng .m3u8 / tệp video phát thẳng bằng mpv
+                    if is_hls && native {
+                        me.s.borrow_mut().hls_url = Some(v.url.clone());
+                        if me.play_native(&v.url, v.subtitle.as_deref(), &src.ep_url, start, false) {
+                            return;
+                        }
+                        me.s.borrow_mut().hls_url = None;
+                    }
+                    // Trình phát nhúng: mở như cũ, đọc link luồng trong JW Player rồi chuyển sang mpv (EXTRACT_JS)
+                    me.s.borrow_mut().extract = native && !is_hls;
                     let page = if is_hls {
                         me.s.borrow_mut().hls_url = Some(v.url.clone());
                         hls_page(&v.url, v.subtitle.as_deref(), start)
@@ -982,10 +1064,108 @@ impl Player {
         });
     }
 
-    fn stop_video(&self) {
-        self.save_position();
+    // ---- Trình phát native (libmpv) ----
+
+    /// Được dùng trình phát native cho lần phát này: đã bật trong cài đặt, máy có libmpv, server này chưa lỗi với mpv.
+    fn native_allowed(&self) -> bool {
+        prefs::native_player() && !self.s.borrow().force_web && crate::native::available()
+    }
+
+    /// Tắt hẳn tiến trình WebKit của trình phát: trang đã đóng mà tiến trình vẫn giữ 200–300 MB (đo trên máy ảo thử); lần nạp
+    /// trang sau WebKit tự mở tiến trình mới. Hàm có từ WebKitGTK 2.34 — tra lúc chạy để bản dựng vẫn chạy trên bản cũ hơn.
+    fn terminate_web(&self) {
+        use glib::object::ObjectType;
+        static SYM: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+        // SAFETY: tra ký hiệu trong các thư viện đã nạp
+        let f = *SYM.get_or_init(|| unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"webkit_web_view_terminate_web_process".as_ptr()) as usize });
+        if f == 0 || self.web.uri().is_none() {
+            return;
+        }
+        // SAFETY: void webkit_web_view_terminate_web_process(WebKitWebView*) — đúng kiểu, WebView còn sống
+        unsafe {
+            let f: unsafe extern "C" fn(*mut std::ffi::c_void) = std::mem::transmute(f);
+            f(self.web.as_ptr() as *mut std::ffi::c_void);
+        }
+    }
+
+    fn native_video(&self) -> Option<Rc<crate::native::Native>> {
+        if let Some(n) = self.native.borrow().as_ref() {
+            return Some(n.clone());
+        }
+        let n = crate::native::Native::new(has_gpu())?;
+        self.stage.add_named(&n.widget, "native");
+        n.widget.show();
+        *self.native.borrow_mut() = Some(n.clone());
+        Some(n)
+    }
+
+    fn drop_native(&self) {
+        if let Some(n) = self.native.borrow_mut().take() {
+            self.stage.remove(&n.widget);
+            drop(n);
+            cbtv::media_proxy::close_all();
+            cbtv::log::d("native", "Đã tắt trình phát native");
+        }
+    }
+
+    /// Phát `src` (luồng .m3u8 / tệp video / data:…mpegurl) bằng mpv qua cổng phát nội bộ; `hls` = biết chắc là luồng HLS dù
+    /// link không có đuôi .m3u8. false = không dùng được (bên gọi tự phát bằng WebView).
+    fn play_native(self: &Rc<Self>, src: &str, sub: Option<&str>, page: &str, start: i64, hls: bool) -> bool {
+        let Some(n) = self.native_video() else { return false };
+        let Some(o) = cbtv::media_proxy::open(src, sub, Some(page), hls) else { return false };
+        let shown = if src.starts_with("data:") { "data:… (link do trình phát nhúng giải mã)".to_string() } else { src.to_string() };
+        cbtv::log::d("native", &format!("Phát native {shown} (trang {page}, bắt đầu {start}s)"));
         {
             let mut s = self.s.borrow_mut();
+            s.native_on = true;
+            s.extract = false;
+            s.load_started_at = cbtv::util::now_ms();
+        }
+        // Trang nhúng (nếu đang mở để lấy link) / trang của lần xem trước không cần nữa: tắt cả tiến trình WebKit để trả bộ nhớ
+        self.blank();
+        self.terminate_web();
+        self.stage.set_visible_child_name("native");
+        n.load(&o.url, start as f64, o.subtitle);
+        true
+    }
+
+    /// Đọc trạng thái mpv, đưa vào cùng đường xử lý với trạng thái của player-agent.js.
+    fn poll_native(self: &Rc<Self>) {
+        let Some(n) = self.native.borrow().clone() else { return };
+        let st = n.state();
+        // Lỗi trước khi phát được giây nào: phát lại bằng WebView (trình phát nhúng / hls.html) như trước khi có mpv
+        if let Some(e) = st.err.as_ref() {
+            if !self.s.borrow().started && !self.s.borrow().force_web {
+                cbtv::log::d("native", &format!("mpv lỗi ({e}) — chuyển sang trình phát web"));
+                self.notice("Trình phát native không mở được luồng này — chuyển sang trình phát web.", 5000);
+                let resume = self.s.borrow().resume_at;
+                self.s.borrow_mut().force_web = true;
+                self.s.borrow_mut().resume_at = resume;
+                let server = self.s.borrow().server.clone();
+                self.play_server(server);
+                return;
+            }
+        }
+        let load = self.s.borrow().page_load;
+        let o = serde_json::json!({
+            "t": st.t, "d": st.d, "paused": st.paused, "ended": st.ended, "waiting": st.waiting, "ready": st.ready,
+            "err": st.err.unwrap_or_default(),
+        });
+        self.on_state(Some(serde_json::json!([load, o]).to_string()));
+    }
+
+    fn stop_video(&self) {
+        self.save_position();
+        if self.s.borrow().native_on {
+            if let Some(n) = self.native.borrow().as_ref() {
+                n.stop();
+            }
+            self.stage.set_visible_child_name("web");
+        }
+        {
+            let mut s = self.s.borrow_mut();
+            s.native_on = false;
+            s.extract = false;
             s.page_mode = false;
             s.embed_url = None;
             s.hls_url = None;
@@ -1014,6 +1194,7 @@ impl Player {
         if let Some(t) = self.current_time() {
             self.s.borrow_mut().resume_at = t;
         }
+        self.s.borrow_mut().force_web = false;
         self.hide_panel();
         self.play_server(Some(sv));
     }
@@ -1090,11 +1271,15 @@ impl Player {
         if !self.is_open() || self.s.borrow().polling {
             return;
         }
+        if self.s.borrow().native_on {
+            self.poll_native();
+            return;
+        }
         self.s.borrow_mut().polling = true;
         let me = self.clone();
         #[allow(deprecated)]
         self.web.run_javascript(
-            "JSON.stringify([window.__chimtoLoad||0,window.__chimtoState||null])",
+            "JSON.stringify([window.__chimtoLoad||0,window.__chimtoState||null,window.__chimtoSrc||null])",
             None::<&gio::Cancellable>,
             move |r| {
                 me.s.borrow_mut().polling = false;
@@ -1109,16 +1294,39 @@ impl Player {
 
     fn on_state(self: &Rc<Self>, raw: Option<String>) {
         let page_load = self.s.borrow().page_load;
-        let o = raw
-            .and_then(|r| serde_json::from_str::<serde_json::Value>(&r).ok())
-            .and_then(|v| {
-                let a = v.as_array()?;
-                if a.len() == 2 && a[0].as_u64() == Some(page_load) {
-                    a[1].as_object().cloned()
-                } else {
-                    None
+        let v = raw.and_then(|r| serde_json::from_str::<serde_json::Value>(&r).ok());
+        let mine = v.as_ref().and_then(|v| v.as_array()).filter(|a| a.len() >= 2 && a[0].as_u64() == Some(page_load));
+        // Trình phát nhúng đã lộ link luồng (EXTRACT_JS): chuyển sang trình phát native
+        if self.s.borrow().extract {
+            if let Some(src) = mine.and_then(|a| a.get(2)).and_then(|x| x.as_object()) {
+                let u = cbtv::json::str(Some(src), "u");
+                let page = cbtv::json::str(Some(src), "p");
+                let sub = cbtv::json::str(Some(src), "s");
+                let hls = cbtv::json::num(Some(src), "h").unwrap_or(0.0) > 0.0;
+                if !u.is_empty() && !page.is_empty() {
+                    self.s.borrow_mut().extract = false;
+                    // Kiểm trước (trang vẫn mở, phát tiếp được nếu không dùng mpv): luồng có lớp bảo vệ riêng của trang —
+                    // streamfree: SAMPLE-AES + khoá gói kín, NguonC: cả danh sách mã hoá AES-GCM — thì không vượt, để trình phát
+                    // của trang phát như trước
+                    let t = self.s.borrow().token;
+                    let me = self.clone();
+                    let (u2, p2) = (u.clone(), page.clone());
+                    ui::spawn(async move { cbtv::media_proxy::probe(&u2, Some(&p2), hls).await }, move |ok| {
+                        if t != me.s.borrow().token || !me.is_open() {
+                            return;
+                        }
+                        if !ok {
+                            cbtv::log::d("native", "Luồng của trình phát nhúng có lớp bảo vệ riêng — giữ trình phát của trang");
+                            return;
+                        }
+                        // Trang đã kịp phát thì mpv bắt đầu đúng chỗ đang xem
+                        let start = me.current_time().unwrap_or(me.s.borrow().start_hint);
+                        me.play_native(&u, (!sub.is_empty()).then_some(sub.as_str()), &page, start, hls);
+                    });
                 }
-            });
+            }
+        }
+        let o = mine.and_then(|a| a[1].as_object().cloned());
         let now = cbtv::util::now_ms();
         let in_ad = o.as_ref().map(|o| cbtv::json::bool(Some(o), "ad", false)).unwrap_or(false);
         if in_ad {
@@ -1865,8 +2073,13 @@ impl Player {
     #[cfg(debug_assertions)]
     pub fn debug(&self) -> String {
         let s = self.s.borrow();
+        let native = match (s.native_on, self.native.borrow().as_ref()) {
+            (true, Some(n)) => format!("on {}", n.debug()),
+            _ if s.extract => "đang lấy link từ trình phát nhúng".to_string(),
+            _ => format!("off (force_web={})", s.force_web),
+        };
         format!(
-            "open={} pageMode={} started={} server={:?} ep={} t={:?} d={:?} paused={:?} embed={:?} hls={:?} load={}",
+            "native={native} open={} pageMode={} started={} server={:?} ep={} t={:?} d={:?} paused={:?} embed={:?} hls={:?} load={}",
             self.is_open(),
             s.page_mode,
             s.started,

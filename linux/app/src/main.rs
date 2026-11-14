@@ -14,6 +14,8 @@ mod images;
 mod keynav;
 mod limits;
 mod menu;
+mod mpv;
+mod native;
 mod pages;
 mod player;
 mod profiles;

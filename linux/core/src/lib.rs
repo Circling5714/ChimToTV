@@ -30,6 +30,7 @@ pub mod watch_limit;
 pub mod update_check;
 pub mod invite;
 pub mod disclaimer;
+pub mod media_proxy;
 
 pub use models::*;
 pub use util::{Error, Result};

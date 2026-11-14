@@ -154,6 +154,21 @@ impl SettingsPage {
             vec![choice("Bật", an, || prefs::set_auto_next(true)), choice("Tắt", !an, || prefs::set_auto_next(false))],
             None,
         );
+        let nat = prefs::native_player();
+        self.option(
+            "Trình phát (thử nghiệm)",
+            vec![
+                choice("Native (mpv)", nat, || prefs::set_native_player(true)),
+                choice("Web (WebView)", !nat, || prefs::set_native_player(false)),
+            ],
+            Some(if crate::native::available() {
+                "Native: luồng phim trực tiếp (KKPhim, VSMOV, CLB Phim Xưa…) phát bằng mpv thay cho trang web — ít bộ nhớ và CPU hơn. \
+                 Trình phát nhúng có mã hoá riêng (yanhh3d, NguonC…) vẫn phát bằng trang; luồng nào mpv không mở được thì app tự \
+                 chuyển sang trình phát web."
+            } else {
+                "Máy chưa có libmpv (gói libmpv2, Ubuntu 22.04: libmpv1) — đang phát bằng trình phát web."
+            }),
+        );
         let kk = prefs::kk_backup();
         self.option(
             "Server dự phòng KKPhim",

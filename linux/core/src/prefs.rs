@@ -1113,6 +1113,15 @@ pub fn set_video_fill(v: bool) {
     set(&k("video_fill"), Some(v));
 }
 
+/// Trình phát native (libmpv) cho luồng .m3u8 / tệp video — cài đặt của máy, không theo người xem. Mặc định bật; máy không có
+/// libmpv thì app tự phát bằng WebView như cũ.
+pub fn native_player() -> bool {
+    flag_on("native_player")
+}
+pub fn set_native_player(v: bool) {
+    set("native_player", Some(v));
+}
+
 // ---- Vị trí đang xem từng tập (giây) — thứ tự lưu: cũ nhất trước ----
 
 fn positions() -> Vec<Position> {

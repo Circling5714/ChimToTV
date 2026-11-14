@@ -16,6 +16,8 @@ path = "src/lib.rs"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "io-util", "sync", "macros", "fs"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots", "gzip", "brotli", "deflate", "socks", "cookies", "stream", "http2"] }
 futures = "0.3"
+# Cổng phát nội bộ (media_proxy.rs): phần thân trả về của reqwest (đã có sẵn trong cây phụ thuộc)
+bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 scraper = "0.20"
