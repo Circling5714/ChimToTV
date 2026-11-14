@@ -106,7 +106,7 @@ public static class DebugServer
                     // Giả máy chủ DNS mã hoá bị chặn: /dohfail?labels=DoH NextDNS,DoT NextDNS (trống = bỏ); trả thứ tự máy chủ
                     Doh.DebugFail = (q["labels"] ?? "").Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).ToHashSet();
                     Net.SettingsChanged(); // đóng kết nối đang giữ (HttpClient dùng lại) → kết nối mới phải hỏi DNS lại
-                    body = Text(string.Join(" → ", Doh.Servers.Select(x => x.Label + (Doh.DebugFail.Contains(x.Label) ? " (giả chặn)" : ""))));
+                    body = Text(string.Join(" → ", Doh.Servers.Select(x => x + (Doh.DebugFail.Contains(x) ? " (giả chặn)" : ""))));
                     break;
                 case "/dnsblock":
                     // Giả DNS của máy chặn: /dnsblock?hosts=a.com,b.com (trống = bỏ)&ip=203.0.113.9 (mặc định 0.0.0.0)

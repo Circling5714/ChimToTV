@@ -104,7 +104,7 @@ public static class UpdateCheck
             {
                 try
                 {
-                    await using (var fs = File.Create(file)) await Http.Download(url, fs, progress);
+                    await Http.DownloadTo(url, file, progress);
                     last = null;
                     break;
                 }

@@ -42,6 +42,9 @@ pub fn sync(m: &str, a: &Value) -> Option<Res> {
     if let Some(r) = crate::sites::sync(m, a) {
         return Some(r);
     }
+    if let Some(r) = crate::netfn::sync(m, a) {
+        return Some(r);
+    }
     let (group, name) = m.split_once('.')?;
     match group {
         "prefs" => prefs_fn(name, a),
@@ -125,6 +128,9 @@ pub async fn call(id: u64, m: &str, a: Value) -> Res {
         return r;
     }
     if let Some(r) = crate::sites::call(m, &a).await {
+        return r;
+    }
+    if let Some(r) = crate::netfn::call(m, &a).await {
         return r;
     }
     match m {

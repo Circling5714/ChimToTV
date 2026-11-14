@@ -23,7 +23,9 @@ public static class ImageLoader
         AutomaticDecompression = DecompressionMethods.All,
         ConnectTimeout = TimeSpan.FromSeconds(10),
         MaxConnectionsPerServer = 6,
-        ConnectCallback = Net.HttpConnect,
+        // Qua cổng SOCKS5 nội bộ của lõi (DNS mã hoá, vượt chặn, proxy)
+        Proxy = Net.Proxy,
+        UseProxy = true,
     })
     {
         Timeout = TimeSpan.FromSeconds(20),

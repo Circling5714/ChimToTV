@@ -10,6 +10,7 @@
 //! Panic trong lõi không làm sập app: trả {"err": …}.
 
 mod dispatch;
+mod netfn;
 mod sites;
 
 use serde_json::{json, Value};
