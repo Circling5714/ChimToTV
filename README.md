@@ -364,7 +364,7 @@ App cho máy tính / mini PC chạy **Ubuntu 22.04+, Linux Mint 21+, Debian 12+*
 WebKitGTK 4.1), dùng được cả chuột lẫn bàn phím / remote — giao diện, phím và tính năng như [Bản Windows](#bản-windows):
 
 - **Cài:** tải tệp `.deb` rồi mở bằng App Center / «Software Install», hoặc `sudo apt install ./ConBangTV-Linux-<bản>.deb` (apt tự
-  cài GTK / WebKitGTK / GStreamer còn thiếu). App hiện trong danh sách ứng dụng với tên «Côn Bằng TV». Tệp `.deb` chỉ vài MB vì
+  cài GTK / WebKitGTK / GStreamer còn thiếu, và libmpv — gói gợi ý từ 1.1). App hiện trong danh sách ứng dụng với tên «Côn Bằng TV». Tệp `.deb` chỉ vài MB vì
   dùng thư viện có sẵn của hệ thống. Dữ liệu ở `~/.local/share/conbangtv` (mật khẩu proxy / khoá Shadowsocks trong
   `secret.json`, quyền 600 — không dùng kho khoá GNOME vì máy tự đăng nhập thì kho khoá bị khoá), ảnh bìa ở
   `~/.cache/conbangtv/img`.
@@ -373,6 +373,20 @@ WebKitGTK 4.1), dùng được cả chuột lẫn bàn phím / remote — giao d
   SOCKS5 nội bộ 127.0.0.1 (DNS mã hoá, vượt chặn, proxy) — tên miền quảng cáo / theo dõi bị từ chối ngay ở cổng này. JW Player
   (streamfree.vip) trên WebKitGTK không tự phát → app tự gửi lệnh phát sau 2,5 giây. Giải mã H.264 bằng GStreamer
   (`gstreamer1.0-libav`); máy có card Intel / AMD cài thêm `gstreamer1.0-vaapi` để giải mã bằng phần cứng.
+- **Trình phát native (từ 1.1, thử nghiệm; Cài đặt → «Trình phát (thử nghiệm)»: Native / Web, mặc định Native):** luồng `.m3u8` /
+  tệp video trực tiếp (KKPhim, mephim, server KK của phimmois, server dự phòng KKPhim, VSMOV, CLB Phim Xưa) phát bằng **libmpv**
+  (`app/src/mpv.rs` nạp lúc chạy `libmpv.so.2` / `.so.1` — không cần lúc dựng; `app/src/native.rs` vẽ bằng render API phần mềm vào
+  bộ nhớ rồi cairo dán lên; máy có card đồ hoạ giải mã bằng card rồi chép về — `hwdec=auto-copy-safe`; `CONBANG_NATIVE_RENDER=gl`
+  thì vẽ bằng OpenGL, chưa thử trên máy thật). Mpv chỉ tải từ **cổng phát nội bộ** (`core/src/media_proxy.rs`, 127.0.0.1, mã phiên
+  ngẫu nhiên, đường dẫn chỉ mang số thứ tự): cổng tải hộ qua máy khách của app (DNS mã hoá, vượt chặn, proxy), bỏ khối quảng cáo như
+  `hls.html`, bỏ phần ngụy trang PNG (VSMOV), bỏ phần trước `WEBVTT` của phụ đề rời, nối các khúc 206 ngắn (CLB Phim Xưa trả 8 MB mỗi
+  lần) thành một luồng liền. Trạng thái / lệnh theo đúng giao thức của `player-agent.js` nên mọi logic của trình phát giữ nguyên;
+  khung hình là `gtk::Stack` (WebView | mpv) mà cửa sổ phim nhỏ mang đi. Trình phát nhúng (JW Player): app đọc link luồng, kiểm trước
+  trong lúc trang vẫn mở — streamfree (SAMPLE-AES, `KEYFORMAT` riêng, khoá gói kín) và NguonC / streamc (cả danh sách mã hoá
+  `#ENC-AESGCM`) **không phát native** (không vượt lớp bảo vệ nội dung), trình phát của trang chạy tiếp. Mpv lỗi lúc mở / lỗi giữa
+  chừng / quá 20 giây chưa chạy → tự phát lại server đó bằng WebView, đúng chỗ đang xem. Đo trên máy ảo (không card đồ hoạ, KKPhim
+  2542×1080 toàn màn hình): WebView 120% CPU · 490 MB riêng, mpv 87% CPU · 333 MB. Thoát phim: huỷ mpv và tắt tiến trình WebKit
+  của trình phát (`webkit_web_view_terminate_web_process`, tra lúc chạy) — trả 200–300 MB.
 - **Tự cập nhật:** Cài đặt → **Kiểm tra cập nhật** (tự hỏi tối đa 2 giờ một lần) — tải `.deb` của release `linux-v<bản>`, kiểm tên
   gói / số bản / kiến trúc, cài bằng `pkexec apt-get install` (hệ thống hỏi mật khẩu máy) rồi mở lại app.
 - **Đồng bộ trong nhà:** như TV / iPad / Windows (cổng 8791, mDNS `_conbangtv._tcp`, nền tảng «linux»).
@@ -386,7 +400,8 @@ WebKitGTK 4.1), dùng được cả chuột lẫn bàn phím / remote — giao d
 - **Chưa có:** xem riêng, chấm điểm server.
 
 Dựng: `.\linux\build.ps1 [-CoreOnly] [-Test] [-Run]` gửi mã nguồn sang máy Ubuntu thử (bộ lệnh `E:\DEV_CODE\_May_Test_App\ubuntu.ps1`),
-dựng và chạy test / mở app trên màn hình máy đó (bản thử có cổng gỡ lỗi 127.0.0.1:8790 khi chạy với `CONBANG_DEBUG=1`).
+dựng và chạy test / mở app trên màn hình máy đó (bản thử có cổng gỡ lỗi 127.0.0.1:8790 khi chạy với `CONBANG_DEBUG=1`; thử đường
+tự chuyển của trình phát native: `/native?fail=1` giả mpv lỗi, `/native?hang=1|0` giả cổng phát treo).
 Bản phát hành: `bash linux/packaging/release-build.sh <thư mục ra>` trên máy Ubuntu — dựng trong container Ubuntu 22.04 (podman,
 glibc 2.35) rồi đóng gói `.deb` (`linux/packaging/make-deb.sh`). Mã NextDNS lấy từ `keys/nextdns.txt` lúc dựng (`linux/core/build.rs`).
 

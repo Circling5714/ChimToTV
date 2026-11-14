@@ -9,6 +9,37 @@ Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề
 Bản Mac (macOS 12+, từ 13/11/2026, cùng mã nguồn và số bản với bản iPad) ghi riêng với tiêu đề "Mac …", tag `mac-v…`.
 Bản Linux (Ubuntu 22.04+ / Linux Mint 21+ / Debian 12+, từ 13/11/2026, tệp `.deb`) ghi riêng với tiêu đề "Linux …", tag `linux-v…`.
 
+## Linux 1.1 — 14/11/2026 (trình phát native)
+
+- **Trình phát native (thử nghiệm)** — luồng phim trực tiếp phát bằng **mpv** thay cho trang web: KKPhim (cả trang KKPhim, mephim,
+  server KK của phimmois và server dự phòng KKPhim), VSMOV, CLB Phim Xưa (MP4). Đo trên máy ảo Ubuntu không card đồ hoạ, cùng tập
+  KKPhim 2542×1080 toàn màn hình: WebView 120% CPU · 490 MB riêng → mpv **87% CPU · 333 MB**; VSMOV 66% CPU, 0 khung rơi; CLB Phim
+  Xưa chạy sau 1 giây. Mpv chỉ tải từ **cổng phát nội bộ** của app (127.0.0.1, mã phiên ngẫu nhiên) nên vẫn đi qua DNS mã hoá / vượt
+  chặn / proxy và vẫn làm những việc trang phát cũ làm: bỏ khối quảng cáo chèn giữa phim của KKPhim, bỏ phần ngụy trang ảnh PNG của
+  VSMOV, bỏ phần ảnh trước phụ đề rời; nối các khúc 8 MB của CLB Phim Xưa thành một luồng liền. Mọi tính năng của trình phát giữ
+  nguyên (xem tiếp, bỏ nhạc mở đầu, đổi server, tốc độ, lấp đầy, giới hạn giờ xem, tự sang tập, cửa sổ phim nhỏ).
+- **Tự chuyển sang trình phát web** (cùng server, phát tiếp đúng chỗ đang xem) khi mpv không mở được luồng, mất luồng giữa chừng,
+  hoặc quá 20 giây chưa chạy mà không báo lỗi; máy không có libmpv thì phát bằng trình phát web như trước.
+- **yanhh3d, hoathinh3d, hhkungfu (streamfree) và NguonC vẫn phát bằng trình phát của trang:** luồng của các trang này được mã hoá
+  riêng (streamfree: SAMPLE-AES với khoá gói kín; NguonC: cả danh sách phát mã hoá AES-GCM) — app không vượt lớp bảo vệ nội dung. App
+  kiểm trước link luồng trong lúc trang vẫn mở nên không phải nạp lại trang.
+- Chọn lại trình phát cũ: **Cài đặt → Trình phát (thử nghiệm) → Web**. Mặc định vẽ hình bằng phần mềm trên mọi máy (máy có card đồ hoạ
+  vẫn giải mã bằng card khi được — hwdec auto-copy-safe); vẽ bằng OpenGL chỉ khi đặt `CONBANG_NATIVE_RENDER=gl` (chưa thử trên máy
+  thật có card đồ hoạ).
+- **Trả bộ nhớ khi thoát phim:** tắt hẳn tiến trình WebKit của trình phát (trước đây giữ thêm 200–300 MB sau khi xem bằng trình phát
+  web) và trình phát mpv.
+- Gói `.deb` thêm `Recommends: libmpv2 | libmpv1` — apt cài theo mặc định, cả lúc app tự cập nhật.
+- bản 1.1.0 · gói `conbangtv` (amd64, cần glibc ≥ 2.34) · tag `linux-v1.1` (không phải "latest") · commit `a7b696d` (đăng 07:43:42) ·
+  `ConBangTV-Linux-1.1.deb` 5 430 968 byte · SHA-256 `67843b98dd71d50c1470ab4fdeea288da104e0b7fea4daf02375e01c2a26aa4c` · dựng
+  trong container Ubuntu 22.04 trên máy Ubuntu thử. Link cố định `conbangtv_linux` đã chép đè bản 1.1.
+- 213 test lõi (210 đạt, 3 test cần mạng thật để riêng; 10 test mới cho cổng phát). Thử trên máy ảo Ubuntu 26.04: KKPhim, VSMOV, CLB
+  Phim Xưa phát bằng mpv; streamfree / NguonC giữ trình phát của trang, không nạp lại; tua / dừng / phát bằng phím; cửa sổ phim nhỏ;
+  ba đường tự chuyển sang trình phát web (giả lỗi lúc mở, lỗi giữa chừng, treo 20 giây); thoát phim trả bộ nhớ. Bản phát hành: cài
+  bằng apt, mở từ biểu tượng app, phát CLB Phim Xưa bằng mpv (không có cổng gỡ lỗi). Sau khi đăng: tự cập nhật thật 1.0 → 1.1 — «Có
+  bản mới: Côn Bằng TV 1.1», Cập nhật ngay 07:45:14, `pkexec apt-get install` mã 0, mở lại 1.1.0 lúc 07:45:18, tệp chạy đã cài trùng
+  tệp phát hành; `releases/latest` vẫn `v2.17`; `-Verify` cả 5 nền tảng đạt. **Chưa thử: máy thật có card đồ hoạ, phụ đề rời (server
+  HD).**
+
 ## Linux 1.0 — 13/11/2026 (bản Linux đầu tiên)
 
 - **Côn Bằng TV cho máy tính Linux**: Ubuntu 22.04 trở lên, Linux Mint 21+, Debian 12+ (máy 64-bit x86). Viết mới bằng Rust + GTK3 +
