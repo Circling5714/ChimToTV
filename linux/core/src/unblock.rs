@@ -184,13 +184,19 @@ pub fn ttl_of(fd: i32) -> Option<i32> {
 }
 
 /// struct tcp_info của nhân Linux (đọc thô): (byte, số byte nhân trả). Nhân cũ trả ít trường hơn.
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_vendor = "apple")))]
 fn tcp_info(fd: i32) -> Option<([u8; 232], usize)> {
     let mut buf = [0u8; 232];
     let mut len = buf.len() as libc::socklen_t;
     // SAFETY: getsockopt ghi tối đa len byte vào buf và cập nhật len.
     let r = unsafe { libc::getsockopt(fd, libc::IPPROTO_TCP, libc::TCP_INFO, buf.as_mut_ptr() as *mut libc::c_void, &mut len) };
     (r == 0).then_some((buf, len as usize))
+}
+
+/// iOS (bản iOS 6 — ConBangTV_Legacy): Darwin không có TCP_INFO kiểu Linux → không có số đo hàng đợi TCP
+#[cfg(target_vendor = "apple")]
+fn tcp_info(_fd: i32) -> Option<([u8; 232], usize)> {
+    None
 }
 
 #[cfg(not(windows))]
