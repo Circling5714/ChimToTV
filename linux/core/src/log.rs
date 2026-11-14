@@ -52,11 +52,7 @@ pub fn since(since: u64) -> (u64, Vec<String>) {
 
 fn stamp() -> (String, String) {
     let ms = crate::util::now_ms();
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    let tt: libc::time_t = (ms / 1000) as libc::time_t;
-    unsafe {
-        libc::localtime_r(&tt, &mut tm);
-    }
+    let tm = crate::util::local_tm_of((ms / 1000) as i64);
     (
         format!("{:04}-{:02}-{:02}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday),
         format!("{:02}:{:02}:{:02}.{:03}", tm.tm_hour, tm.tm_min, tm.tm_sec, ms % 1000),

@@ -262,34 +262,55 @@ pub async fn with_timeout<T>(seconds: f64, work: impl Future<Output = Result<T>>
     }
 }
 
-/// Giờ địa phương (phút trong ngày, ngày "yyyy-MM-dd") — dùng cho giới hạn giờ xem.
-pub fn local_now() -> (String, i32) {
-    let t = now_ms() / 1000;
+/// Giờ địa phương của mốc giây (Linux: localtime_r, Windows: _localtime64_s).
+pub fn local_tm_of(secs: i64) -> libc::tm {
+    // SAFETY: struct tm toàn số nguyên — khởi tạo 0 hợp lệ; hàm C chỉ ghi vào tm
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    let tt: libc::time_t = t as libc::time_t;
+    let tt = secs as libc::time_t;
+    #[cfg(unix)]
     unsafe {
         libc::localtime_r(&tt, &mut tm);
     }
+    #[cfg(windows)]
+    unsafe {
+        libc::localtime_s(&mut tm, &tt);
+    }
+    tm
+}
+
+/// Mốc giây của một giờ địa phương (ngày tràn tháng tự chuyển — mktime / _mktime64).
+pub fn mktime_local(tm: &mut libc::tm) -> i64 {
+    #[cfg(unix)]
+    {
+        // SAFETY: mktime đọc / chuẩn hoá tm hợp lệ
+        unsafe { libc::mktime(tm) as i64 }
+    }
+    #[cfg(windows)]
+    {
+        extern "C" {
+            fn _mktime64(tm: *mut libc::tm) -> i64;
+        }
+        // SAFETY: như trên (CRT của Windows)
+        unsafe { _mktime64(tm) }
+    }
+}
+
+/// Giờ địa phương (phút trong ngày, ngày "yyyy-MM-dd") — dùng cho giới hạn giờ xem.
+pub fn local_now() -> (String, i32) {
+    let t = now_ms() / 1000;
+    let tm = crate::util::local_tm_of(t as i64);
     (format!("{:04}-{:02}-{:02}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday), tm.tm_hour * 60 + tm.tm_min)
 }
 
 /// "HH:mm" giờ địa phương của mốc ms.
 pub fn local_hm(ms: i64) -> String {
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    let tt: libc::time_t = (ms / 1000) as libc::time_t;
-    unsafe {
-        libc::localtime_r(&tt, &mut tm);
-    }
+    let tm = crate::util::local_tm_of((ms / 1000) as i64);
     format!("{:02}:{:02}", tm.tm_hour, tm.tm_min)
 }
 
 /// "dd/MM HH:mm" giờ địa phương của mốc ms.
 pub fn local_dm_hm(ms: i64) -> String {
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    let tt: libc::time_t = (ms / 1000) as libc::time_t;
-    unsafe {
-        libc::localtime_r(&tt, &mut tm);
-    }
+    let tm = crate::util::local_tm_of((ms / 1000) as i64);
     format!("{:02}/{:02} {:02}:{:02}", tm.tm_mday, tm.tm_mon + 1, tm.tm_hour, tm.tm_min)
 }
 

@@ -56,6 +56,8 @@ pub struct Chunk {
     pub start: usize,
     pub len: usize,
     pub ttl1: bool,
+    /// Windows: gửi xong mẩu này thì chờ máy chủ xác nhận hết rồi mới gửi tiếp (xem hello_chunks)
+    pub hold: bool,
 }
 
 struct Plan {
@@ -67,7 +69,7 @@ impl Plan {
     fn add(&mut self, start: usize, end: usize) {
         let s = start.max(self.i);
         if end > self.i && end > start {
-            self.chunks.push(Chunk { start: s, len: end - s, ttl1: false });
+            self.chunks.push(Chunk { start: s, len: end - s, ttl1: false, hold: false });
         }
         self.i = self.i.max(end);
     }
@@ -88,9 +90,18 @@ impl Plan {
 pub fn hello_chunks(buf: &[u8], host: &str, level: i64) -> Vec<Chunk> {
     let tls = is_tls_hello(buf);
     if (!tls && !is_http_request(buf)) || level <= 0 {
-        return vec![Chunk { start: 0, len: buf.len(), ttl1: false }];
+        return vec![Chunk { start: 0, len: buf.len(), ttl1: false, hold: false }];
     }
-    let mut p = Plan { chunks: vec![Chunk { start: 0, len: 1, ttl1: level >= 2 }], i: 1 };
+    let mut p = Plan { chunks: vec![Chunk { start: 0, len: 1, ttl1: level >= 2, hold: false }], i: 1 };
+    // Windows (như Unblock.cs bản C# 1.13): Windows gửi lại MỌI byte chưa được xác nhận trong một gói — byte đầu (TTL 1) mất
+    // thì gói gửi lại gộp luôn tên trang. Nên mức 2: byte 1, 2, 3 từng gói, gửi xong byte 3 thì chờ máy chủ xác nhận hết
+    // (byte đầu đã gửi lại xong) rồi mới gửi phần chứa tên trang.
+    if cfg!(windows) && level >= 2 && buf.len() > 4 {
+        for k in 1..4 {
+            p.chunks.push(Chunk { start: k, len: 1, ttl1: false, hold: k == 3 });
+        }
+        p.i = 4;
+    }
     if tls {
         let name = host.to_lowercase();
         let name = name.as_bytes();
@@ -128,8 +139,29 @@ fn index_of_ignore_case(b: &[u8], name: &[u8]) -> Option<usize> {
 
 // ---- Ổ cắm: TTL, trạng thái TCP ----
 
+/// Số hiệu ổ cắm của hệ điều hành (Linux: fd, Windows: SOCKET).
+#[cfg(not(windows))]
+pub type Sock = std::os::fd::RawFd;
+#[cfg(windows)]
+pub type Sock = std::os::windows::io::RawSocket;
+
+/// Số hiệu ổ cắm của một kết nối TCP tokio.
+pub fn sock_of(s: &tokio::net::TcpStream) -> Sock {
+    #[cfg(not(windows))]
+    {
+        use std::os::fd::AsRawFd;
+        s.as_raw_fd()
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawSocket;
+        s.as_raw_socket()
+    }
+}
+
 /// Đặt TTL (IPv4) / hop limit (IPv6) của ổ cắm (-1 = trả về mặc định của hệ thống). Đặt cả hai tầng (ổ IPv6 nối tới địa chỉ
 /// IPv4 dùng IP_TTL), như TcpTtl.kt; true nếu ít nhất một tầng đặt được. Không cần quyền root.
+#[cfg(not(windows))]
 pub fn set_ttl(fd: i32, ttl: i32) -> bool {
     let v: libc::c_int = ttl;
     let p = &v as *const libc::c_int as *const libc::c_void;
@@ -142,6 +174,7 @@ pub fn set_ttl(fd: i32, ttl: i32) -> bool {
 }
 
 /// TTL đang đặt (IPv4) — gỡ lỗi / test.
+#[cfg(not(windows))]
 pub fn ttl_of(fd: i32) -> Option<i32> {
     let mut v: libc::c_int = 0;
     let mut l = std::mem::size_of::<libc::c_int>() as libc::socklen_t;
@@ -151,6 +184,7 @@ pub fn ttl_of(fd: i32) -> Option<i32> {
 }
 
 /// struct tcp_info của nhân Linux (đọc thô): (byte, số byte nhân trả). Nhân cũ trả ít trường hơn.
+#[cfg(not(windows))]
 fn tcp_info(fd: i32) -> Option<([u8; 232], usize)> {
     let mut buf = [0u8; 232];
     let mut len = buf.len() as libc::socklen_t;
@@ -159,6 +193,7 @@ fn tcp_info(fd: i32) -> Option<([u8; 232], usize)> {
     (r == 0).then_some((buf, len as usize))
 }
 
+#[cfg(not(windows))]
 fn tcp_info_u32(fd: i32, offset: usize) -> Option<u32> {
     let (b, n) = tcp_info(fd)?;
     if n < offset + 4 {
@@ -168,34 +203,111 @@ fn tcp_info_u32(fd: i32, offset: usize) -> Option<u32> {
 }
 
 /// Số gói đã gửi mà máy kia chưa xác nhận (tcpi_unacked); None = không hỏi được.
+#[cfg(not(windows))]
 pub fn tcp_unacked(fd: i32) -> Option<u32> {
     tcp_info_u32(fd, 24)
 }
 
 /// Số byte đã ghi mà TCP chưa gửi đi (tcpi_notsent_bytes, nhân ≥ 4.6); None = không hỏi được.
+#[cfg(not(windows))]
 pub fn tcp_notsent(fd: i32) -> Option<u32> {
     tcp_info_u32(fd, 144)
 }
 
 /// Số gói có dữ liệu đã nhận (tcpi_data_segs_in, nhân ≥ 4.6) — test đếm số mẩu.
+#[cfg(not(windows))]
 pub fn tcp_data_segs_in(fd: i32) -> Option<u32> {
     tcp_info_u32(fd, 152)
 }
 
 /// Số gói có dữ liệu đã gửi, kể cả gửi lại (tcpi_data_segs_out, nhân ≥ 4.6) — gỡ lỗi / test.
+#[cfg(not(windows))]
 pub fn tcp_data_segs_out(fd: i32) -> Option<u32> {
     tcp_info_u32(fd, 156)
 }
 
 /// Tổng số gói đã gửi lại (tcpi_total_retrans) — gỡ lỗi / test (mức 2: byte đầu TTL 1 mất → gửi lại).
+#[cfg(not(windows))]
 pub fn tcp_total_retrans(fd: i32) -> Option<u32> {
     tcp_info_u32(fd, 100)
+}
+
+#[cfg(windows)]
+pub use winsock::{set_ttl, tcp_in_flight, ttl_of, wait_acked};
+
+/// Windows: mỗi lần ghi (TCP_NODELAY) là một gói ngay — không phải chờ như Linux.
+#[cfg(windows)]
+async fn wait_sent(_fd: Sock, _deadline: Instant) {}
+
+/// Ổ cắm Windows (Winsock): TTL, SIO_TCP_INFO — đúng cách của Unblock.cs bản C#.
+#[cfg(windows)]
+mod winsock {
+    use super::Sock;
+    use std::ffi::c_void;
+    use std::time::Duration;
+    use tokio::time::Instant;
+    use windows_sys::Win32::Networking::WinSock as ws;
+
+    /// Đặt TTL (IPv4) / hop limit (IPv6); -1 = mặc định của Windows (128). true nếu ít nhất một tầng đặt được.
+    pub fn set_ttl(fd: Sock, ttl: i32) -> bool {
+        let v: i32 = if ttl < 0 { 128 } else { ttl };
+        let p = &v as *const i32 as *const u8;
+        // SAFETY: setsockopt chỉ đọc 4 byte từ p; ổ cắm sai thì hàm trả lỗi
+        let a = unsafe { ws::setsockopt(fd as usize, ws::IPPROTO_IP as i32, ws::IP_TTL as i32, p, 4) } == 0;
+        // SAFETY: như trên
+        let b = unsafe { ws::setsockopt(fd as usize, ws::IPPROTO_IPV6 as i32, ws::IPV6_UNICAST_HOPS as i32, p, 4) } == 0;
+        a || b
+    }
+
+    /// TTL đang đặt (IPv4).
+    pub fn ttl_of(fd: Sock) -> Option<i32> {
+        let mut v: i32 = 0;
+        let mut l: i32 = 4;
+        // SAFETY: getsockopt ghi tối đa l byte vào v
+        let r = unsafe { ws::getsockopt(fd as usize, ws::IPPROTO_IP as i32, ws::IP_TTL as i32, &mut v as *mut i32 as *mut u8, &mut l) };
+        (r == 0).then_some(v)
+    }
+
+    const SIO_TCP_INFO: u32 = 0xD800_0027;
+
+    /// Số byte đã gửi mà máy chủ chưa xác nhận (SIO_TCP_INFO — Windows 10 1703 trở lên; BytesInFlight của TCP_INFO_v0 ở byte
+    /// 28). None = không hỏi được.
+    pub fn tcp_in_flight(fd: Sock) -> Option<u32> {
+        let ver: u32 = 0;
+        let mut out = [0u8; 128];
+        let mut n: u32 = 0;
+        // SAFETY: vào 4 byte (phiên bản 0), ra tối đa 128 byte; gọi đồng bộ (không OVERLAPPED)
+        let r = unsafe {
+            ws::WSAIoctl(
+                fd as usize,
+                SIO_TCP_INFO,
+                &ver as *const u32 as *const c_void,
+                4,
+                out.as_mut_ptr() as *mut c_void,
+                out.len() as u32,
+                &mut n,
+                std::ptr::null_mut(),
+                None,
+            )
+        };
+        (r == 0 && n >= 32).then(|| u32::from_le_bytes([out[28], out[29], out[30], out[31]]))
+    }
+
+    /// Chờ máy chủ xác nhận hết phần đã gửi: byte đầu mất ở chặng đầu → máy chủ báo thiếu → Windows gửi lại 4 byte đầu → máy
+    /// chủ xác nhận (khoảng 2 lượt đi về). Quá 1,5 giây vẫn chưa xong (mạng rớt gói nặng) thì cứ gửi tiếp.
+    pub async fn wait_acked(fd: Sock) {
+        let until = Instant::now() + Duration::from_millis(1500);
+        while matches!(tcp_in_flight(fd), Some(n) if n > 0) && Instant::now() < until {
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+    }
 }
 
 /// Thời gian chờ tối đa (cả gói bắt tay) để từng mẩu rời hàng gửi của TCP thành gói riêng (xem đầu tệp).
 const SENT_WAIT_MS: u64 = 1_000;
 
 /// Chờ mẩu vừa ghi rời hàng gửi của TCP (đã thành một gói riêng). Không hỏi được / quá hạn thì thôi.
+#[cfg(not(windows))]
 async fn wait_sent(fd: i32, deadline: Instant) {
     let mut spins = 0;
     while matches!(tcp_notsent(fd), Some(n) if n > 0) && Instant::now() < deadline {
@@ -229,25 +341,43 @@ pub async fn write_hello(conn: &mut Conn, buf: &[u8], host: &str, level: i64, vi
     if level >= 2 && (via_proxy || fd.is_none()) {
         level = 1;
     }
+    // Windows: mức 2 cần hỏi được SIO_TCP_INFO (biết lúc byte đầu đã gửi lại xong) — không hỏi được thì gửi như mức 1
+    #[cfg(windows)]
+    if level >= 2 && fd.and_then(tcp_in_flight).is_none() {
+        level = 1;
+    }
     let chunks = hello_chunks(buf, host, level);
     let deadline = Instant::now() + Duration::from_millis(SENT_WAIT_MS);
     let last = chunks.len().saturating_sub(1);
     for (idx, c) in chunks.iter().enumerate() {
         let piece = &buf[c.start..c.start + c.len];
         match fd {
-            Some(f) if c.ttl1 && set_ttl(f, 1) => {
-                // Byte đầu với TTL 1: chết ở router đầu tiên; hệ điều hành gửi lại sau với TTL mặc định
-                let r = write_piece(&mut conn.stream, piece).await;
-                wait_sent(f, deadline).await;
-                set_ttl(f, -1); // gói gửi lại (và mọi gói sau) đi với TTL mặc định
-                r?;
-                DISORDER_COUNT.fetch_add(1, Ordering::Relaxed);
+            Some(f) if c.ttl1 => {
+                // TTL để trả lại: Linux -1 = mặc định của hệ thống; Windows giá trị đang đặt (như Unblock.cs)
+                let back = if cfg!(windows) { ttl_of(f).unwrap_or(-1) } else { -1 };
+                if set_ttl(f, 1) {
+                    // Byte đầu với TTL 1: chết ở router đầu tiên; hệ điều hành gửi lại sau với TTL như cũ
+                    let r = write_piece(&mut conn.stream, piece).await;
+                    wait_sent(f, deadline).await;
+                    set_ttl(f, back);
+                    r?;
+                    DISORDER_COUNT.fetch_add(1, Ordering::Relaxed);
+                } else {
+                    level = 1; // không đặt được TTL: gửi như mức 1
+                    write_piece(&mut conn.stream, piece).await?;
+                }
             }
             _ => {
                 if c.ttl1 {
                     level = 1; // không đặt được TTL: gửi như mức 1
                 }
                 write_piece(&mut conn.stream, piece).await?;
+            }
+        }
+        #[cfg(windows)]
+        if c.hold {
+            if let Some(f) = fd {
+                wait_acked(f).await;
             }
         }
         if idx < last {
@@ -513,7 +643,7 @@ mod tests {
     }
 
     fn c(start: usize, len: usize, ttl1: bool) -> Chunk {
-        Chunk { start, len, ttl1 }
+        Chunk { start, len, ttl1, hold: false }
     }
 
     #[test]
@@ -534,6 +664,7 @@ mod tests {
         assert_eq!(hello_chunks(&upper, "phimmois.fun", 1).len(), 9);
     }
 
+    #[cfg(not(windows))]
     /// Mức 2 trên Linux: như mức 1, chỉ byte đầu gửi với TTL 1 (không điểm chờ như Windows — xem đầu tệp).
     #[test]
     fn level2_is_level1_with_ttl1_first_byte() {
@@ -556,6 +687,7 @@ mod tests {
         assert_eq!(other, vec![c(0, 1, true), c(1, h.len() - 1, false)]);
     }
 
+    #[cfg(not(windows))]
     /// Yêu cầu HTTP thường: tách quanh tên trang trong dòng Host (như bản TV); mức 2 như mức 1 + TTL 1 ở byte đầu.
     #[test]
     fn splits_http_request_around_host() {
@@ -615,11 +747,11 @@ mod tests {
         let client = TcpStream::connect(l.local_addr().unwrap()).await.unwrap();
         client.set_nodelay(true).unwrap();
         let (server, _) = l.accept().await.unwrap();
-        use std::os::fd::AsRawFd;
-        let fd = client.as_raw_fd();
+        let fd = sock_of(&client);
         (Conn { stream: Box::pin(client), fd: Some(fd), via_proxy: false, ss: false }, server)
     }
 
+    #[cfg(not(windows))]
     /// Gửi thật qua một kết nối trong máy: mọi mức đều phải tới đủ, đúng thứ tự, mỗi mẩu một gói, không treo.
     #[tokio::test]
     async fn write_hello_delivers_every_byte_in_order() {
@@ -657,7 +789,51 @@ mod tests {
         assert_eq!(ttl_of(fd), Some(1));
         assert!(set_ttl(fd, -1));
         assert_eq!(ttl_of(fd), Some(def));
+        #[cfg(not(windows))]
         assert_eq!(tcp_unacked(fd), Some(0));
+        #[cfg(windows)]
+        assert_eq!(tcp_in_flight(fd), Some(0));
+    }
+
+    /// Windows (như Unblock.cs bản C# 1.13): mức 2 = byte 0 TTL 1, byte 1, 2, 3 từng gói, chờ xác nhận sau byte 3, rồi như mức 1.
+    #[cfg(windows)]
+    #[test]
+    fn windows_level2_holds_after_first_four_bytes() {
+        let h = hello("phimmois.fun");
+        let l1 = hello_chunks(&h, "phimmois.fun", 1);
+        let l2 = hello_chunks(&h, "phimmois.fun", 2);
+        assert_eq!(l2[..4].to_vec(), vec![c(0, 1, true), c(1, 1, false), c(2, 1, false), Chunk { start: 3, len: 1, ttl1: false, hold: true }]);
+        assert_eq!(l2.iter().filter(|x| x.hold).count(), 1);
+        // Sau 4 byte đầu: tên trang vẫn tách từng mẩu 2 byte như mức 1
+        assert_eq!(l2[4..].iter().filter(|x| x.len == 2).count(), l1.iter().filter(|x| x.len == 2).count());
+        let mut at = 0;
+        for x in &l2 {
+            assert_eq!(at, x.start);
+            at += x.len;
+        }
+        assert_eq!(at, h.len());
+    }
+
+    /// Windows: gửi thật qua kết nối trong máy — mọi mức tới đủ, đúng thứ tự, không treo; mức 2 trả TTL về như cũ.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_write_hello_delivers_every_byte_in_order() {
+        let h = hello("phimmois.fun");
+        for (level, via) in [(1, false), (2, false), (2, true), (0, false)] {
+            let (mut conn, mut server) = pair().await;
+            let fd = conn.fd.unwrap();
+            assert_eq!(tcp_in_flight(fd), Some(0), "hỏi được SIO_TCP_INFO");
+            let def = ttl_of(fd);
+            let t0 = Instant::now();
+            let applied = write_hello(&mut conn, &h, "phimmois.fun", level, via).await.unwrap();
+            assert!(t0.elapsed() < Duration::from_millis(1600), "mức {level} mất {:?}", t0.elapsed());
+            assert_eq!(applied, if via { 1 } else { level });
+            assert_eq!(ttl_of(fd), def, "TTL trả về như cũ");
+            conn.stream.shutdown().await.unwrap();
+            let mut got = Vec::new();
+            server.read_to_end(&mut got).await.unwrap();
+            assert_eq!(got, h);
+        }
     }
 
     #[tokio::test]

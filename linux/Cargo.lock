@@ -372,6 +372,7 @@ dependencies = [
  "futures",
  "hkdf",
  "hmac",
+ "if-addrs",
  "libc",
  "md-5",
  "mdns-sd",
@@ -391,6 +392,7 @@ dependencies = [
  "tokio-rustls",
  "unicode-normalization",
  "url",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

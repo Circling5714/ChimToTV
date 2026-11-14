@@ -7,6 +7,7 @@ use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::Aes128Gcm;
 use base64::Engine;
 use cbtv::{net, prefs, unblock};
+#[cfg(not(windows))]
 use std::os::fd::AsRawFd;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, Once};
@@ -77,7 +78,11 @@ async fn read_counted(s: &mut TcpStream, want: usize) -> (Vec<u8>, u32) {
         }
         data.extend_from_slice(&b[..n]);
     }
-    (data, unblock::tcp_data_segs_in(s.as_raw_fd()).unwrap_or(0))
+    #[cfg(not(windows))]
+    let segs = unblock::tcp_data_segs_in(s.as_raw_fd()).unwrap_or(0);
+    #[cfg(windows)]
+    let segs = 0; // Windows không đếm được số gói đã nhận
+    (data, segs)
 }
 
 async fn listener() -> (TcpListener, u16) {
@@ -88,6 +93,7 @@ async fn listener() -> (TcpListener, u16) {
 
 /// Mức 0 / 1 / 2 với gói bắt tay TLS: máy đích nhận đủ, đúng thứ tự, đúng số mẩu (byte đầu riêng, tên trang từng 2 byte);
 /// trả lời đầu và dữ liệu sau chuyển tiếp như thường.
+#[cfg(not(windows))] // đếm gói (TCP_INFO của Linux)
 #[tokio::test]
 async fn tls_hello_is_split_per_level() {
     let _g = setup().await;
@@ -130,6 +136,7 @@ async fn tls_hello_is_split_per_level() {
 }
 
 /// Yêu cầu HTTP thường: tách quanh dòng Host (mức 1), trả lời về đủ.
+#[cfg(not(windows))] // đếm gói (TCP_INFO của Linux)
 #[tokio::test]
 async fn plain_http_is_split_around_host() {
     let _g = setup().await;
@@ -408,6 +415,7 @@ async fn real_network_through_bridge() {
 /// Thử thật trên card mạng (chạy tay, --ignored): gửi gói bắt tay TLS thật (rustls) thẳng tới www.cloudflare.com theo mức 1 /
 /// 2, đọc TCP_INFO của chính ổ cắm (không cần quyền root): số gói có dữ liệu đã gửi (mỗi mẩu một gói — không bị Linux tự gộp)
 /// và số lần gửi lại (mức 2: byte đầu TTL 1 mất ở chặng đầu → nhân gửi lại); trang vẫn trả ServerHello.
+#[cfg(not(windows))] // đếm gói (TCP_INFO của Linux)
 #[tokio::test]
 #[ignore]
 async fn real_nic_pieces_and_ttl1() {

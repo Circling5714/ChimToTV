@@ -96,7 +96,10 @@ pub enum SyncEvent {
 }
 
 pub const SERVICE_TYPE: &str = "_conbangtv._tcp";
+#[cfg(not(windows))]
 pub const PLATFORM: &str = "linux";
+#[cfg(windows)]
+pub const PLATFORM: &str = "windows";
 /// Cổng mặc định khi người dùng gõ địa chỉ không kèm cổng.
 pub const DEFAULT_PORT: u16 = 8791;
 
@@ -111,6 +114,13 @@ pub fn port() -> u16 {
 
 /// Tên máy (hostname, bỏ phần tên miền).
 pub fn device_name() -> String {
+    #[cfg(windows)]
+    {
+        // Như Environment.MachineName của bản C# (tên NetBIOS)
+        std::env::var("COMPUTERNAME").ok().filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "Windows".into())
+    }
+    #[cfg(not(windows))]
+    {
     let mut buf = [0u8; 256];
     let r = unsafe { libc::gethostname(buf.as_mut_ptr() as *mut libc::c_char, buf.len()) };
     if r == 0 {
@@ -122,6 +132,7 @@ pub fn device_name() -> String {
         }
     }
     "Linux".into()
+    }
 }
 
 // ---- Sự kiện ----
@@ -289,6 +300,21 @@ pub fn status() -> SyncStatus {
 }
 
 /// Địa chỉ IPv4 trong mạng của máy này (bỏ loopback, 169.254.x.x, card mạng chưa cắm).
+#[cfg(windows)]
+pub fn local_ips() -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for i in if_addrs::get_if_addrs().unwrap_or_default() {
+        if let IpAddr::V4(ip) = i.ip() {
+            let s = ip.to_string();
+            if !i.is_loopback() && !ip.is_loopback() && !ip.is_link_local() && !out.contains(&s) {
+                out.push(s);
+            }
+        }
+    }
+    out
+}
+
+#[cfg(not(windows))]
 pub fn local_ips() -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     unsafe {
@@ -991,7 +1017,11 @@ pub mod http1 {
             Ok(n) => n,
             Err(_) => {
                 let c = std::ffi::CString::new(scope).ok()?;
+                #[cfg(not(windows))]
                 let i = unsafe { libc::if_nametoindex(c.as_ptr()) };
+                // SAFETY: chuỗi C hợp lệ trong lúc gọi
+                #[cfg(windows)]
+                let i = unsafe { windows_sys::Win32::NetworkManagement::IpHelper::if_nametoindex(c.as_ptr() as *const u8) };
                 if i == 0 {
                     return None;
                 }
@@ -1088,7 +1118,7 @@ pub mod mdns {
             .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
             .collect();
         let s = s.trim_matches('-').to_string();
-        format!("conbangtv-{}", if s.is_empty() { "linux".to_string() } else { s })
+        format!("conbangtv-{}", if s.is_empty() { crate::sync_service::PLATFORM.to_string() } else { s })
     }
 
     pub fn advertise(device_name: &str, port: u16, id: &str, platform: &str) {

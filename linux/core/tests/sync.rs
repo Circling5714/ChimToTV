@@ -108,7 +108,7 @@ fn hello_and_pairing_by_code() {
     let (m, v) = answer(&req("GET", "/hello", b"", &[]));
     assert_eq!(m.status, 200);
     assert_eq!(v["app"], "conbangtv");
-    assert_eq!(v["platform"], "linux");
+    assert_eq!(v["platform"], cbtv::sync_service::PLATFORM);
     assert_eq!(v["device"], prefs::device_id());
     assert_eq!(v["version"], cbtv::update_check::current_version());
     assert_eq!(v["pairing"], false);
@@ -140,7 +140,7 @@ fn hello_and_pairing_by_code() {
     let (m, v) = answer(&req("POST", "/pair", &pair_body("tv1", &code), &[("X-Port", "8791")]));
     assert_eq!(m.status, 200);
     assert_eq!(v["device"], prefs::device_id());
-    assert_eq!(v["platform"], "linux");
+    assert_eq!(v["platform"], cbtv::sync_service::PLATFORM);
     let token = v["token"].as_str().unwrap();
     assert!(token.len() == 64 && token.chars().all(|c| c.is_ascii_hexdigit()));
     let p = peer("tv1");
@@ -193,7 +193,7 @@ fn sync_request_merges_and_answers_signed() {
     assert_eq!(m.status, 200);
     assert!(http1::verify(&m, &token));
     let back = SyncPayload::parse(&m.body).unwrap();
-    assert_eq!(back.platform, "linux");
+    assert_eq!(back.platform, cbtv::sync_service::PLATFORM);
     assert_eq!(back.profiles[0].history.iter().map(|h| h.film.as_str()).collect::<Vec<_>>(), ["x", "a"]);
     assert_eq!(prefs::history().iter().map(|h| h.title.as_str()).collect::<Vec<_>>(), ["X", "A"]);
     let p = peer("tv1");

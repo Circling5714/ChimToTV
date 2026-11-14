@@ -31,7 +31,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Send> Duplex for T {}
 /// None khi qua Shadowsocks (dữ liệu đã mã hoá, khỏi chia).
 pub struct Conn {
     pub stream: Pin<Box<dyn Duplex>>,
-    pub fd: Option<i32>,
+    pub fd: Option<crate::unblock::Sock>,
     pub via_proxy: bool,
     pub ss: bool,
 }
@@ -332,9 +332,8 @@ pub async fn connect(host: &str, port: u16) -> Result<Conn> {
 }
 
 fn tcp_conn(s: TcpStream, via: bool) -> Conn {
-    use std::os::fd::AsRawFd;
     let _ = s.set_nodelay(true);
-    let fd = s.as_raw_fd();
+    let fd = crate::unblock::sock_of(&s);
     Conn { stream: Box::pin(s), fd: Some(fd), via_proxy: via, ss: false }
 }
 

@@ -48,11 +48,7 @@ fn clock() -> i64 {
 }
 
 fn local_tm(ms: i64) -> libc::tm {
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    let t: libc::time_t = ms.div_euclid(1000) as libc::time_t;
-    unsafe {
-        libc::localtime_r(&t, &mut tm);
-    }
+    let tm = crate::util::local_tm_of(ms.div_euclid(1000) as i64);
     tm
 }
 
@@ -65,8 +61,7 @@ pub fn local_ms(year: i32, month: i32, day: i32, hour: i32, minute: i32) -> i64 
     tm.tm_hour = hour;
     tm.tm_min = minute;
     tm.tm_isdst = -1;
-    let t = unsafe { libc::mktime(&mut tm) };
-    t as i64 * 1000
+    crate::util::mktime_local(&mut tm) * 1000
 }
 
 /// Ngày địa phương "yyyy-MM-dd" của mốc ms.

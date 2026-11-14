@@ -199,7 +199,7 @@ fn sync_carries_every_profile() {
     let na = prefs::add_profile("Bé Na");
     let payload = sync_service::payload();
     assert_eq!(payload.profiles.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["Cả nhà", "Bé Na"]);
-    assert_eq!(payload.platform, "linux");
+    assert_eq!(payload.platform, if cfg!(windows) { "windows" } else { "linux" });
     assert_eq!(payload.device, prefs::device_id());
     // Máy kia (TV) có người xem "bé na" (khác id) xem phim x → vào đúng người xem ở máy này
     let remote = SyncPayload {

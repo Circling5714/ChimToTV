@@ -23,7 +23,12 @@ impl Response {
 /// User-Agent chung cho app (trang thấy một trình duyệt bình thường).
 static USER_AGENT: RwLock<String> = RwLock::new(String::new());
 
+#[cfg(not(windows))]
 pub const DEFAULT_UA: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36";
+/// Bản Windows: như Http.cs của bản C# (Edge 138)
+#[cfg(windows)]
+pub const DEFAULT_UA: &str =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0";
 
 pub fn user_agent() -> String {
     let u = USER_AGENT.read().unwrap();

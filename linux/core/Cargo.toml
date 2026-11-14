@@ -47,5 +47,11 @@ unicode-normalization = "0.1"
 # Đồng bộ trong nhà: quảng bá / tìm máy `_conbangtv._tcp` (mDNS)
 mdns-sd = "0.21"
 
+# Bản Windows (lõi dựng thành conbang_core.dll cho app WPF — linux/ffi): DPAPI (mật khẩu proxy / khoá Shadowsocks như bản C#),
+# Winsock (TTL, SIO_TCP_INFO cho vượt chặn Mức 2), danh sách card mạng
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_Networking_WinSock", "Win32_NetworkManagement_IpHelper"] }
+if-addrs = "0.15"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }

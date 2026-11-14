@@ -370,6 +370,7 @@ fn tail(s: &str) -> String {
 
 /// Mở lại app bằng bản vừa cài (`--updated`), tách hẳn khỏi app đang chạy; giao diện thoát ngay sau đó. Chờ 1 giây cho app
 /// cũ đóng cổng đồng bộ.
+#[cfg(unix)]
 pub fn relaunch() -> Result<()> {
     use std::os::unix::process::CommandExt;
     crate::prefs::flush();
@@ -381,6 +382,12 @@ pub fn relaunch() -> Result<()> {
         .process_group(0)
         .spawn()?;
     Ok(())
+}
+
+/// Bản Windows tự cập nhật bằng UpdateCheck.cs của app WPF (tải .exe) — lõi không mở lại app.
+#[cfg(windows)]
+pub fn relaunch() -> Result<()> {
+    Err(Error::app("Bản Windows mở lại app ở phần giao diện."))
 }
 
 /// App cài bằng gói .deb (tự cập nhật được); chạy từ thư mục dựng / AppImage… thì mở trang Releases để tải tay.
