@@ -9,6 +9,38 @@ Bản Windows (Windows 10 / 11, một tệp `.exe`) ghi riêng với tiêu đề
 Bản Mac (macOS 12+, từ 13/11/2026, cùng mã nguồn và số bản với bản iPad) ghi riêng với tiêu đề "Mac …", tag `mac-v…`.
 Bản Linux (Ubuntu 22.04+ / Linux Mint 21+ / Debian 12+, từ 13/11/2026, tệp `.deb`) ghi riêng với tiêu đề "Linux …", tag `linux-v…`.
 
+## iPad / iPhone 1.18 và Mac 1.18 — 14/11/2026 (đọc trang bật chống bot)
+
+- **hoathinh3d.pw:** trang vừa bật lớp chống bot của Cloudflare (403 «Just a moment…» với các bản Android / Windows / Linux). Đo ngày
+  14/11/2026 trên iPhone (iOS 15.8) và Mac (macOS 14): URLSession của Apple **chưa bị chặn** (trang, API JSON, ảnh đều 200). Bản này
+  thêm đường dự phòng: `Core/WebFetch.swift` nhận ra lớp chặn (`cf-mitigated: challenge` / «Just a moment…» / `_cf_chl_opt`), nhớ
+  trang 12 giờ, rồi đọc hộ bằng **WKWebView ẩn** gắn ngoài màn hình (`Player/WebFetcher.swift`, cùng kho cookie / proxy / User-Agent
+  với trình phát): mở trang chủ cho trình duyệt tự qua lớp chặn, đứng ở robots.txt, mỗi yêu cầu là `fetch()` trong trang
+  (`web-fetch.js` dùng chung với Windows / Linux). Trang đòi bấm xác nhận / chặn hẳn WebKit thì báo lỗi (không giả, không giải hộ);
+  5 phút không dùng thì đóng WebView. Cùng luật với lõi Rust (`web_fetch.rs`) và bản TV.
+- **Lên bản mới thì bỏ tạm nghỉ của các nguồn trang chủ** (một lần, `Feed.clearRestOnUpgrade`).
+- Hộp «Có bản mới» đọc đúng mục «Có gì mới» cả khi ghi chú phát hành lỡ lưu kèm BOM.
+- Cổng gỡ lỗi (chỉ bản thử): `/web` — `?remember=<tên miền>` ép đường WebView, `?fetch=<url>` tải thử, `?forget=1`.
+- iPad / iPhone: bản 1.18 (build 24) · tag `ios-v1.18` · `ConBangTV-iPad-1.18.ipa` 4 532 999 byte · SHA-256
+  `8fe885adf3b9435dbebbff66ef16333fd68f3a1931354199fda432154efd3469`
+- Mac: bản 1.18 (build 24) · tag `mac-v1.18` · `ConBangTV-Mac-1.18.zip` 8 009 607 byte (Intel + Apple Silicon, ký ad-hoc) · SHA-256
+  `511ea87af18fa1c83b02ee3484dfbaf643bbbfea7dbe32522f5d8329c9007a60`
+- commit `0f5b023` (không bản nào là "latest" — Latest vẫn là `v2.18`).
+- Thử:
+  - Test lõi 160/160.
+  - Bản Mac thử trên Mac mini (Xcode 15.4), ép đường WebView: qua lớp chặn 3,3 giây, các yêu cầu sau 0,1–0,3 giây; ảnh PNG qua WebView
+    khớp từng byte với đọc thẳng. Trang chủ, danh mục «Huyền Huyễn» + ảnh bìa, trang phim «Tru Tiên», phát tập 1 đều chạy.
+  - IPA thử trên iPhone 6s Plus (iOS 15.8.3), cả đọc thẳng lẫn ép WebView (qua lớp chặn 2,3 giây): «Đang Chiếu» (API JSON) + ảnh
+    bìa, tìm «tru tiên» mọi trang (hoathinh3d.pw 20 phim), trang phim.
+  - Tệp chính: Info.plist đúng (`vn.chimto.tv`, 1.18, build 24), không có cổng gỡ lỗi; bản Mac `lipo` x86_64 + arm64,
+    `codesign --verify` đạt. Lần dựng IPA bản chính đầu tiên trên CI hỏng không kèm thông báo lỗi (cùng commit vừa dựng qua) → chạy
+    lại job thì qua.
+- Đăng lúc 14:36:32 (iPad) và 14:36:57 (Mac) bằng `release.ps1 ipad` / `release.ps1 mac`; link cố định `conbangtv_ios` /
+  `conbangtv_macos` chép đè sang 1.18, khớp SHA-256 (`-Verify` đạt).
+  - **Tự cập nhật thật Mac 1.17 → 1.18** (bản trong `/Applications` của Mac mini): hộp «Có bản mới 1.18» hiện đúng mục «Có gì mới»
+    → «Cài đặt ngay» → khoảng 25 giây sau app mở lại ở 1.18 (build 24), `codesign` đạt, không bị cách ly, trang chủ hiện đủ.
+  - IPA bản chính cài bằng TrollStore lên iPhone: app mở, không có báo lỗi văng.
+
 ## Linux 1.2 — 14/11/2026 (đọc trang bật chống bot)
 
 - **Xem lại được hoathinh3d.pw:** trang vừa bật lớp chống bot của Cloudflare (403 «Just a moment…» với mọi trình tải không phải

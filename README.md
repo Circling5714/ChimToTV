@@ -160,7 +160,7 @@ Có sẵn trong danh sách (menu **Đổi trang phim**). Mở menu này là app 
 | yanhh3d.ee | yanhh3d (`flw-item`) | `player.php` → iframe |
 | hoathinh3d.ee | HaLim, chia Việt Sub / Thuyết Minh | `player.php` → iframe |
 | hhkungfu.ee | HaLim, chia Vietsub / Thuyết Minh | `player.php` → iframe |
-| hoathinh3d.pw | HaLimMovies (Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Đánh Giá Cao đọc qua API JSON của trang, từ 2.2). Từ 14/11/2026 trang bật lớp chống bot của Cloudflare — xem đoạn «Trang bật chống bot của Cloudflare» dưới bảng (TV 2.18+, Windows 1.16+, Linux 1.2+; iPad / Mac chưa) | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
+| hoathinh3d.pw | HaLimMovies (Phim Lẻ, Đang Chiếu, Lịch Chiếu, Hoàn Thành, Đánh Giá Cao đọc qua API JSON của trang, từ 2.2). Từ 14/11/2026 trang bật lớp chống bot của Cloudflare — xem đoạn «Trang bật chống bot của Cloudflare» dưới bảng (TV 2.18+, Windows 1.16+, Linux 1.2+, iPad / iPhone / Mac 1.18+) | mở thẳng trang tập (trình phát có khoá xác thực riêng) |
 | phimmois.fun (trước là phimmoir.fun; từ 06/11/2026 tự chuyển sang phimmoiw.fun — app tự đổi theo) | Next.js kiểu PhimMoi, chia Vietsub / Thuyết Minh / Lồng Tiếng / Song Ngữ | link `.m3u8` → app tự phát (KK Phim, HD); NguonC → iframe |
 | mephim.ddns.net (từ 2.5 / iPad 1.5) | ứng dụng React — đọc API JSON `/api/movies/…` của trang (nguồn KKPhim), chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
 | KKPhim — www.kkphim.com (từ 2.6 / iPad 1.6 / Windows 1.3) | không đọc trang: gọi thẳng API công khai `phimapi.com`, chia Vietsub / Thuyết Minh | link `.m3u8` → app tự phát (bỏ quảng cáo); trình phát KKPhim → iframe |
@@ -187,7 +187,7 @@ trình phát gốc. KKPhim được tìm song song với trang tập (chậm / l
 được. Tắt / bật: **Cài đặt → Phát video → Server dự phòng KKPhim** (mặc định bật). Lưu ý: bản trên KKPhim có khi dài ngắn
 khác bản của trang (vd cắt đoạn đầu), đổi server giữa chừng giữ số giây nên có thể lệch cảnh.
 
-**Trang bật chống bot của Cloudflare** (từ 2.18 / Windows 1.16 / Linux 1.2): hoathinh3d.pw từ 14/11/2026 trả «Just a moment…» (403,
+**Trang bật chống bot của Cloudflare** (từ 2.18 / Windows 1.16 / Linux 1.2 / iPad · Mac 1.18): hoathinh3d.pw từ 14/11/2026 trả «Just a moment…» (403,
 `cf-mitigated: challenge`) cho mọi trình tải không phải trình duyệt — cả trang, API, ảnh — còn WebView của Android thì bị chặn hẳn
 («Attention Required! … you have been blocked»). App nhận ra lớp chặn, nhớ trang đó 12 giờ và chỉ với trang đó thì đọc bằng trình
 duyệt thật; trang bình thường vẫn như cũ. **TV:** gói kèm **GeckoView 141** (engine Firefox, MPL 2.0, `WebFetch.kt`) — phiên Gecko ẩn
@@ -196,7 +196,10 @@ mã hoá / vượt chặn qua cổng SOCKS nội bộ riêng); «Trình phát c�
 NguonC. APK vì thế ~143 MB (thư viện Gecko cho ARM 32 + 64-bit); Gecko chỉ khởi động khi gặp trang bị chặn (thêm ~200 MB RAM lúc đó).
 **Windows:** WebView2 ẩn (`Player/WebFetch.cs`) + `fetch()` trong trang (`app/src/main/assets/web-fetch.js`). **Linux:** WebKitGTK
 ẩn trong cửa sổ ngoài màn hình (`linux/app/src/webfetch.rs`, cùng cookie / cổng nội bộ với trình phát) + cùng `web-fetch.js`; lõi Rust
-(`web_fetch.rs`) nhận ra lớp chặn và nhờ app đọc hộ (Windows qua sự kiện `web.fetch` của `conbang_core.dll`). App không giả / không
+(`web_fetch.rs`) nhận ra lớp chặn và nhờ app đọc hộ (Windows qua sự kiện `web.fetch` của `conbang_core.dll`). **iPad / iPhone /
+Mac:** URLSession của Apple hiện chưa bị trang này chặn (đo 14/11/2026: trang, API, ảnh đều 200) — `Core/WebFetch.swift` chỉ chuyển
+khi gặp lớp chặn, sang WKWebView ẩn gắn ngoài màn hình (`Player/WebFetcher.swift`, cùng kho cookie / proxy / User-Agent với trình
+phát) + cùng `web-fetch.js`; thử ép đường này bằng cổng gỡ lỗi `/web?remember=<tên miền>`. App không giả / không
 giải hộ lớp chặn: trang đòi bấm xác nhận, hay chặn hẳn cả engine đang dùng, thì báo «Trang … chặn app này — xem ở nguồn khác».
 
 **Server dự phòng NguonC** (từ 2.7 / iPad 1.7 / Windows 1.4): như KKPhim nhưng tìm trên NguonC (hay có tập mới sớm, vd Mục Thần
