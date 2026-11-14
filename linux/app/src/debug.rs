@@ -157,6 +157,20 @@ fn handle(r: Req) {
             app().play(r.q.get("film").map(|s| s.as_str()).unwrap_or(""), r.q.get("ep").map(|s| s.as_str()).unwrap_or(""), r.q.contains_key("resume"));
             send("ok".into());
         }
+        // Thử đường tự chuyển sang WebView: /native?fail=1 (mpv báo lỗi giữa chừng), /native?hang=1|0 (cổng phát nội bộ treo)
+        "/native" => {
+            let hang = r.q.get("hang").map(|v| v == "1");
+            let fail = r.q.get("fail").map(|v| v == "1").unwrap_or(false);
+            match app().player.borrow().clone() {
+                Some(p) => send(p.debug_native(fail, hang)),
+                None => {
+                    if let Some(h) = hang {
+                        cbtv::media_proxy::debug_hang(h);
+                    }
+                    send("trình phát chưa mở".into())
+                }
+            }
+        }
         "/open" => {
             app().push(crate::pages::detail::new(r.q.get("url").map(|s| s.as_str()).unwrap_or(""), None, Vec::new()));
             send("ok".into());

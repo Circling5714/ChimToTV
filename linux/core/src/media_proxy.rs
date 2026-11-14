@@ -191,6 +191,15 @@ pub fn open(src: &str, subtitle: Option<&str>, page: Option<&str>, hls: bool) ->
     Some(Opened { url, subtitle, token })
 }
 
+/// Bản thử (cổng gỡ lỗi): làm cổng treo — nhận yêu cầu mà không trả lời — để thử đường tự chuyển sang WebView khi mpv treo.
+#[cfg(debug_assertions)]
+static HANG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+#[cfg(debug_assertions)]
+pub fn debug_hang(on: bool) {
+    HANG.store(on, std::sync::atomic::Ordering::SeqCst);
+    crate::log::d("media", if on { "cổng phát: giả treo (bản thử)" } else { "cổng phát: hết giả treo" });
+}
+
 /// Đóng mọi phiên (thoát trình phát): địa chỉ cũ hết dùng được.
 pub fn close_all() {
     SESSIONS.lock().unwrap().clear();
@@ -390,6 +399,11 @@ async fn serve(sock: TcpStream) {
     let (r, mut w) = sock.into_split();
     let mut r = BufReader::new(r);
     while let Some(req) = read_request(&mut r).await {
+        #[cfg(debug_assertions)]
+        if HANG.load(std::sync::atomic::Ordering::SeqCst) {
+            tokio::time::sleep(Duration::from_secs(120)).await;
+            break;
+        }
         let keep = handle(&req, &mut w).await;
         if !keep || req.close {
             break;

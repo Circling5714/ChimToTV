@@ -24,6 +24,9 @@ use webkit2gtk::{
 };
 
 const RATES: [f64; 5] = [0.75, 1.0, 1.25, 1.5, 2.0];
+/// Trình phát native quá chừng này (ms) chưa chạy được mà cũng không báo lỗi → chuyển sang WebView. Đo trên máy ảo thử: mpv
+/// thường chạy sau 1–4 s kể từ lúc nạp (VSMOV chậm nhất ~4 s).
+const NATIVE_STALL_MS: i64 = 20_000;
 
 /// CSS của agent (agent thêm lúc tài liệu vừa tạo có thể chưa có <head> → thêm lại khi trang dựng xong).
 const STYLE_SHIM: &str = "(function(){var css='.jw-controlbar,.jw-title{display:none!important}.chimto-pin{position:fixed!important;left:0!important;\
@@ -1133,18 +1136,21 @@ impl Player {
     fn poll_native(self: &Rc<Self>) {
         let Some(n) = self.native.borrow().clone() else { return };
         let st = n.state();
-        // Lỗi trước khi phát được giây nào: phát lại bằng WebView (trình phát nhúng / hls.html) như trước khi có mpv
+        // mpv hỏng thì phát lại bằng WebView (hls.html / trình phát nhúng) như trước khi có mpv, cùng server, tiếp đúng chỗ:
+        // - lỗi trước khi phát được giây nào (không mở được luồng)
+        // - lỗi giữa chừng (luồng đứt mà mpv đã thử lại hết — cổng nội bộ tự thử lại 3 lần, FFmpeg thêm 5 lần mỗi đoạn)
+        // - treo: quá NATIVE_STALL_MS mà chưa chạy được, cũng không báo lỗi
+        let (started, waited) = {
+            let s = self.s.borrow();
+            (s.started, cbtv::util::now_ms() - s.load_started_at)
+        };
         if let Some(e) = st.err.as_ref() {
-            if !self.s.borrow().started && !self.s.borrow().force_web {
-                cbtv::log::d("native", &format!("mpv lỗi ({e}) — chuyển sang trình phát web"));
-                self.notice("Trình phát native không mở được luồng này — chuyển sang trình phát web.", 5000);
-                let resume = self.s.borrow().resume_at;
-                self.s.borrow_mut().force_web = true;
-                self.s.borrow_mut().resume_at = resume;
-                let server = self.s.borrow().server.clone();
-                self.play_server(server);
-                return;
-            }
+            self.native_fallback(&format!("mpv lỗi ({e}){}", if started { " giữa chừng" } else { "" }));
+            return;
+        }
+        if !started && waited > NATIVE_STALL_MS {
+            self.native_fallback(&format!("mpv chưa chạy được sau {} giây", waited / 1000));
+            return;
         }
         let load = self.s.borrow().page_load;
         let o = serde_json::json!({
@@ -1152,6 +1158,33 @@ impl Player {
             "err": st.err.unwrap_or_default(),
         });
         self.on_state(Some(serde_json::json!([load, o]).to_string()));
+    }
+
+    /// Trình phát native hỏng: phát lại server này bằng WebView (tới khi đổi tập / đổi server), tiếp đúng chỗ đang xem.
+    fn native_fallback(self: &Rc<Self>, why: &str) {
+        cbtv::log::d("native", &format!("{why} — chuyển sang trình phát web"));
+        self.notice("Trình phát native không phát được — chuyển sang trình phát web.", 5000);
+        if let Some(t) = self.current_time() {
+            self.s.borrow_mut().resume_at = t;
+        }
+        self.s.borrow_mut().force_web = true;
+        let server = self.s.borrow().server.clone();
+        self.play_server(server);
+    }
+
+    /// Cổng gỡ lỗi (bản thử): giả lỗi giữa chừng của mpv / làm cổng phát nội bộ treo — thử đường tự chuyển sang WebView.
+    #[cfg(debug_assertions)]
+    pub fn debug_native(&self, fail: bool, hang: Option<bool>) -> String {
+        if let Some(h) = hang {
+            cbtv::media_proxy::debug_hang(h);
+        }
+        if fail {
+            match self.native.borrow().as_ref() {
+                Some(n) if self.s.borrow().native_on => n.debug_fail(),
+                _ => return "không đang phát native".into(),
+            }
+        }
+        "ok".into()
     }
 
     fn stop_video(&self) {

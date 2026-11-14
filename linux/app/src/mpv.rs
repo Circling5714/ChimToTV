@@ -12,6 +12,7 @@ pub type Callback = unsafe extern "C" fn(*mut c_void);
 // mpv_format
 pub const FORMAT_STRING: c_int = 1;
 pub const FORMAT_FLAG: c_int = 3;
+#[cfg_attr(not(debug_assertions), allow(dead_code))] // chỉ cổng gỡ lỗi đọc số nguyên / chuỗi
 pub const FORMAT_INT64: c_int = 4;
 pub const FORMAT_DOUBLE: c_int = 5;
 
@@ -98,6 +99,7 @@ pub struct Lib {
     pub set_wakeup_callback: unsafe extern "C" fn(Handle, Option<Callback>, *mut c_void),
     pub request_log_messages: unsafe extern "C" fn(Handle, *const c_char) -> c_int,
     pub error_string: unsafe extern "C" fn(c_int) -> *const c_char,
+    #[cfg_attr(not(debug_assertions), allow(dead_code))]
     pub free: unsafe extern "C" fn(*mut c_void),
     pub rc_create: unsafe extern "C" fn(*mut RenderCtx, Handle, *mut RenderParam) -> c_int,
     pub rc_set_update_callback: unsafe extern "C" fn(RenderCtx, Option<Callback>, *mut c_void),
@@ -267,6 +269,7 @@ impl Mpv {
         (r >= 0).then_some(f != 0)
     }
 
+    #[cfg_attr(not(debug_assertions), allow(dead_code))]
     pub fn get_i64(&self, k: &str) -> Option<i64> {
         let k = CString::new(k).unwrap();
         let mut v: i64 = 0;
@@ -275,6 +278,7 @@ impl Mpv {
         (r >= 0).then_some(v)
     }
 
+    #[cfg_attr(not(debug_assertions), allow(dead_code))]
     pub fn get_str(&self, k: &str) -> Option<String> {
         let k = CString::new(k).unwrap();
         let mut p: *mut c_char = std::ptr::null_mut();

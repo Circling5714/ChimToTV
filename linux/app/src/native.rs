@@ -1,7 +1,8 @@
 //! Trình phát native (thử nghiệm): libmpv vẽ hình thẳng vào ô của app (render API), thay WebView cho luồng .m3u8 / tệp video.
-//! - Máy có GPU: GtkGLArea + render API OpenGL, giải mã bằng card đồ hoạ khi được (hwdec=auto-safe → VA-API).
-//! - Máy không có GPU (máy ảo): render API phần mềm («sw») vẽ vào bộ nhớ đúng cỡ ô, cairo dán lên — OpenGL giả lập (llvmpipe)
-//!   quá chậm (đo trên máy ảo thử: 378% CPU, rơi khung liên tục).
+//! - Mặc định: render API phần mềm («sw») vẽ vào bộ nhớ đúng cỡ ô, cairo dán lên; máy có GPU vẫn giải mã bằng card đồ hoạ rồi
+//!   chép về (hwdec=auto-copy-safe → VA-API). Đã thử kỹ trên máy ảo không GPU (OpenGL giả lập llvmpipe: 378% CPU, rơi khung).
+//! - CONBANG_NATIVE_RENDER=gl: GtkGLArea + render API OpenGL (hwdec=auto-safe). Chưa thử trên máy thật có GPU — trên llvmpipe
+//!   hình bị kẻ ô đen; thử được trên máy thật thì mới cho làm mặc định ở máy có GPU.
 //! Mạng: mpv chỉ tải từ cổng phát nội bộ (cbtv::media_proxy) — DNS mã hoá, vượt chặn, proxy, bỏ quảng cáo như hls.html.
 //! Trạng thái / lệnh dùng đúng giao thức của player-agent.js (t, d, paused, ended, waiting, ready, err; toggle, play, pause,
 //! seekTo, rate, fit) để player.rs giữ nguyên mọi logic (xem tiếp, bỏ nhạc mở đầu, đổi server, giới hạn giờ…).
@@ -91,16 +92,18 @@ pub fn available() -> bool {
 impl Native {
     /// Tạo trình phát (một cái cho cả trình phát của app; tắt phim thì huỷ để trả bộ nhớ).
     pub fn new(has_gpu: bool) -> Option<Rc<Native>> {
-        let gl = match std::env::var("CONBANG_NATIVE_RENDER").as_deref() {
-            Ok("sw") => false,
-            Ok("gl") => true,
-            _ => has_gpu,
+        let gl = std::env::var("CONBANG_NATIVE_RENDER").as_deref() == Ok("gl");
+        // Vẽ phần mềm mà máy có GPU: giải mã bằng card rồi chép về bộ nhớ (danh sách bộ giải mã an toàn của mpv)
+        let hwdec = match (gl, has_gpu) {
+            (true, _) => "auto-safe",
+            (false, true) => "auto-copy-safe",
+            (false, false) => "no",
         };
         let ua = cbtv::http::user_agent();
         let mute = if std::env::var("CONBANG_MUTE").as_deref() == Ok("1") { "yes" } else { "no" };
         let opts: Vec<(&str, &str)> = vec![
             ("vo", "libmpv"),
-            ("hwdec", if gl { "auto-safe" } else { "no" }),
+            ("hwdec", hwdec),
             ("config", "no"),
             ("load-scripts", "no"),
             ("ytdl", "no"),
@@ -460,7 +463,14 @@ impl Native {
         }
     }
 
+    /// Cổng gỡ lỗi (bản thử): giả như mpv báo lỗi luồng.
+    #[cfg(debug_assertions)]
+    pub fn debug_fail(&self) {
+        *self.err.borrow_mut() = Some("lỗi giả (cổng gỡ lỗi)".into());
+    }
+
     /// Cổng gỡ lỗi: khung rơi, cỡ hình, bộ giải mã.
+    #[cfg(debug_assertions)]
     pub fn debug(&self) -> String {
         format!(
             "render={} dropped={} decoderDropped={} video={}x{} hwdec={} cache={:.0}s",
