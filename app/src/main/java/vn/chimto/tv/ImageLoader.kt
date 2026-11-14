@@ -86,13 +86,27 @@ object ImageLoader {
 
     /** null nếu không phải ảnh (vd trang 404) — không đọc phần thân để đỡ tốn mạng. */
     private fun fetch(url: String): ByteArray? {
+        // Trang bật chống bot của Cloudflare (đã nhớ): ảnh cũng lấy qua WebView ẩn
+        if (WebFetch.needs(url)) return webImage(url)
         val c = Http.open(url, mapOf("Referer" to Prefs.baseUrl + "/"))
         try {
-            if (c.responseCode != 200 || c.contentType?.startsWith("image/") != true) return null
+            val code = c.responseCode
+            if ((code == 403 || code == 503) && c.getHeaderField("cf-mitigated")?.trim().equals("challenge", ignoreCase = true)) {
+                WebFetch.remember(WebFetch.hostOf(url))
+                return webImage(url)
+            }
+            if (code != 200 || c.contentType?.startsWith("image/") != true) return null
             return c.inputStream.use { it.readBytes() }
         } finally {
             c.disconnect()
         }
+    }
+
+    private fun webImage(url: String): ByteArray? = try {
+        WebFetch.fetch(url, headers = mapOf("Accept" to "image/avif,image/webp,image/*,*/*;q=0.8", "Referer" to Prefs.baseUrl + "/"))
+            .takeIf { it.code == 200 && it.type?.startsWith("image/") == true }?.data
+    } catch (e: Exception) {
+        null
     }
 
     private fun decode(data: ByteArray, maxWidth: Int): Bitmap? {

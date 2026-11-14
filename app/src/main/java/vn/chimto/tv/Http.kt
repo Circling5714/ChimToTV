@@ -54,11 +54,33 @@ object Http {
      * "unexpected end of stream") → thử lại một lần bằng kết nối mới. Lỗi chắc chắn lặp lại (mã lỗi HTTP, tên miền
      * không phân giải, chứng chỉ, chuyển hướng vòng…) hay quá thời gian chờ thì thôi (trang chết hẳn không bắt chờ gấp đôi).
      */
-    fun get(url: String, headers: Map<String, String> = emptyMap()): Response = try {
-        getOnce(url, headers)
-    } catch (e: IOException) {
-        if (!dropped(e)) throw e
-        getOnce(url, headers + ("Connection" to "close"))
+    fun get(url: String, headers: Map<String, String> = emptyMap()): Response {
+        // Trang bật chống bot của Cloudflare (đã nhớ / vừa gặp): đọc qua WebView ẩn (WebFetch)
+        if (WebFetch.needs(url)) return WebFetch.response(url, "GET", null, headers)
+        return try {
+            try {
+                getOnce(url, headers)
+            } catch (e: IOException) {
+                if (e is WebFetch.ChallengeError || !dropped(e)) throw e
+                getOnce(url, headers + ("Connection" to "close"))
+            }
+        } catch (e: WebFetch.ChallengeError) {
+            WebFetch.remember(e.host)
+            WebFetch.response(url, "GET", null, headers)
+        }
+    }
+
+    /** Mã lỗi 403 / 503: lớp chặn của Cloudflare thì báo riêng (ChallengeError) để bên gọi nhờ WebView đọc hộ. */
+    private fun failure(c: HttpURLConnection, code: Int): IOException {
+        if (code == 403 || code == 503) {
+            val head = try {
+                WebFetch.head(c.errorStream)
+            } catch (e: IOException) {
+                null
+            }
+            if (WebFetch.isChallenge(code, c.getHeaderField("cf-mitigated"), head)) return WebFetch.ChallengeError(c.url.host.lowercase())
+        }
+        return HttpError(code)
     }
 
     /** Lỗi do proxy (cổng nội bộ báo "SOCKS: …") thì không thử lại — proxy hỏng, thử lại cũng vậy. */
@@ -70,7 +92,7 @@ object Http {
         val c = open(url, headers)
         try {
             val code = c.responseCode
-            if (code >= 400) throw HttpError(code)
+            if (code >= 400) throw failure(c, code)
             val body = c.inputStream.use { readText(it, c.contentType) }
             return Response(c.url.toString(), code, body)
         } finally {
@@ -80,6 +102,11 @@ object Http {
 
     /** POST dạng form (dùng cho admin-ajax.php của WordPress). */
     fun post(url: String, form: Map<String, String>, headers: Map<String, String> = emptyMap()): Response {
+        val body = form.entries.joinToString("&") { (k, v) ->
+            URLEncoder.encode(k, "UTF-8") + "=" + URLEncoder.encode(v, "UTF-8")
+        }
+        val webHeaders = headers + ("Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8")
+        if (WebFetch.needs(url)) return WebFetch.response(url, "POST", body, webHeaders)
         val c = connection(url)
         try {
             c.requestMethod = "POST"
@@ -89,12 +116,14 @@ object Http {
             c.setRequestProperty("User-Agent", UA)
             c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
             for ((k, v) in headers) c.setRequestProperty(k, v)
-            val body = form.entries.joinToString("&") { (k, v) ->
-                URLEncoder.encode(k, "UTF-8") + "=" + URLEncoder.encode(v, "UTF-8")
-            }
             c.outputStream.use { it.write(body.toByteArray()) }
             val code = c.responseCode
-            if (code >= 400) throw IOException("Trang trả về lỗi HTTP $code")
+            if (code >= 400) {
+                val e = failure(c, code)
+                if (e !is WebFetch.ChallengeError) throw IOException("Trang trả về lỗi HTTP $code")
+                WebFetch.remember(e.host)
+                return WebFetch.response(url, "POST", body, webHeaders)
+            }
             return Response(c.url.toString(), code, c.inputStream.use { readText(it, c.contentType) })
         } finally {
             c.disconnect()

@@ -25,6 +25,8 @@ public static class WebFetch
     private static readonly TimeSpan PassTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan IdleClose = TimeSpan.FromMinutes(5);
+    /** Cloudflare của trang chặn hẳn app thì thôi mở WebView lại trong 30 phút (báo lỗi ngay). */
+    private static readonly TimeSpan BlockedFor = TimeSpan.FromMinutes(30);
 
     public sealed record Result(int Code, string Url, string? Type, string? Cf, byte[] Data);
 
@@ -124,6 +126,7 @@ public static class WebFetch
         private readonly DispatcherTimer _idle;
         private string _state = "mới";
         private TaskCompletionSource<bool>? _nav;
+        private DateTime _blockedUntil;
 
         public Session(string host)
         {
@@ -138,8 +141,11 @@ public static class WebFetch
         {
             _idle.Stop();
             _idle.Start();
+            if (DateTime.UtcNow < _blockedUntil) return Task.FromException(Blocked());
             return _ready ??= Open();
         }
+
+        private AppError Blocked() => new($"Trang {_host} chặn app này (Cloudflare «you have been blocked») — xem phim này ở nguồn khác, vd KKPhim.");
 
         public void Invalidate()
         {
@@ -159,6 +165,12 @@ public static class WebFetch
                 while (true)
                 {
                     var st = await Probe();
+                    if (st.Blocked)
+                    {
+                        // Quy tắc chặn của chủ trang (không phải thử thách) — không lách
+                        _blockedUntil = DateTime.UtcNow + BlockedFor;
+                        throw Blocked();
+                    }
                     if (st.Passed) break;
                     if (DateTime.UtcNow - t0 > PassTimeout)
                         throw new AppError($"Trang {_host} đòi bấm xác nhận chống bot (Cloudflare) — app chưa đọc được trang này.");
@@ -224,28 +236,31 @@ public static class WebFetch
         }
 
         /// Tài liệu đang mở đã là trang thật (không còn là trang chặn) chưa.
-        private async Task<(bool Passed, string Title)> Probe()
+        private async Task<(bool Passed, bool Blocked, string Title)> Probe()
         {
             string raw;
             try
             {
                 raw = await _web!.ExecuteScriptAsync(
                     "JSON.stringify([location.host, document.readyState, document.title || '', typeof window._cf_chl_opt, " +
-                    "!!document.querySelector('#challenge-form,#challenge-stage,#cf-challenge-running,.cf-turnstile')])");
+                    "!!document.querySelector('#challenge-form,#challenge-stage,#cf-challenge-running,.cf-turnstile'), " +
+                    "!!document.querySelector('#cf-error-details,.cf-error-details') || /you have been blocked/i.test(document.body ? document.body.innerText.slice(0, 400) : '')])");
             }
             catch (Exception)
             {
-                return (false, "");
+                return (false, false, "");
             }
-            if (JsonSerializer.Deserialize<string>(raw) is not { } s || JsonNode.Parse(s) is not JsonArray a) return (false, "");
+            if (JsonSerializer.Deserialize<string>(raw) is not { } s || JsonNode.Parse(s) is not JsonArray a) return (false, false, "");
             var host = a[0]?.GetValue<string>() ?? "";
             var ready = a[1]?.GetValue<string>() ?? "";
             var title = a[2]?.GetValue<string>() ?? "";
             var chl = a[3]?.GetValue<string>() ?? "";
             var form = a[4]?.GetValue<bool>() ?? false;
+            var sameHost = string.Equals(host, _host, StringComparison.OrdinalIgnoreCase) && ready != "loading";
+            var blocked = sameHost && ((a[5]?.GetValue<bool>() ?? false) || title.StartsWith("Attention Required", StringComparison.OrdinalIgnoreCase));
             var passed = string.Equals(host, _host, StringComparison.OrdinalIgnoreCase) && ready != "loading" && chl == "undefined" && !form &&
                          !title.StartsWith("Just a moment", StringComparison.OrdinalIgnoreCase);
-            return (passed, title);
+            return (passed && !blocked, blocked, title);
         }
 
         /// web-fetch.js đã có trong tài liệu hiện tại (tài liệu robots.txt dạng chữ có thể không chạy script lúc tạo)

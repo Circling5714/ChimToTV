@@ -552,6 +552,8 @@ class PlayerActivity : BaseActivity() {
             headers.keys.removeAll { it.equals("Referer", true) }
             headers["Referer"] = episodeUrl
         }
+        // Trang bật chống bot của Cloudflare (đã nhớ): khung đọc qua WebView ẩn (WebFetch) — cookie trình duyệt tự gửi
+        if (WebFetch.needs(url)) return webFrame(url, headers)
         val cookies = CookieManager.getInstance()
         cookies.getCookie(url)?.let { headers["Cookie"] = it }
 
@@ -561,6 +563,10 @@ class PlayerActivity : BaseActivity() {
                 if (k != null && k.equals("Set-Cookie", true)) values.forEach { cookies.setCookie(url, it) }
             }
             val code = c.responseCode
+            if ((code == 403 || code == 503) && c.getHeaderField("cf-mitigated")?.trim().equals("challenge", ignoreCase = true)) {
+                WebFetch.remember(WebFetch.hostOf(url))
+                return webFrame(url, headers)
+            }
             val type = c.contentType ?: "text/html"
             val mime = type.substringBefore(';').trim().ifEmpty { "text/html" }
             val charset = Http.charsetOf(type)
@@ -581,6 +587,18 @@ class PlayerActivity : BaseActivity() {
         } finally {
             c.disconnect()
         }
+    }
+
+    /** Khung trình phát của trang bật chống bot: tải qua WebView ẩn rồi chèn agent như thường. */
+    private fun webFrame(url: String, headers: Map<String, String>): WebResourceResponse {
+        val r = WebFetch.fetch(url, "GET", null, headers.filterKeys { !it.equals("Cookie", true) })
+        val type = r.type ?: "text/html"
+        val mime = type.substringBefore(';').trim().ifEmpty { "text/html" }
+        val isHtml = mime.contains("html")
+        val charset = Http.charsetOf(type)
+        val body = if (isHtml) injectAgent(r.data.toString(charset)).toByteArray(Charsets.UTF_8) else r.data
+        val status = if (r.code in 100..299 || r.code in 400..599) r.code else 200
+        return WebResourceResponse(mime, if (isHtml) "utf-8" else charset.name(), status, "OK", emptyMap(), ByteArrayInputStream(body))
     }
 
     private fun injectAgent(html: String): String {

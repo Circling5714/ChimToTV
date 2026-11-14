@@ -9,6 +9,7 @@ class App : Application() {
         Prefs.init(this)
         Prefs.applyNetDefaults()
         Privacy.init(this)
+        WebFetch.init(this) // đọc hộ trang bật chống bot của Cloudflare
         AppProxy.apply()
         ImageLoader.init(this)
         ImdbTop.cacheDir = cacheDir

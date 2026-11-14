@@ -245,7 +245,8 @@ object Updater {
 
     /** Ghi chú phát hành (markdown) → vài dòng chữ thường cho hộp thoại; có mục "Có gì mới" thì chỉ lấy mục đó. */
     private fun summary(notes: String): String {
-        val lines = notes.lines().map { it.trim() }
+        // Ghi chú lỡ lưu kèm BOM (Windows 1.16, 14/11/2026) thì dòng «## Có gì mới» không bắt đầu bằng '#'
+        val lines = notes.removePrefix("﻿").lines().map { it.trim() }
         val start = lines.indexOfFirst { it.startsWith("#") && it.contains("Có gì mới", ignoreCase = true) }
         val section = if (start >= 0) lines.drop(start + 1).takeWhile { !it.startsWith("## ") } else lines
         return section
